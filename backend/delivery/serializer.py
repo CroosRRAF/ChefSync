@@ -1,6 +1,5 @@
 from rest_framework import serializers
-from .models import Delivery, DeliveryNotification
-from orders.models import Order  # adjust import if needed
+from .models import Delivery, DeliveryNotification, Order
 
 class DeliverySerializer(serializers.ModelSerializer):
     order_id = serializers.IntegerField(source='order.id', read_only=True)
