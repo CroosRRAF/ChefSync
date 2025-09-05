@@ -4,6 +4,9 @@ import App from "./App.tsx";
 import "./index.css";
 import { suppressKnownWarnings } from "./utils/consoleUtils";
 
+// Debug Google OAuth environment
+import "./debug-google-oauth.ts";
+
 // Clean up known console warnings in development
 suppressKnownWarnings();
 

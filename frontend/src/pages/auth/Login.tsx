@@ -60,10 +60,10 @@ const Login: React.FC = () => {
   // Google Login Button
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-        <Card className="shadow-2xl border bg-card/50 backdrop-blur-sm">
-          <CardHeader className="text-center pb-6">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-6">
+      <div className="w-full max-w-lg">
+        <Card className="shadow-lg border bg-card/50 backdrop-blur-sm">
+          <CardHeader className="text-center pb-4">
             <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 rounded-2xl flex items-center justify-center text-primary-foreground font-bold text-2xl mx-auto mb-4 shadow-lg">
               <ChefHat className="w-8 h-8" />
             </div>
@@ -89,7 +89,7 @@ const Login: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium text-foreground">
                   Email Address
@@ -100,7 +100,7 @@ const Login: React.FC = () => {
                     id="email"
                     type="email"
                     placeholder="Enter your email address"
-                    className="pl-10 h-10"
+                    className="pl-10 h-12"
                     {...register('email', {
                       required: 'Email is required',
                       pattern: {
@@ -125,7 +125,7 @@ const Login: React.FC = () => {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
-                    className="pl-10 pr-10 h-10"
+                    className="pl-10 pr-10 h-12"
                     {...register('password', {
                       required: 'Password is required',
                       minLength: {
@@ -174,7 +174,7 @@ const Login: React.FC = () => {
 
               <Button
                 type="submit"
-                className="w-full h-10"
+                className="w-full h-12"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -191,7 +191,7 @@ const Login: React.FC = () => {
               </Button>
             </form>
 
-            <div className="relative mt-4">
+            <div className="relative mt-6">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-border" />
               </div>

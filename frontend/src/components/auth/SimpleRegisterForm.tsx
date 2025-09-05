@@ -13,9 +13,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 
-// Step 1: Name and Email
-const nameEmailSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
+// Step 1: First name and email (progressive flow)
+const emailSchema = z.object({
+  firstName: z.string().min(2, 'First name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
 });
 
@@ -26,7 +26,7 @@ const roleSchema = z.object({
   }),
 });
 
-// Step 3: Password (after email verification)
+// Step 3: Password only (after email verification & role, name already collected)
 const passwordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
@@ -35,7 +35,7 @@ const passwordSchema = z.object({
   path: ["confirmPassword"],
 });
 
-type NameEmailData = z.infer<typeof nameEmailSchema>;
+type EmailData = z.infer<typeof emailSchema>;
 type RoleData = z.infer<typeof roleSchema>;
 type PasswordData = z.infer<typeof passwordSchema>;
 
@@ -47,7 +47,7 @@ const SimpleRegisterForm: React.FC = () => {
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
-  const [userName, setUserName] = useState('');
+  const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [otp, setOtp] = useState('');
@@ -98,9 +98,9 @@ const SimpleRegisterForm: React.FC = () => {
     );
   };
 
-  // Step 1: Name and Email form
-  const nameEmailForm = useForm<NameEmailData>({
-    resolver: zodResolver(nameEmailSchema),
+  // Step 1: Email form
+  const emailForm = useForm<EmailData>({
+    resolver: zodResolver(emailSchema),
   });
 
   // Step 2: Role form
@@ -138,16 +138,34 @@ const SimpleRegisterForm: React.FC = () => {
       const result = await response.json();
       
       if (!response.ok) {
-        // Provide more specific error messages
-        if (response.status === 400) {
-          throw new Error(result.message || result.error || 'Invalid data provided');
-        } else if (response.status === 409) {
-          throw new Error('Email already exists. Please use a different email address.');
-        } else if (response.status === 500) {
-          throw new Error('Server error. Please try again later.');
-        } else {
-          throw new Error(result.message || result.error || 'An unexpected error occurred');
+        // Enhanced error extraction for serializer / field errors
+        let errorMessage = '';
+        if (typeof result === 'object' && result) {
+          // Direct keys like message / error first
+            if (result.message) errorMessage = result.message;
+            else if (result.error) errorMessage = result.error;
+            else {
+              // Accumulate field errors (Django REST serializer style)
+              const collected: string[] = [];
+              for (const key of Object.keys(result)) {
+                const value = (result as any)[key];
+                if (Array.isArray(value)) {
+                  collected.push(`${key}: ${value.join(', ')}`);
+                } else if (typeof value === 'string') {
+                  collected.push(`${key}: ${value}`);
+                }
+              }
+              if (collected.length) errorMessage = collected.join(' | ');
+            }
         }
+        if (response.status === 409 && !errorMessage) {
+          errorMessage = 'Email already exists. Please use a different email address.';
+        } else if (response.status === 500 && !errorMessage) {
+          errorMessage = 'Server error. Please try again later.';
+        } else if (response.status === 400 && !errorMessage) {
+          errorMessage = 'Invalid data provided';
+        }
+        throw new Error(errorMessage || 'An unexpected error occurred');
       }
       
       return result;
@@ -159,19 +177,19 @@ const SimpleRegisterForm: React.FC = () => {
     }
   };
 
-  const handleNameEmailSubmit = async (data: NameEmailData) => {
+  const handleEmailSubmit = async (data: EmailData) => {
     setIsLoading(true);
     try {
       // Send OTP for email verification
       const otpData = {
         email: data.email,
-        name: data.name,
+        name: data.firstName,
         purpose: 'registration'
       };
 
       await apiCall('send-otp/', otpData);
       
-      setUserName(data.name);
+      setFirstName(data.firstName);
       setEmail(data.email);
       setOtpSent(true);
       setOtpTimer(600); // 10 minutes
@@ -181,9 +199,10 @@ const SimpleRegisterForm: React.FC = () => {
         description: `We've sent a 6-digit code to ${data.email}. Please check your inbox and spam folder.`,
       });
     } catch (error: any) {
+      const msg = (error?.message || '').replace(/^email:\s*/i, '').trim();
       toast({
         title: "Unable to Send Code",
-        description: "Please check your email address and try again. If the problem persists, contact support.",
+        description: msg || "Please check your email address and try again. If the problem persists, contact support.",
         variant: "destructive",
       });
     } finally {
@@ -230,12 +249,12 @@ const SimpleRegisterForm: React.FC = () => {
   };
 
   const handlePasswordSubmit = async (data: PasswordData) => {
-    if (!email || !selectedRole || !userName) return;
+    if (!email || !selectedRole || !firstName) return;
     
     setIsLoading(true);
     try {
       const finalData = {
-        name: userName,
+        name: firstName,
         email: email,
         password: data.password,
         confirm_password: data.confirmPassword,
@@ -269,9 +288,10 @@ const SimpleRegisterForm: React.FC = () => {
       }
       
     } catch (error: any) {
+      console.error('❌ Registration failed:', error);
       toast({
         title: "Registration Failed",
-        description: "We couldn't create your account. Please check your information and try again. If the problem persists, contact support.",
+        description: error.message || "We couldn't create your account. Please check your information and try again.",
         variant: "destructive",
       });
     } finally {
@@ -280,13 +300,13 @@ const SimpleRegisterForm: React.FC = () => {
   };
 
   const handleResendOTP = async () => {
-    if (otpTimer > 0 || !email || !userName) return;
+    if (otpTimer > 0 || !email) return;
     
     setIsLoading(true);
     try {
       const otpData = {
         email: email,
-        name: userName,
+        name: firstName,
         purpose: 'registration'
       };
 
@@ -418,7 +438,7 @@ const SimpleRegisterForm: React.FC = () => {
     switch (currentStep) {
       case 1: return otpSent ? 'Verify Your Email' : 'Join ChefSync';
       case 2: return 'Choose Your Role';
-      case 3: return 'Create Password';
+      case 3: return 'Complete Your Profile';
       default: return 'Join ChefSync';
     }
   };
@@ -427,52 +447,47 @@ const SimpleRegisterForm: React.FC = () => {
     switch (currentStep) {
       case 1: return otpSent ? 'Enter the verification code sent to your email' : 'Enter your name and email to get started';
       case 2: return 'Select your role in the ChefSync community';
-      case 3: return 'Create a secure password for your account';
+      case 3: return 'Create a secure password';
       default: return 'Create your account to start your culinary journey';
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-primary/5 p-4 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent"></div>
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
-      
-      <Card className="w-full max-w-2xl mx-auto shadow-2xl border-0 bg-card/80 backdrop-blur-md relative z-10">
-        <CardHeader className="text-center pb-8 pt-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-primary via-primary/90 to-primary/80 rounded-3xl flex items-center justify-center text-primary-foreground font-bold text-2xl mx-auto mb-6 shadow-xl ring-4 ring-primary/20">
-            <ChefHat className="w-10 h-10" />
-          </div>
-          <CardTitle className="text-3xl font-bold text-foreground mb-2">
-            {getStepTitle()}
-          </CardTitle>
-          <CardDescription className="text-muted-foreground text-lg">
-            {getStepDescription()}
-          </CardDescription>
-          
-          {/* Step Indicator */}
+    <Card className="w-full max-w-3xl mx-auto shadow-lg border bg-card/50 backdrop-blur-sm">
+      <CardHeader className="text-center pb-6 pt-6">
+        <div className="w-20 h-20 bg-gradient-to-br from-primary via-primary/90 to-primary/80 rounded-3xl flex items-center justify-center text-primary-foreground font-bold text-2xl mx-auto mb-5 shadow-xl ring-4 ring-primary/20">
+          <ChefHat className="w-10 h-10" />
+        </div>
+        <CardTitle className="text-3xl font-bold text-foreground mb-1">
+          {getStepTitle()}
+        </CardTitle>
+        <CardDescription className="text-muted-foreground text-base">
+          {getStepDescription()}
+        </CardDescription>
+        {/* Step Indicator */}
+        <div className="mt-4">
           <StepIndicator />
-        </CardHeader>
+        </div>
+      </CardHeader>
 
       <CardContent>
         {currentStep === 1 && !otpSent && (
-          <form onSubmit={nameEmailForm.handleSubmit(handleNameEmailSubmit)} className="space-y-6">
+          <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-6">
             <div className="space-y-3">
-              <Label htmlFor="name" className="text-sm font-semibold text-foreground">
-                Full Name
+              <Label htmlFor="firstName" className="text-sm font-semibold text-foreground">
+                First Name
               </Label>
               <div className="relative group">
                 <User className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
-                  id="name"
-                  placeholder="Enter your full name"
+                  id="firstName"
+                  placeholder="Enter your first name"
                   className="pl-12 h-12 text-base border-2 focus:border-primary transition-all duration-200 rounded-xl"
-                  {...nameEmailForm.register('name')}
+                  {...emailForm.register('firstName')}
                 />
               </div>
-              {nameEmailForm.formState.errors.name && (
-                <p className="text-sm text-destructive font-medium">{nameEmailForm.formState.errors.name.message}</p>
+              {emailForm.formState.errors.firstName && (
+                <p className="text-sm text-destructive font-medium">{emailForm.formState.errors.firstName.message}</p>
               )}
             </div>
 
@@ -487,11 +502,11 @@ const SimpleRegisterForm: React.FC = () => {
                   type="email"
                   placeholder="Enter your email address"
                   className="pl-12 h-12 text-base border-2 focus:border-primary transition-all duration-200 rounded-xl"
-                  {...nameEmailForm.register('email')}
+                  {...emailForm.register('email')}
                 />
               </div>
-              {nameEmailForm.formState.errors.email && (
-                <p className="text-sm text-destructive font-medium">{nameEmailForm.formState.errors.email.message}</p>
+              {emailForm.formState.errors.email && (
+                <p className="text-sm text-destructive font-medium">{emailForm.formState.errors.email.message}</p>
               )}
             </div>
 
@@ -526,7 +541,7 @@ const SimpleRegisterForm: React.FC = () => {
                 Select Your Role
               </Label>
               <Select onValueChange={(value) => roleForm.setValue('role', value as 'customer' | 'cook' | 'delivery_agent')}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-11">
                   <SelectValue placeholder="Choose your role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -576,6 +591,7 @@ const SimpleRegisterForm: React.FC = () => {
 
         {currentStep === 3 && (
           <form onSubmit={passwordForm.handleSubmit(handlePasswordSubmit)} className="space-y-6">
+            {/* Password */}
             <div className="space-y-3">
               <Label htmlFor="password" className="text-sm font-semibold text-foreground">
                 Password
@@ -602,6 +618,7 @@ const SimpleRegisterForm: React.FC = () => {
               )}
             </div>
 
+            {/* Confirm Password */}
             <div className="space-y-3">
               <Label htmlFor="confirmPassword" className="text-sm font-semibold text-foreground">
                 Confirm Password
@@ -649,7 +666,6 @@ const SimpleRegisterForm: React.FC = () => {
         )}
       </CardContent>
     </Card>
-    </div>
   );
 };
 

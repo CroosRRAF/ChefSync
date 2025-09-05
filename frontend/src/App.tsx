@@ -22,15 +22,12 @@ const queryClient = new QueryClient();
 
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
-  // Temporarily disable Google OAuth until properly configured
-  return false;
-  /*
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
   return clientId && 
          clientId !== 'your-google-client-id' && 
+         clientId !== 'YOUR_NEW_GOOGLE_CLIENT_ID_HERE' &&
          clientId !== '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com' &&
          clientId.includes('.apps.googleusercontent.com');
-  */
 };
 
 const App = () => {

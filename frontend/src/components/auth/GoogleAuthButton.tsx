@@ -3,19 +3,17 @@ import { GoogleLogin } from '@react-oauth/google';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { getRoleBasedPath } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
-  // Temporarily disable Google OAuth until properly configured
-  return false;
-  /*
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
   return clientId && 
          clientId !== 'your-google-client-id' && 
+         clientId !== 'YOUR_NEW_GOOGLE_CLIENT_ID_HERE' &&
          clientId !== '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com' &&
          clientId.includes('.apps.googleusercontent.com');
-  */
 };
 
 interface GoogleAuthButtonProps {
@@ -29,7 +27,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { oauthLogin } = useAuth();
   const isValidClientId = hasValidGoogleClientId();
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
@@ -44,23 +42,9 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
       const data = await res.json();
       
       if (res.ok) {
-        // Store tokens in localStorage
-        localStorage.setItem('chefsync_token', data.access);
-        localStorage.setItem('chefsync_refresh_token', data.refresh);
-        
-        // Update auth context with user data
-        const user = {
-          id: data.user.user_id,
-          email: data.user.email,
-          name: data.user.name,
-          phone: data.user.phone_no,
-          role: data.user.role,
-          avatar: data.user.profile_image,
-          isEmailVerified: data.user.email_verified,
-          createdAt: data.user.created_at,
-          updatedAt: data.user.updated_at
-        };
-        
+        // Set auth context state via oauthLogin helper
+        oauthLogin(data);
+
         toast({ 
           title: `Google ${mode === 'login' ? 'login' : 'registration'} successful!`,
           description: `Welcome, ${data.user.name || data.user.email}!`
@@ -69,8 +53,9 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
         // Call onSuccess callback if provided
         onSuccess?.();
         
-        // Navigate to dashboard or intended page
-        navigate('/');
+        // Role-based redirect
+        const rolePath = getRoleBasedPath(data.user.role);
+        navigate(rolePath, { replace: true, state: { from: 'google_oauth' } });
       } else {
         const errorMessage = data.error || data.detail || 'Authentication failed';
         toast({ 

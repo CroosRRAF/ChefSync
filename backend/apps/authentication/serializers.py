@@ -302,12 +302,17 @@ class CompleteRegistrationSerializer(serializers.ModelSerializer):
         # Check if email is verified (OTP verification completed)
         email = attrs.get('email')
         
-        # Check for existing users with this email OR username
-        if User.objects.filter(email=email).exists():
-            raise serializers.ValidationError("Email already registered")
-            
-        if User.objects.filter(username=email).exists():
-            raise serializers.ValidationError("Username already exists")
+        # Check for existing users with this email
+        existing_user = User.objects.filter(email=email).first()
+        if existing_user:
+            # If user exists and has a password set, they already registered normally
+            if existing_user.has_usable_password():
+                raise serializers.ValidationError("Email already registered. Please sign in instead.")
+            else:
+                # This is likely a Google OAuth user without a password
+                # We should allow them to complete registration by setting a password
+                # But for now, let's inform them to use Google sign-in
+                raise serializers.ValidationError("This email is already registered with Google. Please sign in with Google instead.")
         
         # Verify that OTP was verified for this email
         recent_verified_otp = EmailOTP.objects.filter(
@@ -343,8 +348,17 @@ class CompleteRegistrationSerializer(serializers.ModelSerializer):
         # Store role before creating user since it will be used later
         role = validated_data.get('role')
         
-        # Ensure username is set to email
-        validated_data['username'] = validated_data['email']
+        # Generate a unique username based on email
+        base_username = validated_data['email']
+        username = base_username
+        counter = 1
+        
+        # If username conflicts, try adding numbers until we find a unique one
+        while User.objects.filter(username=username).exists():
+            username = f"{base_username}_{counter}"
+            counter += 1
+        
+        validated_data['username'] = username
         validated_data['email_verified'] = True  # Mark email as verified
         
         # Create user

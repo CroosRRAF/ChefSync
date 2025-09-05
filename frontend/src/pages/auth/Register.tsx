@@ -5,8 +5,8 @@ import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 
 const Register: React.FC = () => {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-6">
+      <div className="w-full max-w-3xl">
         {/* Main Registration Form */}
         <SimpleRegisterForm />
 

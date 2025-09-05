@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import authService from '@/services/authService';
-import { Mail, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import { Mail, AlertCircle, Loader2, CheckCircle, ChefHat } from 'lucide-react';
 
 const schema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -56,15 +56,15 @@ const ForgotPassword: React.FC = () => {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8">
         <div className="w-full max-w-md">
-          <Card className="shadow-food">
-            <CardHeader className="text-center">
+          <Card className="shadow-lg border bg-card/50 backdrop-blur-sm">
+            <CardHeader className="text-center pb-5">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mx-auto mb-4">
                 <CheckCircle className="h-8 w-8" />
               </div>
-              <CardTitle className="text-2xl font-bold text-green-800">Check Your Email</CardTitle>
-              <CardDescription className="text-green-700">
+              <CardTitle className="text-2xl font-bold text-foreground">Check Your Email</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 We've sent a password reset link to <strong>{submittedEmail}</strong>
               </CardDescription>
             </CardHeader>
@@ -84,7 +84,7 @@ const ForgotPassword: React.FC = () => {
             <CardFooter className="text-center">
               <p className="text-sm text-muted-foreground w-full">
                 Remembered your password?{' '}
-                <Link to="/auth/login" className="text-primary hover:text-primary-dark font-medium">
+                <Link to="/auth/login" className="text-primary hover:text-primary/80 font-medium">
                   Back to Sign in
                 </Link>
               </p>
@@ -96,15 +96,15 @@ const ForgotPassword: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8">
       <div className="w-full max-w-md">
-        <Card className="shadow-food">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-2xl mx-auto mb-4">
-              C
+        <Card className="shadow-lg border bg-card/50 backdrop-blur-sm">
+          <CardHeader className="text-center pb-5">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 rounded-2xl flex items-center justify-center text-primary-foreground font-bold text-2xl mx-auto mb-4 shadow-lg">
+              <ChefHat className="w-8 h-8" />
             </div>
-            <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
-            <CardDescription>Enter your email to receive a password reset link.</CardDescription>
+            <CardTitle className="text-2xl font-bold text-foreground">Forgot Password</CardTitle>
+            <CardDescription className="text-muted-foreground">Enter your email to receive a password reset link.</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -115,17 +115,17 @@ const ForgotPassword: React.FC = () => {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="email" type="email" placeholder="you@example.com" className="pl-10" {...register('email')} />
+                  <Input id="email" type="email" placeholder="you@example.com" className="pl-10 h-11" {...register('email')} />
                 </div>
                 {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
               </div>
 
-              <Button type="submit" className="w-full button-gradient-primary" disabled={isLoading}>
+              <Button type="submit" className="w-full h-11" disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending reset link...
@@ -140,7 +140,7 @@ const ForgotPassword: React.FC = () => {
           <CardFooter className="text-center">
             <p className="text-sm text-muted-foreground w-full">
               Remembered your password?{' '}
-              <Link to="/auth/login" className="text-primary hover:text-primary-dark font-medium">
+              <Link to="/auth/login" className="text-primary hover:text-primary/80 font-medium">
                 Back to Sign in
               </Link>
             </p>

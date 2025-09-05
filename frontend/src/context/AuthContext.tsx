@@ -9,6 +9,7 @@ export interface AuthContextType extends AuthState {
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
+  oauthLogin: (data: any) => void; // Google / social login direct state set
 }
 
 // Create the context with undefined as initial value
@@ -69,7 +70,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 }
 
 // Helper function to get role-based path
-function getRoleBasedPath(role: string): string {
+export function getRoleBasedPath(role: string): string {
   switch (role) {
     case 'customer':
       return '/customer/dashboard';
@@ -203,12 +204,36 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     }
   };
 
-  const value = {
+  // Direct state setter for OAuth flows (Google, etc.)
+  const oauthLogin = (data: any) => {
+    if (!data?.access || !data?.user) return;
+
+    // Persist tokens
+    localStorage.setItem('chefsync_token', data.access);
+    if (data.refresh) localStorage.setItem('chefsync_refresh_token', data.refresh);
+
+    const frontendUser: User = {
+      id: data.user.user_id,
+      email: data.user.email,
+      name: data.user.name,
+      phone: data.user.phone_no,
+      role: data.user.role,
+      avatar: data.user.profile_image,
+      isEmailVerified: data.user.email_verified,
+      createdAt: data.user.created_at,
+      updatedAt: data.user.updated_at
+    };
+
+    dispatch({ type: 'SET_USER', payload: { user: frontendUser, token: data.access } });
+  };
+
+  const value: AuthContextType = {
     ...state,
     login,
     register,
     logout,
     refreshToken,
+    oauthLogin,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

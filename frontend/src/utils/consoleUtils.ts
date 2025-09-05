@@ -29,7 +29,10 @@ export const suppressKnownWarnings = () => {
       const message = args.join(' ');
       
       // Filter out -ms-high-contrast deprecation (browser-level, can't be fixed by us)
-      if (message.includes('-ms-high-contrast is in the process of being deprecated')) {
+      if (
+        message.includes('-ms-high-contrast is in the process of being deprecated') ||
+        message.includes('Deprecation') && message.includes('-ms-high-contrast')
+      ) {
         return; // Suppress this browser deprecation warning
       }
       
