@@ -10,6 +10,7 @@ export interface AuthContextType extends AuthState {
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   oauthLogin: (data: any) => void; // Google / social login direct state set
+  updateProfile: (data: { name?: string; phone?: string; address?: string }) => Promise<void>;
 }
 
 // Create the context with undefined as initial value
@@ -31,10 +32,37 @@ type AuthAction =
   | { type: 'CLEAR_USER' }
   | { type: 'SET_TOKEN'; payload: string };
 
+// Secure token storage functions
+const getSecureToken = (): string | null => {
+  try {
+    return localStorage.getItem('chefsync_token');
+  } catch (error) {
+    console.error('Error accessing localStorage:', error);
+    return null;
+  }
+};
+
+const setSecureToken = (token: string): void => {
+  try {
+    localStorage.setItem('chefsync_token', token);
+  } catch (error) {
+    console.error('Error setting token in localStorage:', error);
+  }
+};
+
+const removeSecureToken = (): void => {
+  try {
+    localStorage.removeItem('chefsync_token');
+    localStorage.removeItem('chefsync_refresh_token');
+  } catch (error) {
+    console.error('Error removing tokens from localStorage:', error);
+  }
+};
+
 // Initial state
 const initialState: AuthState = {
   user: null,
-  token: localStorage.getItem('chefsync_token'),
+  token: getSecureToken(),
   isAuthenticated: false,
   isLoading: true,
 };
@@ -53,8 +81,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         isLoading: false,
       };
     case 'CLEAR_USER':
-      localStorage.removeItem('chefsync_token');
-      localStorage.removeItem('chefsync_refresh_token');
+      removeSecureToken();
       return {
         user: null,
         token: null,
@@ -62,7 +89,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         isLoading: false,
       };
     case 'SET_TOKEN':
-      localStorage.setItem('chefsync_token', action.payload);
+      setSecureToken(action.payload);
       return { ...state, token: action.payload };
     default:
       return state;
@@ -91,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('chefsync_token');
+    const token = getSecureToken();
     if (token) {
       validateToken(token);
     } else {
@@ -227,6 +254,31 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     dispatch({ type: 'SET_USER', payload: { user: frontendUser, token: data.access } });
   };
 
+  const updateProfile = async (data: { name?: string; phone?: string; address?: string }) => {
+    if (!state.user) throw new Error('No user logged in');
+    
+    try {
+      // Call the auth service to update profile on backend
+      const response = await authService.updateProfile(data);
+      
+      // Update the user in state with new data
+      const updatedUser: User = {
+        ...state.user,
+        name: data.name || state.user.name,
+        phone: data.phone || state.user.phone,
+        address: data.address || state.user.address
+      };
+      
+      dispatch({ 
+        type: 'SET_USER', 
+        payload: { user: updatedUser, token: state.token! } 
+      });
+    } catch (error) {
+      console.error('Profile update failed:', error);
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     ...state,
     login,
@@ -234,6 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     logout,
     refreshToken,
     oauthLogin,
+    updateProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

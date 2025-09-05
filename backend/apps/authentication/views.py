@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 from django.shortcuts import get_object_or_404
+from django_ratelimit.decorators import ratelimit
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, UserProfileSerializer,
     CustomerSerializer, CookSerializer, DeliveryAgentSerializer,
@@ -37,6 +38,7 @@ from google.auth.exceptions import GoogleAuthError
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@ratelimit(key='ip', rate='10/h', method='POST', block=True)
 def user_registration(request):
     """
     User registration with email verification
@@ -69,6 +71,7 @@ def user_registration(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@ratelimit(key='ip', rate='5/m', method='POST', block=True)
 def user_login(request):
     """
     User login with JWT tokens
@@ -80,21 +83,16 @@ def user_login(request):
         # Reset failed login attempts on successful login
         user.reset_failed_login_attempts()
         
-        # Generate JWT tokens
-        refresh = RefreshToken.for_user(user)
-        access = refresh.access_token
-        
-        # Add custom claims
-        access['user_id'] = user.user_id
-        access['email'] = user.email
-        access['name'] = user.name
+        # Generate JWT tokens using the service
+        from .services.jwt_service import JWTTokenService
+        token_data = JWTTokenService.create_tokens(user, request)
         
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
         
         return Response({
             'message': 'Login successful',
-            'access': str(access),
-            'refresh': str(refresh),
+            'access': token_data['access_token'],
+            'refresh': token_data['refresh_token'],
             'user': UserProfileSerializer(user).data
         }, status=status.HTTP_200_OK)
     
@@ -115,11 +113,15 @@ def user_logout(request):
     User logout and token blacklisting
     """
     try:
-        # Blacklist refresh token
+        # Revoke tokens using the service
+        from .services.jwt_service import JWTTokenService
+        
         refresh_token = request.data.get('refresh')
         if refresh_token:
-            token = RefreshToken(refresh_token)
-            token.blacklist()
+            JWTTokenService.revoke_token(refresh_token, 'refresh')
+        
+        # Revoke all user tokens for security
+        JWTTokenService.revoke_all_user_tokens(request.user)
         
         logout(request)
         return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
@@ -138,18 +140,13 @@ def token_refresh(request):
         if not refresh_token:
             return Response({'error': 'Refresh token required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        token = RefreshToken(refresh_token)
-        access = token.access_token
-        
-        # Add custom claims
-        user = User.objects.get(user_id=access['user_id'])
-        access['user_id'] = user.user_id
-        access['email'] = user.email
-        access['name'] = user.name
+        # Use JWT service to refresh token
+        from .services.jwt_service import JWTTokenService
+        token_data = JWTTokenService.refresh_access_token(refresh_token, request)
         
         return Response({
-            'access': str(access),
-            'refresh': str(token)
+            'access': token_data['access_token'],
+            'refresh': refresh_token  # Keep the same refresh token
         }, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({'error': 'Invalid refresh token'}, status=status.HTTP_400_BAD_REQUEST)
@@ -185,6 +182,7 @@ def verify_email(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@ratelimit(key='ip', rate='3/h', method='POST', block=True)
 def request_password_reset(request):
     """
     Request password reset with OTP
@@ -319,21 +317,16 @@ def google_oauth_login(request):
                     print(f"Profile creation failed: {e}")
                     # Continue without profile creation
             
-            # Generate JWT tokens
-            refresh = RefreshToken.for_user(user)
-            access = refresh.access_token
-            
-            # Add custom claims
-            access['user_id'] = user.user_id
-            access['email'] = user.email
-            access['name'] = user.name
+            # Generate JWT tokens using the service
+            from .services.jwt_service import JWTTokenService
+            token_data = JWTTokenService.create_tokens(user, request)
             
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             
             return Response({
                 'message': 'Google OAuth login successful',
-                'access': str(access),
-                'refresh': str(refresh),
+                'access': token_data['access_token'],
+                'refresh': token_data['refresh_token'],
                 'user': UserProfileSerializer(user).data
             }, status=status.HTTP_200_OK)
             
@@ -520,10 +513,10 @@ def complete_registration(request):
             user.refresh_from_db()
             print(f"✅ User refreshed from database")  # Debug log
             
-            # Generate JWT tokens
+            # Generate JWT tokens using the service
             try:
-                refresh = RefreshToken.for_user(user)
-                access = refresh.access_token
+                from .services.jwt_service import JWTTokenService
+                token_data = JWTTokenService.create_tokens(user, request)
                 print(f"✅ JWT tokens created successfully")  # Debug log
             except Exception as e:
                 print(f"💥 Error creating JWT tokens: {str(e)}")  # Debug log
@@ -541,8 +534,8 @@ def complete_registration(request):
                 'message': 'Registration completed successfully',
                 'user': user_profile_data,
                 'tokens': {
-                    'refresh': str(refresh),
-                    'access': str(access)
+                    'refresh': token_data['refresh_token'],
+                    'access': token_data['access_token']
                 }
             }
             print(f"✅ Response data prepared successfully")  # Debug log
@@ -562,3 +555,80 @@ def complete_registration(request):
             'error': 'Internal server error during registration',
             'message': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_tokens(request):
+    """
+    Get all active tokens for the current user
+    """
+    try:
+        from .services.jwt_service import JWTTokenService
+        tokens = JWTTokenService.get_user_active_tokens(request.user)
+        
+        token_data = []
+        for token in tokens:
+            token_data.append({
+                'id': token.id,
+                'token_type': token.token_type,
+                'issued_at': token.issued_at,
+                'expires_at': token.expires_at,
+                'last_used_at': token.last_used_at,
+                'usage_count': token.usage_count,
+                'ip_address': token.ip_address,
+                'device_info': token.device_info,
+                'is_valid': token.is_valid(),
+            })
+        
+        return Response({
+            'tokens': token_data,
+            'count': len(token_data)
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def revoke_token(request):
+    """
+    Revoke a specific token
+    """
+    try:
+        from .services.jwt_service import JWTTokenService
+        
+        token = request.data.get('token')
+        token_type = request.data.get('token_type', 'refresh')
+        
+        if not token:
+            return Response({'error': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        success = JWTTokenService.revoke_token(token, token_type)
+        
+        if success:
+            return Response({'message': 'Token revoked successfully'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Token not found or already revoked'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def revoke_all_tokens(request):
+    """
+    Revoke all tokens for the current user
+    """
+    try:
+        from .services.jwt_service import JWTTokenService
+        
+        token_type = request.data.get('token_type', 'refresh')  # Only refresh tokens supported
+        revoked_count = JWTTokenService.revoke_all_user_tokens(request.user, token_type)
+        
+        return Response({
+            'message': f'Successfully revoked {revoked_count} tokens',
+            'revoked_count': revoked_count
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

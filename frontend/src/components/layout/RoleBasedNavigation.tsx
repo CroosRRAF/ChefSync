@@ -42,6 +42,7 @@ const RoleBasedNavigation: React.FC = () => {
           { label: 'Kitchen', href: '/cook/kitchen', icon: ChefHat },
           { label: 'Orders', href: '/cook/orders', icon: Package },
           { label: 'Schedule', href: '/cook/schedule', icon: Calendar },
+          { label: 'Profile', href: '/cook/profile', icon: User },
           { label: 'Settings', href: '/cook/settings', icon: Settings },
         ];
       
@@ -51,6 +52,7 @@ const RoleBasedNavigation: React.FC = () => {
           { label: 'Deliveries', href: '/delivery/deliveries', icon: Truck },
           { label: 'Map', href: '/delivery/map', icon: MapPin },
           { label: 'Schedule', href: '/delivery/schedule', icon: Calendar },
+          { label: 'Profile', href: '/delivery/profile', icon: User },
           { label: 'Settings', href: '/delivery/settings', icon: Settings },
         ];
       
@@ -62,6 +64,7 @@ const RoleBasedNavigation: React.FC = () => {
           { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
           { label: 'Reports', href: '/admin/reports', icon: FileText },
           { label: 'Notifications', href: '/admin/notifications', icon: Bell },
+          { label: 'Profile', href: '/admin/profile', icon: User },
           { label: 'Settings', href: '/admin/settings', icon: Settings },
         ];
       

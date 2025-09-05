@@ -9,8 +9,7 @@ from django.utils import timezone
 from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
-from apps.authentication.models import User
-# from apps.authentication.models import JWTToken  # Commented out as JWTToken model doesn't exist
+from apps.authentication.models import User, JWTToken
 
 
 class JWTTokenService:
@@ -36,6 +35,7 @@ class JWTTokenService:
     def create_tokens(cls, user: User, request=None) -> Dict[str, Any]:
         """
         Create access and refresh tokens for a user
+        Only refresh tokens are stored in database for security
         
         Args:
             user: User instance
@@ -48,7 +48,7 @@ class JWTTokenService:
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token
         
-        # Add custom claims
+        # Add custom claims to access token
         access['user_id'] = user.user_id
         access['email'] = user.email
         access['name'] = user.name
@@ -57,19 +57,10 @@ class JWTTokenService:
         # Get client info if request is provided
         client_info = cls.get_client_info(request) if request else {}
         
-        # Calculate expiry times
-        access_expires_at = timezone.now() + timedelta(minutes=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds() / 60)
+        # Calculate refresh token expiry time
         refresh_expires_at = timezone.now() + timedelta(days=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].days)
         
-        # Store tokens in database
-        access_token_record = cls._store_token(
-            user=user,
-            token=str(access),
-            token_type='access',
-            expires_at=access_expires_at,
-            client_info=client_info
-        )
-        
+        # Store ONLY refresh token in database
         refresh_token_record = cls._store_token(
             user=user,
             token=str(refresh),
@@ -81,11 +72,6 @@ class JWTTokenService:
         return {
             'access_token': str(access),
             'refresh_token': str(refresh),
-            'access_token_info': {
-                'id': access_token_record.id,
-                'issued_at': access_token_record.issued_at,
-                'expires_at': access_token_record.expires_at,
-            },
             'refresh_token_info': {
                 'id': refresh_token_record.id,
                 'issued_at': refresh_token_record.issued_at,
@@ -99,10 +85,22 @@ class JWTTokenService:
         """Store token in database"""
         token_hash = cls.generate_token_hash(token)
         
+        # Extract JTI from token
+        try:
+            if token_type == 'access':
+                access_token = AccessToken(token)
+                jti = access_token.get('jti')
+            else:
+                refresh_token = RefreshToken(token)
+                jti = refresh_token.get('jti')
+        except Exception:
+            jti = secrets.token_urlsafe(32)  # Generate random JTI if extraction fails
+        
         return JWTToken.objects.create(
             user=user,
             token_hash=token_hash,
             token_type=token_type,
+            jti=jti,
             expires_at=expires_at,
             ip_address=client_info.get('ip_address'),
             user_agent=client_info.get('user_agent'),
@@ -113,6 +111,8 @@ class JWTTokenService:
     def validate_token(cls, token: str, token_type: str = 'access') -> Tuple[bool, Optional[User], Optional[str]]:
         """
         Validate a JWT token
+        Access tokens: Stateless validation only
+        Refresh tokens: Database validation + usage tracking
         
         Args:
             token: JWT token string
@@ -126,41 +126,58 @@ class JWTTokenService:
             if token_type == 'access':
                 access_token = AccessToken(token)
                 user_id = access_token['user_id']
-            else:
+                
+                # For access tokens: Only stateless validation
+                try:
+                    user = User.objects.get(user_id=user_id)
+                except User.DoesNotExist:
+                    return False, None, "User not found"
+                
+                # Check if user is active
+                if not user.is_active:
+                    return False, None, "User account is disabled"
+                
+                # Access tokens are stateless - no database lookup needed
+                return True, user, None
+                
+            else:  # refresh token
                 refresh_token = RefreshToken(token)
                 user_id = refresh_token['user_id']
-            
-            # Get user
-            try:
-                user = User.objects.get(user_id=user_id)
-            except User.DoesNotExist:
-                return False, None, "User not found"
-            
-            # Check if user is active
-            if not user.is_active:
-                return False, None, "User account is disabled"
-            
-            # Check database token record
-            token_hash = cls.generate_token_hash(token)
-            try:
-                token_record = JWTToken.objects.get(
-                    token_hash=token_hash,
-                    token_type=token_type,
-                    user=user
-                )
-            except JWTToken.DoesNotExist:
-                return False, None, "Token not found in database"
-            
-            # Check if token is valid
-            if not token_record.is_valid():
-                if token_record.is_expired():
-                    return False, None, "Token has expired"
-                elif token_record.is_revoked:
-                    return False, None, "Token has been revoked"
-                elif token_record.is_blacklisted:
-                    return False, None, "Token has been blacklisted"
-            
-            return True, user, None
+                
+                # Get user
+                try:
+                    user = User.objects.get(user_id=user_id)
+                except User.DoesNotExist:
+                    return False, None, "User not found"
+                
+                # Check if user is active
+                if not user.is_active:
+                    return False, None, "User account is disabled"
+                
+                # For refresh tokens: Check database record
+                token_hash = cls.generate_token_hash(token)
+                try:
+                    token_record = JWTToken.objects.get(
+                        token_hash=token_hash,
+                        token_type='refresh',
+                        user=user
+                    )
+                except JWTToken.DoesNotExist:
+                    return False, None, "Refresh token not found in database"
+                
+                # Check if refresh token is valid
+                if not token_record.is_valid():
+                    if token_record.is_expired():
+                        return False, None, "Refresh token has expired"
+                    elif token_record.is_revoked:
+                        return False, None, "Refresh token has been revoked"
+                    elif token_record.is_blacklisted:
+                        return False, None, "Refresh token has been blacklisted"
+                
+                # Mark refresh token as used
+                token_record.mark_as_used()
+                
+                return True, user, None
             
         except TokenError as e:
             return False, None, f"Invalid token: {str(e)}"
@@ -171,15 +188,16 @@ class JWTTokenService:
     def refresh_access_token(cls, refresh_token: str, request=None) -> Dict[str, Any]:
         """
         Refresh access token using refresh token
+        Only refresh tokens are stored in database
         
         Args:
             refresh_token: Refresh token string
             request: Django request object (optional)
             
         Returns:
-            Dict containing new access_token and token_info
+            Dict containing new access_token
         """
-        # Validate refresh token
+        # Validate refresh token (this checks database)
         is_valid, user, error = cls.validate_token(refresh_token, 'refresh')
         if not is_valid:
             raise InvalidToken(error)
@@ -194,47 +212,32 @@ class JWTTokenService:
         access['name'] = user.name
         access['role'] = user.role
         
-        # Get client info if request is provided
-        client_info = cls.get_client_info(request) if request else {}
-        
-        # Calculate expiry time
-        access_expires_at = timezone.now() + timedelta(minutes=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds() / 60)
-        
-        # Store new access token in database
-        access_token_record = cls._store_token(
-            user=user,
-            token=str(access),
-            token_type='access',
-            expires_at=access_expires_at,
-            client_info=client_info
-        )
-        
+        # Access tokens are stateless - no database storage needed
         return {
-            'access_token': str(access),
-            'access_token_info': {
-                'id': access_token_record.id,
-                'issued_at': access_token_record.issued_at,
-                'expires_at': access_token_record.expires_at,
-            }
+            'access_token': str(access)
         }
     
     @classmethod
-    def revoke_token(cls, token: str, token_type: str = 'access') -> bool:
+    def revoke_token(cls, token: str, token_type: str = 'refresh') -> bool:
         """
         Revoke a token
+        Only refresh tokens can be revoked (access tokens are stateless)
         
         Args:
             token: JWT token string
-            token_type: Type of token ('access' or 'refresh')
+            token_type: Type of token (only 'refresh' supported)
             
         Returns:
             True if token was revoked, False otherwise
         """
+        if token_type != 'refresh':
+            return False  # Access tokens are stateless, cannot be revoked individually
+            
         try:
             token_hash = cls.generate_token_hash(token)
             token_record = JWTToken.objects.get(
                 token_hash=token_hash,
-                token_type=token_type
+                token_type='refresh'
             )
             token_record.revoke()
             return True
@@ -245,39 +248,41 @@ class JWTTokenService:
     def revoke_all_user_tokens(cls, user: User, token_type: str = None) -> int:
         """
         Revoke all tokens for a user
+        Only revokes refresh tokens (access tokens are stateless)
         
         Args:
             user: User instance
-            token_type: Type of token to revoke (None for all types)
+            token_type: Type of token to revoke (only 'refresh' or None)
             
         Returns:
             Number of tokens revoked
         """
-        queryset = JWTToken.objects.filter(user=user, is_revoked=False)
-        if token_type:
-            queryset = queryset.filter(token_type=token_type)
-        
-        count = queryset.count()
-        queryset.update(is_revoked=True)
-        return count
+        if token_type and token_type != 'refresh':
+            return 0  # Only refresh tokens can be revoked
+            
+        return JWTToken.revoke_all_user_tokens(user, 'refresh')
     
     @classmethod
-    def blacklist_token(cls, token: str, token_type: str = 'access') -> bool:
+    def blacklist_token(cls, token: str, token_type: str = 'refresh') -> bool:
         """
         Blacklist a token
+        Only refresh tokens can be blacklisted (access tokens are stateless)
         
         Args:
             token: JWT token string
-            token_type: Type of token ('access' or 'refresh')
+            token_type: Type of token (only 'refresh' supported)
             
         Returns:
             True if token was blacklisted, False otherwise
         """
+        if token_type != 'refresh':
+            return False  # Access tokens are stateless, cannot be blacklisted
+            
         try:
             token_hash = cls.generate_token_hash(token)
             token_record = JWTToken.objects.get(
                 token_hash=token_hash,
-                token_type=token_type
+                token_type='refresh'
             )
             token_record.blacklist()
             return True
@@ -292,51 +297,52 @@ class JWTTokenService:
         Returns:
             Number of tokens cleaned up
         """
-        expired_tokens = JWTToken.objects.filter(expires_at__lt=timezone.now())
-        count = expired_tokens.count()
-        expired_tokens.delete()
-        return count
+        return JWTToken.cleanup_expired_tokens()
     
     @classmethod
     def get_user_active_tokens(cls, user: User, token_type: str = None) -> list:
         """
         Get all active tokens for a user
+        Only returns refresh tokens (access tokens are stateless)
         
         Args:
             user: User instance
-            token_type: Type of token (None for all types)
+            token_type: Type of token (only 'refresh' or None)
             
         Returns:
-            List of active token records
+            List of active refresh token records
         """
         queryset = JWTToken.objects.filter(
             user=user,
+            token_type='refresh',  # Only refresh tokens are stored
             is_revoked=False,
             is_blacklisted=False,
             expires_at__gt=timezone.now()
         )
-        if token_type:
-            queryset = queryset.filter(token_type=token_type)
         
         return list(queryset.order_by('-issued_at'))
     
     @classmethod
-    def get_token_info(cls, token: str, token_type: str = 'access') -> Optional[Dict[str, Any]]:
+    def get_token_info(cls, token: str, token_type: str = 'refresh') -> Optional[Dict[str, Any]]:
         """
         Get token information from database
+        Only works for refresh tokens (access tokens are stateless)
         
         Args:
             token: JWT token string
-            token_type: Type of token ('access' or 'refresh')
+            token_type: Type of token (only 'refresh' supported)
             
         Returns:
             Token information dict or None if not found
         """
+        if token_type != 'refresh':
+            return None  # Access tokens are stateless, no database info
+            
         try:
             token_hash = cls.generate_token_hash(token)
             token_record = JWTToken.objects.get(
                 token_hash=token_hash,
-                token_type=token_type
+                token_type='refresh'
             )
             
             return {
@@ -352,6 +358,8 @@ class JWTTokenService:
                 'is_valid': token_record.is_valid(),
                 'ip_address': token_record.ip_address,
                 'device_info': token_record.device_info,
+                'last_used_at': token_record.last_used_at,
+                'usage_count': token_record.usage_count,
             }
         except JWTToken.DoesNotExist:
             return None

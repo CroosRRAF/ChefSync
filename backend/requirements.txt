@@ -12,3 +12,5 @@ PyJWT==2.10.1
 asgiref==3.9.1
 sqlparse==0.5.3
 tzdata==2025.2
+django-ratelimit==4.1.0
+django-security==0.12.0

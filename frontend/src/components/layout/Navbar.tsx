@@ -58,7 +58,7 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
       case 'delivery_agent':
         return '/delivery/dashboard';
       default:
-        return '/customer/profile';
+        return '/customer/dashboard';
     }
   };
 
@@ -165,8 +165,12 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigate(getRoleBasedDashboard())}
                     className="flex items-center space-x-1"
+                    onClick={() => {
+                      if (user?.role === 'customer') {
+                        navigate('/customer/dashboard');
+                      }
+                    }}
                   >
                     <User className="h-4 w-4" />
                     <span className="text-sm">{user?.name}</span>
@@ -240,7 +244,14 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
                   <div className="mt-auto space-y-4 pt-6 border-t">
                     {isAuthenticated ? (
                       <>
-                        <div className="flex items-center space-x-3 p-3 bg-muted rounded-lg">
+                        <div 
+                          className="flex items-center space-x-3 p-3 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition-colors"
+                          onClick={() => {
+                            if (user?.role === 'customer') {
+                              navigate('/customer/dashboard');
+                            }
+                          }}
+                        >
                           <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-primary-foreground">
                             {user?.name?.charAt(0).toUpperCase()}
                           </div>
@@ -250,14 +261,6 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
                           </div>
                         </div>
                         
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={() => navigate(getRoleBasedDashboard())}
-                        >
-                          <Settings className="h-4 w-4 mr-2" />
-                          Dashboard
-                        </Button>
                         
                         <Button
                           variant="ghost"

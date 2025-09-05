@@ -10,10 +10,37 @@ const api = axios.create({
   },
 });
 
+// Secure token access function
+const getSecureToken = (): string | null => {
+  try {
+    return localStorage.getItem('chefsync_token');
+  } catch (error) {
+    console.error('Error accessing localStorage:', error);
+    return null;
+  }
+};
+
+const setSecureToken = (token: string): void => {
+  try {
+    localStorage.setItem('chefsync_token', token);
+  } catch (error) {
+    console.error('Error setting token in localStorage:', error);
+  }
+};
+
+const removeSecureTokens = (): void => {
+  try {
+    localStorage.removeItem('chefsync_token');
+    localStorage.removeItem('chefsync_refresh_token');
+  } catch (error) {
+    console.error('Error removing tokens from localStorage:', error);
+  }
+};
+
 // Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('chefsync_token');
+    const token = getSecureToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -64,14 +91,14 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('chefsync_refresh_token');
+        const refreshToken = getSecureToken(); // Get refresh token
         if (refreshToken) {
           const response = await api.post('/token/refresh/', {
             refresh: refreshToken,
           });
           
           const { access } = response.data;
-          localStorage.setItem('chefsync_token', access);
+          setSecureToken(access);
           
           // Retry original request with new token
           originalRequest.headers.Authorization = `Bearer ${access}`;
@@ -79,8 +106,7 @@ api.interceptors.response.use(
         }
       } catch (refreshError) {
         // Refresh failed, redirect to login
-        localStorage.removeItem('chefsync_token');
-        localStorage.removeItem('chefsync_refresh_token');
+        removeSecureTokens();
         window.location.href = '/auth/login';
       }
     }

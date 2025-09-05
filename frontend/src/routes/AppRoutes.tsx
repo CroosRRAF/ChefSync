@@ -1,6 +1,8 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { AuthProvider } from '@/context/AuthContext';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Layout components
 import Navbar from '@/components/layout/Navbar';
@@ -19,8 +21,7 @@ import ForgotPassword from '@/pages/auth/ForgotPassword';
 import VerifyEmail from '@/pages/auth/VerifyEmail';
 import ResetPassword from '@/pages/auth/ResetPassword';
 
-// Profile page
-import Profile from '@/pages/Profile';
+// Profile page - removed old generic profile, now using role-specific profiles
 
 // Role-based pages
 import CustomerDashboard from '@/pages/customer/Dashboard';
@@ -35,18 +36,34 @@ import AdminAnalytics from '@/pages/admin/Analytics';
 import AdminSettings from '@/pages/admin/Settings';
 import AdminNotifications from '@/pages/admin/Notifications';
 import AdminReports from '@/pages/admin/Reports';
+import AdminProfile from '@/pages/admin/Profile';
 
 import DeliveryDashboard from '@/pages/delivery/Dashboard';
 import DeliveryDeliveries from '@/pages/delivery/Deliveries';
 import DeliveryMap from '@/pages/delivery/Map';
 import DeliverySchedule from '@/pages/delivery/Schedule';
 import DeliverySettings from '@/pages/delivery/Settings';
+import DeliveryProfile from '@/pages/delivery/Profile';
 
 import CookDashboard from '@/pages/cook/Dashboard';
 import CookKitchen from '@/pages/cook/Kitchen';
 import CookOrders from '@/pages/cook/Orders';
 import CookSchedule from '@/pages/cook/Schedule';
 import CookSettings from '@/pages/cook/Settings';
+import CookProfile from '@/pages/cook/Profile';
+
+// Debug pages
+import AuthDebug from '@/pages/debug/AuthDebug';
+
+// Check if we have a valid Google OAuth client ID
+const hasValidGoogleClientId = () => {
+  const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
+  return clientId && 
+         clientId !== 'your-google-client-id' && 
+         clientId !== 'YOUR_NEW_GOOGLE_CLIENT_ID_HERE' &&
+         clientId !== '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com' &&
+         clientId.includes('.apps.googleusercontent.com');
+};
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -94,8 +111,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   return <>{children}</>;
 };
 
-// Main App Routes Component
-const AppRoutes: React.FC = () => {
+// Inner Routes Component that uses useAuth
+const InnerRoutes: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
 
   // Get default route based on user role
@@ -118,41 +135,78 @@ const AppRoutes: React.FC = () => {
 
   return (
     <>
-      <Navbar />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={
-          isAuthenticated && user ? <Navigate to={getDefaultRoute()} replace /> : <Home />
+          isAuthenticated && user && user.role !== 'customer' ? 
+            <Navigate to={getDefaultRoute()} replace /> : 
+            <>
+              <Navbar />
+              <Home />
+            </>
         } />
-        <Route path="/menu" element={<Menu />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/contact" element={<Contact />} />
+        <Route path="/menu" element={
+          <>
+            <Navbar />
+            <Menu />
+          </>
+        } />
+        <Route path="/about" element={
+          <>
+            <Navbar />
+            <About />
+          </>
+        } />
+        <Route path="/contact" element={
+          <>
+            <Navbar />
+            <Contact />
+          </>
+        } />
         
         {/* Authentication Routes */}
         <Route path="/auth/login" element={
           <ProtectedRoute requireAuth={false}>
-            {isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : <Login />}
+            {isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : 
+              <>
+                <Navbar />
+                <Login />
+              </>
+            }
           </ProtectedRoute>
         } />
         <Route path="/auth/register" element={
           <ProtectedRoute requireAuth={false}>
-            {isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : <Register />}
+            {isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : 
+              <>
+                <Navbar />
+                <Register />
+              </>
+            }
           </ProtectedRoute>
         } />
         <Route path="/auth/forgot-password" element={
           <ProtectedRoute requireAuth={false}>
-            <ForgotPassword />
+            <>
+              <Navbar />
+              <ForgotPassword />
+            </>
           </ProtectedRoute>
         } />
-        <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={
+          <>
+            <Navbar />
+            <VerifyEmail />
+          </>
+        } />
+        <Route path="/reset-password" element={
+          <>
+            <Navbar />
+            <ResetPassword />
+          </>
+        } />
         
-        {/* Profile Route */}
-        <Route path="/profile" element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } />
+        {/* Profile Route - removed old generic profile route, now using role-specific profiles */}
 
         {/* General Dashboard Route - Redirects to role-specific dashboard */}
         <Route path="/dashboard" element={
@@ -167,24 +221,44 @@ const AppRoutes: React.FC = () => {
             <Navigate to="/customer/dashboard" replace />
           </ProtectedRoute>
         } />
+        <Route path="/customer/home" element={
+          <ProtectedRoute allowedRoles={['customer']}>
+            <>
+              <Navbar />
+              <CustomerDashboard />
+            </>
+          </ProtectedRoute>
+        } />
         <Route path="/customer/dashboard" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <CustomerDashboard />
+            <>
+              <Navbar />
+              <CustomerDashboard />
+            </>
           </ProtectedRoute>
         } />
         <Route path="/customer/orders" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <CustomerOrders />
+            <>
+              <Navbar />
+              <CustomerOrders />
+            </>
           </ProtectedRoute>
         } />
         <Route path="/customer/profile" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <CustomerProfile />
+            <>
+              <Navbar />
+              <CustomerProfile />
+            </>
           </ProtectedRoute>
         } />
         <Route path="/customer/settings" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <CustomerSettings />
+            <>
+              <Navbar />
+              <CustomerSettings />
+            </>
           </ProtectedRoute>
         } />
 
@@ -229,6 +303,11 @@ const AppRoutes: React.FC = () => {
             <AdminReports />
           </ProtectedRoute>
         } />
+        <Route path="/admin/profile" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminProfile />
+          </ProtectedRoute>
+        } />
 
         {/* Cook Routes */}
         <Route path="/cook" element={
@@ -259,6 +338,11 @@ const AppRoutes: React.FC = () => {
         <Route path="/cook/settings" element={
           <ProtectedRoute allowedRoles={['cook']}>
             <CookSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/cook/profile" element={
+          <ProtectedRoute allowedRoles={['cook']}>
+            <CookProfile />
           </ProtectedRoute>
         } />
 
@@ -293,11 +377,44 @@ const AppRoutes: React.FC = () => {
             <DeliverySettings />
           </ProtectedRoute>
         } />
+        <Route path="/delivery/profile" element={
+          <ProtectedRoute allowedRoles={['delivery_agent']}>
+            <DeliveryProfile />
+          </ProtectedRoute>
+        } />
+
+        {/* Debug Routes */}
+        <Route path="/debug/auth" element={<AuthDebug />} />
 
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
+  );
+};
+
+// Main App Routes Component
+const AppRoutes: React.FC = () => {
+  const googleClientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
+  const isValidClientId = hasValidGoogleClientId();
+
+  return (
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
+      <AuthProvider>
+        {isValidClientId ? (
+          <GoogleOAuthProvider clientId={googleClientId}>
+            <InnerRoutes />
+          </GoogleOAuthProvider>
+        ) : (
+          <InnerRoutes />
+        )}
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 

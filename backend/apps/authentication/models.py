@@ -219,3 +219,103 @@ class EmailOTP(models.Model):
     def __str__(self):
         return f"OTP for {self.email} - {self.purpose}"
 
+
+class JWTToken(models.Model):
+    """
+    Model to store JWT tokens in database for enhanced security
+    """
+    TOKEN_TYPES = [
+        ('access', 'Access Token'),
+        ('refresh', 'Refresh Token'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='jwt_tokens')
+    token_hash = models.CharField(max_length=64, unique=True, help_text="SHA-256 hash of the token")
+    token_type = models.CharField(max_length=10, choices=TOKEN_TYPES)
+    jti = models.CharField(max_length=255, unique=True, help_text="JWT ID from token payload")
+    
+    # Token metadata
+    issued_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    
+    # Security tracking
+    is_revoked = models.BooleanField(default=False)
+    is_blacklisted = models.BooleanField(default=False)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    blacklisted_at = models.DateTimeField(null=True, blank=True)
+    
+    # Client information for security monitoring
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+    device_info = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Additional security fields
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    usage_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = 'jwt_tokens'
+        ordering = ['-issued_at']
+        indexes = [
+            models.Index(fields=['user', 'token_type']),
+            models.Index(fields=['token_hash']),
+            models.Index(fields=['jti']),
+            models.Index(fields=['expires_at']),
+            models.Index(fields=['is_revoked', 'is_blacklisted']),
+        ]
+
+    def __str__(self):
+        return f"{self.token_type.title()} token for {self.user.email}"
+
+    def is_valid(self):
+        """Check if token is valid (not expired, revoked, or blacklisted)"""
+        now = timezone.now()
+        return (
+            not self.is_revoked and 
+            not self.is_blacklisted and 
+            now < self.expires_at
+        )
+
+    def is_expired(self):
+        """Check if token has expired"""
+        return timezone.now() >= self.expires_at
+
+    def revoke(self):
+        """Revoke the token"""
+        self.is_revoked = True
+        self.revoked_at = timezone.now()
+        self.save()
+
+    def blacklist(self):
+        """Blacklist the token"""
+        self.is_blacklisted = True
+        self.blacklisted_at = timezone.now()
+        self.save()
+
+    def mark_as_used(self):
+        """Mark token as used (update last_used_at and increment usage_count)"""
+        self.last_used_at = timezone.now()
+        self.usage_count += 1
+        self.save(update_fields=['last_used_at', 'usage_count'])
+
+    @classmethod
+    def cleanup_expired_tokens(cls):
+        """Clean up expired tokens from database"""
+        expired_tokens = cls.objects.filter(expires_at__lt=timezone.now())
+        count = expired_tokens.count()
+        expired_tokens.delete()
+        return count
+
+    @classmethod
+    def revoke_all_user_tokens(cls, user, token_type=None):
+        """Revoke all tokens for a user"""
+        queryset = cls.objects.filter(user=user, is_revoked=False)
+        if token_type:
+            queryset = queryset.filter(token_type=token_type)
+        
+        count = queryset.count()
+        queryset.update(
+            is_revoked=True,
+            revoked_at=timezone.now()
+        )
+        return count

@@ -39,4 +39,9 @@ urlpatterns = [
     path('send-otp/', views.send_otp, name='send_otp'),
     path('verify-otp/', views.verify_otp, name='verify_otp'),
     path('complete-registration/', views.complete_registration, name='complete_registration'),
+    
+    # Token Management endpoints
+    path('tokens/', views.user_tokens, name='user_tokens'),
+    path('tokens/revoke/', views.revoke_token, name='revoke_token'),
+    path('tokens/revoke-all/', views.revoke_all_tokens, name='revoke_all_tokens'),
 ]
