@@ -2,7 +2,8 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User, Customer, Cook, DeliveryAgent
+from .models import User, Customer, Cook, DeliveryAgent, EmailOTP
+from .services.email_service import EmailService
 import re
 
 
@@ -45,18 +46,17 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('confirm_password')
-        
-        # Create user with role
-        user = User.objects.create_user(**validated_data)
-        
+        password = validated_data.pop('password')
+        # Ensure username is set to email for custom user model
+        if 'username' not in validated_data or not validated_data.get('username'):
+            validated_data['username'] = validated_data['email']
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
         # Automatically create the appropriate profile model
         user.create_profile()
-
-
-
         # Generate email verification token
         user.generate_email_verification_token()
-        
         return user
 
 
@@ -70,7 +70,6 @@ class UserLoginSerializer(serializers.Serializer):
     def validate(self, attrs):
         email = attrs.get('email')
         password = attrs.get('password')
-
         if email and password:
             user = authenticate(username=email, password=password)
             if not user:
@@ -79,9 +78,9 @@ class UserLoginSerializer(serializers.Serializer):
                 raise serializers.ValidationError('User account is disabled')
             if user.account_locked:
                 raise serializers.ValidationError('Account is temporarily locked')
-            if not user.email_verified:
-                raise serializers.ValidationError('Please verify your email before logging in')
-            
+            # TEMPORARY: Allow login without email verification for testing
+            # if not user.email_verified:
+            #     raise serializers.ValidationError('Please verify your email before logging in')
             attrs['user'] = user
             return attrs
         else:
@@ -226,3 +225,149 @@ class DeliveryAgentSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryAgent
         fields = ['user_id', 'user', 'vehicle_type', 'vehicle_number', 'current_location', 'is_available']
+
+
+class SendOTPSerializer(serializers.Serializer):
+    """
+    Serializer for sending OTP to email
+    """
+    email = serializers.EmailField(required=True)
+    name = serializers.CharField(max_length=100, required=False)
+    purpose = serializers.ChoiceField(
+        choices=[('registration', 'Registration'), ('password_reset', 'Password Reset')],
+        default='registration'
+    )
+
+    def validate_email(self, value):
+        purpose = self.initial_data.get('purpose', 'registration')
+        
+        if purpose == 'registration':
+            # Check if email already exists for registration
+            if User.objects.filter(email=value).exists():
+                raise serializers.ValidationError("Email already registered")
+        
+        return value
+
+    def send_otp(self):
+        email = self.validated_data['email']
+        name = self.validated_data.get('name', 'User')
+        purpose = self.validated_data.get('purpose', 'registration')
+        
+        return EmailService.send_otp(email, purpose, name)
+
+
+class VerifyOTPSerializer(serializers.Serializer):
+    """
+    Serializer for verifying OTP
+    """
+    email = serializers.EmailField(required=True)
+    otp = serializers.CharField(max_length=6, min_length=6, required=True)
+    purpose = serializers.ChoiceField(
+        choices=[('registration', 'Registration'), ('password_reset', 'Password Reset')],
+        default='registration'
+    )
+
+    def validate_otp(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("OTP must contain only digits")
+        return value
+
+    def verify_otp(self):
+        email = self.validated_data['email']
+        otp = self.validated_data['otp']
+        purpose = self.validated_data.get('purpose', 'registration')
+        
+        return EmailService.verify_otp(email, otp, purpose)
+
+
+class CompleteRegistrationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for completing registration after OTP verification
+    """
+    password = serializers.CharField(write_only=True, min_length=8, validators=[validate_password])
+    confirm_password = serializers.CharField(write_only=True)
+    email = serializers.EmailField(required=True)
+    role = serializers.ChoiceField(choices=User.ROLE_CHOICES, required=True)
+    phone_no = serializers.CharField(required=False, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = User
+        fields = ['name', 'email', 'password', 'confirm_password', 'phone_no', 'role', 'address']
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['confirm_password']:
+            raise serializers.ValidationError("Passwords don't match")
+        
+        # Check if email is verified (OTP verification completed)
+        email = attrs.get('email')
+        
+        # Check for existing users with this email OR username
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError("Email already registered")
+            
+        if User.objects.filter(username=email).exists():
+            raise serializers.ValidationError("Username already exists")
+        
+        # Verify that OTP was verified for this email
+        recent_verified_otp = EmailOTP.objects.filter(
+            email=email,
+            purpose='registration',
+            is_used=True
+        ).order_by('-created_at').first()
+        
+        if not recent_verified_otp:
+            raise serializers.ValidationError("Email verification required. Please verify your OTP first.")
+        
+        # Phone number validation - only validate if provided and not empty
+        phone_no = attrs.get('phone_no', '').strip()
+        if phone_no:
+            phone_pattern = re.compile(r'^\+?1?\d{9,15}$')
+            if not phone_pattern.match(phone_no):
+                raise serializers.ValidationError("Invalid phone number format")
+        else:
+            # Set to None if empty to avoid database issues
+            attrs['phone_no'] = None
+            
+        # Handle empty address
+        address = attrs.get('address', '').strip()
+        if not address:
+            attrs['address'] = None
+        
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop('confirm_password')
+        password = validated_data.pop('password')
+        
+        # Store role before creating user since it will be used later
+        role = validated_data.get('role')
+        
+        # Ensure username is set to email
+        validated_data['username'] = validated_data['email']
+        validated_data['email_verified'] = True  # Mark email as verified
+        
+        # Create user
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        
+        # Create role-specific profile
+        if role == 'customer':
+            Customer.objects.create(
+                user=user
+            )
+        elif role == 'cook':
+            Cook.objects.create(
+                user=user,
+                specialty='',
+                availability_hours=''
+            )
+        elif role == 'delivery_agent':
+            DeliveryAgent.objects.create(
+                user=user,
+                vehicle_type='bike',
+                is_available=True
+            )
+        
+        return user

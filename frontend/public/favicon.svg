@@ -1,0 +1,25 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="16" fill="#FF6B35"/>
+  
+  <!-- Delivery truck body -->
+  <rect x="6" y="12" width="12" height="8" rx="1" fill="white"/>
+  
+  <!-- Truck cab -->
+  <rect x="18" y="14" width="6" height="6" rx="1" fill="white"/>
+  
+  <!-- Wheels -->
+  <circle cx="10" cy="22" r="2" fill="#333"/>
+  <circle cx="22" cy="22" r="2" fill="#333"/>
+  
+  <!-- Food box on truck -->
+  <rect x="8" y="10" width="4" height="4" fill="#FFD700"/>
+  <rect x="13" y="10" width="4" height="4" fill="#FF6B35"/>
+  
+  <!-- Delivery bag -->
+  <rect x="20" y="12" width="3" height="4" rx="0.5" fill="#8B4513"/>
+  
+  <!-- Steam lines -->
+  <path d="M10 8 Q11 6 12 8 Q13 6 14 8" stroke="white" stroke-width="0.5" fill="none"/>
+  <path d="M14 8 Q15 6 16 8 Q17 6 18 8" stroke="white" stroke-width="0.5" fill="none"/>
+</svg>

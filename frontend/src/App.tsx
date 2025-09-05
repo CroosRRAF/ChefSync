@@ -20,35 +20,66 @@ import ResetPassword from "./pages/auth/ResetPassword";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID}>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Navbar />
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/menu" element={<Menu />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/auth/login" element={<Login />} />
-                <Route path="/auth/register" element={<Register />} />
-                <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-                <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </AuthProvider>
-      </GoogleOAuthProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+// Check if we have a valid Google OAuth client ID
+const hasValidGoogleClientId = () => {
+  // Temporarily disable Google OAuth until properly configured
+  return false;
+  /*
+  const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
+  return clientId && 
+         clientId !== 'your-google-client-id' && 
+         clientId !== '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com' &&
+         clientId.includes('.apps.googleusercontent.com');
+  */
+};
+
+const App = () => {
+  const googleClientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
+  const isValidClientId = hasValidGoogleClientId();
+
+  const appContent = (
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Navbar />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/menu" element={<Menu />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/register" element={<Register />} />
+            <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TooltipProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        {isValidClientId ? (
+          <GoogleOAuthProvider clientId={googleClientId}>
+            {appContent}
+          </GoogleOAuthProvider>
+        ) : (
+          appContent
+        )}
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

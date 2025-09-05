@@ -24,6 +24,36 @@ api.interceptors.request.use(
   }
 );
 
+// Helper function to format error messages
+const formatErrorMessage = (error: any): string => {
+  if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+    return '🔌 Connection Error: Backend server is not running. Please start the backend server at http://127.0.0.1:8000';
+  }
+  
+  if (error.code === 'ECONNREFUSED') {
+    return '🚫 Server Unavailable: Cannot connect to backend server. Make sure Django server is running.';
+  }
+  
+  if (error.response?.data) {
+    const data = error.response.data;
+    if (typeof data === 'string') return data;
+    if (data.error) return data.error;
+    if (data.detail) return data.detail;
+    if (data.non_field_errors) return data.non_field_errors.join(', ');
+    if (data.message) return data.message;
+    
+    // Handle field-specific errors
+    const fieldErrors = Object.entries(data)
+      .filter(([key, value]) => Array.isArray(value))
+      .map(([key, value]) => `${key}: ${(value as string[]).join(', ')}`)
+      .join('; ');
+    
+    if (fieldErrors) return fieldErrors;
+  }
+  
+  return error.message || 'An unexpected error occurred';
+};
+
 // Add response interceptor to handle token refresh
 api.interceptors.response.use(
   (response) => response,
@@ -121,19 +151,43 @@ export interface GoogleOAuthData {
 }
 
 class AuthService {
+  // Check if backend server is running
+  async checkServerStatus(): Promise<boolean> {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/auth/health/', {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Backend server check failed:', error);
+      return false;
+    }
+  }
+
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/login/', credentials);
-    
-    // Store tokens
-    localStorage.setItem('chefsync_token', response.data.access);
-    localStorage.setItem('chefsync_refresh_token', response.data.refresh);
-    
-    return response.data;
+    try {
+      const response = await api.post<AuthResponse>('/login/', credentials);
+      
+      // Store tokens
+      localStorage.setItem('chefsync_token', response.data.access);
+      localStorage.setItem('chefsync_refresh_token', response.data.refresh);
+      
+      return response.data;
+    } catch (error: any) {
+      const formattedError = formatErrorMessage(error);
+      throw new Error(formattedError);
+    }
   }
 
   async register(data: RegisterData): Promise<RegisterResponse> {
-    const response = await api.post<RegisterResponse>('/register/', data);
-    return response.data;
+    try {
+      const response = await api.post<RegisterResponse>('/register/', data);
+      return response.data;
+    } catch (error: any) {
+      const formattedError = formatErrorMessage(error);
+      throw new Error(formattedError);
+    }
   }
 
   async logout(): Promise<void> {

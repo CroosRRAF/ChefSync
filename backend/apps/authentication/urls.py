@@ -4,6 +4,9 @@ from . import views
 app_name = 'authentication'
 
 urlpatterns = [
+    # Health Check
+    path('health/', views.health_check, name='health_check'),
+    
     # Basic Authentication
     path('register/', views.user_registration, name='register'),
     path('login/', views.user_login, name='login'),
@@ -31,4 +34,9 @@ urlpatterns = [
     path('customer/create/', views.create_customer_profile, name='create_customer'),
     path('cook/create/', views.create_cook_profile, name='create_cook'),
     path('delivery-agent/create/', views.create_delivery_agent_profile, name='create_delivery_agent'),
+    
+    # OTP Verification for Registration
+    path('send-otp/', views.send_otp, name='send_otp'),
+    path('verify-otp/', views.verify_otp, name='verify_otp'),
+    path('complete-registration/', views.complete_registration, name='complete_registration'),
 ]

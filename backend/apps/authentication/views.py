@@ -13,10 +13,22 @@ from .serializers import (
     CustomerSerializer, CookSerializer, DeliveryAgentSerializer,
     PasswordChangeSerializer, EmailVerificationSerializer,
     PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
-    GoogleOAuthSerializer, JWTTokenSerializer
+    GoogleOAuthSerializer, JWTTokenSerializer,
+    SendOTPSerializer, VerifyOTPSerializer, CompleteRegistrationSerializer
 )
 from .models import User, Customer, Cook, DeliveryAgent
 import json
+
+# Health Check Endpoint
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+    """Simple health check endpoint to verify server is running"""
+    return Response({
+        'status': 'healthy',
+        'timestamp': timezone.now(),
+        'message': 'ChefSync API is running'
+    }, status=status.HTTP_200_OK)
 import requests
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -413,3 +425,116 @@ def create_delivery_agent_profile(request):
             'delivery_agent': DeliveryAgentSerializer(delivery_agent).data
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_otp(request):
+    """
+    Send OTP to email for verification
+    """
+    serializer = SendOTPSerializer(data=request.data)
+    if serializer.is_valid():
+        result = serializer.send_otp()
+        if result['success']:
+            return Response({
+                'message': result['message'],
+                'success': True
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'message': result['message'],
+                'success': False
+            }, status=status.HTTP_400_BAD_REQUEST)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp(request):
+    """
+    Verify OTP for email verification
+    """
+    print(f"🔍 OTP Verification Request: {request.data}")  # Debug log
+    serializer = VerifyOTPSerializer(data=request.data)
+    if serializer.is_valid():
+        print(f"✅ Serializer validation passed")  # Debug log
+        result = serializer.verify_otp()
+        print(f"🔍 OTP verification result: {result}")  # Debug log
+        if result['success']:
+            return Response({
+                'message': result['message'],
+                'success': True
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'message': result['message'],
+                'success': False
+            }, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        print(f"❌ Serializer validation failed: {serializer.errors}")  # Debug log
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def complete_registration(request):
+    """
+    Complete user registration after OTP verification
+    """
+    print(f"🔍 Complete Registration Request: {request.data}")  # Debug log
+    
+    try:
+        serializer = CompleteRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            print(f"✅ Serializer validation passed")  # Debug log
+            
+            user = serializer.save()
+            print(f"✅ User created successfully: {user.email}")  # Debug log
+            
+            # Refresh user from database to ensure all relationships are loaded
+            user.refresh_from_db()
+            print(f"✅ User refreshed from database")  # Debug log
+            
+            # Generate JWT tokens
+            try:
+                refresh = RefreshToken.for_user(user)
+                access = refresh.access_token
+                print(f"✅ JWT tokens created successfully")  # Debug log
+            except Exception as e:
+                print(f"💥 Error creating JWT tokens: {str(e)}")  # Debug log
+                raise
+            
+            # Create user profile data
+            try:
+                user_profile_data = UserProfileSerializer(user).data
+                print(f"✅ User profile serialized successfully")  # Debug log
+            except Exception as e:
+                print(f"💥 Error serializing user profile: {str(e)}")  # Debug log
+                raise
+            
+            response_data = {
+                'message': 'Registration completed successfully',
+                'user': user_profile_data,
+                'tokens': {
+                    'refresh': str(refresh),
+                    'access': str(access)
+                }
+            }
+            print(f"✅ Response data prepared successfully")  # Debug log
+            
+            return Response(response_data, status=status.HTTP_201_CREATED)
+        else:
+            print(f"❌ Serializer validation failed: {serializer.errors}")  # Debug log
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        print(f"💥 Exception in complete_registration: {str(e)}")  # Debug log
+        print(f"💥 Exception type: {type(e).__name__}")  # Debug log
+        import traceback
+        print(f"💥 Traceback: {traceback.format_exc()}")  # Debug log
+        
+        return Response({
+            'error': 'Internal server error during registration',
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

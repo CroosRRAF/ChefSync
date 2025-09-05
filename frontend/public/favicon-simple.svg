@@ -1,0 +1,21 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="16" fill="#FF6B35"/>
+  
+  <!-- Food delivery bag -->
+  <rect x="10" y="8" width="12" height="16" rx="2" fill="white"/>
+  
+  <!-- Bag handles -->
+  <path d="M12 8 Q12 6 14 6 Q16 6 16 8" stroke="white" stroke-width="2" fill="none"/>
+  <path d="M16 8 Q16 6 18 6 Q20 6 20 8" stroke="white" stroke-width="2" fill="none"/>
+  
+  <!-- Food items in bag -->
+  <circle cx="14" cy="14" r="2" fill="#FFD700"/>
+  <circle cx="18" cy="14" r="2" fill="#FF6B35"/>
+  <circle cx="16" cy="18" r="2" fill="#32CD32"/>
+  
+  <!-- Delivery speed lines -->
+  <path d="M4 12 Q6 10 8 12" stroke="white" stroke-width="1" fill="none"/>
+  <path d="M4 16 Q6 14 8 16" stroke="white" stroke-width="1" fill="none"/>
+  <path d="M4 20 Q6 18 8 20" stroke="white" stroke-width="1" fill="none"/>
+</svg>

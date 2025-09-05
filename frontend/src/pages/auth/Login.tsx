@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import GoogleRegisterButton from '@/components/auth/GoogleRegisterButton';
+import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { LoginCredentials } from '@/types/auth';
-import { Eye, EyeOff, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, AlertCircle, Loader2, ChefHat, ArrowRight } from 'lucide-react';
 
 const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -60,37 +60,47 @@ const Login: React.FC = () => {
   // Google Login Button
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
-        <Card className="shadow-food">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-2xl mx-auto mb-4">
-              C
+        <Card className="shadow-2xl border bg-card/50 backdrop-blur-sm">
+          <CardHeader className="text-center pb-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 rounded-2xl flex items-center justify-center text-primary-foreground font-bold text-2xl mx-auto mb-4 shadow-lg">
+              <ChefHat className="w-8 h-8" />
             </div>
-            <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-            <CardDescription>
-              Sign in to your ChefSync account to continue ordering delicious food.
+            <CardTitle className="text-2xl font-bold text-foreground">
+              Welcome Back
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Sign in to your ChefSync account to continue your culinary journey
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
             {errors.root && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{errors.root.message}</AlertDescription>
-              </Alert>
+              <div className="space-y-4">
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="font-medium">Login Failed</div>
+                    <div className="text-sm mt-1">{errors.root.message}</div>
+                  </AlertDescription>
+                </Alert>
+                
+              </div>
             )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email" className="text-sm font-medium text-foreground">
+                  Email Address
+                </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="Enter your email"
-                    className="pl-10"
+                    placeholder="Enter your email address"
+                    className="pl-10 h-10"
                     {...register('email', {
                       required: 'Email is required',
                       pattern: {
@@ -106,14 +116,16 @@ const Login: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-sm font-medium text-foreground">
+                  Password
+                </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
-                    className="pl-10 pr-10"
+                    className="pl-10 pr-10 h-10"
                     {...register('password', {
                       required: 'Password is required',
                       minLength: {
@@ -146,7 +158,7 @@ const Login: React.FC = () => {
                   <input
                     type="checkbox"
                     id="remember"
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                    className="rounded border-input text-primary focus:ring-primary focus:ring-2"
                   />
                   <Label htmlFor="remember" className="text-sm text-muted-foreground">
                     Remember me
@@ -154,7 +166,7 @@ const Login: React.FC = () => {
                 </div>
                 <Link
                   to="/auth/forgot-password"
-                  className="text-sm text-primary hover:text-primary-dark transition-colors"
+                  className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
                 >
                   Forgot password?
                 </Link>
@@ -162,7 +174,7 @@ const Login: React.FC = () => {
 
               <Button
                 type="submit"
-                className="w-full button-gradient-primary"
+                className="w-full h-10"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -171,28 +183,33 @@ const Login: React.FC = () => {
                     Signing In...
                   </>
                 ) : (
-                  'Sign In'
+                  <>
+                    Sign In
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
                 )}
               </Button>
             </form>
 
             <div className="relative mt-4">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="bg-background px-4 text-muted-foreground">Or continue with</span>
               </div>
             </div>
-            <GoogleRegisterButton />
+            <GoogleAuthButton mode="login" />
           </CardContent>
 
-          <CardFooter className="text-center">
+          <CardFooter className="text-center pt-4">
             <p className="text-sm text-muted-foreground">
               Don't have an account?{' '}
               <Link
                 to="/auth/register"
-                className="text-primary hover:text-primary-dark font-medium transition-colors"
+                className="text-primary hover:text-primary/80 font-medium transition-colors"
               >
-                Sign up here
+                Create one here
               </Link>
             </p>
           </CardFooter>

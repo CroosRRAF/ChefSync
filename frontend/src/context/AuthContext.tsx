@@ -1,23 +1,45 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { User, AuthState, LoginCredentials, RegisterData } from '@/types/auth';
 import authService, { AuthResponse } from '@/services/authService';
+import { useNavigate } from 'react-router-dom';
 
-interface AuthContextType extends AuthState {
+// Define the shape of our context
+export interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Create the context with undefined as initial value
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Define the auth hook
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
+// Define action types
 type AuthAction = 
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_USER'; payload: { user: User; token: string } }
   | { type: 'CLEAR_USER' }
   | { type: 'SET_TOKEN'; payload: string };
 
-const authReducer = (state: AuthState, action: AuthAction): AuthState => {
+// Initial state
+const initialState: AuthState = {
+  user: null,
+  token: localStorage.getItem('chefsync_token'),
+  isAuthenticated: false,
+  isLoading: true,
+};
+
+// Reducer function
+function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
@@ -44,23 +66,32 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
     default:
       return state;
   }
-};
+}
 
-const initialState: AuthState = {
-  user: null,
-  token: localStorage.getItem('chefsync_token'),
-  isAuthenticated: false,
-  isLoading: true,
-};
+// Helper function to get role-based path
+function getRoleBasedPath(role: string): string {
+  switch (role) {
+    case 'customer':
+      return '/customer/dashboard';
+    case 'cook':
+      return '/cook/dashboard';
+    case 'delivery_agent':
+      return '/delivery/dashboard';
+    case 'admin':
+      return '/admin/dashboard';
+    default:
+      return '/';
+  }
+}
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+// Provider component
+export function AuthProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is authenticated on app load
     const token = localStorage.getItem('chefsync_token');
     if (token) {
-      // Validate token and get user info
       validateToken(token);
     } else {
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -69,8 +100,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const validateToken = async (token: string) => {
     try {
-      const user = await authService.getProfile();
-      dispatch({ type: 'SET_USER', payload: { user, token } });
+      const response = await authService.getProfile();
+      if (response) {
+        const user: User = {
+          id: response.user_id,
+          email: response.email,
+          name: response.name,
+          phone: response.phone_no,
+          role: response.role,
+          avatar: response.profile_image,
+          isEmailVerified: response.email_verified,
+          createdAt: response.created_at,
+          updatedAt: response.updated_at
+        };
+        dispatch({ type: 'SET_USER', payload: { user, token } });
+      }
     } catch (error) {
       console.error('Token validation failed:', error);
       dispatch({ type: 'CLEAR_USER' });
@@ -81,8 +125,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const response: AuthResponse = await authService.login(credentials);
-      
-      // Convert backend user format to frontend format
+            
       const frontendUser: User = {
         id: response.user.user_id,
         email: response.user.email,
@@ -92,11 +135,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         avatar: response.user.profile_image,
         isEmailVerified: response.user.email_verified,
         createdAt: response.user.created_at,
-        updatedAt: response.user.updated_at,
+        updatedAt: response.user.updated_at
       };
+            
+      // Add a small delay before state update to ensure clean state
+      await new Promise(resolve => setTimeout(resolve, 100));
       
+      // Set both auth context and user store state
       dispatch({ type: 'SET_USER', payload: { user: frontendUser, token: response.access } });
-    } catch (error: any) {
+      
+      // Add another small delay after state update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Get the role-specific dashboard path
+      const dashboardPath = getRoleBasedPath(frontendUser.role);
+      
+      // Force navigate to the dashboard path with state
+      navigate(dashboardPath, { 
+        replace: true,
+        state: { from: 'login' }
+      });
+    } catch (error) {
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;
     }
@@ -105,23 +164,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const register = async (data: RegisterData) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      // Convert frontend format to backend format
       const backendData = {
         name: data.name,
         email: data.email,
         password: data.password,
-        confirm_password: data.password, // Backend expects confirm_password
-        phone_no: data.phone,
-        role: data.role,
-        address: '',
+        confirm_password: data.password,
+        phone_no: data.phone_no,
+        role: data.role || 'customer',
+        address: data.address || ''
       };
-      
+
       await authService.register(backendData);
-      
-      // After successful registration, show message and redirect to login
-      // Don't automatically log in - user needs to verify email first
-      dispatch({ type: 'SET_LOADING', payload: false });
-    } catch (error: any) {
+      await login({ email: data.email, password: data.password });
+    } catch (error) {
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;
     }
@@ -134,38 +189,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Logout error:', error);
     } finally {
       dispatch({ type: 'CLEAR_USER' });
+      navigate('/', { replace: true });
     }
   };
 
   const refreshToken = async () => {
     try {
-      const { access } = await authService.refreshToken();
-      dispatch({ type: 'SET_TOKEN', payload: access });
+      const response = await authService.refreshToken();
+      dispatch({ type: 'SET_TOKEN', payload: response.access });
     } catch (error) {
       console.error('Token refresh failed:', error);
       dispatch({ type: 'CLEAR_USER' });
     }
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        ...state,
-        login,
-        register,
-        logout,
-        refreshToken,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-};
+  const value = {
+    ...state,
+    login,
+    register,
+    logout,
+    refreshToken,
+  };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
