@@ -187,32 +187,30 @@ def verify_email(request):
 @permission_classes([AllowAny])
 def request_password_reset(request):
     """
-    Request password reset
+    Request password reset with OTP
     """
     serializer = PasswordResetRequestSerializer(data=request.data)
     if serializer.is_valid():
         email = serializer.validated_data['email']
         try:
             user = User.objects.get(email=email)
-            # Generate reset token
-            reset_token = user.generate_email_verification_token()
             
-            # Send password reset email
-            reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
-            send_mail(
-                'Password Reset - ChefSync',
-                f'Click the following link to reset your password: {reset_url}',
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                fail_silently=False,
-            )
+            # Send OTP for password reset
+            from .services.email_service import EmailService
+            result = EmailService.send_otp(email, purpose='password_reset', user_name=user.name)
             
-            return Response({
-                'message': 'Password reset email sent'
-            }, status=status.HTTP_200_OK)
+            if result['success']:
+                return Response({
+                    'message': 'Password reset code sent to your email'
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': result['message']
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
         except User.DoesNotExist:
             return Response({
-                'error': 'User not found'
+                'error': 'No account found with this email address'
             }, status=status.HTTP_404_NOT_FOUND)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -222,34 +220,60 @@ def request_password_reset(request):
 @permission_classes([AllowAny])
 def confirm_password_reset(request):
     """
-    Confirm password reset with token
+    Confirm password reset with OTP and set new password
     """
-    serializer = PasswordResetConfirmSerializer(data=request.data)
-    if serializer.is_valid():
-        token = serializer.validated_data['token']
-        new_password = serializer.validated_data['new_password']
-        
-        try:
-            user = User.objects.get(email_verification_token=token)
-            if user.email_verification_expires > timezone.now():
-                user.set_password(new_password)
-                user.email_verification_token = None
-                user.email_verification_expires = None
-                user.save()
-                
-                return Response({
-                    'message': 'Password reset successful'
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({
-                    'error': 'Token expired'
-                }, status=status.HTTP_400_BAD_REQUEST)
-        except User.DoesNotExist:
-            return Response({
-                'error': 'Invalid token'
-            }, status=status.HTTP_400_BAD_REQUEST)
+    data = request.data
+    email = data.get('email')
+    otp = data.get('otp')
+    new_password = data.get('new_password')
+    confirm_password = data.get('confirm_password')
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if not all([email, otp, new_password, confirm_password]):
+        return Response({
+            'error': 'Email, OTP, new password, and confirm password are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    if new_password != confirm_password:
+        return Response({
+            'error': "Passwords don't match"
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validate password strength
+    try:
+        from django.contrib.auth.password_validation import validate_password
+        validate_password(new_password)
+    except Exception as e:
+        return Response({
+            'error': f'Password validation failed: {str(e)}'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Verify OTP
+        from .services.email_service import EmailService
+        result = EmailService.verify_otp(email, otp, purpose='password_reset')
+        
+        if not result['success']:
+            return Response({
+                'error': result['message']
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get user and update password
+        user = User.objects.get(email=email)
+        user.set_password(new_password)
+        user.save()
+        
+        return Response({
+            'message': 'Password reset successful'
+        }, status=status.HTTP_200_OK)
+        
+    except User.DoesNotExist:
+        return Response({
+            'error': 'User not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': f'Password reset failed: {str(e)}'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])

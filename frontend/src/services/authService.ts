@@ -211,7 +211,7 @@ class AuthService {
   }
 
   async requestPasswordReset(data: PasswordResetRequestData): Promise<{ message: string }> {
-    const response = await api.post<{ message: string }>('/password/reset/', data);
+    const response = await api.post<{ message: string }>('/password/reset/request/', data);
     return response.data;
   }
 

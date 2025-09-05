@@ -20,7 +20,7 @@ urlpatterns = [
     
     # Password Management
     path('password/change/', views.change_password, name='change_password'),
-    path('password/reset/', views.request_password_reset, name='request_password_reset'),
+    path('password/reset/request/', views.request_password_reset, name='request_password_reset'),
     path('password/reset/confirm/', views.confirm_password_reset, name='confirm_password_reset'),
     
     # Google OAuth
