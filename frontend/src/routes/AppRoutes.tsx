@@ -52,9 +52,6 @@ import CookSchedule from '@/pages/cook/Schedule';
 import CookSettings from '@/pages/cook/Settings';
 import CookProfile from '@/pages/cook/Profile';
 
-// Debug pages
-import AuthDebug from '@/pages/debug/AuthDebug';
-
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
@@ -382,9 +379,6 @@ const InnerRoutes: React.FC = () => {
             <DeliveryProfile />
           </ProtectedRoute>
         } />
-
-        {/* Debug Routes */}
-        <Route path="/debug/auth" element={<AuthDebug />} />
 
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
