@@ -1,0 +1,16 @@
+Django==5.2.5
+djangorestframework==3.16.1
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.7.0
+django-allauth==65.11.1
+python-decouple==3.8
+mysqlclient==2.2.7
+Pillow==10.4.0
+google-auth==2.40.3
+google-auth-oauthlib==1.2.2
+PyJWT==2.10.1
+asgiref==3.9.1
+sqlparse==0.5.3
+tzdata==2025.2
+django-ratelimit==4.1.0
+django-security==0.12.0
