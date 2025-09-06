@@ -1,9 +1,16 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
+
+router = DefaultRouter()
+router.register(r'users', views.UserViewSet, basename='users')
 
 app_name = 'authentication'
 
 urlpatterns = [
+    # API Router
+    path('', include(router.urls)),
+    
     # Health Check
     path('health/', views.health_check, name='health_check'),
     

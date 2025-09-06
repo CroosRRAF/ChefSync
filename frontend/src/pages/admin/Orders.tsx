@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useUserStore } from '@/store/userStore';
+import { useAuth } from '@/context/AuthContext';
 import { apiClient } from '@/utils/fetcher';
 import { 
   Clock, 
@@ -52,6 +54,17 @@ interface AdminOrder {
 
 const AdminOrders: React.FC = () => {
   const { user } = useUserStore();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Logout handler
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  }, [logout]);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<AdminOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -195,12 +208,34 @@ const AdminOrders: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gradient-primary mb-2">
-          Order Management
-        </h1>
-        <p className="text-muted-foreground">
-          Monitor and manage all system orders
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gradient-primary mb-2">
+              Order Management
+            </h1>
+            <p className="text-muted-foreground">
+              Monitor and manage all system orders
+            </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Button
+              onClick={() => navigate('/admin/dashboard')}
+              variant="outline"
+              className="flex items-center space-x-2"
+            >
+              <i className="bx bx-arrow-back w-4 h-4"></i>
+              <span>Back to Dashboard</span>
+            </Button>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              className="flex items-center space-x-2"
+            >
+              <i className="bx bx-log-out w-4 h-4"></i>
+              <span>Logout</span>
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Stats Cards */}

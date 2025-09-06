@@ -33,4 +33,41 @@ function Badge({ className, variant, ...props }: BadgeProps) {
   )
 }
 
-export { Badge, badgeVariants }
+// StatusBadge component for displaying user status
+interface StatusBadgeProps {
+  status: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
+  const getStatusVariant = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return 'default';
+      case 'inactive':
+        return 'secondary';
+      case 'banned':
+      case 'suspended':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
+  };
+
+  const sizeClasses = {
+    sm: 'text-xs px-1.5 py-0.5',
+    md: 'text-xs px-2.5 py-0.5',
+    lg: 'text-sm px-3 py-1'
+  };
+
+  return (
+    <Badge 
+      variant={getStatusVariant(status)} 
+      className={sizeClasses[size]}
+    >
+      {status || 'Unknown'}
+    </Badge>
+  );
+}
+
+export { Badge, badgeVariants, StatusBadge }

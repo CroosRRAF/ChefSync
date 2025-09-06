@@ -43,6 +43,15 @@ import CookSchedule from '@/pages/cook/Schedule';
 import CookSettings from '@/pages/cook/Settings';
 import CookProfile from '@/pages/cook/Profile';
 
+// Admin pages
+import AdminDashboard from '@/pages/admin/Dashboard';
+import AdminManageUsers from '@/pages/admin/ManageUsers';
+import AdminOrders from '@/pages/admin/Orders';
+import AdminAnalytics from '@/pages/admin/Analytics';
+import AdminSettings from '@/pages/admin/Settings';
+import AdminProfile from '@/pages/admin/Profile';
+import AdminReports from '@/pages/admin/Reports';
+
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
@@ -89,6 +98,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         return <Navigate to="/cook/dashboard" replace />;
       case 'delivery_agent':
         return <Navigate to="/delivery/dashboard" replace />;
+      case 'admin':
+        return <Navigate to="/admin/dashboard" replace />;
       default:
         return <Navigate to="/" replace />;
     }
@@ -112,6 +123,8 @@ const InnerRoutes: React.FC = () => {
         return '/cook/dashboard';
       case 'delivery_agent':
         return '/delivery/dashboard';
+      case 'admin':
+        return '/admin/dashboard';
       default:
         return '/';
     }
@@ -317,6 +330,48 @@ const InnerRoutes: React.FC = () => {
         <Route path="/delivery/profile" element={
           <ProtectedRoute allowedRoles={['delivery_agent']}>
             <DeliveryProfile />
+          </ProtectedRoute>
+        } />
+
+        {/* Admin Routes */}
+        <Route path="/admin" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <Navigate to="/admin/dashboard" replace />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/dashboard" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/users" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminManageUsers />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/orders" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminOrders />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/analytics" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminAnalytics />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/settings" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/profile" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminProfile />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/reports" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminReports />
           </ProtectedRoute>
         } />
 

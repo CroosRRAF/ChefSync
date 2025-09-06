@@ -1,12 +1,43 @@
 
 
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils import timezone
 import datetime
 import random
 import string
 from datetime import timedelta
+
+
+class UserManager(BaseUserManager):
+    """Custom user manager for ChefSync User model"""
+    
+    def create_user(self, email, password=None, **extra_fields):
+        """Create and return a regular user with the given email and password."""
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        """Create and return a superuser with the given email and password."""
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('role', 'admin')
+        
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+        
+        # Use email as username if not provided
+        if not extra_fields.get('username'):
+            extra_fields['username'] = email
+        
+        return self.create_user(email, password, **extra_fields)
 
 
 class User(AbstractUser):
@@ -15,6 +46,7 @@ class User(AbstractUser):
     """
     # Role choices for user types
     ROLE_CHOICES = [
+        ('admin', 'Admin'),
         ('customer', 'Customer'),
         ('cook', 'Cook'),
         ('delivery_agent', 'Delivery Agent'),
@@ -126,8 +158,11 @@ class User(AbstractUser):
         self.account_locked_until = None
         self.save()
 
+    objects = UserManager()
+
     class Meta:
         db_table = 'User'
+
 
 
 class Customer(models.Model):
