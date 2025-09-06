@@ -16,6 +16,7 @@ class User(AbstractUser):
     # Role choices for user types
     ROLE_CHOICES = [
         ('customer', 'Customer'),
+        ('admin', 'Admin'),
         ('cook', 'Cook'),
         ('delivery_agent', 'Delivery Agent'),
     ]
@@ -59,6 +60,7 @@ class User(AbstractUser):
             Cook.objects.get_or_create(user=self)
         elif self.role == 'delivery_agent':
             DeliveryAgent.objects.get_or_create(user=self)
+        # Admin doesn't need a separate profile model
 
     def get_profile(self):
         """Get the user's profile model instance"""
@@ -77,6 +79,8 @@ class User(AbstractUser):
                 return self.deliveryagent
             except DeliveryAgent.DoesNotExist:
                 return None
+        elif self.role == 'admin':
+            return self  # Admin uses the main User model
         return None
 
     def generate_email_verification_token(self):
@@ -125,6 +129,24 @@ class User(AbstractUser):
         self.account_locked = False
         self.account_locked_until = None
         self.save()
+
+    def save(self, *args, **kwargs):
+        """Override save to automatically set staff status based on role"""
+        # Set username to email if not provided
+        if not self.username:
+            self.username = self.email
+        
+        # Set staff status based on role
+        if self.role in ['admin', 'cook', 'delivery_agent']:
+            self.is_staff = True
+            # Set admin as superuser as well
+            if self.role == 'admin':
+                self.is_superuser = True
+        else:  # customer role
+            self.is_staff = False
+            self.is_superuser = False
+        
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'User'

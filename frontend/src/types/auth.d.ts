@@ -3,7 +3,7 @@ export interface User {
   email: string;
   name: string;
   phone?: string;
-  role: 'customer' | 'cook' | 'delivery_agent';
+  role: 'customer' | 'admin' | 'cook' | 'delivery_agent';
   avatar?: string;
   isEmailVerified: boolean;
   createdAt: string;
@@ -59,7 +59,7 @@ export interface BackendUser {
   email: string;
   phone_no?: string;
   address?: string;
-  role: 'customer' | 'cook' | 'delivery_agent';
+  role: 'customer' | 'admin' | 'cook' | 'delivery_agent';
   role_display: string;
   profile_image?: string;
   email_verified: boolean;

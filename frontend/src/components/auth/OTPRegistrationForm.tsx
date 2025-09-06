@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 
 // Step 1: Role and Name Selection
 const step1Schema = z.object({
-  role: z.enum(['customer', 'cook', 'delivery_agent'], {
+  role: z.enum(['customer', 'admin', 'cook', 'delivery_agent'], {
     required_error: 'Please select a role',
   }),
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -276,7 +276,7 @@ const OTPRegistrationForm: React.FC = () => {
               Select Your Role
             </Label>
             <Select 
-              onValueChange={(value) => step1Form.setValue('role', value as 'customer' | 'cook' | 'delivery_agent')}
+              onValueChange={(value) => step1Form.setValue('role', value as 'customer' | 'admin' | 'cook' | 'delivery_agent')}
             >
               <SelectTrigger className="h-12 text-left">
                 <SelectValue placeholder="Choose your role in ChefSync" />
@@ -288,6 +288,15 @@ const OTPRegistrationForm: React.FC = () => {
                     <div className="text-left">
                       <div className="font-medium">Customer</div>
                       <div className="text-sm text-gray-500">Order delicious food from local cooks</div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="admin" className="p-4">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-2xl">👨‍💼</span>
+                    <div className="text-left">
+                      <div className="font-medium">Admin</div>
+                      <div className="text-sm text-gray-500">Manage the platform and oversee operations</div>
                     </div>
                   </div>
                 </SelectItem>

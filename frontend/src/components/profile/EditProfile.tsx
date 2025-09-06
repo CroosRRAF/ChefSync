@@ -17,7 +17,7 @@ const schema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
   phone_no: z.string().optional(),
-  role: z.enum(['customer', 'cook', 'delivery_agent'], {
+  role: z.enum(['customer', 'admin', 'cook', 'delivery_agent'], {
     required_error: 'Please select a role',
   }),
   address: z.string().optional(),
