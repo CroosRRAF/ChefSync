@@ -39,7 +39,7 @@ export const registerSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   confirm_password: z.string().min(1, 'Please confirm your password'),
-  role: z.enum(['customer', 'admin', 'cook', 'delivery_agent'], {
+  role: z.enum(['customer', 'cook', 'delivery_agent'], {
     required_error: 'Please select a role',
   }),
   address: z.string().optional(),

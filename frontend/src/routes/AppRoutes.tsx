@@ -29,15 +29,6 @@ import CustomerOrders from '@/pages/customer/Orders';
 import CustomerProfile from '@/pages/customer/Profile';
 import CustomerSettings from '@/pages/customer/Settings';
 
-import AdminDashboard from '@/pages/admin/Dashboard';
-import AdminManageUsers from '@/pages/admin/ManageUsers';
-import AdminOrders from '@/pages/admin/Orders';
-import AdminAnalytics from '@/pages/admin/Analytics';
-import AdminSettings from '@/pages/admin/Settings';
-import AdminNotifications from '@/pages/admin/Notifications';
-import AdminReports from '@/pages/admin/Reports';
-import AdminProfile from '@/pages/admin/Profile';
-
 import DeliveryDashboard from '@/pages/delivery/Dashboard';
 import DeliveryDeliveries from '@/pages/delivery/Deliveries';
 import DeliveryMap from '@/pages/delivery/Map';
@@ -94,8 +85,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     switch (user.role) {
       case 'customer':
         return <Navigate to="/customer/dashboard" replace />;
-      case 'admin':
-        return <Navigate to="/admin/dashboard" replace />;
       case 'cook':
         return <Navigate to="/cook/dashboard" replace />;
       case 'delivery_agent':
@@ -119,8 +108,6 @@ const InnerRoutes: React.FC = () => {
     switch (user.role) {
       case 'customer':
         return '/customer/dashboard';
-      case 'admin':
-        return '/admin/dashboard';
       case 'cook':
         return '/cook/dashboard';
       case 'delivery_agent':
@@ -256,53 +243,6 @@ const InnerRoutes: React.FC = () => {
               <Navbar />
               <CustomerSettings />
             </>
-          </ProtectedRoute>
-        } />
-
-        {/* Admin Routes */}
-        <Route path="/admin" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <Navigate to="/admin/dashboard" replace />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/dashboard" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/manage-users" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminManageUsers />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/orders" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminOrders />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/analytics" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminAnalytics />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/settings" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminSettings />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/notifications" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminNotifications />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/reports" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminReports />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/profile" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminProfile />
           </ProtectedRoute>
         } />
 

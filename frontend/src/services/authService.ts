@@ -126,7 +126,7 @@ export interface RegisterData {
   password: string;
   confirm_password: string;
   phone_no?: string;
-  role: 'customer' | 'admin' | 'cook' | 'delivery_agent';
+  role: 'customer' | 'cook' | 'delivery_agent';
   address?: string;
 }
 
@@ -136,7 +136,7 @@ export interface User {
   email: string;
   phone_no?: string;
   address?: string;
-  role: 'customer' | 'admin' | 'cook' | 'delivery_agent';
+  role: 'customer' | 'cook' | 'delivery_agent';
   role_display: string;
   profile_image?: string;
   email_verified: boolean;

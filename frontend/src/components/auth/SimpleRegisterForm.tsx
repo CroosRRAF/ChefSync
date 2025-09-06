@@ -21,7 +21,7 @@ const emailSchema = z.object({
 
 // Step 2: Role selection
 const roleSchema = z.object({
-  role: z.enum(['customer', 'admin', 'cook', 'delivery_agent'], {
+  role: z.enum(['customer', 'cook', 'delivery_agent'], {
     required_error: 'Please select a role',
   }),
 });
@@ -540,7 +540,7 @@ const SimpleRegisterForm: React.FC = () => {
               <Label className="text-sm font-medium text-foreground">
                 Select Your Role
               </Label>
-              <Select onValueChange={(value) => roleForm.setValue('role', value as 'customer' | 'admin' | 'cook' | 'delivery_agent')}>
+              <Select onValueChange={(value) => roleForm.setValue('role', value as 'customer' | 'cook' | 'delivery_agent')}>
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Choose your role" />
                 </SelectTrigger>
@@ -551,15 +551,6 @@ const SimpleRegisterForm: React.FC = () => {
                       <div>
                         <div className="font-medium">Customer</div>
                         <div className="text-xs text-muted-foreground">Order delicious food</div>
-                      </div>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="admin">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-lg">👨‍💼</span>
-                      <div>
-                        <div className="font-medium">Admin</div>
-                        <div className="text-xs text-muted-foreground">Manage the platform</div>
                       </div>
                     </div>
                   </SelectItem>
