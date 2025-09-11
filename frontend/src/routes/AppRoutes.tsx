@@ -6,6 +6,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Layout components
 import Navbar from '@/components/layout/Navbar';
+import AdminLayout from '@/components/layout/AdminLayout';
 
 // Public pages
 import Home from '@/pages/Home';
@@ -341,37 +342,51 @@ const InnerRoutes: React.FC = () => {
         } />
         <Route path="/admin/dashboard" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminDashboard />
+            <AdminLayout>
+              <AdminDashboard />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/users" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminManageUsers />
+            <AdminLayout>
+              <AdminManageUsers />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/orders" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminOrders />
+            <AdminLayout>
+              <AdminOrders />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/analytics" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminAnalytics />
+            <AdminLayout>
+              <AdminAnalytics />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/settings" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminSettings />
+            <AdminLayout>
+              <AdminSettings />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/profile" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminProfile />
+            <AdminLayout>
+              <AdminProfile />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/reports" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminReports />
+            <AdminLayout>
+              <AdminReports />
+            </AdminLayout>
           </ProtectedRoute>
         } />
 

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { User, AuthState, LoginCredentials, RegisterData } from '@/types/auth';
 import authService, { AuthResponse } from '@/services/authService';
-import { useNavigate } from 'react-router-dom';
 
 // Define the shape of our context
 export interface AuthContextType extends AuthState {
@@ -35,7 +34,7 @@ type AuthAction =
 // Secure token storage functions
 const getSecureToken = (): string | null => {
   try {
-    return localStorage.getItem('chefsync_token');
+    return localStorage.getItem('access_token');
   } catch (error) {
     console.error('Error accessing localStorage:', error);
     return null;
@@ -44,7 +43,7 @@ const getSecureToken = (): string | null => {
 
 const setSecureToken = (token: string): void => {
   try {
-    localStorage.setItem('chefsync_token', token);
+    localStorage.setItem('access_token', token);
   } catch (error) {
     console.error('Error setting token in localStorage:', error);
   }
@@ -52,8 +51,8 @@ const setSecureToken = (token: string): void => {
 
 const removeSecureToken = (): void => {
   try {
-    localStorage.removeItem('chefsync_token');
-    localStorage.removeItem('chefsync_refresh_token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
   } catch (error) {
     console.error('Error removing tokens from localStorage:', error);
   }
@@ -115,7 +114,6 @@ export function getRoleBasedPath(role: string): string {
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(authReducer, initialState);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const token = getSecureToken();
@@ -171,18 +169,6 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       
       // Set both auth context and user store state
       dispatch({ type: 'SET_USER', payload: { user: frontendUser, token: response.access } });
-      
-      // Add another small delay after state update
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Get the role-specific dashboard path
-      const dashboardPath = getRoleBasedPath(frontendUser.role);
-      
-      // Force navigate to the dashboard path with state
-      navigate(dashboardPath, { 
-        replace: true,
-        state: { from: 'login' }
-      });
     } catch (error) {
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;
@@ -217,7 +203,6 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       console.error('Logout error:', error);
     } finally {
       dispatch({ type: 'CLEAR_USER' });
-      navigate('/', { replace: true });
     }
   };
 

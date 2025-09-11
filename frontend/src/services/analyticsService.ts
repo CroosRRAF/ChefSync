@@ -1,54 +1,14 @@
-// Analytics service for admin dashboard
-export interface DashboardStats {
-  total_users: number;
-  active_users: number;
-  new_users_this_week: number;
-  new_users_this_month: number;
-  user_growth: number;
-  
-  total_chefs: number;
-  active_chefs: number;
-  chef_growth: number;
-  
-  total_orders: number;
-  orders_today: number;
-  orders_this_week: number;
-  orders_this_month: number;
-  order_growth: number;
-  
-  total_revenue: number;
-  revenue_today: number;
-  revenue_this_week: number;
-  revenue_this_month: number;
-  revenue_growth: number;
-  
-  total_foods: number;
-  active_foods: number;
-  pending_approvals: number;
-}
+// Analytics service for admin dashboard - now using admin service
+import { adminService, type DashboardStats } from './adminService';
 
 class AnalyticsService {
-  private baseUrl = '/api/analytics';
-
   async getDashboardStats(): Promise<DashboardStats> {
     try {
-      const response = await fetch(`${this.baseUrl}/dashboard/stats/`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
+      // Use the new admin service for real-time data
+      return await adminService.getDashboardStats();
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
-      // Return mock data for development
+      // Return mock data for development if admin service fails
       return this.getMockDashboardStats();
     }
   }
@@ -57,12 +17,14 @@ class AnalyticsService {
     return {
       total_users: 1247,
       active_users: 892,
+      new_users_today: 12,
       new_users_this_week: 45,
       new_users_this_month: 156,
       user_growth: 12.5,
       
       total_chefs: 45,
       active_chefs: 38,
+      pending_chef_approvals: 7,
       chef_growth: 8.2,
       
       total_orders: 2341,
@@ -79,7 +41,12 @@ class AnalyticsService {
       
       total_foods: 234,
       active_foods: 198,
-      pending_approvals: 12,
+      pending_food_approvals: 12,
+      
+      system_health_score: 85.5,
+      active_sessions: 23,
+      unread_notifications: 5,
+      pending_backups: 0,
     };
   }
 }

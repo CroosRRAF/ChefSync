@@ -54,17 +54,8 @@ interface AdminOrder {
 
 const AdminOrders: React.FC = () => {
   const { user } = useUserStore();
-  const { logout } = useAuth();
   const navigate = useNavigate();
 
-  // Logout handler
-  const handleLogout = useCallback(async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  }, [logout]);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<AdminOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -225,14 +216,6 @@ const AdminOrders: React.FC = () => {
             >
               <i className="bx bx-arrow-back w-4 h-4"></i>
               <span>Back to Dashboard</span>
-            </Button>
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              className="flex items-center space-x-2"
-            >
-              <i className="bx bx-log-out w-4 h-4"></i>
-              <span>Logout</span>
             </Button>
           </div>
         </div>

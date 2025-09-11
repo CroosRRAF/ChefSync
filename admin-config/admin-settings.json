@@ -1,0 +1,233 @@
+{
+  "dashboard": {
+    "defaultView": "overview",
+    "refreshInterval": 30000,
+    "autoRefresh": true,
+    "widgets": {
+      "stats": {
+        "enabled": true,
+        "position": "top",
+        "size": "large"
+      },
+      "charts": {
+        "enabled": true,
+        "position": "middle",
+        "size": "medium",
+        "types": ["line", "bar", "pie"]
+      },
+      "recentActivity": {
+        "enabled": true,
+        "position": "right",
+        "size": "small",
+        "limit": 10
+      },
+      "systemHealth": {
+        "enabled": true,
+        "position": "bottom",
+        "size": "small"
+      },
+      "quickActions": {
+        "enabled": true,
+        "position": "top-right",
+        "size": "small"
+      }
+    }
+  },
+  "navigation": {
+    "collapsed": false,
+    "items": [
+      {
+        "id": "dashboard",
+        "label": "Dashboard",
+        "icon": "bx-home",
+        "path": "/admin/dashboard",
+        "enabled": true
+      },
+      {
+        "id": "users",
+        "label": "User Management",
+        "icon": "bx-user-group",
+        "path": "/admin/users",
+        "enabled": true,
+        "subItems": [
+          {
+            "id": "all-users",
+            "label": "All Users",
+            "path": "/admin/users"
+          },
+          {
+            "id": "chefs",
+            "label": "Chefs",
+            "path": "/admin/users/chefs"
+          },
+          {
+            "id": "customers",
+            "label": "Customers",
+            "path": "/admin/users/customers"
+          },
+          {
+            "id": "delivery-agents",
+            "label": "Delivery Agents",
+            "path": "/admin/users/delivery-agents"
+          }
+        ]
+      },
+      {
+        "id": "orders",
+        "label": "Order Management",
+        "icon": "bx-shopping-bag",
+        "path": "/admin/orders",
+        "enabled": true,
+        "subItems": [
+          {
+            "id": "all-orders",
+            "label": "All Orders",
+            "path": "/admin/orders"
+          },
+          {
+            "id": "pending-orders",
+            "label": "Pending Orders",
+            "path": "/admin/orders/pending"
+          },
+          {
+            "id": "completed-orders",
+            "label": "Completed Orders",
+            "path": "/admin/orders/completed"
+          }
+        ]
+      },
+      {
+        "id": "foods",
+        "label": "Food Management",
+        "icon": "bx-restaurant",
+        "path": "/admin/foods",
+        "enabled": true,
+        "subItems": [
+          {
+            "id": "all-foods",
+            "label": "All Foods",
+            "path": "/admin/foods"
+          },
+          {
+            "id": "pending-approval",
+            "label": "Pending Approval",
+            "path": "/admin/foods/pending"
+          },
+          {
+            "id": "categories",
+            "label": "Categories",
+            "path": "/admin/foods/categories"
+          }
+        ]
+      },
+      {
+        "id": "analytics",
+        "label": "Analytics",
+        "icon": "bx-bar-chart-alt-2",
+        "path": "/admin/analytics",
+        "enabled": true
+      },
+      {
+        "id": "reports",
+        "label": "Reports",
+        "icon": "bx-file-blank",
+        "path": "/admin/reports",
+        "enabled": true
+      },
+      {
+        "id": "notifications",
+        "label": "Notifications",
+        "icon": "bx-bell",
+        "path": "/admin/notifications",
+        "enabled": true
+      },
+      {
+        "id": "settings",
+        "label": "Settings",
+        "icon": "bx-cog",
+        "path": "/admin/settings",
+        "enabled": true,
+        "subItems": [
+          {
+            "id": "system-settings",
+            "label": "System Settings",
+            "path": "/admin/settings/system"
+          },
+          {
+            "id": "user-settings",
+            "label": "User Settings",
+            "path": "/admin/settings/users"
+          },
+          {
+            "id": "security-settings",
+            "label": "Security Settings",
+            "path": "/admin/settings/security"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "user_management": {
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "bulk_operations": true
+    },
+    "order_management": {
+      "create": false,
+      "read": true,
+      "update": true,
+      "delete": false,
+      "bulk_operations": true
+    },
+    "food_management": {
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "bulk_operations": true,
+      "approve": true
+    },
+    "analytics": {
+      "view": true,
+      "export": true,
+      "custom_reports": true
+    },
+    "system_settings": {
+      "view": true,
+      "modify": true,
+      "backup": true,
+      "maintenance": true
+    }
+  },
+  "ui": {
+    "theme": "light",
+    "sidebarCollapsed": false,
+    "showBreadcrumbs": true,
+    "showQuickActions": true,
+    "showSystemStatus": true,
+    "animations": true,
+    "compactMode": false
+  },
+  "notifications": {
+    "enabled": true,
+    "sound": true,
+    "popup": true,
+    "email": true,
+    "types": {
+      "system_alerts": true,
+      "user_activities": true,
+      "order_updates": true,
+      "security_events": true
+    }
+  },
+  "data": {
+    "paginationSize": 25,
+    "bulkOperationLimit": 100,
+    "exportFormats": ["csv", "excel", "pdf"],
+    "cacheEnabled": true,
+    "cacheTTL": 300
+  }
+}
