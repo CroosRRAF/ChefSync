@@ -349,6 +349,365 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 {'error': f'Failed to fetch users: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+    
+    @action(detail=False, methods=['post'])
+    def bulk_activate(self, request):
+        """Bulk activate users"""
+        try:
+            user_ids = request.data.get('user_ids', [])
+            if not user_ids:
+                return Response(
+                    {'error': 'user_ids list is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Update users
+            updated_count = User.objects.filter(
+                id__in=user_ids,
+                is_active=False
+            ).update(is_active=True)
+            
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action='bulk_update',
+                resource_type='users',
+                resource_id=','.join(map(str, user_ids)),
+                description=f'Bulk activated {updated_count} users',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            
+            return Response({
+                'message': f'Successfully activated {updated_count} users',
+                'updated_count': updated_count
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to bulk activate users: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'])
+    def bulk_deactivate(self, request):
+        """Bulk deactivate users"""
+        try:
+            user_ids = request.data.get('user_ids', [])
+            if not user_ids:
+                return Response(
+                    {'error': 'user_ids list is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Don't allow deactivating admin users
+            admin_users = User.objects.filter(
+                id__in=user_ids,
+                role='admin',
+                is_active=True
+            ).values_list('id', flat=True)
+            
+            if admin_users:
+                return Response(
+                    {'error': 'Cannot deactivate admin users'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Update users
+            updated_count = User.objects.filter(
+                id__in=user_ids,
+                is_active=True
+            ).exclude(role='admin').update(is_active=False)
+            
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action='bulk_update',
+                resource_type='users',
+                resource_id=','.join(map(str, user_ids)),
+                description=f'Bulk deactivated {updated_count} users',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            
+            return Response({
+                'message': f'Successfully deactivated {updated_count} users',
+                'updated_count': updated_count
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to bulk deactivate users: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'])
+    def bulk_delete(self, request):
+        """Bulk delete users (soft delete by deactivating)"""
+        try:
+            user_ids = request.data.get('user_ids', [])
+            if not user_ids:
+                return Response(
+                    {'error': 'user_ids list is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Don't allow deleting admin users
+            admin_users = User.objects.filter(
+                id__in=user_ids,
+                role='admin'
+            ).values_list('id', flat=True)
+            
+            if admin_users:
+                return Response(
+                    {'error': 'Cannot delete admin users'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Soft delete by deactivating
+            updated_count = User.objects.filter(
+                id__in=user_ids
+            ).exclude(role='admin').update(is_active=False)
+            
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action='bulk_delete',
+                resource_type='users',
+                resource_id=','.join(map(str, user_ids)),
+                description=f'Bulk deleted {updated_count} users',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            
+            return Response({
+                'message': f'Successfully deleted {updated_count} users',
+                'updated_count': updated_count
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to bulk delete users: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['get'])
+    def details(self, request, pk=None):
+        """Get detailed user information"""
+        try:
+            user = User.objects.get(pk=pk)
+            
+            # Get user statistics
+            from apps.orders.models import Order
+            total_orders = Order.objects.filter(customer=user).count()
+            total_spent = Order.objects.filter(
+                customer=user, payment_status='paid'
+            ).aggregate(total=Sum('total_amount'))['total'] or 0
+            
+            # Get recent orders
+            recent_orders = Order.objects.filter(customer=user).order_by('-created_at')[:5]
+            recent_orders_data = []
+            for order in recent_orders:
+                recent_orders_data.append({
+                    'id': order.id,
+                    'order_number': order.order_number,
+                    'status': order.status,
+                    'total_amount': float(order.total_amount),
+                    'created_at': order.created_at,
+                })
+            
+            # Get user activity logs
+            activity_logs = AdminActivityLog.objects.filter(
+                admin=user
+            ).order_by('-timestamp')[:10]
+            
+            activity_data = []
+            for log in activity_logs:
+                activity_data.append({
+                    'id': log.id,
+                    'action': log.action,
+                    'resource_type': log.resource_type,
+                    'description': log.description,
+                    'timestamp': log.timestamp,
+                })
+            
+            user_data = {
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'phone_no': user.phone_no,
+                'address': user.address,
+                'role': user.role,
+                'is_active': user.is_active,
+                'email_verified': user.email_verified,
+                'last_login': user.last_login,
+                'date_joined': user.date_joined,
+                'failed_login_attempts': user.failed_login_attempts,
+                'account_locked': user.account_locked,
+                'statistics': {
+                    'total_orders': total_orders,
+                    'total_spent': float(total_spent),
+                },
+                'recent_orders': recent_orders_data,
+                'activity_logs': activity_data,
+            }
+            
+            return Response(user_data)
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to fetch user details: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['patch'])
+    def update_user(self, request, pk=None):
+        """Update user information"""
+        try:
+            user = User.objects.get(pk=pk)
+            
+            # Get update data
+            update_data = {}
+            allowed_fields = ['name', 'phone_no', 'address', 'role', 'is_active']
+            
+            for field in allowed_fields:
+                if field in request.data:
+                    update_data[field] = request.data[field]
+            
+            # Validate role changes
+            if 'role' in update_data:
+                valid_roles = [choice[0] for choice in User.ROLE_CHOICES]
+                if update_data['role'] not in valid_roles:
+                    return Response(
+                        {'error': f'Invalid role. Valid options: {valid_roles}'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Don't allow changing admin roles unless current user is admin
+                if update_data['role'] == 'admin' and request.user.role != 'admin':
+                    return Response(
+                        {'error': 'Only admins can assign admin role'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
+            # Update user
+            old_values = {}
+            for field in update_data:
+                old_values[field] = getattr(user, field)
+                setattr(user, field, update_data[field])
+            
+            user.save()
+            
+            # Log activity
+            changes = []
+            for field in update_data:
+                if old_values[field] != update_data[field]:
+                    changes.append(f'{field}: {old_values[field]} -> {update_data[field]}')
+            
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action='update',
+                resource_type='user',
+                resource_id=str(user.id),
+                description=f'Updated user {user.email}: {", ".join(changes)}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            
+            return Response({
+                'message': 'User updated successfully',
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'name': user.name,
+                    'role': user.role,
+                    'is_active': user.is_active,
+                }
+            })
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to update user: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'])
+    def export_users(self, request):
+        """Export users data as CSV"""
+        try:
+            import csv
+            from django.http import HttpResponse
+            from io import StringIO
+            
+            # Get query parameters
+            role = request.query_params.get('role', '')
+            status = request.query_params.get('status', '')
+            
+            # Build queryset
+            queryset = User.objects.all()
+            
+            if role:
+                queryset = queryset.filter(role=role)
+            
+            if status == 'active':
+                queryset = queryset.filter(is_active=True)
+            elif status == 'inactive':
+                queryset = queryset.filter(is_active=False)
+            
+            # Create CSV response
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename="users_export.csv"'
+            
+            writer = csv.writer(response)
+            
+            # Write header
+            writer.writerow([
+                'ID', 'Email', 'Name', 'Phone', 'Role', 'Active', 
+                'Email Verified', 'Date Joined', 'Last Login'
+            ])
+            
+            # Write data
+            for user in queryset:
+                writer.writerow([
+                    user.id,
+                    user.email,
+                    user.name,
+                    user.phone_no or '',
+                    user.role,
+                    'Yes' if user.is_active else 'No',
+                    'Yes' if user.email_verified else 'No',
+                    user.date_joined.strftime('%Y-%m-%d %H:%M:%S') if user.date_joined else '',
+                    user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else '',
+                ])
+            
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action='export',
+                resource_type='users',
+                resource_id='export',
+                description=f'Exported {queryset.count()} users to CSV',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            
+            return response
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to export users: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class AdminOrderManagementViewSet(viewsets.ViewSet):
@@ -558,6 +917,168 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response(
                 {'error': f'Failed to fetch order details: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['patch'])
+    def assign_chef(self, request, pk=None):
+        """Assign order to a chef"""
+        try:
+            from apps.orders.models import Order
+            order = Order.objects.get(pk=pk)
+            
+            chef_id = request.data.get('chef_id')
+            if not chef_id:
+                return Response(
+                    {'error': 'chef_id is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Verify chef exists and has correct role
+            chef = User.objects.get(pk=chef_id, role='cook', is_active=True)
+            
+            # Update order
+            old_chef = order.chef
+            order.chef = chef
+            order.save()
+            
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action='assign',
+                resource_type='order',
+                resource_id=str(order.id),
+                description=f'Assigned order {order.order_number} to chef {chef.name}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            
+            return Response({
+                'message': f'Order assigned to chef {chef.name}',
+                'order': {
+                    'id': order.id,
+                    'order_number': order.order_number,
+                    'chef': {
+                        'id': chef.id,
+                        'name': chef.name,
+                        'email': chef.email,
+                    }
+                }
+            })
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Chef not found or not active'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Order.DoesNotExist:
+            return Response(
+                {'error': 'Order not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to assign chef: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['patch'])
+    def assign_delivery_partner(self, request, pk=None):
+        """Assign order to a delivery partner"""
+        try:
+            from apps.orders.models import Order
+            order = Order.objects.get(pk=pk)
+            
+            partner_id = request.data.get('partner_id')
+            if not partner_id:
+                return Response(
+                    {'error': 'partner_id is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Verify delivery partner exists and has correct role
+            partner = User.objects.get(pk=partner_id, role='delivery_agent', is_active=True)
+            
+            # Update order
+            old_partner = order.delivery_partner
+            order.delivery_partner = partner
+            order.save()
+            
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action='assign',
+                resource_type='order',
+                resource_id=str(order.id),
+                description=f'Assigned order {order.order_number} to delivery partner {partner.name}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            
+            return Response({
+                'message': f'Order assigned to delivery partner {partner.name}',
+                'order': {
+                    'id': order.id,
+                    'order_number': order.order_number,
+                    'delivery_partner': {
+                        'id': partner.id,
+                        'name': partner.name,
+                        'email': partner.email,
+                    }
+                }
+            })
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Delivery partner not found or not active'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Order.DoesNotExist:
+            return Response(
+                {'error': 'Order not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to assign delivery partner: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'])
+    def available_chefs(self, request):
+        """Get list of available chefs for order assignment"""
+        try:
+            chefs = User.objects.filter(
+                role='cook',
+                is_active=True
+            ).values('id', 'name', 'email')
+            
+            return Response({
+                'chefs': list(chefs)
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to fetch available chefs: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'])
+    def available_delivery_partners(self, request):
+        """Get list of available delivery partners for order assignment"""
+        try:
+            partners = User.objects.filter(
+                role='delivery_agent',
+                is_active=True
+            ).values('id', 'name', 'email')
+            
+            return Response({
+                'partners': list(partners)
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to fetch available delivery partners: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

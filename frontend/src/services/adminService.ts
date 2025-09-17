@@ -232,6 +232,89 @@ class AdminService {
     }
   }
 
+  // Bulk User Operations
+  async bulkActivateUsers(userIds: number[]): Promise<{ message: string; updated_count: number }> {
+    try {
+      const response = await apiClient.post(`${this.baseUrl}/users/bulk_activate/`, {
+        user_ids: userIds
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error bulk activating users:', error);
+      throw new Error('Failed to bulk activate users');
+    }
+  }
+
+  async bulkDeactivateUsers(userIds: number[]): Promise<{ message: string; updated_count: number }> {
+    try {
+      const response = await apiClient.post(`${this.baseUrl}/users/bulk_deactivate/`, {
+        user_ids: userIds
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error bulk deactivating users:', error);
+      throw new Error('Failed to bulk deactivate users');
+    }
+  }
+
+  async bulkDeleteUsers(userIds: number[]): Promise<{ message: string; updated_count: number }> {
+    try {
+      const response = await apiClient.post(`${this.baseUrl}/users/bulk_delete/`, {
+        user_ids: userIds
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error bulk deleting users:', error);
+      throw new Error('Failed to bulk delete users');
+    }
+  }
+
+  // User Details and Management
+  async getUserDetails(userId: number): Promise<any> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/users/${userId}/details/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      throw new Error('Failed to fetch user details');
+    }
+  }
+
+  async updateUser(userId: number, data: {
+    name?: string;
+    phone_no?: string;
+    address?: string;
+    role?: string;
+    is_active?: boolean;
+  }): Promise<{ message: string; user: AdminUser }> {
+    try {
+      const response = await apiClient.patch(`${this.baseUrl}/users/${userId}/update_user/`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw new Error('Failed to update user');
+    }
+  }
+
+  async exportUsers(params: {
+    role?: string;
+    status?: string;
+  } = {}): Promise<Blob> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/users/export_users/`, {
+        params: {
+          role: params.role,
+          status: params.status
+        },
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error exporting users:', error);
+      throw new Error('Failed to export users');
+    }
+  }
+
   // Order Management
   async getOrders(params: {
     page?: number;

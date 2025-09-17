@@ -50,6 +50,13 @@ const AdminOrders: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [availableChefs, setAvailableChefs] = useState<any[]>([]);
+  const [availablePartners, setAvailablePartners] = useState<any[]>([]);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [assignmentType, setAssignmentType] = useState<'chef' | 'partner' | null>(null);
+  const [selectedNewStatus, setSelectedNewStatus] = useState<AdminOrder['status'] | null>(null);
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -101,15 +108,62 @@ const AdminOrders: React.FC = () => {
 
   const updateOrderStatus = async (orderId: string, newStatus: AdminOrder['status']) => {
     try {
-      await apiClient.patch(`/api/admin/orders/${orderId}/`, { status: newStatus });
+      // Use the correct API endpoint for status updates
+      await apiClient.patch(`/api/admin/orders/${orderId}/update_status/`, { 
+        status: newStatus 
+      });
+      
+      // Update local state
       setOrders(prev => 
         prev.map(order => 
-          order.id === parseInt(orderId) ? { ...order, status: newStatus } : order
+          order.id === parseInt(orderId) ? { 
+            ...order, 
+            status: newStatus,
+            updated_at: new Date().toISOString()
+          } : order
         )
       );
+      
+      // Show success message (you can add a toast notification here)
+      console.log(`Order ${orderId} status updated to ${newStatus}`);
     } catch (error) {
       console.error('Error updating order status:', error);
+      // Show error message (you can add a toast notification here)
+      alert('Failed to update order status. Please try again.');
     }
+  };
+
+  // Validate status transitions
+  const getValidStatusTransitions = (currentStatus: AdminOrder['status']): AdminOrder['status'][] => {
+    const transitions: Record<AdminOrder['status'], AdminOrder['status'][]> = {
+      'cart': ['pending', 'cancelled'],
+      'pending': ['confirmed', 'cancelled'],
+      'confirmed': ['preparing', 'cancelled'],
+      'preparing': ['ready', 'cancelled'],
+      'ready': ['out_for_delivery', 'cancelled'],
+      'out_for_delivery': ['delivered', 'cancelled'],
+      'delivered': ['refunded'],
+      'cancelled': [],
+      'refunded': []
+    };
+    
+    return transitions[currentStatus] || [];
+  };
+
+  // Get status transition label
+  const getStatusTransitionLabel = (from: AdminOrder['status'], to: AdminOrder['status']): string => {
+    const labels: Record<string, string> = {
+      'cart-pending': 'Confirm Order',
+      'pending-confirmed': 'Confirm Payment',
+      'confirmed-preparing': 'Start Preparing',
+      'preparing-ready': 'Mark as Ready',
+      'ready-out_for_delivery': 'Send for Delivery',
+      'out_for_delivery-delivered': 'Mark as Delivered',
+      'delivered-refunded': 'Process Refund',
+      '*-cancelled': 'Cancel Order'
+    };
+    
+    return labels[`${from}-${to}`] || labels[`*-${to}`] || `Change to ${to.replace('_', ' ')}`;
   };
 
   const getStatusColor = (status: AdminOrder['status']) => {
@@ -151,6 +205,94 @@ const AdminOrders: React.FC = () => {
       case 'refunded': return <AlertCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
+  };
+
+  // Handle status change modal
+  const handleStatusChange = (order: AdminOrder, newStatus: AdminOrder['status']) => {
+    setSelectedOrder(order);
+    setSelectedNewStatus(newStatus);
+    setShowStatusModal(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (selectedOrder && selectedNewStatus) {
+      await updateOrderStatus(selectedOrder.id.toString(), selectedNewStatus);
+      setShowStatusModal(false);
+      setSelectedOrder(null);
+      setSelectedNewStatus(null);
+    }
+  };
+
+  const cancelStatusChange = () => {
+    setShowStatusModal(false);
+    setSelectedOrder(null);
+    setSelectedNewStatus(null);
+  };
+
+  // Fetch available chefs and partners
+  const fetchAvailableResources = async () => {
+    try {
+      const [chefsResponse, partnersResponse] = await Promise.all([
+        apiClient.get('/api/admin/orders/available_chefs/'),
+        apiClient.get('/api/admin/orders/available_delivery_partners/')
+      ]);
+      
+      setAvailableChefs(chefsResponse.data.chefs || []);
+      setAvailablePartners(partnersResponse.data.partners || []);
+    } catch (error) {
+      console.error('Error fetching available resources:', error);
+    }
+  };
+
+  // Handle assignment
+  const handleAssignment = (order: AdminOrder, type: 'chef' | 'partner') => {
+    setSelectedOrder(order);
+    setAssignmentType(type);
+    setShowAssignmentModal(true);
+  };
+
+  const confirmAssignment = async (resourceId: number) => {
+    if (!selectedOrder || !assignmentType) return;
+    
+    try {
+      const endpoint = assignmentType === 'chef' ? 'assign_chef' : 'assign_delivery_partner';
+      const data = assignmentType === 'chef' 
+        ? { chef_id: resourceId } 
+        : { partner_id: resourceId };
+      
+      await apiClient.patch(`/api/admin/orders/${selectedOrder.id}/${endpoint}/`, data);
+      
+      // Update local state
+      setOrders(prev => 
+        prev.map(order => 
+          order.id === selectedOrder.id ? { 
+            ...order, 
+            [assignmentType === 'chef' ? 'chef' : 'delivery_partner']: {
+              id: resourceId,
+              name: assignmentType === 'chef' 
+                ? availableChefs.find(c => c.id === resourceId)?.name
+                : availablePartners.find(p => p.id === resourceId)?.name,
+              email: assignmentType === 'chef'
+                ? availableChefs.find(c => c.id === resourceId)?.email
+                : availablePartners.find(p => p.id === resourceId)?.email
+            }
+          } : order
+        )
+      );
+      
+      setShowAssignmentModal(false);
+      setSelectedOrder(null);
+      setAssignmentType(null);
+    } catch (error) {
+      console.error('Error assigning resource:', error);
+      alert('Failed to assign resource. Please try again.');
+    }
+  };
+
+  const cancelAssignment = () => {
+    setShowAssignmentModal(false);
+    setSelectedOrder(null);
+    setAssignmentType(null);
   };
 
   const getTotalRevenue = () => {
@@ -205,109 +347,67 @@ const AdminOrders: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{orders.length}</div>
-            <p className="text-xs text-muted-foreground">
-              All time orders
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{getOrdersCount('pending')}</div>
-            <p className="text-xs text-muted-foreground">
-              Awaiting preparation
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue Today</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${getTotalRevenue().toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              Total revenue
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
-            <ChefHat className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {getOrdersCount('preparing') + getOrdersCount('ready') + getOrdersCount('out_for_delivery')}
+      {/* Assignment Modal */}
+      {showAssignmentModal && selectedOrder && assignmentType && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <ChefHat className="h-6 w-6 text-blue-500 mr-3" />
+                <h3 className="text-lg font-semibold">
+                  Assign {assignmentType === 'chef' ? 'Chef' : 'Delivery Partner'}
+                </h3>
+              </div>
+              <div className="mb-6">
+                <p className="text-gray-600 mb-3">
+                  Select a {assignmentType === 'chef' ? 'chef' : 'delivery partner'} for order <strong>#{selectedOrder.order_number}</strong>
+                </p>
+                <div className="bg-gray-50 p-3 rounded-lg mb-4">
+                  <div className="text-sm text-gray-600">
+                    <strong>Customer:</strong> {selectedOrder.customer_name}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <strong>Items:</strong> {selectedOrder.items_count} items
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <strong>Total:</strong> ${selectedOrder.total_amount.toFixed(2)}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Available {assignmentType === 'chef' ? 'Chefs' : 'Delivery Partners'}:
+                  </label>
+                  <div className="max-h-48 overflow-y-auto border rounded-lg">
+                    {(assignmentType === 'chef' ? availableChefs : availablePartners).map((resource: any) => (
+                      <div
+                        key={resource.id}
+                        className="p-3 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => confirmAssignment(resource.id)}
+                      >
+                        <div className="font-medium">{resource.name}</div>
+                        <div className="text-sm text-gray-600">{resource.email}</div>
+                        {resource.phone && (
+                          <div className="text-sm text-gray-600">{resource.phone}</div>
+                        )}
+                      </div>
+                    ))}
+                    {(assignmentType === 'chef' ? availableChefs : availablePartners).length === 0 && (
+                      <div className="p-4 text-center text-gray-500">
+                        No available {assignmentType === 'chef' ? 'chefs' : 'delivery partners'} found
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <Button variant="outline" onClick={cancelAssignment}>
+                  Cancel
+                </Button>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              In progress
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters and Search */}
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search orders, customers, or phone numbers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
           </div>
-          
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="cart">Cart</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
-              <SelectItem value="preparing">Preparing</SelectItem>
-              <SelectItem value="ready">Ready</SelectItem>
-              <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-              <SelectItem value="refunded">Refunded</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Filter by payment" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Payments</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-              <SelectItem value="refunded">Refunded</SelectItem>
-              <SelectItem value="partial_refund">Partial Refund</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
-      </div>
+      )}
 
       {/* Orders Table */}
       <Card>
@@ -372,15 +472,39 @@ const AdminOrders: React.FC = () => {
                     {new Date(order.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <div className="flex space-x-2">
-                      <Button size="sm" variant="outline">
-                        <Eye className="h-4 w-4" />
+                    <div className="flex flex-wrap gap-1">
+                      {getValidStatusTransitions(order.status).map((newStatus) => (
+                        <Button
+                          key={newStatus}
+                          size="sm"
+                          variant="outline"
+                          className="text-xs px-2 py-1 h-auto"
+                          onClick={() => handleStatusChange(order, newStatus)}
+                        >
+                          {getStatusTransitionLabel(order.status, newStatus)}
+                        </Button>
+                      ))}
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-xs px-2 py-1 h-auto"
+                        onClick={() => handleAssignment(order, 'chef')}
+                      >
+                        <ChefHat className="h-3 w-3 mr-1" />
+                        Assign Chef
                       </Button>
-                      <Button size="sm" variant="outline">
-                        <Edit className="h-4 w-4" />
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-xs px-2 py-1 h-auto"
+                        onClick={() => handleAssignment(order, 'partner')}
+                      >
+                        <Package className="h-3 w-3 mr-1" />
+                        Assign Partner
                       </Button>
-                      <Button size="sm" variant="outline" className="text-red-600">
-                        <Trash2 className="h-4 w-4" />
+                      <Button size="sm" variant="outline" className="text-xs px-2 py-1 h-auto">
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
                       </Button>
                     </div>
                   </TableCell>
@@ -390,27 +514,6 @@ const AdminOrders: React.FC = () => {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Empty State */}
-      {filteredOrders.length === 0 && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
-              {orders.length === 0 ? 'No Orders Found' : 'No Orders Match Filters'}
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              {orders.length === 0 
-                ? 'There are no orders in the system yet.'
-                : 'Try adjusting your search or filter criteria.'
-              }
-            </p>
-            <Button onClick={fetchOrders}>
-              Refresh Orders
-            </Button>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };

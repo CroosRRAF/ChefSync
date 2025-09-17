@@ -36,6 +36,10 @@ const EnhancedUserManagement: React.FC = () => {
     total: 0,
     pages: 0
   });
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [userDetails, setUserDetails] = useState<any>(null);
+  const [showUserDetail, setShowUserDetail] = useState(false);
+  const [userDetailLoading, setUserDetailLoading] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     role: '',
@@ -74,48 +78,118 @@ const EnhancedUserManagement: React.FC = () => {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Handle search
-  const handleSearch = (searchTerm: string) => {
-    setFilters(prev => ({ ...prev, search: searchTerm }));
-    fetchUsers(1, searchTerm, filters.role, filters.status);
-  };
+  // Enhanced search with debouncing
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  const handleSearch = useCallback((searchTerm: string) => {
+    // Clear previous timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Debounce search
+    const timeout = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: searchTerm }));
+      fetchUsers(1, searchTerm, filters.role, filters.status);
+    }, 300);
+    
+    setSearchTimeout(timeout);
+  }, [filters.role, filters.status, searchTimeout]);
 
-  // Handle filter change
-  const handleFilterChange = (key: string, value: string) => {
+  // Enhanced filter change with date range support
+  const handleFilterChange = useCallback((key: string, value: string) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
+    
+    // Handle date range filters
+    if (key === 'date_joined') {
+      const now = new Date();
+      let startDate = '';
+      
+      switch (value) {
+        case 'today':
+          startDate = now.toISOString().split('T')[0];
+          break;
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          startDate = weekAgo.toISOString().split('T')[0];
+          break;
+        case 'month':
+          const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+          startDate = monthAgo.toISOString().split('T')[0];
+          break;
+        case 'quarter':
+          const quarterAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+          startDate = quarterAgo.toISOString().split('T')[0];
+          break;
+      }
+      
+      if (startDate) {
+        // You would need to modify the backend to support date filtering
+        console.log('Date filter:', startDate);
+      }
+    }
+    
     fetchUsers(1, newFilters.search, newFilters.role, newFilters.status);
+  }, [filters]);
+
+  // Clear all filters
+  const handleClearFilters = () => {
+    setFilters({ search: '', role: '', status: '' });
+    fetchUsers(1, '', '', '');
   };
 
-  // Handle page change
-  const handlePageChange = (page: number) => {
-    fetchUsers(page, filters.search, filters.role, filters.status);
-  };
+  // Get active filter count
+  const activeFilterCount = Object.values(filters).filter(value => value !== '').length;
 
-  // Handle user status change
-  const handleUserStatusChange = async (userId: number, action: 'activate' | 'deactivate') => {
+  // Handle user detail view
+  const handleUserDetail = async (user: AdminUser) => {
     try {
-      await adminService.updateUserStatus(userId, action);
-      // Refresh the user list
+      setSelectedUser(user);
+      setUserDetailLoading(true);
+      setShowUserDetail(true);
+      
+      const details = await adminService.getUserDetails(user.id);
+      setUserDetails(details);
+    } catch (err) {
+      console.error('Failed to fetch user details:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch user details');
+    } finally {
+      setUserDetailLoading(false);
+    }
+  };
+
+  // Handle user update
+  const handleUserUpdate = async (userId: number, updates: any) => {
+    try {
+      await adminService.updateUser(userId, updates);
+      // Refresh user details
+      if (selectedUser) {
+        const details = await adminService.getUserDetails(userId);
+        setUserDetails(details);
+      }
+      // Refresh user list
       fetchUsers(pagination.page, filters.search, filters.role, filters.status);
     } catch (err) {
-      console.error('Failed to update user status:', err);
+      console.error('Failed to update user:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update user');
     }
   };
 
   // Handle bulk actions
   const handleBulkAction = async (selectedUsers: AdminUser[], action: string) => {
     try {
+      const userIds = selectedUsers.map(user => user.id);
+      
       switch (action) {
         case 'activate':
-          await Promise.all(selectedUsers.map(user => 
-            adminService.updateUserStatus(user.id, 'activate')
-          ));
+          await adminService.bulkActivateUsers(userIds);
           break;
         case 'deactivate':
-          await Promise.all(selectedUsers.map(user => 
-            adminService.updateUserStatus(user.id, 'deactivate')
-          ));
+          await adminService.bulkDeactivateUsers(userIds);
+          break;
+        case 'delete':
+          await adminService.bulkDeleteUsers(userIds);
           break;
         default:
           console.log(`Bulk action: ${action}`, selectedUsers);
@@ -124,13 +198,31 @@ const EnhancedUserManagement: React.FC = () => {
       fetchUsers(pagination.page, filters.search, filters.role, filters.status);
     } catch (err) {
       console.error('Failed to perform bulk action:', err);
+      setError(err instanceof Error ? err.message : 'Failed to perform bulk action');
     }
   };
 
   // Handle export
-  const handleExport = (data: AdminUser[]) => {
-    console.log('Exporting users:', data);
-    // Implement export functionality
+  const handleExport = async (data: AdminUser[]) => {
+    try {
+      const blob = await adminService.exportUsers({
+        role: filters.role,
+        status: filters.status
+      });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'users_export.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Failed to export users:', err);
+      setError(err instanceof Error ? err.message : 'Failed to export users');
+    }
   };
 
   // Get user stats
@@ -235,8 +327,9 @@ const EnhancedUserManagement: React.FC = () => {
       label: 'Role',
       options: [
         { value: 'admin', label: 'Admin' },
-        { value: 'chef', label: 'Chef' },
-        { value: 'customer', label: 'Customer' }
+        { value: 'cook', label: 'Cook' },
+        { value: 'customer', label: 'Customer' },
+        { value: 'delivery_agent', label: 'Delivery Agent' }
       ]
     },
     {
@@ -245,6 +338,17 @@ const EnhancedUserManagement: React.FC = () => {
       options: [
         { value: 'active', label: 'Active' },
         { value: 'inactive', label: 'Inactive' }
+      ]
+    },
+    {
+      key: 'date_joined',
+      label: 'Registration Date',
+      type: 'date_range' as const,
+      options: [
+        { value: 'today', label: 'Today' },
+        { value: 'week', label: 'This Week' },
+        { value: 'month', label: 'This Month' },
+        { value: 'quarter', label: 'This Quarter' }
       ]
     }
   ];
@@ -262,6 +366,13 @@ const EnhancedUserManagement: React.FC = () => {
       icon: <UserX className="h-4 w-4" />,
       action: (selectedUsers: AdminUser[]) => handleBulkAction(selectedUsers, 'deactivate'),
       variant: 'destructive' as const
+    },
+    {
+      label: 'Delete',
+      icon: <Trash2 className="h-4 w-4" />,
+      action: (selectedUsers: AdminUser[]) => handleBulkAction(selectedUsers, 'delete'),
+      variant: 'destructive' as const,
+      confirmMessage: 'Are you sure you want to delete the selected users? This action cannot be undone.'
     }
   ];
 
@@ -280,6 +391,12 @@ const EnhancedUserManagement: React.FC = () => {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
+          {activeFilterCount > 0 && (
+            <Button variant="outline" onClick={handleClearFilters}>
+              <Filter className="h-4 w-4 mr-2" />
+              Clear Filters ({activeFilterCount})
+            </Button>
+          )}
           <Button variant="outline" onClick={() => handleExport(users)}>
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -330,6 +447,70 @@ const EnhancedUserManagement: React.FC = () => {
         />
       </div>
 
+      {/* Search and Filters Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or phone..."
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-80"
+                  value={filters.search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
+              </div>
+              <span className="text-sm text-gray-500">
+                {pagination.total} users found
+                {filters.search && ` for "${filters.search}"`}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary">
+                  {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          {/* Quick Filter Buttons */}
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-gray-700">Quick Filters:</span>
+            <Button
+              variant={filters.status === 'active' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleFilterChange('status', filters.status === 'active' ? '' : 'active')}
+            >
+              Active Users
+            </Button>
+            <Button
+              variant={filters.status === 'inactive' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleFilterChange('status', filters.status === 'inactive' ? '' : 'inactive')}
+            >
+              Inactive Users
+            </Button>
+            <Button
+              variant={filters.role === 'admin' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleFilterChange('role', filters.role === 'admin' ? '' : 'admin')}
+            >
+              Admins
+            </Button>
+            <Button
+              variant={filters.role === 'cook' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleFilterChange('role', filters.role === 'cook' ? '' : 'cook')}
+            >
+              Cooks
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Main Content */}
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList>
@@ -352,16 +533,13 @@ const EnhancedUserManagement: React.FC = () => {
             filters={filterOptions}
             loading={loading}
             error={error}
-            onSearch={handleSearch}
-            onFilterChange={handleFilterChange}
-            onPageChange={handlePageChange}
             onExport={handleExport}
             currentPage={pagination.page}
             totalPages={pagination.pages}
             totalItems={pagination.total}
             pageSize={pagination.limit}
             showPagination
-            onRowClick={(row) => console.log('User clicked:', row)}
+            onRowClick={(row) => handleUserDetail(row)}
           />
         </TabsContent>
 
@@ -419,6 +597,194 @@ const EnhancedUserManagement: React.FC = () => {
           />
         </TabsContent>
       </Tabs>
+
+      {/* User Detail Modal */}
+      {showUserDetail && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">User Details</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowUserDetail(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+
+              {userDetailLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+                  <span className="ml-2 text-gray-600">Loading user details...</span>
+                </div>
+              ) : userDetails ? (
+                <div className="space-y-6">
+                  {/* User Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center">
+                          <UserCheck className="h-5 w-5 mr-2" />
+                          Basic Information
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                            <Users className="h-6 w-6 text-gray-500" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">{userDetails.name}</h3>
+                            <p className="text-gray-600">{userDetails.email}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium">Role:</span>
+                            <select
+                              value={userDetails.role}
+                              onChange={(e) => handleUserUpdate(userDetails.id, { role: e.target.value })}
+                              className="ml-2 px-2 py-1 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="customer">Customer</option>
+                              <option value="cook">Cook</option>
+                              <option value="delivery_agent">Delivery Agent</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </div>
+                          <div>
+                            <span className="font-medium">Status:</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="ml-2"
+                              onClick={() => handleUserUpdate(userDetails.id, { 
+                                is_active: !userDetails.is_active 
+                              })}
+                            >
+                              {userDetails.is_active ? 'Deactivate' : 'Activate'}
+                            </Button>
+                          </div>
+                          <div>
+                            <span className="font-medium">Phone:</span>
+                            <input
+                              type="text"
+                              value={userDetails.phone_no || ''}
+                              onChange={(e) => setUserDetails({...userDetails, phone_no: e.target.value})}
+                              onBlur={(e) => handleUserUpdate(userDetails.id, { phone_no: e.target.value })}
+                              className="ml-2 px-2 py-1 border border-gray-300 rounded text-sm w-32"
+                              placeholder="Phone number"
+                            />
+                          </div>
+                          <div>
+                            <span className="font-medium">Address:</span>
+                            <input
+                              type="text"
+                              value={userDetails.address || ''}
+                              onChange={(e) => setUserDetails({...userDetails, address: e.target.value})}
+                              onBlur={(e) => handleUserUpdate(userDetails.id, { address: e.target.value })}
+                              className="ml-2 px-2 py-1 border border-gray-300 rounded text-sm w-32"
+                              placeholder="Address"
+                            />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center">
+                          <DollarSign className="h-5 w-5 mr-2" />
+                          Statistics
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="text-center p-4 bg-blue-50 rounded-lg">
+                            <div className="text-2xl font-bold text-blue-600">
+                              {userDetails.statistics?.total_orders || 0}
+                            </div>
+                            <div className="text-sm text-gray-600">Total Orders</div>
+                          </div>
+                          <div className="text-center p-4 bg-green-50 rounded-lg">
+                            <div className="text-2xl font-bold text-green-600">
+                              ${userDetails.statistics?.total_spent?.toFixed(2) || '0.00'}
+                            </div>
+                            <div className="text-sm text-gray-600">Total Spent</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Recent Orders */}
+                  {userDetails.recent_orders && userDetails.recent_orders.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Recent Orders</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {userDetails.recent_orders.map((order: any) => (
+                            <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
+                              <div>
+                                <div className="font-medium">Order #{order.order_number}</div>
+                                <div className="text-sm text-gray-600">
+                                  {new Date(order.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-medium">${order.total_amount}</div>
+                                <Badge variant={
+                                  order.status === 'delivered' ? 'default' :
+                                  order.status === 'cancelled' ? 'destructive' : 'secondary'
+                                }>
+                                  {order.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Activity Logs */}
+                  {userDetails.activity_logs && userDetails.activity_logs.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Recent Activity</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {userDetails.activity_logs.map((log: any) => (
+                            <div key={log.id} className="flex items-start space-x-3 p-3 border rounded-lg">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                              <div className="flex-1">
+                                <div className="font-medium">{log.action}</div>
+                                <div className="text-sm text-gray-600">{log.description}</div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {new Date(log.timestamp).toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  Failed to load user details
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
