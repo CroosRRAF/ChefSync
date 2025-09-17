@@ -13,7 +13,7 @@ User = get_user_model()
 
 class AdminActivityLogSerializer(serializers.ModelSerializer):
     admin_email = serializers.CharField(source='admin.email', read_only=True)
-    admin_name = serializers.CharField(source='admin.get_full_name', read_only=True)
+    admin_name = serializers.CharField(source='admin.name', read_only=True)
     time_ago = serializers.SerializerMethodField()
     
     class Meta:

@@ -1,0 +1,105 @@
+Project summary: I’m building the Admin Management for a university 2nd-year, 2nd-semester real-world group project (team of 5). I own the Admin part and want it to be a professional admin panel for a Kitchen Management System. Users log in like a real app (do not create user accounts from admin). Admin responsibilities include: user management (view/edit/role management, not creating users), full CRUD for foods, order management (statuses, assignment, cancellations, payments if any), reports and analytics, and other admin functionality. I’ve implemented parts already and want a complete analysis before any code changes are made.
+
+Goal for you (analysis first — no immediate code changes): perform a comprehensive audit and produce a prioritized action plan plus concrete deliverables so I (or my team) can implement fixes and improvements safely.
+
+Please perform the following (start with analysis only):
+
+Repository & environment checklist
+
+Confirm tech stack: Frontend: React / Backend: Django / DB: MySQL
+
+Tell me what you need to access/run the app (repo link, branch, test admin credentials, Postman collection, .env template).
+
+Verify build & run steps (frontend & backend), and list any missing run instructions or environment variables.
+
+Full API endpoint audit
+
+Enumerate every API endpoint exposed by the backend (method + path + purpose).
+
+For each endpoint indicate: authentication required? authorization level? request/response schema (expected fields & types), status codes returned, and common error cases.
+
+Identify missing or inconsistent REST behavior (e.g., endpoints that should be PATCH but use POST, missing pagination, inconsistent naming).
+
+Check for OpenAPI/Swagger or Postman docs; if missing, generate a minimal spec for the most critical endpoints (users, foods, orders, reports).
+
+Frontend ↔ Backend integration
+
+Verify that endpoints used by the admin UI exist and match backend routes (no broken API calls).
+
+Check auth flow (token handling, refresh tokens, role checks on frontend and backend).
+
+Identify places where frontend assumptions mismatch backend (payload shape, date formats, error format).
+
+List failing UI flows (where actions produce errors, stale data, missing loading/error states).
+
+Admin dashboard feature & UX audit
+
+List recommended modules/pages for a professional admin panel (minimum: Dashboard/Overview, Users, Foods/Catalog, Orders, Reports/Analytics, Inventory, Settings, Activity Logs).
+
+For each page suggest essential fields, filters, sorts, bulk actions, and role/permission controls.
+
+UX/Accessibility checklist: responsive layout, keyboard navigation, ARIA labels, form validation, confirm dialogs for destructive actions.
+
+Functional correctness & bug hunting
+
+Run through typical admin flows and list bugs/edge cases to fix (e.g., stale order status after update, race conditions, duplicate entries, orphaned records).
+
+Provide clear reproduction steps, expected vs actual behavior, and severity levels (Critical / High / Medium / Low).
+
+Security & data validation
+
+Check auth and authorization enforcement on server routes (no admin-only endpoint accessible to non-admins).
+
+Input validation and sanitization (prevent injection, validate file uploads, size/type checks).
+
+Sensitive data handling (no leaking passwords/secret keys, minimal data in logs).
+
+Recommend security hardening (CORS, rate limiting, helmet, secure cookie flags, password reset flows).
+
+Data model & DB integrity
+
+Review key models/tables: Users, Foods, Orders, OrderItems, Reports, Inventory, Roles/Permissions.
+
+Find schema problems (missing indexes, inconsistent relations, cascade rules).
+
+Suggest migrations or schema changes if needed.
+
+Reporting & analytics
+
+Recommend the core reports needed (sales by day/week/month, top foods, order status breakdown, user activity, revenue, inventory low stock alert).
+
+Define required APIs and example SQL/MongoDB aggregation queries for those reports.
+
+Suggest downloadable report formats (CSV, PDF) and scheduling/export options.
+
+Testing & CI
+
+Provide a list of unit, integration, and end-to-end tests that should exist (and example test cases).
+
+Suggest a minimal CI pipeline checklist (lint, unit tests, build, deploy staging).
+
+Provide a few Postman test scenarios (copyable) for critical flows (admin login, create/update food, change order status, generate report).
+
+Deliverables I want from you (after analysis)
+
+A written audit report with: endpoint inventory, frontend/backend mismatch list, prioritized bug list (with reproduction steps), suggested fixes (code snippets or pseudo-patches), and acceptance criteria for fixes.
+
+A prioritized action plan (bulleted) with each item labeled (Critical/High/Medium/Low) and estimated effort in story points (not time).
+
+A Postman collection (or OpenAPI stub) for critical endpoints.
+
+Example code fixes or PR diffs for 2–3 highest priority bugs (or exact file+line suggestions).
+
+Minimal UI wireframe or checklist for dashboard improvements (can be simple bullet wireframe).
+
+A test checklist and example test cases (unit + e2e).
+
+Important constraints & notes (must follow):
+
+Do the analysis first and present findings in a single audit report before proposing code changes. I will review and approve changes before you implement them.
+
+Do not require production secrets — use a test admin account and test DB where possible.
+
+If any assumption is made about the tech stack or repo layout, clearly state it at the top of your report and how to adjust if wrong.
+
+Where you provide code suggestions, keep them small, annotated, and safe to run (no deleting production data).

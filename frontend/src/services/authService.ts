@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = '/api/auth';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -93,7 +93,7 @@ api.interceptors.response.use(
       try {
         const refreshToken = getSecureToken(); // Get refresh token
         if (refreshToken) {
-          const response = await api.post('/token/refresh/', {
+          const response = await api.post('/auth/token/refresh/', {
             refresh: refreshToken,
           });
           
@@ -180,7 +180,7 @@ class AuthService {
   // Check if backend server is running
   async checkServerStatus(): Promise<boolean> {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/auth/health/', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/auth/health/`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000) // 5 second timeout
       });
@@ -193,7 +193,7 @@ class AuthService {
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await api.post<AuthResponse>('/login/', credentials);
+      const response = await api.post<AuthResponse>('/auth/login/', credentials);
       
       // Store tokens
       localStorage.setItem('access_token', response.data.access);
@@ -208,7 +208,7 @@ class AuthService {
 
   async register(data: RegisterData): Promise<RegisterResponse> {
     try {
-      const response = await api.post<RegisterResponse>('/register/', data);
+      const response = await api.post<RegisterResponse>('/auth/register/', data);
       return response.data;
     } catch (error: any) {
       const formattedError = formatErrorMessage(error);
@@ -220,7 +220,7 @@ class AuthService {
     try {
       const refreshToken = localStorage.getItem('refresh_token');
       if (refreshToken) {
-        await api.post('/logout/', { refresh: refreshToken });
+        await api.post('/auth/logout/', { refresh: refreshToken });
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -231,22 +231,22 @@ class AuthService {
   }
 
   async verifyEmail(data: EmailVerificationData): Promise<{ message: string }> {
-    const response = await api.post<{ message: string }>('/verify-email/', data);
+    const response = await api.post<{ message: string }>('/auth/verify-email/', data);
     return response.data;
   }
 
   async requestPasswordReset(data: PasswordResetRequestData): Promise<{ message: string }> {
-    const response = await api.post<{ message: string }>('/password/reset/request/', data);
+    const response = await api.post<{ message: string }>('/auth/password/reset/request/', data);
     return response.data;
   }
 
   async confirmPasswordReset(data: PasswordResetConfirmData): Promise<{ message: string }> {
-    const response = await api.post<{ message: string }>('/password/reset/confirm/', data);
+    const response = await api.post<{ message: string }>('/auth/password/reset/confirm/', data);
     return response.data;
   }
 
   async googleOAuth(data: GoogleOAuthData): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/google/login/', data);
+    const response = await api.post<AuthResponse>('/auth/google/login/', data);
     
     // Store tokens
     localStorage.setItem('access_token', response.data.access);
@@ -256,17 +256,17 @@ class AuthService {
   }
 
   async getProfile(): Promise<User> {
-    const response = await api.get<User>('/profile/');
+    const response = await api.get<User>('/auth/profile/');
     return response.data;
   }
 
   async updateProfile(data: Partial<User>): Promise<{ message: string; user: User }> {
-    const response = await api.put<{ message: string; user: User }>('/profile/update/', data);
+    const response = await api.put<{ message: string; user: User }>('/auth/profile/update/', data);
     return response.data;
   }
 
   async changePassword(oldPassword: string, newPassword: string, confirmNewPassword: string): Promise<{ message: string }> {
-    const response = await api.post<{ message: string }>('/password/change/', {
+    const response = await api.post<{ message: string }>('/auth/password/change/', {
       old_password: oldPassword,
       new_password: newPassword,
       confirm_new_password: confirmNewPassword,
@@ -280,7 +280,7 @@ class AuthService {
       throw new Error('No refresh token available');
     }
 
-    const response = await api.post<{ access: string; refresh: string }>('/token/refresh/', {
+    const response = await api.post<{ access: string; refresh: string }>('/auth/token/refresh/', {
       refresh: refreshToken,
     });
 
