@@ -91,7 +91,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = getSecureToken(); // Get refresh token
+        const refreshToken = localStorage.getItem('refresh_token'); // Get refresh token from localStorage
         if (refreshToken) {
           const response = await api.post('/auth/token/refresh/', {
             refresh: refreshToken,

@@ -27,6 +27,7 @@ import { adminService, type DashboardStats, type AdminOrder, type AdminActivityL
 import AdvancedStatsCard from '@/components/admin/AdvancedStatsCard';
 import InteractiveChart from '@/components/admin/InteractiveChart';
 import AdvancedDataTable from '@/components/admin/AdvancedDataTable';
+import { formatCurrency } from '@/utils/numberUtils';
 import NotificationCenter from '@/components/admin/NotificationCenter';
 import SystemHealthMonitor from '@/components/admin/SystemHealthMonitor';
 
@@ -302,7 +303,7 @@ const EnhancedDashboard: React.FC = () => {
                 sortable: true,
                 align: 'right',
                 render: (value) => (
-                  <span className="font-medium">${value.toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(value)}</span>
                 )
               },
               {

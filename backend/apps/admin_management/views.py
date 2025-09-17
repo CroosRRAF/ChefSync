@@ -273,18 +273,40 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
     def list_users(self, request):
         """Get paginated list of users with filters"""
         try:
-            # Get query parameters
-            page = int(request.query_params.get('page', 1))
-            limit = int(request.query_params.get('limit', 25))
-            search = request.query_params.get('search', '')
-            role = request.query_params.get('role', '')
-            status = request.query_params.get('status', '')
-            sort_by = request.query_params.get('sort_by', 'date_joined')
-            sort_order = request.query_params.get('sort_order', 'desc')
+            # Get query parameters with validation
+            try:
+                page = int(request.query_params.get('page', 1))
+                limit = int(request.query_params.get('limit', 25))
+                if page < 1 or limit < 1 or limit > 100:
+                    return Response(
+                        {'error': 'Invalid pagination parameters'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except (ValueError, TypeError):
+                return Response(
+                    {'error': 'Invalid page or limit parameter'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            search = request.query_params.get('search', '').strip()
+            role = request.query_params.get('role', '').strip()
+            status_param = request.query_params.get('status', '').strip()
+            sort_by = request.query_params.get('sort_by', 'date_joined').strip()
+            sort_order = request.query_params.get('sort_order', 'desc').strip()
+            
+            # Validate sort_by field
+            allowed_sort_fields = ['date_joined', 'name', 'email', 'last_login']
+            if sort_by not in allowed_sort_fields:
+                sort_by = 'date_joined'
+            
+            # Validate sort_order
+            if sort_order not in ['asc', 'desc']:
+                sort_order = 'desc'
             
             # Build query
             queryset = User.objects.all()
             
+            # Apply filters
             if search:
                 queryset = queryset.filter(
                     Q(email__icontains=search) |
@@ -294,9 +316,9 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             if role:
                 queryset = queryset.filter(role=role)
             
-            if status == 'active':
+            if status_param == 'active':
                 queryset = queryset.filter(is_active=True)
-            elif status == 'inactive':
+            elif status_param == 'inactive':
                 queryset = queryset.filter(is_active=False)
             
             # Apply sorting
@@ -304,35 +326,67 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 sort_by = f'-{sort_by}'
             queryset = queryset.order_by(sort_by)
             
+            # Get total count before pagination
+            total_count = queryset.count()
+            
             # Pagination
             start = (page - 1) * limit
             end = start + limit
             users = queryset[start:end]
             
-            # Get user summaries
+            # Get user summaries with error handling
             user_data = []
             for user in users:
-                # Get user statistics
-                from apps.orders.models import Order
-                total_orders = Order.objects.filter(customer=user).count()
-                total_spent = Order.objects.filter(
-                    customer=user, payment_status='paid'
-                ).aggregate(total=Sum('total_amount'))['total'] or 0
-                
-                user_data.append({
-                    'id': user.id,
-                    'email': user.email,
-                    'name': user.name,
-                    'role': user.role,
-                    'is_active': user.is_active,
-                    'last_login': user.last_login,
-                    'date_joined': user.date_joined,
-                    'total_orders': total_orders,
-                    'total_spent': float(total_spent),
-                })
+                try:
+                    # Get user statistics with error handling
+                    from apps.orders.models import Order
+                    
+                    # Count orders safely
+                    try:
+                        total_orders = Order.objects.filter(customer=user).count()
+                    except Exception as e:
+                        print(f"Error counting orders for user {user.user_id}: {e}")
+                        total_orders = 0
+                    
+                    # Calculate total spent safely
+                    try:
+                        total_spent_result = Order.objects.filter(
+                            customer=user, payment_status='paid'
+                        ).aggregate(total=Sum('total_amount'))
+                        total_spent = total_spent_result['total'] or 0
+                    except Exception as e:
+                        print(f"Error calculating total spent for user {user.user_id}: {e}")
+                        total_spent = 0
+                    
+                    user_data.append({
+                        'id': user.user_id,
+                        'email': user.email,
+                        'name': user.name or '',
+                        'role': user.role,
+                        'is_active': user.is_active,
+                        'last_login': user.last_login,
+                        'date_joined': user.date_joined,
+                        'total_orders': total_orders,
+                        'total_spent': float(total_spent) if total_spent else 0.0,
+                    })
+                    
+                except Exception as e:
+                    print(f"Error processing user {user.user_id}: {e}")
+                    # Add user with default values if processing fails
+                    user_data.append({
+                        'id': user.user_id,
+                        'email': user.email,
+                        'name': user.name or '',
+                        'role': user.role,
+                        'is_active': user.is_active,
+                        'last_login': user.last_login,
+                        'date_joined': user.date_joined,
+                        'total_orders': 0,
+                        'total_spent': 0.0,
+                    })
             
-            # Get total count for pagination
-            total_count = queryset.count()
+            # Calculate pagination info
+            total_pages = (total_count + limit - 1) // limit
             
             return Response({
                 'users': user_data,
@@ -340,11 +394,17 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     'page': page,
                     'limit': limit,
                     'total': total_count,
-                    'pages': (total_count + limit - 1) // limit,
+                    'pages': total_pages,
                 }
             })
             
         except Exception as e:
+            # Enhanced error logging
+            import traceback
+            print(f"Error in list_users: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            print(f"Request data: {request.query_params}")
+            
             return Response(
                 {'error': f'Failed to fetch users: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -363,7 +423,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             
             # Update users
             updated_count = User.objects.filter(
-                id__in=user_ids,
+                user_id__in=user_ids,
                 is_active=False
             ).update(is_active=True)
             
@@ -402,10 +462,10 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             
             # Don't allow deactivating admin users
             admin_users = User.objects.filter(
-                id__in=user_ids,
+                user_id__in=user_ids,
                 role='admin',
                 is_active=True
-            ).values_list('id', flat=True)
+            ).values_list('user_id', flat=True)
             
             if admin_users:
                 return Response(
@@ -415,7 +475,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             
             # Update users
             updated_count = User.objects.filter(
-                id__in=user_ids,
+                user_id__in=user_ids,
                 is_active=True
             ).exclude(role='admin').update(is_active=False)
             
@@ -454,9 +514,9 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             
             # Don't allow deleting admin users
             admin_users = User.objects.filter(
-                id__in=user_ids,
+                user_id__in=user_ids,
                 role='admin'
-            ).values_list('id', flat=True)
+            ).values_list('user_id', flat=True)
             
             if admin_users:
                 return Response(
@@ -466,7 +526,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             
             # Soft delete by deactivating
             updated_count = User.objects.filter(
-                id__in=user_ids
+                user_id__in=user_ids
             ).exclude(role='admin').update(is_active=False)
             
             # Log activity
@@ -532,7 +592,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 })
             
             user_data = {
-                'id': user.id,
+                'id': user.user_id,
                 'email': user.email,
                 'name': user.name,
                 'phone_no': user.phone_no,
@@ -613,7 +673,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 admin=request.user,
                 action='update',
                 resource_type='user',
-                resource_id=str(user.id),
+                resource_id=str(user.user_id),
                 description=f'Updated user {user.email}: {", ".join(changes)}',
                 ip_address=request.META.get('REMOTE_ADDR'),
                 user_agent=request.META.get('HTTP_USER_AGENT'),
@@ -622,7 +682,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             return Response({
                 'message': 'User updated successfully',
                 'user': {
-                    'id': user.id,
+                    'id': user.user_id,
                     'email': user.email,
                     'name': user.name,
                     'role': user.role,
@@ -679,7 +739,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             # Write data
             for user in queryset:
                 writer.writerow([
-                    user.id,
+                    user.user_id,
                     user.email,
                     user.name,
                     user.phone_no or '',

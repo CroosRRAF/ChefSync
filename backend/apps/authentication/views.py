@@ -139,11 +139,11 @@ def token_refresh(request):
         refresh_token = request.data.get('refresh')
         if not refresh_token:
             return Response({'error': 'Refresh token required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Use JWT service to refresh token
         from .services.jwt_service import JWTTokenService
         token_data = JWTTokenService.refresh_access_token(refresh_token, request)
-        
+
         return Response({
             'access': token_data['access_token'],
             'refresh': refresh_token  # Keep the same refresh token

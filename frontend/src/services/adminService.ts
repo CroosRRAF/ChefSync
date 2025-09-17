@@ -30,12 +30,54 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Enhanced error handling for different error types
     if (error.response?.status === 401) {
       // Handle unauthorized access
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       window.location.href = '/login';
+    } else if (error.response?.status === 500) {
+      // Handle server errors with detailed logging
+      console.error('🚨 Server Error (500) in Admin API:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        timestamp: new Date().toISOString()
+      });
+
+      // Show user-friendly error message
+      const errorMessage = error.response.data?.error ||
+                          error.response.data?.message ||
+                          'Server error occurred. Please try again later or contact support.';
+
+      // You could dispatch to a global error handler or toast system here
+      console.warn('User-friendly error:', errorMessage);
+
+    } else if (error.response?.status >= 400 && error.response?.status < 500) {
+      // Handle client errors (400-499)
+      console.warn('Client Error in Admin API:', {
+        status: error.response.status,
+        message: error.response.data?.error || error.response.data?.message,
+        url: error.config?.url
+      });
+    } else if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+      // Handle network errors
+      console.error('🌐 Network Error:', {
+        code: error.code,
+        message: 'Unable to connect to server. Please check your internet connection.',
+        url: error.config?.url
+      });
+    } else {
+      // Handle other errors
+      console.error('❌ Unexpected Error in Admin API:', {
+        code: error.code,
+        message: error.message,
+        url: error.config?.url
+      });
     }
+
     return Promise.reject(error);
   }
 );
@@ -111,11 +153,11 @@ export interface AdminOrder {
   customer_name: string;
   customer_email: string;
   status: string;
-  total_amount: number;
+  total_amount: number | string; // API might return string
   created_at: string;
   updated_at: string;
   payment_status: string;
-  items_count: number;
+  items_count: number | string; // API might return string
 }
 
 export interface AdminNotification {
@@ -225,7 +267,18 @@ class AdminService {
       const response = await apiClient.get(`${this.baseUrl}/dashboard/recent_orders/`, {
         params: { limit }
       });
-      return response.data;
+      
+      // Transform data to ensure type safety
+      const orders: AdminOrder[] = response.data.map((order: any) => ({
+        ...order,
+        total_amount: typeof order.total_amount === 'string' 
+          ? parseFloat(order.total_amount) 
+          : Number(order.total_amount) || 0,
+        items_count: Number(order.items_count) || 0,
+        id: Number(order.id) || 0
+      }));
+      
+      return orders;
     } catch (error) {
       console.error('Error fetching recent orders:', error);
       throw new Error('Failed to fetch recent orders');
