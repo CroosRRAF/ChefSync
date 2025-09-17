@@ -6,6 +6,7 @@ from .models import (
     AdminDashboardWidget, AdminQuickAction, AdminSystemSettings,
     AdminBackupLog
 )
+from apps.orders.models import Order
 
 User = get_user_model()
 
@@ -257,28 +258,44 @@ class SystemHealthSerializer(serializers.Serializer):
     alerts = serializers.ListField(child=serializers.DictField())
 
 
-class AdminUserSummarySerializer(serializers.Serializer):
+class AdminUserSummarySerializer(serializers.ModelSerializer):
     """User summary for admin dashboard"""
-    id = serializers.IntegerField()
-    email = serializers.EmailField()
-    name = serializers.CharField()
-    role = serializers.CharField()
-    is_active = serializers.BooleanField()
-    last_login = serializers.DateTimeField()
-    date_joined = serializers.DateTimeField()
-    total_orders = serializers.IntegerField()
-    total_spent = serializers.FloatField()
+    total_orders = serializers.SerializerMethodField()
+    total_spent = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = [
+            'id', 'email', 'name', 'role', 'is_active', 'last_login',
+            'date_joined', 'total_orders', 'total_spent'
+        ]
+    
+    def get_total_orders(self, obj):
+        from apps.orders.models import Order
+        return Order.objects.filter(customer=obj).count()
+    
+    def get_total_spent(self, obj):
+        from apps.orders.models import Order
+        from django.db.models import Sum
+        total = Order.objects.filter(
+            customer=obj, payment_status='paid'
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+        return float(total)
 
 
-class AdminOrderSummarySerializer(serializers.Serializer):
+class AdminOrderSummarySerializer(serializers.ModelSerializer):
     """Order summary for admin dashboard"""
-    id = serializers.IntegerField()
-    order_number = serializers.CharField()
-    customer_name = serializers.CharField()
-    customer_email = serializers.EmailField()
-    status = serializers.CharField()
-    total_amount = serializers.FloatField()
-    created_at = serializers.DateTimeField()
-    updated_at = serializers.DateTimeField()
-    payment_status = serializers.CharField()
-    items_count = serializers.IntegerField()
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    customer_email = serializers.CharField(source='customer.email', read_only=True)
+    items_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Order
+        fields = [
+            'id', 'order_number', 'customer_name', 'customer_email',
+            'status', 'total_amount', 'created_at', 'updated_at',
+            'payment_status', 'items_count'
+        ]
+    
+    def get_items_count(self, obj):
+        return obj.items.count()

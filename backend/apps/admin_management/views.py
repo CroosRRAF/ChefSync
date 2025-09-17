@@ -61,10 +61,10 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             user_growth = ((new_users_this_week - previous_week_users) / max(previous_week_users, 1)) * 100
             
             # Chef statistics
-            total_chefs = User.objects.filter(role='chef').count()
-            active_chefs = User.objects.filter(role='chef', is_active=True).count()
+            total_chefs = User.objects.filter(role='cook').count()
+            active_chefs = User.objects.filter(role='cook', is_active=True).count()
             pending_chef_approvals = User.objects.filter(
-                role='chef', 
+                role='cook', 
                 is_active=False
             ).count()
             
@@ -190,7 +190,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         try:
             limit = int(request.query_params.get('limit', 10))
             from apps.orders.models import Order
-            recent_orders = Order.objects.select_related('customer', 'assigned_cook').order_by('-created_at')[:limit]
+            recent_orders = Order.objects.select_related('customer', 'chef').order_by('-created_at')[:limit]
             serializer = AdminOrderSummarySerializer(recent_orders, many=True)
             return Response(serializer.data)
         except Exception as e:
@@ -288,8 +288,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             if search:
                 queryset = queryset.filter(
                     Q(email__icontains=search) |
-                    Q(first_name__icontains=search) |
-                    Q(last_name__icontains=search)
+                    Q(name__icontains=search)
                 )
             
             if role:
@@ -323,7 +322,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 user_data.append({
                     'id': user.id,
                     'email': user.email,
-                    'name': user.get_full_name(),
+                    'name': user.name,
                     'role': user.role,
                     'is_active': user.is_active,
                     'last_login': user.last_login,
@@ -378,8 +377,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                 queryset = queryset.filter(
                     Q(order_number__icontains=search) |
                     Q(customer__email__icontains=search) |
-                    Q(customer__first_name__icontains=search) |
-                    Q(customer__last_name__icontains=search)
+                    Q(customer__name__icontains=search)
                 )
             
             if status:
@@ -404,14 +402,14 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                 order_data.append({
                     'id': order.id,
                     'order_number': order.order_number,
-                    'customer_name': order.customer.get_full_name() if order.customer else 'Unknown',
+                    'customer_name': order.customer.name if order.customer else 'Unknown',
                     'customer_email': order.customer.email if order.customer else '',
                     'status': order.status,
                     'total_amount': float(order.total_amount),
                     'created_at': order.created_at,
                     'updated_at': order.updated_at,
                     'payment_status': order.payment_status,
-                    'items_count': order.items.count() if hasattr(order, 'items') else 0,
+                    'items_count': order.items.count(),
                 })
             
             # Get total count for pagination
@@ -430,6 +428,136 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response(
                 {'error': f'Failed to fetch orders: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['patch'])
+    def update_status(self, request, pk=None):
+        """Update order status"""
+        try:
+            from apps.orders.models import Order
+            order = Order.objects.get(pk=pk)
+            
+            new_status = request.data.get('status')
+            if not new_status:
+                return Response(
+                    {'error': 'Status is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate status
+            valid_statuses = [choice[0] for choice in Order.ORDER_STATUS_CHOICES]
+            if new_status not in valid_statuses:
+                return Response(
+                    {'error': f'Invalid status. Valid options: {valid_statuses}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            old_status = order.status
+            order.status = new_status
+            order.updated_at = timezone.now()
+            order.save()
+            
+            # Log the status change
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action='update',
+                resource_type='order',
+                resource_id=str(order.id),
+                description=f'Updated order {order.order_number} status from {old_status} to {new_status}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            
+            return Response({
+                'message': f'Order status updated to {new_status}',
+                'order': {
+                    'id': order.id,
+                    'order_number': order.order_number,
+                    'status': order.status,
+                    'updated_at': order.updated_at,
+                }
+            })
+            
+        except Order.DoesNotExist:
+            return Response(
+                {'error': 'Order not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to update order status: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['get'])
+    def details(self, request, pk=None):
+        """Get detailed order information"""
+        try:
+            from apps.orders.models import Order
+            order = Order.objects.select_related('customer', 'chef', 'delivery_partner').get(pk=pk)
+            
+            # Get order items
+            items = []
+            for item in order.items.select_related('food').all():
+                items.append({
+                    'id': item.id,
+                    'food_name': item.food_name,
+                    'quantity': item.quantity,
+                    'unit_price': float(item.unit_price),
+                    'total_price': float(item.total_price),
+                    'special_instructions': item.special_instructions,
+                })
+            
+            order_data = {
+                'id': order.id,
+                'order_number': order.order_number,
+                'customer': {
+                    'id': order.customer.id,
+                    'name': order.customer.name,
+                    'email': order.customer.email,
+                    'phone': order.customer.phone_no,
+                } if order.customer else None,
+                'chef': {
+                    'id': order.chef.id,
+                    'name': order.chef.name,
+                    'email': order.chef.email,
+                } if order.chef else None,
+                'delivery_partner': {
+                    'id': order.delivery_partner.id,
+                    'name': order.delivery_partner.name,
+                    'email': order.delivery_partner.email,
+                } if order.delivery_partner else None,
+                'status': order.status,
+                'payment_status': order.payment_status,
+                'payment_method': order.payment_method,
+                'subtotal': float(order.subtotal),
+                'tax_amount': float(order.tax_amount),
+                'delivery_fee': float(order.delivery_fee),
+                'discount_amount': float(order.discount_amount),
+                'total_amount': float(order.total_amount),
+                'delivery_address': order.delivery_address,
+                'delivery_instructions': order.delivery_instructions,
+                'estimated_delivery_time': order.estimated_delivery_time,
+                'actual_delivery_time': order.actual_delivery_time,
+                'customer_notes': order.customer_notes,
+                'chef_notes': order.chef_notes,
+                'admin_notes': order.admin_notes,
+                'items': items,
+                'created_at': order.created_at,
+                'updated_at': order.updated_at,
+            }
+            
+            return Response(order_data)
+            
+        except Order.DoesNotExist:
+            return Response(
+                {'error': 'Order not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to fetch order details: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

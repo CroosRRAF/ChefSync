@@ -29,27 +29,16 @@ import {
 } from 'lucide-react';
 
 interface AdminOrder {
-  id: string;
-  orderNumber: string;
-  customerName: string;
-  customerPhone: string;
-  customerAddress: string;
-  items: Array<{
-    name: string;
-    quantity: number;
-    price: number;
-    specialInstructions?: string;
-  }>;
-  status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
-  priority: 'high' | 'medium' | 'low';
-  estimatedTime: number;
-  actualTime: number;
-  orderTime: string;
-  assignedCookId?: string;
-  assignedDeliveryAgentId?: string;
-  totalAmount: number;
-  paymentStatus: 'pending' | 'paid' | 'failed';
-  paymentMethod: 'cash' | 'card' | 'online';
+  id: number;
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  status: 'cart' | 'pending' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'refunded';
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+  payment_status: 'pending' | 'paid' | 'failed' | 'refunded' | 'partial_refund';
+  items_count: number;
 }
 
 const AdminOrders: React.FC = () => {
@@ -61,7 +50,6 @@ const AdminOrders: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -70,15 +58,17 @@ const AdminOrders: React.FC = () => {
 
   useEffect(() => {
     filterOrders();
-  }, [orders, searchTerm, statusFilter, priorityFilter, paymentFilter]);
+  }, [orders, searchTerm, statusFilter, paymentFilter]);
 
   const fetchOrders = async () => {
     try {
       setIsLoading(true);
-      const response = await apiClient.get('/admin/orders/');
-      setOrders(response.orders || []);
+      const response = await apiClient.get('/api/admin/orders/list_orders/');
+      // Backend returns { orders: [], pagination: {...} }
+      setOrders(response.data.orders || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
+      setOrders([]);
     } finally {
       setIsLoading(false);
     }
@@ -90,9 +80,9 @@ const AdminOrders: React.FC = () => {
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(order =>
-        order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customerPhone.includes(searchTerm)
+        order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.customer_email.includes(searchTerm)
       );
     }
 
@@ -101,14 +91,9 @@ const AdminOrders: React.FC = () => {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
-    // Priority filter
-    if (priorityFilter !== 'all') {
-      filtered = filtered.filter(order => order.priority === priorityFilter);
-    }
-
     // Payment filter
     if (paymentFilter !== 'all') {
-      filtered = filtered.filter(order => order.paymentStatus === paymentFilter);
+      filtered = filtered.filter(order => order.payment_status === paymentFilter);
     }
 
     setFilteredOrders(filtered);
@@ -116,10 +101,10 @@ const AdminOrders: React.FC = () => {
 
   const updateOrderStatus = async (orderId: string, newStatus: AdminOrder['status']) => {
     try {
-      await apiClient.patch(`/admin/orders/${orderId}/`, { status: newStatus });
+      await apiClient.patch(`/api/admin/orders/${orderId}/`, { status: newStatus });
       setOrders(prev => 
         prev.map(order => 
-          order.id === orderId ? { ...order, status: newStatus } : order
+          order.id === parseInt(orderId) ? { ...order, status: newStatus } : order
         )
       );
     } catch (error) {
@@ -129,50 +114,49 @@ const AdminOrders: React.FC = () => {
 
   const getStatusColor = (status: AdminOrder['status']) => {
     switch (status) {
+      case 'cart': return 'bg-gray-500';
       case 'pending': return 'bg-yellow-500';
-      case 'preparing': return 'bg-blue-500';
+      case 'confirmed': return 'bg-blue-500';
+      case 'preparing': return 'bg-orange-500';
       case 'ready': return 'bg-green-500';
       case 'out_for_delivery': return 'bg-purple-500';
-      case 'delivered': return 'bg-gray-500';
+      case 'delivered': return 'bg-emerald-500';
       case 'cancelled': return 'bg-red-500';
+      case 'refunded': return 'bg-indigo-500';
       default: return 'bg-gray-500';
     }
   };
 
-  const getPriorityColor = (priority: AdminOrder['priority']) => {
-    switch (priority) {
-      case 'high': return 'bg-red-500';
-      case 'medium': return 'bg-yellow-500';
-      case 'low': return 'bg-green-500';
-      default: return 'bg-gray-500';
-    }
-  };
-
-  const getPaymentColor = (status: AdminOrder['paymentStatus']) => {
+  const getPaymentColor = (status: AdminOrder['payment_status']) => {
     switch (status) {
       case 'paid': return 'bg-green-500';
       case 'pending': return 'bg-yellow-500';
       case 'failed': return 'bg-red-500';
+      case 'refunded': return 'bg-blue-500';
+      case 'partial_refund': return 'bg-orange-500';
       default: return 'bg-gray-500';
     }
   };
 
   const getStatusIcon = (status: AdminOrder['status']) => {
     switch (status) {
+      case 'cart': return <Clock className="h-4 w-4" />;
       case 'pending': return <Clock className="h-4 w-4" />;
+      case 'confirmed': return <CheckCircle className="h-4 w-4" />;
       case 'preparing': return <ChefHat className="h-4 w-4" />;
       case 'ready': return <CheckCircle className="h-4 w-4" />;
       case 'out_for_delivery': return <Package className="h-4 w-4" />;
       case 'delivered': return <CheckCircle className="h-4 w-4" />;
       case 'cancelled': return <AlertCircle className="h-4 w-4" />;
+      case 'refunded': return <AlertCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
   };
 
   const getTotalRevenue = () => {
     return orders
-      .filter(order => order.paymentStatus === 'paid')
-      .reduce((total, order) => total + order.totalAmount, 0);
+      .filter(order => order.payment_status === 'paid')
+      .reduce((total, order) => total + order.total_amount, 0);
   };
 
   const getOrdersCount = (status: AdminOrder['status']) => {
@@ -297,24 +281,15 @@ const AdminOrders: React.FC = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="cart">Cart</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
               <SelectItem value="preparing">Preparing</SelectItem>
               <SelectItem value="ready">Ready</SelectItem>
               <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Filter by priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="refunded">Refunded</SelectItem>
             </SelectContent>
           </Select>
 
@@ -327,6 +302,8 @@ const AdminOrders: React.FC = () => {
               <SelectItem value="paid">Paid</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="refunded">Refunded</SelectItem>
+              <SelectItem value="partial_refund">Partial Refund</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -348,9 +325,9 @@ const AdminOrders: React.FC = () => {
                 <TableHead>Customer</TableHead>
                 <TableHead>Items</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Priority</TableHead>
                 <TableHead>Payment</TableHead>
                 <TableHead>Total</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -358,21 +335,17 @@ const AdminOrders: React.FC = () => {
               {filteredOrders.map((order) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">
-                    #{order.orderNumber}
+                    #{order.order_number}
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{order.customerName}</div>
-                      <div className="text-sm text-muted-foreground">{order.customerPhone}</div>
+                      <div className="font-medium">{order.customer_name}</div>
+                      <div className="text-sm text-muted-foreground">{order.customer_email}</div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      {order.items.length} items
-                      <div className="text-xs text-muted-foreground">
-                        {order.items.slice(0, 2).map(item => `${item.quantity}x ${item.name}`).join(', ')}
-                        {order.items.length > 2 && '...'}
-                      </div>
+                      {order.items_count} items
                     </div>
                   </TableCell>
                   <TableCell>
@@ -387,21 +360,16 @@ const AdminOrders: React.FC = () => {
                   <TableCell>
                     <Badge 
                       variant="outline" 
-                      className={`${getPriorityColor(order.priority)} text-white`}
+                      className={`${getPaymentColor(order.payment_status)} text-white`}
                     >
-                      {order.priority}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant="outline" 
-                      className={`${getPaymentColor(order.paymentStatus)} text-white`}
-                    >
-                      {order.paymentStatus}
+                      {order.payment_status}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-medium">
-                    ${order.totalAmount.toFixed(2)}
+                    ${order.total_amount.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {new Date(order.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
