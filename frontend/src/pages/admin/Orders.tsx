@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useUserStore } from '@/store/userStore';
 import { useAuth } from '@/context/AuthContext';
 import { apiClient } from '@/utils/fetcher';
+import { adminService } from '@/services/adminService';
 import { 
   Clock, 
   CheckCircle, 
@@ -27,7 +27,8 @@ import {
   Eye,
   Edit,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
 
 interface AdminOrder {
@@ -43,7 +44,7 @@ interface AdminOrder {
   items_count: number;
 }
 
-const AdminOrders: React.FC = () => {
+const OrderManagement: React.FC = () => {
   const { user } = useUserStore();
   const navigate = useNavigate();
 
@@ -60,6 +61,14 @@ const AdminOrders: React.FC = () => {
   const [assignmentType, setAssignmentType] = useState<'chef' | 'partner' | null>(null);
   const [selectedNewStatus, setSelectedNewStatus] = useState<AdminOrder['status'] | null>(null);
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewOrder, setPreviewOrder] = useState<AdminOrder | null>(null);
+  const [previewPosition, setPreviewPosition] = useState({ x: 0, y: 0 });
+  
+  // Order details modal states
+  const [showOrderDetail, setShowOrderDetail] = useState(false);
+  const [orderDetails, setOrderDetails] = useState<any>(null);
+  const [orderDetailLoading, setOrderDetailLoading] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -72,11 +81,100 @@ const AdminOrders: React.FC = () => {
   const fetchOrders = async () => {
     try {
       setIsLoading(true);
-      const response = await apiClient.get('/api/admin/orders/list_orders/');
-      // Backend returns { orders: [], pagination: {...} }
-      setOrders(response.data.orders || []);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.log('🔍 Fetching orders using adminService');
+
+      // Use the adminService instead of direct API call
+      const ordersResponse = await adminService.getOrders({
+        page: 1,
+        limit: 100 // You can adjust this or make it configurable
+      });
+      
+      console.log('✅ API Response received:', {
+        orders: ordersResponse.orders.length,
+        pagination: ordersResponse.pagination
+      });
+
+      // Convert service AdminOrder type to component AdminOrder type
+      const convertedOrders = ordersResponse.orders.map(order => ({
+        id: order.id,
+        order_number: order.order_number,
+        customer_name: order.customer_name,
+        customer_email: order.customer_email,
+        status: order.status as AdminOrder['status'], // Type assertion to handle the status enum
+        total_amount: typeof order.total_amount === 'string' ? parseFloat(order.total_amount) : order.total_amount,
+        created_at: order.created_at,
+        updated_at: order.updated_at,
+        payment_status: order.payment_status as AdminOrder['payment_status'], // Type assertion for payment status
+        items_count: typeof order.items_count === 'string' ? parseInt(order.items_count) : order.items_count
+      }));
+
+      // Set the converted orders
+      setOrders(convertedOrders || []);
+    } catch (error: any) {
+      console.error('❌ Error fetching orders with adminService:', {
+        message: error?.message,
+        response: error?.response,
+        request: error?.request,
+        config: error?.config,
+        stack: error?.stack
+      });
+
+      // Log detailed request information
+      if (error?.config) {
+        console.error('📡 Request Details:', {
+          method: error.config.method,
+          url: error.config.url,
+          baseURL: error.config.baseURL,
+          headers: error.config.headers,
+          timeout: error.config.timeout
+        });
+      }
+
+      // Handle different types of errors
+      if (error?.response) {
+        // Server responded with error status
+        const status = error.response.status;
+        const message = error.response.data?.detail || error.response.data?.message || 'Server error';
+
+        console.error('🚨 Server Error Response:', {
+          status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+
+        if (status === 401) {
+          alert('Authentication required. Please log in again.');
+          window.location.href = '/auth/login';
+        } else if (status === 403) {
+          alert('You do not have permission to access this resource.');
+        } else if (status === 404) {
+          alert(`Orders endpoint not found. Please check if the backend server is running.`);
+          console.error('🔍 404 Error - Possible causes:');
+          console.error('  - Backend server not running');
+          console.error('  - Wrong endpoint URL in adminService');
+          console.error('  - Missing route in Django URLs');
+          console.error('  - CORS issues');
+          console.error('  - Proxy configuration problem');
+        } else {
+          alert(`Failed to fetch orders: ${message}`);
+        }
+      } else if (error?.request) {
+        // Network error
+        console.error('🌐 Network Error Details:', {
+          request: error.request,
+          code: error.code,
+          errno: error.errno,
+          syscall: error.syscall
+        });
+        alert('Network error. Please check your connection and try again.');
+      } else {
+        // Other error
+        const errorMessage = error?.message || 'Unknown error occurred';
+        console.error('❓ Unknown Error Details:', error);
+        alert(`Error: ${errorMessage}`);
+      }
+
       setOrders([]);
     } finally {
       setIsLoading(false);
@@ -111,27 +209,46 @@ const AdminOrders: React.FC = () => {
   const updateOrderStatus = async (orderId: string, newStatus: AdminOrder['status']) => {
     try {
       // Use the correct API endpoint for status updates
-      await apiClient.patch(`/api/admin/orders/${orderId}/update_status/`, { 
+      const response = await apiClient.patch(`/api/admin/orders/${orderId}/update_status/`, { 
         status: newStatus 
       });
-      
-      // Update local state
-      setOrders(prev => 
-        prev.map(order => 
-          order.id === parseInt(orderId) ? { 
-            ...order, 
-            status: newStatus,
-            updated_at: new Date().toISOString()
-          } : order
-        )
-      );
-      
-      // Show success message (you can add a toast notification here)
-      console.log(`Order ${orderId} status updated to ${newStatus}`);
-    } catch (error) {
-      console.error('Error updating order status:', error);
-      // Show error message (you can add a toast notification here)
-      alert('Failed to update order status. Please try again.');
+
+      if (response.status >= 200 && response.status < 300) {
+        // Update local state
+        setOrders(prev => 
+          prev.map(order => 
+            order.id === parseInt(orderId) ? { 
+              ...order, 
+              status: newStatus,
+              updated_at: new Date().toISOString()
+            } : order
+          )
+        );
+        
+        // Show success message (you can add a toast notification here)
+        console.log(`Order ${orderId} status updated to ${newStatus}`);
+        alert(`Order status updated successfully to ${newStatus.replace('_', ' ')}`);
+      } else {
+        throw new Error(response.data?.detail || 'Failed to update order status');
+      }
+    } catch (error: any) {
+      console.error('Error updating order status:', {
+        message: error?.message,
+        response: error?.response,
+        request: error?.request
+      });
+
+      if (error?.response?.status === 401) {
+        alert('Authentication required. Please log in again.');
+        window.location.href = '/auth/login';
+      } else if (error?.response?.status === 403) {
+        alert('You do not have permission to update order status.');
+      } else if (error?.response?.status === 404) {
+        alert('Order not found or update endpoint not available.');
+      } else {
+        const message = error?.response?.data?.detail || error?.response?.data?.message || error?.message || 'Unknown error';
+        alert(`Failed to update order status: ${message}`);
+      }
     }
   };
 
@@ -238,11 +355,30 @@ const AdminOrders: React.FC = () => {
         apiClient.get('/api/admin/orders/available_chefs/'),
         apiClient.get('/api/admin/orders/available_delivery_partners/')
       ]);
-      
-      setAvailableChefs(chefsResponse.data.chefs || []);
-      setAvailablePartners(partnersResponse.data.partners || []);
-    } catch (error) {
-      console.error('Error fetching available resources:', error);
+
+      // Check responses
+      if (chefsResponse.status >= 200 && chefsResponse.status < 300) {
+        setAvailableChefs(chefsResponse.data.chefs || []);
+      }
+      if (partnersResponse.status >= 200 && partnersResponse.status < 300) {
+        setAvailablePartners(partnersResponse.data.partners || []);
+      }
+    } catch (error: any) {
+      console.error('Error fetching available resources:', {
+        message: error?.message,
+        response: error?.response
+      });
+
+      if (error?.response?.status === 401) {
+        alert('Authentication required. Please log in again.');
+        window.location.href = '/auth/login';
+      } else {
+        const message = error?.response?.data?.detail || error?.response?.data?.message || error?.message || 'Unknown error';
+        alert(`Failed to fetch available resources: ${message}`);
+      }
+
+      setAvailableChefs([]);
+      setAvailablePartners([]);
     }
   };
 
@@ -262,32 +398,48 @@ const AdminOrders: React.FC = () => {
         ? { chef_id: resourceId } 
         : { partner_id: resourceId };
       
-      await apiClient.patch(`/api/admin/orders/${selectedOrder.id}/${endpoint}/`, data);
-      
-      // Update local state
-      setOrders(prev => 
-        prev.map(order => 
-          order.id === selectedOrder.id ? { 
-            ...order, 
-            [assignmentType === 'chef' ? 'chef' : 'delivery_partner']: {
-              id: resourceId,
-              name: assignmentType === 'chef' 
-                ? availableChefs.find(c => c.id === resourceId)?.name
-                : availablePartners.find(p => p.id === resourceId)?.name,
-              email: assignmentType === 'chef'
-                ? availableChefs.find(c => c.id === resourceId)?.email
-                : availablePartners.find(p => p.id === resourceId)?.email
-            }
-          } : order
-        )
-      );
-      
-      setShowAssignmentModal(false);
-      setSelectedOrder(null);
-      setAssignmentType(null);
-    } catch (error) {
+      const response = await apiClient.patch(`/api/admin/orders/${selectedOrder.id}/${endpoint}/`, data);
+
+      if (response.status >= 200 && response.status < 300) {
+        // Update local state
+        setOrders(prev => 
+          prev.map(order => 
+            order.id === selectedOrder.id ? { 
+              ...order, 
+              [assignmentType === 'chef' ? 'chef' : 'delivery_partner']: {
+                id: resourceId,
+                name: assignmentType === 'chef' 
+                  ? availableChefs.find(c => c.id === resourceId)?.name
+                  : availablePartners.find(p => p.id === resourceId)?.name,
+                email: assignmentType === 'chef'
+                  ? availableChefs.find(c => c.id === resourceId)?.email
+                  : availablePartners.find(p => p.id === resourceId)?.email
+              }
+            } : order
+          )
+        );
+        
+        setShowAssignmentModal(false);
+        setSelectedOrder(null);
+        setAssignmentType(null);
+        alert(`${assignmentType === 'chef' ? 'Chef' : 'Delivery partner'} assigned successfully!`);
+      } else {
+        throw new Error(response.data?.detail || 'Failed to assign resource');
+      }
+    } catch (error: any) {
       console.error('Error assigning resource:', error);
-      alert('Failed to assign resource. Please try again.');
+
+      if (error.response?.status === 401) {
+        alert('Authentication required. Please log in again.');
+        window.location.href = '/auth/login';
+      } else if (error.response?.status === 403) {
+        alert('You do not have permission to assign resources.');
+      } else if (error.response?.status === 404) {
+        alert('Order or resource not found.');
+      } else {
+        const message = error.response?.data?.detail || error.response?.data?.message || error.message || 'Unknown error';
+        alert(`Failed to assign resource: ${message}`);
+      }
     }
   };
 
@@ -295,6 +447,44 @@ const AdminOrders: React.FC = () => {
     setShowAssignmentModal(false);
     setSelectedOrder(null);
     setAssignmentType(null);
+  };
+
+  // Handle order preview on hover
+  const handleOrderPreview = (order: AdminOrder, event: React.MouseEvent) => {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+    
+    setPreviewOrder(order);
+    setShowPreview(true);
+    setPreviewPosition({
+      x: rect.left + rect.width / 2 + scrollLeft,
+      y: rect.top + scrollTop - 10
+    });
+  };
+
+  const handlePreviewClose = () => {
+    setShowPreview(false);
+    setPreviewOrder(null);
+  };
+
+  // Handle order detail view
+  const handleOrderDetail = async (order: AdminOrder) => {
+    try {
+      setSelectedOrder(order);
+      setOrderDetailLoading(true);
+      setShowOrderDetail(true);
+      setOrderDetails(null); // Reset details while loading
+      
+      const details = await adminService.getOrderDetails(order.id);
+      setOrderDetails(details);
+    } catch (err) {
+      console.error('Failed to fetch order details:', err);
+      alert(err instanceof Error ? err.message : 'Failed to fetch order details');
+      setOrderDetails(null); // Ensure orderDetails is null on error
+    } finally {
+      setOrderDetailLoading(false);
+    }
   };
 
   const getTotalRevenue = () => {
@@ -309,95 +499,42 @@ const AdminOrders: React.FC = () => {
 
   if (isLoading) {
     return (
-      <AdminLayout>
-        <div className="space-y-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              ))}
-            </div>
-            <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      <div className="space-y-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            ))}
           </div>
+          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded"></div>
         </div>
-      </AdminLayout>
+      </div>
     );
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-8">
-        {/* Header */}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Order Management
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
-                Monitor and manage all system orders
-              </p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Button onClick={fetchOrders} variant="outline" size="sm">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Order Management
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Monitor and manage all system orders
+          </p>
         </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-600 dark:text-blue-400 text-sm font-medium">Total Orders</p>
-                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{orders.length}</p>
-                </div>
-                <Package className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-600 dark:text-green-400 text-sm font-medium">Completed</p>
-                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">{getOrdersCount('delivered')}</p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-800">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-yellow-600 dark:text-yellow-400 text-sm font-medium">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">{getOrdersCount('pending')}</p>
-                </div>
-                <Clock className="h-8 w-8 text-yellow-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 border-purple-200 dark:border-purple-800">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-600 dark:text-purple-400 text-sm font-medium">Revenue</p>
-                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">${getTotalRevenue().toFixed(2)}</p>
-                </div>
-                <DollarSign className="h-8 w-8 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex items-center space-x-3">
+          <Badge variant="outline" className="text-xs">
+            {orders.length} total orders
+          </Badge>
+          <Button onClick={fetchOrders} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
+      </div>
 
         {/* Filters */}
         <Card>
@@ -510,9 +647,9 @@ const AdminOrders: React.FC = () => {
       {/* Orders Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Orders</CardTitle>
+          <CardTitle>Orders</CardTitle>
           <CardDescription>
-            {filteredOrders.length} orders found
+            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} found
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -531,7 +668,12 @@ const AdminOrders: React.FC = () => {
             </TableHeader>
             <TableBody>
               {filteredOrders.map((order) => (
-                <TableRow key={order.id}>
+                <TableRow 
+                  key={order.id}
+                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors relative group"
+                  onMouseEnter={(e) => handleOrderPreview(order, e)}
+                  onMouseLeave={handlePreviewClose}
+                >
                   <TableCell className="font-medium">
                     #{order.order_number}
                   </TableCell>
@@ -571,6 +713,15 @@ const AdminOrders: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
+                      <Button 
+                        size="sm" 
+                        variant="default" 
+                        className="text-xs px-2 py-1 h-auto"
+                        onClick={() => handleOrderDetail(order)}
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        View Details
+                      </Button>
                       {getValidStatusTransitions(order.status).map((newStatus) => (
                         <Button
                           key={newStatus}
@@ -600,10 +751,6 @@ const AdminOrders: React.FC = () => {
                         <Package className="h-3 w-3 mr-1" />
                         Assign Partner
                       </Button>
-                      <Button size="sm" variant="outline" className="text-xs px-2 py-1 h-auto">
-                        <Eye className="h-3 w-3 mr-1" />
-                        View
-                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -612,10 +759,446 @@ const AdminOrders: React.FC = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Status Change Modal */}
+      {showStatusModal && selectedOrder && selectedNewStatus && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <AlertCircle className="h-6 w-6 text-yellow-500 mr-3" />
+                <h3 className="text-lg font-semibold">Confirm Status Change</h3>
+              </div>
+              <div className="mb-6">
+                <p className="text-gray-600 mb-3">
+                  Are you sure you want to change the status of order <strong>#{selectedOrder.order_number}</strong> to <strong>{selectedNewStatus.replace('_', ' ')}</strong>?
+                </p>
+                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <strong>Customer:</strong> {selectedOrder.customer_name}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <strong>Current Status:</strong> {selectedOrder.status.replace('_', ' ')}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <strong>New Status:</strong> {selectedNewStatus.replace('_', ' ')}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <Button variant="outline" onClick={cancelStatusChange}>
+                  Cancel
+                </Button>
+                <Button onClick={confirmStatusChange}>
+                  Confirm Change
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Preview Popup */}
+      {showPreview && previewOrder && (
+        <div 
+          className="fixed z-50 pointer-events-none animate-in fade-in-0 zoom-in-95"
+          style={{
+            left: `${previewPosition.x}px`,
+            top: `${previewPosition.y}px`,
+            transform: 'translate(-50%, -100%)'
+          }}
+        >
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-4 w-80 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                {previewOrder.order_number.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+                  Order #{previewOrder.order_number}
+                </h3>
+                <p className="text-sm text-gray-500 truncate">{previewOrder.customer_name}</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+              <div className="flex items-center space-x-2">
+                <span className="font-medium text-gray-700 dark:text-gray-300">Status:</span>
+                <Badge 
+                  variant={
+                    previewOrder.status === 'delivered' ? 'default' :
+                    previewOrder.status === 'cancelled' ? 'destructive' :
+                    previewOrder.status === 'pending' ? 'secondary' : 'outline'
+                  }
+                  className={`text-xs ${
+                    previewOrder.status === 'delivered' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                    previewOrder.status === 'cancelled' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                    previewOrder.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                    'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                  }`}
+                >
+                  {previewOrder.status.replace('_', ' ')}
+                </Badge>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="font-medium text-gray-700 dark:text-gray-300">Payment:</span>
+                <Badge 
+                  variant={previewOrder.payment_status === 'paid' ? 'default' : 'secondary'}
+                  className={`text-xs ${
+                    previewOrder.payment_status === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                    'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                  }`}
+                >
+                  {previewOrder.payment_status}
+                </Badge>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="font-medium text-gray-700 dark:text-gray-300">Items:</span>
+                <span className="ml-2 text-gray-900 dark:text-white font-semibold">{previewOrder.items_count}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-700 dark:text-gray-300">Total:</span>
+                <span className="ml-2 text-gray-900 dark:text-white font-semibold">${previewOrder.total_amount.toFixed(2)}</span>
+              </div>
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center space-x-1">
+                  <Calendar className="h-3 w-3" />
+                  <span>Ordered: {new Date(previewOrder.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <span>Updated: {new Date(previewOrder.updated_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Detail Modal */}
+      {showOrderDetail && selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-6 flex flex-col h-full max-h-[90vh]">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
+                    {selectedOrder.order_number.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Order #{selectedOrder.order_number}
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {new Date(selectedOrder.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setShowOrderDetail(false)}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {orderDetailLoading ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full inline-block mb-2"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Loading order details...</p>
+                  </div>
+                </div>
+              ) : orderDetails ? (
+                <div className="flex-1 overflow-auto">
+                  <div className="grid md:grid-cols-2 gap-6 mb-6">
+                    <Card className="overflow-hidden">
+                      <CardHeader className="bg-gray-50 dark:bg-gray-800/50 pb-3">
+                        <CardTitle className="text-lg">Customer Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-4">
+                        {orderDetails.customer ? (
+                          <div className="space-y-2">
+                            <div className="flex">
+                              <span className="font-medium w-24">Name:</span>
+                              <span>{orderDetails.customer.name}</span>
+                            </div>
+                            <div className="flex">
+                              <span className="font-medium w-24">Email:</span>
+                              <span>{orderDetails.customer.email}</span>
+                            </div>
+                            {orderDetails.customer.phone && (
+                              <div className="flex">
+                                <span className="font-medium w-24">Phone:</span>
+                                <span>{orderDetails.customer.phone}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 italic">Customer information not available</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="overflow-hidden">
+                      <CardHeader className="bg-gray-50 dark:bg-gray-800/50 pb-3">
+                        <CardTitle className="text-lg">Order Status</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-4">
+                        <div className="space-y-3">
+                          <div className="flex">
+                            <span className="font-medium w-24">Status:</span>
+                            <Badge 
+                              variant="secondary" 
+                              className={`${getStatusColor(orderDetails.status)} text-white`}
+                            >
+                              {getStatusIcon(orderDetails.status)}
+                              <span className="ml-1">{orderDetails.status.replace('_', ' ')}</span>
+                            </Badge>
+                          </div>
+                          <div className="flex">
+                            <span className="font-medium w-24">Payment:</span>
+                            <Badge 
+                              variant="outline" 
+                              className={`${getPaymentColor(orderDetails.payment_status)} text-white`}
+                            >
+                              {orderDetails.payment_status}
+                            </Badge>
+                          </div>
+                          <div className="flex">
+                            <span className="font-medium w-24">Method:</span>
+                            <span>{orderDetails.payment_method || 'Not specified'}</span>
+                          </div>
+                          <div className="flex">
+                            <span className="font-medium w-24">Created:</span>
+                            <span>{new Date(orderDetails.created_at).toLocaleString()}</span>
+                          </div>
+                          <div className="flex">
+                            <span className="font-medium w-24">Updated:</span>
+                            <span>{new Date(orderDetails.updated_at).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card className="mb-6 overflow-hidden">
+                    <CardHeader className="bg-gray-50 dark:bg-gray-800/50 pb-3">
+                      <CardTitle className="text-lg">Order Items</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Item</TableHead>
+                            <TableHead className="text-right">Quantity</TableHead>
+                            <TableHead className="text-right">Unit Price</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {orderDetails.items && orderDetails.items.length > 0 ? (
+                            orderDetails.items.map((item: any, index: number) => (
+                              <TableRow key={index}>
+                                <TableCell>
+                                  <div>
+                                    <div className="font-medium">{item.food_name}</div>
+                                    {item.special_instructions && (
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        <span className="font-medium">Instructions:</span> {item.special_instructions}
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">{item.quantity}</TableCell>
+                                <TableCell className="text-right">${parseFloat(item.unit_price).toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-medium">${parseFloat(item.total_price).toFixed(2)}</TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center text-gray-500 py-4">No items found</TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid md:grid-cols-2 gap-6 mb-6">
+                    <Card className="overflow-hidden">
+                      <CardHeader className="bg-gray-50 dark:bg-gray-800/50 pb-3">
+                        <CardTitle className="text-lg">Delivery Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-4">
+                        <div className="space-y-2">
+                          <div>
+                            <span className="font-medium">Delivery Address:</span>
+                            <p className="mt-1 text-gray-700 dark:text-gray-300">{orderDetails.delivery_address || 'Not provided'}</p>
+                          </div>
+                          {orderDetails.delivery_instructions && (
+                            <div className="mt-3">
+                              <span className="font-medium">Delivery Instructions:</span>
+                              <p className="mt-1 text-gray-700 dark:text-gray-300">{orderDetails.delivery_instructions}</p>
+                            </div>
+                          )}
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="font-medium">Estimated Delivery:</span>
+                              <p className="text-gray-700 dark:text-gray-300">
+                                {orderDetails.estimated_delivery_time ? new Date(orderDetails.estimated_delivery_time).toLocaleString() : 'Not set'}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="font-medium">Actual Delivery:</span>
+                              <p className="text-gray-700 dark:text-gray-300">
+                                {orderDetails.actual_delivery_time ? new Date(orderDetails.actual_delivery_time).toLocaleString() : 'Not delivered yet'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="overflow-hidden">
+                      <CardHeader className="bg-gray-50 dark:bg-gray-800/50 pb-3">
+                        <CardTitle className="text-lg">Order Summary</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span>Subtotal:</span>
+                            <span>${parseFloat(orderDetails.subtotal).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Tax:</span>
+                            <span>${parseFloat(orderDetails.tax_amount).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Delivery Fee:</span>
+                            <span>${parseFloat(orderDetails.delivery_fee).toFixed(2)}</span>
+                          </div>
+                          {parseFloat(orderDetails.discount_amount) > 0 && (
+                            <div className="flex justify-between text-green-600">
+                              <span>Discount:</span>
+                              <span>-${parseFloat(orderDetails.discount_amount).toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-bold text-lg pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
+                            <span>Total:</span>
+                            <span>${parseFloat(orderDetails.total_amount).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Additional Notes Section */}
+                  {(orderDetails.customer_notes || orderDetails.chef_notes || orderDetails.admin_notes) && (
+                    <Card className="mb-6 overflow-hidden">
+                      <CardHeader className="bg-gray-50 dark:bg-gray-800/50 pb-3">
+                        <CardTitle className="text-lg">Notes</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-4">
+                        <div className="space-y-4">
+                          {orderDetails.customer_notes && (
+                            <div>
+                              <h4 className="font-medium text-gray-900 dark:text-white mb-1">Customer Notes:</h4>
+                              <p className="text-gray-700 dark:text-gray-300">{orderDetails.customer_notes}</p>
+                            </div>
+                          )}
+                          {orderDetails.chef_notes && (
+                            <div>
+                              <h4 className="font-medium text-gray-900 dark:text-white mb-1">Chef Notes:</h4>
+                              <p className="text-gray-700 dark:text-gray-300">{orderDetails.chef_notes}</p>
+                            </div>
+                          )}
+                          {orderDetails.admin_notes && (
+                            <div>
+                              <h4 className="font-medium text-gray-900 dark:text-white mb-1">Admin Notes:</h4>
+                              <p className="text-gray-700 dark:text-gray-300">{orderDetails.admin_notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Assignment Section */}
+                  <div className="grid md:grid-cols-2 gap-6 mb-6">
+                    {orderDetails.chef && (
+                      <Card className="overflow-hidden">
+                        <CardHeader className="bg-gray-50 dark:bg-gray-800/50 pb-3">
+                          <CardTitle className="text-lg">Assigned Chef</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mr-3">
+                              <ChefHat className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{orderDetails.chef.name}</p>
+                              <p className="text-sm text-gray-500">{orderDetails.chef.email}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {orderDetails.delivery_partner && (
+                      <Card className="overflow-hidden">
+                        <CardHeader className="bg-gray-50 dark:bg-gray-800/50 pb-3">
+                          <CardTitle className="text-lg">Delivery Partner</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mr-3">
+                              <Package className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{orderDetails.delivery_partner.name}</p>
+                              <p className="text-sm text-gray-500">{orderDetails.delivery_partner.email}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Failed to load order details</h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">Please try again or contact support if the problem persists.</p>
+                    <Button onClick={() => setShowOrderDetail(false)} variant="outline">
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 mt-auto border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <div className="flex items-center text-sm text-gray-500">
+                  <Clock className="h-4 w-4 mr-1" />
+                  <span>Last updated: {new Date(selectedOrder.updated_at).toLocaleString()}</span>
+                </div>
+                <div className="space-x-2">
+                  <Button variant="outline" onClick={() => setShowOrderDetail(false)}>
+                    Close
+                  </Button>
+                  {/* Add more action buttons here if needed */}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  </AdminLayout>
-);
+  );
 
 };
 
-export default AdminOrders;
+export default OrderManagement;

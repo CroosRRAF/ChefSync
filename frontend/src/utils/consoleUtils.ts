@@ -26,8 +26,16 @@ export const suppressKnownWarnings = () => {
 
     // Override console.error for specific known deprecations
     console.error = (...args) => {
-      const message = args.join(' ');
-      
+      // Filter out undefined or null arguments
+      const filteredArgs = args.filter(arg => arg !== undefined && arg !== null);
+
+      // If no valid arguments remain, skip logging entirely
+      if (filteredArgs.length === 0) {
+        return;
+      }
+
+      const message = filteredArgs.join(' ');
+
       // Filter out -ms-high-contrast deprecation (browser-level, can't be fixed by us)
       if (
         message.includes('-ms-high-contrast is in the process of being deprecated') ||
@@ -35,7 +43,7 @@ export const suppressKnownWarnings = () => {
       ) {
         return; // Suppress this browser deprecation warning
       }
-      
+
       // Allow all other errors through
       originalError.apply(console, args);
     };

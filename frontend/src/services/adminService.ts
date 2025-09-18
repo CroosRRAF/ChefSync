@@ -437,6 +437,16 @@ class AdminService {
     }
   }
 
+  async getOrderDetails(orderId: number): Promise<any> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/orders/${orderId}/details/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching order details:', error);
+      throw new Error('Failed to fetch order details');
+    }
+  }
+
   // Notifications
   async getNotifications(params: {
     is_read?: boolean;
