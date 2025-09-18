@@ -60,6 +60,7 @@ interface NavItem {
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
@@ -170,15 +171,42 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   const pageInfo = getCurrentPageInfo();
 
+  // Auto-expand active navigation items
+  useEffect(() => {
+    const activeItems = new Set<string>();
+    navItems.forEach(item => {
+      if (isActiveRoute(item.href)) {
+        activeItems.add(item.href);
+      }
+      if (item.children) {
+        item.children.forEach(child => {
+          if (isActiveRoute(child.href)) {
+            activeItems.add(item.href); // Expand parent
+          }
+        });
+      }
+    });
+    setExpandedItems(activeItems);
+  }, [location.pathname]);
+
+  // Handle expanding/collapsing navigation items
+  const toggleExpanded = (href: string) => {
+    setExpandedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(href)) {
+        newSet.delete(href);
+      } else {
+        newSet.add(href);
+      }
+      return newSet;
+    });
+  };
+
   // Render navigation item
   const renderNavItem = (item: NavItem, level = 0) => {
     const isActive = isActiveRoute(item.href);
     const hasChildren = item.children && item.children.length > 0;
-    const [isExpanded, setIsExpanded] = useState(isActive);
-
-    useEffect(() => {
-      if (isActive) setIsExpanded(true);
-    }, [isActive]);
+    const isExpanded = expandedItems.has(item.href) || isActive;
 
     return (
       <div key={item.href} className="space-y-1">
@@ -192,7 +220,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           )}
           onClick={() => {
             if (hasChildren && !sidebarCollapsed) {
-              setIsExpanded(!isExpanded);
+              toggleExpanded(item.href);
             } else {
               navigate(item.href);
               setMobileMenuOpen(false);

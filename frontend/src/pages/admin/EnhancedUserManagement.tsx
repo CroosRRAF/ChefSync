@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Users,
   UserPlus,
@@ -512,17 +511,14 @@ const EnhancedUserManagement: React.FC = () => {
       </Card>
 
       {/* Main Content */}
-      <Tabs defaultValue="users" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="users">All Users</TabsTrigger>
-          <TabsTrigger value="chefs">Chefs</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="admins">Admins</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="users" className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>All Users</CardTitle>
+          <p className="text-sm text-gray-600">Manage all users across your platform</p>
+        </CardHeader>
+        <CardContent>
           <AdvancedDataTable
-            title="All Users"
+            title=""
             data={users}
             columns={columns}
             searchable
@@ -541,62 +537,8 @@ const EnhancedUserManagement: React.FC = () => {
             showPagination
             onRowClick={(row) => handleUserDetail(row)}
           />
-        </TabsContent>
-
-        <TabsContent value="chefs" className="space-y-6">
-          <AdvancedDataTable
-            title="Chefs"
-            data={users.filter(u => u.role === 'chef')}
-            columns={columns}
-            searchable
-            filterable
-            sortable
-            selectable
-            bulkActions={bulkActions}
-            filters={filterOptions}
-            loading={loading}
-            error={error}
-            onExport={handleExport}
-            onRowClick={(row) => console.log('Chef clicked:', row)}
-          />
-        </TabsContent>
-
-        <TabsContent value="customers" className="space-y-6">
-          <AdvancedDataTable
-            title="Customers"
-            data={users.filter(u => u.role === 'customer')}
-            columns={columns}
-            searchable
-            filterable
-            sortable
-            selectable
-            bulkActions={bulkActions}
-            filters={filterOptions}
-            loading={loading}
-            error={error}
-            onExport={handleExport}
-            onRowClick={(row) => console.log('Customer clicked:', row)}
-          />
-        </TabsContent>
-
-        <TabsContent value="admins" className="space-y-6">
-          <AdvancedDataTable
-            title="Administrators"
-            data={users.filter(u => u.role === 'admin')}
-            columns={columns}
-            searchable
-            filterable
-            sortable
-            selectable
-            bulkActions={bulkActions}
-            filters={filterOptions}
-            loading={loading}
-            error={error}
-            onExport={handleExport}
-            onRowClick={(row) => console.log('Admin clicked:', row)}
-          />
-        </TabsContent>
-      </Tabs>
+        </CardContent>
+      </Card>
 
       {/* User Detail Modal */}
       {showUserDetail && selectedUser && (
@@ -605,13 +547,34 @@ const EnhancedUserManagement: React.FC = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">User Details</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowUserDetail(false)}
-                >
-                  ✕
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleUserUpdate(userDetails.id, { 
+                      is_active: !userDetails.is_active 
+                    })}
+                  >
+                    {userDetails.is_active ? (
+                      <>
+                        <UserX className="h-4 w-4 mr-1" />
+                        Deactivate
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="h-4 w-4 mr-1" />
+                        Activate
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowUserDetail(false)}
+                  >
+                    ✕
+                  </Button>
+                </div>
               </div>
 
               {userDetailLoading ? (
@@ -657,14 +620,24 @@ const EnhancedUserManagement: React.FC = () => {
                           <div>
                             <span className="font-medium">Status:</span>
                             <Button
-                              variant="outline"
+                              variant={userDetails.is_active ? "default" : "destructive"}
                               size="sm"
                               className="ml-2"
                               onClick={() => handleUserUpdate(userDetails.id, { 
                                 is_active: !userDetails.is_active 
                               })}
                             >
-                              {userDetails.is_active ? 'Deactivate' : 'Activate'}
+                              {userDetails.is_active ? (
+                                <>
+                                  <UserX className="h-4 w-4 mr-1" />
+                                  Deactivate
+                                </>
+                              ) : (
+                                <>
+                                  <UserCheck className="h-4 w-4 mr-1" />
+                                  Activate
+                                </>
+                              )}
                             </Button>
                           </div>
                           <div>
@@ -688,6 +661,18 @@ const EnhancedUserManagement: React.FC = () => {
                               className="ml-2 px-2 py-1 border border-gray-300 rounded text-sm w-32"
                               placeholder="Address"
                             />
+                          </div>
+                          <div>
+                            <span className="font-medium">Joined:</span>
+                            <span className="ml-2 text-gray-600">
+                              {userDetails.date_joined ? new Date(userDetails.date_joined).toLocaleDateString() : 'N/A'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Last Login:</span>
+                            <span className="ml-2 text-gray-600">
+                              {userDetails.last_login ? new Date(userDetails.last_login).toLocaleDateString() : 'Never'}
+                            </span>
                           </div>
                         </div>
                       </CardContent>
