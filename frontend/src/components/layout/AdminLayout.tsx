@@ -76,15 +76,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     {
       label: 'User Management',
       href: '/admin/users',
-      icon: Users,
-      children: [
-        { label: 'All Users', href: '/admin/users', icon: Users },
-        { label: 'Manage Users', href: '/admin/manage-users', icon: Users },
-        { label: 'Admins', href: '/admin/users/admins', icon: Shield },
-        { label: 'Chefs', href: '/admin/users/chefs', icon: ChefHat },
-        { label: 'Customers', href: '/admin/users/customers', icon: User },
-        { label: 'Delivery Agents', href: '/admin/users/delivery', icon: Truck }
-      ]
+      icon: Users
     },
     {
       label: 'Orders',
