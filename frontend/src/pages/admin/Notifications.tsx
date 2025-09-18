@@ -1,5 +1,4 @@
 import React from 'react';
-import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,11 +12,9 @@ const AdminNotifications: React.FC = () => {
 
   if (!user) {
     return (
-      <AdminLayout>
-        <div className="flex items-center justify-center h-64">
-          <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
-        </div>
-      </AdminLayout>
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
     );
   }
 
@@ -76,8 +73,7 @@ const AdminNotifications: React.FC = () => {
   };
 
   return (
-    <AdminLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Notifications</h1>
@@ -236,7 +232,6 @@ const AdminNotifications: React.FC = () => {
           </Card>
         </div>
       </div>
-    </AdminLayout>
   );
 };
 

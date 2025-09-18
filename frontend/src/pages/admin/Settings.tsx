@@ -1,5 +1,4 @@
 import React from 'react';
-import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,8 +15,7 @@ const AdminSettings: React.FC = () => {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Settings</h1>
@@ -200,7 +198,6 @@ const AdminSettings: React.FC = () => {
           </Card>
         </div>
       </div>
-    </AdminLayout>
   );
 };
 

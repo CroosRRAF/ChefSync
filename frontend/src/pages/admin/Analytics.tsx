@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useUserStore } from '@/store/userStore';
+import { useAuth } from '@/context/AuthContext';
 import { apiClient } from '@/utils/fetcher';
 import InteractiveChart from '@/components/admin/InteractiveChart';
 import { 
@@ -24,93 +24,97 @@ import {
 } from 'lucide-react';
 
 interface AnalyticsData {
-  totalUsers: number;
-  totalOrders: number;
-  totalRevenue: number;
-  averageOrderValue: number;
-  ordersByStatus: Record<string, number>;
-  revenueByMonth: Array<{ month: string; revenue: number }>;
-  topItems: Array<{ name: string; quantity: number; revenue: number }>;
-  userGrowth: Array<{ month: string; users: number }>;
-  orderTrends: Array<{ day: string; orders: number }>;
-  roleDistribution: Record<string, number>;
+  total_users: number;
+  active_users: number;
+  new_users_today: number;
+  new_users_this_week: number;
+  new_users_this_month: number;
+  user_growth: number;
+  
+  total_chefs: number;
+  active_chefs: number;
+  pending_chef_approvals: number;
+  chef_growth: number;
+  
+  total_orders: number;
+  orders_today: number;
+  orders_this_week: number;
+  orders_this_month: number;
+  order_growth: number;
+  
+  total_revenue: number;
+  revenue_today: number;
+  revenue_this_week: number;
+  revenue_this_month: number;
+  revenue_growth: number;
+  
+  total_foods: number;
+  active_foods: number;
+  pending_approvals: number;
 }
 
 const AdminAnalytics: React.FC = () => {
-  const { user } = useUserStore();
+  const { user, isAuthenticated } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<string>('30d');
 
   useEffect(() => {
-    fetchAnalytics();
-  }, [timeRange]);
+    if (isAuthenticated && user?.role === 'admin') {
+      fetchAnalytics();
+    } else {
+      setIsLoading(false);
+      console.log('User not authenticated or not admin:', { isAuthenticated, userRole: user?.role });
+    }
+  }, [timeRange, isAuthenticated, user]);
 
   const fetchAnalytics = async () => {
     try {
       setIsLoading(true);
-      const response = await apiClient.get(`/admin/analytics/?range=${timeRange}`);
+      console.log('Fetching analytics with timeRange:', timeRange);
+      const response = await apiClient.get(`/api/analytics/dashboard/stats/?range=${timeRange}`);
+      console.log('Analytics response:', response);
       setAnalytics(response.data || response);
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      // Set mock data for development
-      setAnalytics(getMockAnalytics());
+      // Show error state instead of fallback to dummy data
+      setAnalytics(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getMockAnalytics = (): AnalyticsData => ({
-    totalUsers: 1247,
-    totalOrders: 8934,
-    totalRevenue: 45678.90,
-    averageOrderValue: 51.12,
-    ordersByStatus: {
-      'pending': 45,
-      'preparing': 23,
-      'ready': 12,
-      'out_for_delivery': 8,
-      'delivered': 8846
-    },
-    revenueByMonth: [
-      { month: 'Jan', revenue: 4200 },
-      { month: 'Feb', revenue: 3800 },
-      { month: 'Mar', revenue: 4500 },
-      { month: 'Apr', revenue: 5200 },
-      { month: 'May', revenue: 4800 },
-      { month: 'Jun', revenue: 6100 }
-    ],
-    topItems: [
-      { name: 'Margherita Pizza', quantity: 234, revenue: 4680 },
-      { name: 'Chicken Burger', quantity: 189, revenue: 2835 },
-      { name: 'Caesar Salad', quantity: 156, revenue: 2340 },
-      { name: 'Pasta Carbonara', quantity: 134, revenue: 2010 },
-      { name: 'Chocolate Cake', quantity: 98, revenue: 1470 }
-    ],
-    userGrowth: [
-      { month: 'Jan', users: 890 },
-      { month: 'Feb', users: 920 },
-      { month: 'Mar', users: 980 },
-      { month: 'Apr', users: 1050 },
-      { month: 'May', users: 1120 },
-      { month: 'Jun', users: 1247 }
-    ],
-    orderTrends: [
-      { day: 'Mon', orders: 45 },
-      { day: 'Tue', orders: 52 },
-      { day: 'Wed', orders: 48 },
-      { day: 'Thu', orders: 61 },
-      { day: 'Fri', orders: 78 },
-      { day: 'Sat', orders: 89 },
-      { day: 'Sun', orders: 67 }
-    ],
-    roleDistribution: {
-      'customer': 1050,
-      'cook': 45,
-      'delivery_agent': 32,
-      'admin': 8
-    }
-  });
+  if (!isAuthenticated) {
+    return (
+      <AdminLayout>
+        <Card className="text-center py-12">
+          <CardContent>
+            <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Authentication Required</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Please log in to access analytics data.
+            </p>
+          </CardContent>
+        </Card>
+      </AdminLayout>
+    );
+  }
+
+  if (user?.role !== 'admin') {
+    return (
+      <AdminLayout>
+        <Card className="text-center py-12">
+          <CardContent>
+            <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              You need admin privileges to access analytics data.
+            </p>
+          </CardContent>
+        </Card>
+      </AdminLayout>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -195,10 +199,10 @@ const AdminAnalytics: React.FC = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalUsers.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{analytics.total_users.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               <TrendingUp className="inline h-3 w-3 mr-1" />
-              +12% from last month
+              {analytics.user_growth > 0 ? '+' : ''}{analytics.user_growth}% from last month
             </p>
           </CardContent>
         </Card>
@@ -209,10 +213,10 @@ const AdminAnalytics: React.FC = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalOrders.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{analytics.total_orders.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               <TrendingUp className="inline h-3 w-3 mr-1" />
-              +8% from last month
+              {analytics.order_growth > 0 ? '+' : ''}{analytics.order_growth}% from last month
             </p>
           </CardContent>
         </Card>
@@ -223,24 +227,23 @@ const AdminAnalytics: React.FC = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${analytics.totalRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">${analytics.total_revenue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               <TrendingUp className="inline h-3 w-3 mr-1" />
-              +15% from last month
+              {analytics.revenue_growth > 0 ? '+' : ''}{analytics.revenue_growth}% from last month
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Order Value</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${analytics.averageOrderValue}</div>
+            <div className="text-2xl font-bold">{analytics.active_users.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              <TrendingUp className="inline h-3 w-3 mr-1" />
-              +5% from last month
+              Currently active users
             </p>
           </CardContent>
         </Card>
@@ -248,109 +251,156 @@ const AdminAnalytics: React.FC = () => {
 
       {/* Charts and Detailed Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Order Status Distribution */}
+        {/* User Statistics */}
         <Card>
           <CardHeader>
-            <CardTitle>Order Status Distribution</CardTitle>
-            <CardDescription>Current order status breakdown</CardDescription>
+            <CardTitle>User Statistics</CardTitle>
+            <CardDescription>User registration and activity breakdown</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {Object.entries(analytics.ordersByStatus).map(([status, count]) => (
-                <div key={status} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${
-                      status === 'pending' ? 'bg-yellow-500' :
-                      status === 'preparing' ? 'bg-blue-500' :
-                      status === 'ready' ? 'bg-green-500' :
-                      status === 'out_for_delivery' ? 'bg-purple-500' :
-                      'bg-gray-500'
-                    }`} />
-                    <span className="capitalize">{status.replace('_', ' ')}</span>
-                  </div>
-                  <Badge variant="secondary">{count}</Badge>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span>Total Users</span>
                 </div>
-              ))}
+                <Badge variant="secondary">{analytics.total_users}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span>Active Users</span>
+                </div>
+                <Badge variant="secondary">{analytics.active_users}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <span>New Today</span>
+                </div>
+                <Badge variant="secondary">{analytics.new_users_today}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-orange-500" />
+                  <span>New This Week</span>
+                </div>
+                <Badge variant="secondary">{analytics.new_users_this_week}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-purple-500" />
+                  <span>New This Month</span>
+                </div>
+                <Badge variant="secondary">{analytics.new_users_this_month}</Badge>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Role Distribution */}
+        {/* Order Statistics */}
         <Card>
           <CardHeader>
-            <CardTitle>User Role Distribution</CardTitle>
-            <CardDescription>Breakdown of users by role</CardDescription>
+            <CardTitle>Order Statistics</CardTitle>
+            <CardDescription>Order volume and trends</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {Object.entries(analytics.roleDistribution).map(([role, count]) => (
-                <div key={role} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${
-                      role === 'customer' ? 'bg-blue-500' :
-                      role === 'cook' ? 'bg-orange-500' :
-                      role === 'delivery_agent' ? 'bg-green-500' :
-                      'bg-purple-500'
-                    }`} />
-                    <span className="capitalize">{role.replace('_', ' ')}</span>
-                  </div>
-                  <Badge variant="secondary">{count}</Badge>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span>Total Orders</span>
                 </div>
-              ))}
+                <Badge variant="secondary">{analytics.total_orders}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span>Orders Today</span>
+                </div>
+                <Badge variant="secondary">{analytics.orders_today}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <span>Orders This Week</span>
+                </div>
+                <Badge variant="secondary">{analytics.orders_this_week}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-purple-500" />
+                  <span>Orders This Month</span>
+                </div>
+                <Badge variant="secondary">{analytics.orders_this_month}</Badge>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Top Items */}
+      {/* Revenue Statistics */}
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Top Selling Items</CardTitle>
-          <CardDescription>Most popular menu items by quantity and revenue</CardDescription>
+          <CardTitle>Revenue Statistics</CardTitle>
+          <CardDescription>Revenue breakdown by time periods</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {analytics.topItems.map((item, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Badge variant="outline" className="w-8 h-8 rounded-full flex items-center justify-center">
-                    {index + 1}
-                  </Badge>
-                  <div>
-                    <div className="font-medium">{item.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {item.quantity} orders
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-medium">${item.revenue.toLocaleString()}</div>
-                  <div className="text-sm text-muted-foreground">
-                    ${(item.revenue / item.quantity).toFixed(2)} avg
-                  </div>
-                </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 border rounded-lg">
+              <div className="text-sm font-medium text-muted-foreground">Total Revenue</div>
+              <div className="text-2xl font-bold text-green-600">
+                ${analytics.total_revenue.toLocaleString()}
               </div>
-            ))}
+            </div>
+            <div className="text-center p-4 border rounded-lg">
+              <div className="text-sm font-medium text-muted-foreground">Revenue Today</div>
+              <div className="text-2xl font-bold text-green-600">
+                ${analytics.revenue_today.toLocaleString()}
+              </div>
+            </div>
+            <div className="text-center p-4 border rounded-lg">
+              <div className="text-sm font-medium text-muted-foreground">Revenue This Week</div>
+              <div className="text-2xl font-bold text-green-600">
+                ${analytics.revenue_this_week.toLocaleString()}
+              </div>
+            </div>
+            <div className="text-center p-4 border rounded-lg">
+              <div className="text-sm font-medium text-muted-foreground">Revenue This Month</div>
+              <div className="text-2xl font-bold text-green-600">
+                ${analytics.revenue_this_month.toLocaleString()}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Revenue Trend */}
+      {/* Food Statistics */}
       <Card>
         <CardHeader>
-          <CardTitle>Revenue Trend</CardTitle>
-          <CardDescription>Monthly revenue over the last 6 months</CardDescription>
+          <CardTitle>Food Statistics</CardTitle>
+          <CardDescription>Menu items and availability status</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-6 gap-4">
-            {analytics.revenueByMonth.map((month, index) => (
-              <div key={index} className="text-center">
-                <div className="text-sm font-medium">{month.month}</div>
-                <div className="text-2xl font-bold text-green-600">
-                  ${month.revenue.toLocaleString()}
-                </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 border rounded-lg">
+              <div className="text-sm font-medium text-muted-foreground">Total Foods</div>
+              <div className="text-2xl font-bold">
+                {analytics.total_foods}
               </div>
-            ))}
+            </div>
+            <div className="text-center p-4 border rounded-lg">
+              <div className="text-sm font-medium text-muted-foreground">Active Foods</div>
+              <div className="text-2xl font-bold text-green-600">
+                {analytics.active_foods}
+              </div>
+            </div>
+            <div className="text-center p-4 border rounded-lg">
+              <div className="text-sm font-medium text-muted-foreground">Inactive Foods</div>
+              <div className="text-2xl font-bold text-red-600">
+                {analytics.total_foods - analytics.active_foods}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
