@@ -1,8 +1,13 @@
 import React from 'react';
-import EnhancedDashboard from './EnhancedDashboard';
+import AdminLayout from '@/components/layout/AdminLayout';
+import ModernDashboard from './ModernDashboard';
 
 const Dashboard: React.FC = () => {
-  return <EnhancedDashboard />;
+  return (
+    <AdminLayout>
+      <ModernDashboard />
+    </AdminLayout>
+  );
 };
 
 export default Dashboard;

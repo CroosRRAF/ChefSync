@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useUserStore } from '@/store/userStore';
 import { apiClient } from '@/utils/fetcher';
+import InteractiveChart from '@/components/admin/InteractiveChart';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -17,7 +19,8 @@ import {
   ChefHat,
   Truck,
   User,
-  Activity
+  Activity,
+  RefreshCw
 } from 'lucide-react';
 
 interface AnalyticsData {
@@ -111,69 +114,78 @@ const AdminAnalytics: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-muted rounded"></div>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-80 bg-muted rounded"></div>
-            ))}
+      <AdminLayout>
+        <div className="space-y-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-80 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </AdminLayout>
     );
   }
 
   if (!analytics) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <AdminLayout>
         <Card className="text-center py-12">
           <CardContent>
-            <BarChart3 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">Analytics Unavailable</h3>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               Unable to load analytics data at this time.
             </p>
             <Button onClick={fetchAnalytics}>
+              <RefreshCw className="h-4 w-4 mr-2" />
               Retry
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gradient-primary mb-2">
-          Analytics Dashboard
-        </h1>
-        <p className="text-muted-foreground">
-          Business insights and performance metrics
-        </p>
-      </div>
-
-      {/* Time Range Selector */}
-      <div className="mb-6">
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Select time range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7d">Last 7 days</SelectItem>
-            <SelectItem value="30d">Last 30 days</SelectItem>
-            <SelectItem value="90d">Last 90 days</SelectItem>
-            <SelectItem value="1y">Last year</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+    <AdminLayout>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Analytics Dashboard
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Business insights and performance metrics
+            </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-48">
+                <Calendar className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Select time range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+                <SelectItem value="1y">Last year</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={fetchAnalytics} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -343,6 +355,7 @@ const AdminAnalytics: React.FC = () => {
         </CardContent>
       </Card>
     </div>
+  </AdminLayout>
   );
 };
 

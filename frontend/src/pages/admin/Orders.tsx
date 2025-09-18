@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +26,8 @@ import {
   DollarSign,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 
 interface AdminOrder {
@@ -307,45 +309,141 @@ const AdminOrders: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-muted rounded"></div>
-            ))}
+      <AdminLayout>
+        <div className="space-y-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              ))}
+            </div>
+            <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded"></div>
           </div>
-          <div className="h-96 bg-muted rounded"></div>
         </div>
-      </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gradient-primary mb-2">
-              Order Management
-            </h1>
-            <p className="text-muted-foreground">
-              Monitor and manage all system orders
-            </p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Button
-              onClick={() => navigate('/admin/dashboard')}
-              variant="outline"
-              className="flex items-center space-x-2"
-            >
-              <i className="bx bx-arrow-back w-4 h-4"></i>
-              <span>Back to Dashboard</span>
-            </Button>
+    <AdminLayout>
+      <div className="space-y-8">
+        {/* Header */}
+        <div>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                Order Management
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">
+                Monitor and manage all system orders
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Button onClick={fetchOrders} variant="outline" size="sm">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-600 dark:text-blue-400 text-sm font-medium">Total Orders</p>
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{orders.length}</p>
+                </div>
+                <Package className="h-8 w-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-600 dark:text-green-400 text-sm font-medium">Completed</p>
+                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">{getOrdersCount('delivered')}</p>
+                </div>
+                <CheckCircle className="h-8 w-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-800">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-yellow-600 dark:text-yellow-400 text-sm font-medium">Pending</p>
+                  <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">{getOrdersCount('pending')}</p>
+                </div>
+                <Clock className="h-8 w-8 text-yellow-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 border-purple-200 dark:border-purple-800">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-600 dark:text-purple-400 text-sm font-medium">Revenue</p>
+                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">${getTotalRevenue().toFixed(2)}</p>
+                </div>
+                <DollarSign className="h-8 w-8 text-purple-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search by order number, customer name, or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="preparing">Preparing</SelectItem>
+                  <SelectItem value="ready">Ready</SelectItem>
+                  <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filter by payment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Payments</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="refunded">Refunded</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
 
       {/* Assignment Modal */}
       {showAssignmentModal && selectedOrder && assignmentType && (
@@ -515,7 +613,9 @@ const AdminOrders: React.FC = () => {
         </CardContent>
       </Card>
     </div>
-  );
+  </AdminLayout>
+);
+
 };
 
 export default AdminOrders;
