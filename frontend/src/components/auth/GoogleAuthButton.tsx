@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/button';
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
+  // For development, allow any client ID that looks like a Google OAuth client ID
+  // In production, you should use proper validation
   return clientId && 
          clientId !== 'your-google-client-id' && 
          clientId !== 'YOUR_NEW_GOOGLE_CLIENT_ID_HERE' &&
          clientId !== '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com' &&
-         clientId.includes('.apps.googleusercontent.com');
+         (clientId.includes('.apps.googleusercontent.com') || clientId.length > 20);
 };
 
 interface GoogleAuthButtonProps {
@@ -112,7 +114,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
         theme="outline"
         size="large"
         text={mode === 'login' ? 'signin_with' : 'signup_with'}
-        width="100%"
+        // Avoid passing width="100%" which causes GSI width invalid warnings; let it fill container.
       />
     </div>
   );

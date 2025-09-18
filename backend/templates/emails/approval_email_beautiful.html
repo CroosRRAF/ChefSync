@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChefSync - Account {{ status|title }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
+        }
+        
+        .header {
+            {% if status == 'approved' %}
+                background: linear-gradient(135deg, #10b981 0%, #34d399 50%, #6ee7b7 100%);
+            {% elif status == 'rejected' %}
+                background: linear-gradient(135deg, #ef4444 0%, #f87171 50%, #fca5a5 100%);
+            {% else %}
+                background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #fde047 100%);
+            {% endif %}
+            padding: 50px 40px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="2" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100%" height="100%" fill="url(%23pattern)"/></svg>');
+            animation: float 20s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(-20px) rotate(0deg); }
+            50% { transform: translateY(20px) rotate(180deg); }
+        }
+        
+        .brand-container {
+            position: relative;
+            z-index: 2;
+        }
+        
+        .status-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            display: block;
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .brand-title {
+            font-size: 42px;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            letter-spacing: -1px;
+        }
+        
+        .brand-subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .content {
+            padding: 60px 50px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 30px;
+            border: 2px solid;
+        }
+        
+        .status-approved {
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            color: #166534;
+            border-color: #22c55e;
+        }
+        
+        .status-rejected {
+            background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+            color: #dc2626;
+            border-color: #ef4444;
+        }
+        
+        .status-pending {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            color: #92400e;
+            border-color: #f59e0b;
+        }
+        
+        .greeting {
+            font-size: 32px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 800;
+            text-align: center;
+        }
+        
+        .message {
+            font-size: 18px;
+            color: #5a6c7d;
+            line-height: 1.8;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        
+        .status-section {
+            {% if status == 'approved' %}
+                background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            {% elif status == 'rejected' %}
+                background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+            {% else %}
+                background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+            {% endif %}
+            border-radius: 20px;
+            padding: 50px 30px;
+            text-align: center;
+            margin: 40px 0;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .status-section::before {
+            {% if status == 'approved' %}
+                content: '🎉✨🍳';
+            {% elif status == 'rejected' %}
+                content: '💔🚫⚠️';
+            {% else %}
+                content: '⏳🔍📋';
+            {% endif %}
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 24px;
+            opacity: 0.3;
+        }
+        
+        .status-section::after {
+            {% if status == 'approved' %}
+                content: '👨‍🍳👩‍🍳🔥';
+            {% elif status == 'rejected' %}
+                content: '😔💭🆘';
+            {% else %}
+                content: '📝🤔💼';
+            {% endif %}
+            position: absolute;
+            bottom: 20px;
+            left: 30px;
+            font-size: 24px;
+            opacity: 0.3;
+        }
+        
+        .status-label {
+            font-size: 16px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+        
+        .status-text {
+            font-size: 54px;
+            font-weight: 900;
+            margin: 30px 0;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 25px 40px;
+            border-radius: 15px;
+            display: inline-block;
+            min-width: 300px;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            text-transform: capitalize;
+        }
+        
+        .status-description {
+            font-size: 16px;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+        
+        .info-card {
+            {% if status == 'approved' %}
+                background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+                border: 2px solid #22c55e;
+            {% elif status == 'rejected' %}
+                background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+                border: 2px solid #ef4444;
+            {% else %}
+                background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+                border: 2px solid #f59e0b;
+            {% endif %}
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .info-card h3 {
+            {% if status == 'approved' %}
+                color: #166534;
+            {% elif status == 'rejected' %}
+                color: #dc2626;
+            {% else %}
+                color: #92400e;
+            {% endif %}
+            font-size: 20px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        
+        .info-card p {
+            {% if status == 'approved' %}
+                color: #166534;
+            {% elif status == 'rejected' %}
+                color: #dc2626;
+            {% else %}
+                color: #92400e;
+            {% endif %}
+            font-size: 16px;
+            margin: 8px 0;
+            font-weight: 500;
+        }
+        
+        .next-steps-card {
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+            border: 2px solid #6366f1;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+        
+        .next-steps-card h3 {
+            color: #3730a3;
+            font-size: 20px;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-align: center;
+        }
+        
+        .next-steps-card ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .next-steps-card li {
+            color: #3730a3;
+            font-size: 16px;
+            margin: 12px 0;
+            font-weight: 500;
+            padding-left: 25px;
+            position: relative;
+        }
+        
+        .next-steps-card li::before {
+            {% if status == 'approved' %}
+                content: '🚀';
+            {% elif status == 'rejected' %}
+                content: '📧';
+            {% else %}
+                content: '⏰';
+            {% endif %}
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        
+        .cta-section {
+            text-align: center;
+            margin: 40px 0;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            {% if status == 'approved' %}
+                background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+                box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+            {% elif status == 'rejected' %}
+                background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+                box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+            {% else %}
+                background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+                box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+            {% endif %}
+            color: white;
+            text-decoration: none;
+            padding: 18px 40px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-3px);
+            {% if status == 'approved' %}
+                box-shadow: 0 12px 35px rgba(16, 185, 129, 0.6);
+            {% elif status == 'rejected' %}
+                box-shadow: 0 12px 35px rgba(239, 68, 68, 0.6);
+            {% else %}
+                box-shadow: 0 12px 35px rgba(245, 158, 11, 0.6);
+            {% endif %}
+        }
+        
+        .divider {
+            height: 4px;
+            {% if status == 'approved' %}
+                background: linear-gradient(90deg, transparent, #10b981, #34d399, #6ee7b7, transparent);
+            {% elif status == 'rejected' %}
+                background: linear-gradient(90deg, transparent, #ef4444, #f87171, #fca5a5, transparent);
+            {% else %}
+                background: linear-gradient(90deg, transparent, #f59e0b, #fbbf24, #fde047, transparent);
+            {% endif %}
+            margin: 40px 0;
+            border-radius: 2px;
+        }
+        
+        .help-section {
+            text-align: center;
+            margin: 40px 0;
+            padding: 30px;
+            background: rgba(103, 126, 234, 0.05);
+            border-radius: 15px;
+        }
+        
+        .help-section h3 {
+            color: #2c3e50;
+            font-size: 22px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        
+        .help-section p {
+            color: #5a6c7d;
+            font-size: 16px;
+            margin: 8px 0;
+        }
+        
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 50px 40px;
+            text-align: center;
+        }
+        
+        .footer-brand {
+            font-size: 28px;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .footer-tagline {
+            font-size: 16px;
+            opacity: 0.8;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        
+        .footer-links a {
+            color: #4ecdc4;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            padding: 8px 16px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .footer-links a:hover {
+            background: rgba(78, 205, 196, 0.2);
+            border-color: #4ecdc4;
+        }
+        
+        .footer-disclaimer {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            line-height: 1.6;
+        }
+        
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.1) 0%, rgba(78, 205, 196, 0.1) 100%);
+            border: 2px solid rgba(255, 107, 107, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .highlight-box p {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        /* Mobile Responsive */
+        @media only screen and (max-width: 600px) {
+            body { padding: 10px; }
+            .email-container { border-radius: 16px; }
+            .header { padding: 40px 30px; }
+            .content { padding: 40px 30px; }
+            .footer { padding: 40px 30px; }
+            .brand-title { font-size: 32px; }
+            .greeting { font-size: 26px; }
+            .status-text { 
+                font-size: 42px;
+                min-width: 260px;
+                padding: 20px 30px;
+            }
+            .footer-links { 
+                flex-direction: column; 
+                gap: 15px; 
+            }
+            .cta-button {
+                padding: 16px 35px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="brand-container">
+                {% if status == 'approved' %}
+                    <span class="status-icon">🎉</span>
+                {% elif status == 'rejected' %}
+                    <span class="status-icon">💔</span>
+                {% else %}
+                    <span class="status-icon">⏳</span>
+                {% endif %}
+                <h1 class="brand-title">ChefSync</h1>
+                <p class="brand-subtitle">Culinary Excellence Delivered</p>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="status-badge status-{{ status }}">
+                {% if status == 'approved' %}
+                    ✅ Account Approved
+                {% elif status == 'rejected' %}
+                    ❌ Account Rejected
+                {% else %}
+                    ⏳ Account Under Review
+                {% endif %}
+            </div>
+            
+            <div class="greeting">
+                Hello {{ user_name }}!
+            </div>
+            
+            <div class="message">
+                {% if status == 'approved' %}
+                    <p><strong>Congratulations! 🎉</strong></p>
+                    <p>We're excited to inform you that your ChefSync {{ role }} account has been approved! You're now ready to start your culinary journey with us and connect with our amazing community.</p>
+                {% elif status == 'rejected' %}
+                    <p><strong>Application Update 📋</strong></p>
+                    <p>After careful review, we're unable to approve your ChefSync {{ role }} account at this time. We appreciate your interest in joining our culinary community.</p>
+                {% else %}
+                    <p><strong>Application Received 📝</strong></p>
+                    <p>Thank you for your interest in becoming a {{ role }} with ChefSync! Your application is currently under review by our team.</p>
+                {% endif %}
+            </div>
+            
+            <div class="status-section">
+                <div class="status-label">Account Status</div>
+                <div class="status-text">{{ status }}</div>
+                <div class="status-description">
+                    {% if status == 'approved' %}
+                        Your account is now active and ready to use!
+                    {% elif status == 'rejected' %}
+                        Application not approved at this time
+                    {% else %}
+                        We'll notify you once the review is complete
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if status == 'approved' %}
+                <div class="info-card">
+                    <h3>🚀 Welcome to ChefSync!</h3>
+                    <p><strong>You can now access all {{ role }} features</strong></p>
+                    <p>Start exploring our platform and connect with customers</p>
+                    <p>Update your profile to attract more opportunities</p>
+                    <p>Join thousands of culinary professionals already on ChefSync</p>
+                </div>
+                
+                <div class="next-steps-card">
+                    <h3>🎯 Next Steps</h3>
+                    <ul>
+                        <li><strong>Complete your profile</strong> with photos and specialties</li>
+                        <li><strong>Set your availability</strong> and service areas</li>
+                        <li><strong>Start receiving orders</strong> from hungry customers</li>
+                        <li><strong>Build your reputation</strong> with excellent service</li>
+                        <li><strong>Grow your culinary business</strong> with ChefSync</li>
+                    </ul>
+                </div>
+                
+                <div class="cta-section">
+                    <a href="{{ frontend_url }}/dashboard" class="cta-button">Access Dashboard</a>
+                </div>
+                
+            {% elif status == 'rejected' %}
+                <div class="info-card">
+                    <h3>📋 Feedback</h3>
+                    {% if reason %}
+                        <p><strong>Reason:</strong> {{ reason }}</p>
+                    {% endif %}
+                    <p>You may reapply in the future if you meet our requirements</p>
+                    <p>Contact our support team if you have questions about this decision</p>
+                </div>
+                
+                <div class="next-steps-card">
+                    <h3>💭 What's Next?</h3>
+                    <ul>
+                        <li><strong>Review our requirements</strong> for {{ role }} accounts</li>
+                        <li><strong>Contact support</strong> if you have questions</li>
+                        <li><strong>Consider reapplying</strong> once you meet criteria</li>
+                        <li><strong>Explore other roles</strong> that might fit better</li>
+                    </ul>
+                </div>
+                
+                <div class="cta-section">
+                    <a href="{{ frontend_url }}/contact" class="cta-button">Contact Support</a>
+                </div>
+                
+            {% else %}
+                <div class="info-card">
+                    <h3>⏰ Review Process</h3>
+                    <p><strong>Expected timeline:</strong> 2-3 business days</p>
+                    <p>We're carefully reviewing your application and credentials</p>
+                    <p>You'll receive an email update once the review is complete</p>
+                    <p>No action is required from you at this time</p>
+                </div>
+                
+                <div class="next-steps-card">
+                    <h3>🔄 While You Wait</h3>
+                    <ul>
+                        <li><strong>Complete your profile</strong> to speed up the review</li>
+                        <li><strong>Verify your email</strong> and phone number</li>
+                        <li><strong>Prepare your documents</strong> if additional info is needed</li>
+                        <li><strong>Explore ChefSync</strong> to familiarize yourself with the platform</li>
+                    </ul>
+                </div>
+                
+                <div class="cta-section">
+                    <a href="{{ frontend_url }}/profile" class="cta-button">Complete Profile</a>
+                </div>
+            {% endif %}
+            
+            <div class="divider"></div>
+            
+            <div class="help-section">
+                <h3>Need Help? 🤝</h3>
+                <p>Our support team is here to help you with any questions about your account status.</p>
+                <p>We're committed to supporting your success on the ChefSync platform!</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="footer-brand">ChefSync Team</div>
+            <div class="footer-tagline">Connecting Culinary Talents Worldwide</div>
+            
+            <div class="footer-links">
+                <a href="{{ frontend_url }}">Visit Website</a>
+                <a href="{{ frontend_url }}/contact">Get Support</a>
+                <a href="{{ frontend_url }}/privacy">Privacy Policy</a>
+                <a href="{{ frontend_url }}/terms">Terms of Service</a>
+            </div>
+            
+            <div class="footer-disclaimer">
+                This email was sent to <strong>{{ email }}</strong><br>
+                You received this email because you applied for a {{ role }} account on ChefSync.<br>
+                © 2025 ChefSync. All rights reserved.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

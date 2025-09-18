@@ -12,6 +12,11 @@ export default defineConfig(({ mode }: { mode: string }) => ({
   server: {
     host: "::",
     port: 8081,
+    // In dev, omit COOP/OAC headers entirely to avoid any postMessage/closed warnings.
+    // In non-dev, keep a permissive COOP for OAuth popups.
+    headers: mode === 'development' ? {} : {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
     proxy: {
       "/api": {
         target: "http://127.0.0.1:8000",

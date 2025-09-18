@@ -101,8 +101,6 @@ class LongBlobImageField(models.ImageField):
             return 'LONGBLOB'
         elif connection.vendor == 'postgresql':
             return 'BYTEA'
-        elif connection.vendor == 'sqlite':
-            return 'BLOB'
         else:
             return 'LONGBLOB'  # Default to MySQL LONGBLOB
 

@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Mail, CheckCircle, User, Lock, Eye, EyeOff, ChefHat, ArrowRight } from 'lucide-react';
+import { Loader2, Mail, CheckCircle, User, Lock, Eye, EyeOff, ChefHat, ArrowRight, FileText, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import DocumentUpload from './DocumentUpload';
 
 // Step 1: First name and email (progressive flow)
 const emailSchema = z.object({
@@ -51,6 +52,7 @@ const SimpleRegisterForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [otp, setOtp] = useState('');
+  const [uploadedDocuments, setUploadedDocuments] = useState<any[]>([]);
   
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -58,11 +60,13 @@ const SimpleRegisterForm: React.FC = () => {
 
   // Enhanced Step indicator component
   const StepIndicator: React.FC = () => {
+    const needsDocuments = selectedRole === 'cook' || selectedRole === 'delivery_agent';
     const steps = [
       { number: 1, title: 'Personal Info', active: currentStep === 1 && !otpSent, completed: false },
       { number: 2, title: 'Email Verification', active: currentStep === 1 && otpSent && !otpVerified, completed: otpVerified },
       { number: 3, title: 'Role Selection', active: currentStep === 2, completed: currentStep > 2 },
-      { number: 4, title: 'Account Setup', active: currentStep === 3, completed: false }
+      ...(needsDocuments ? [{ number: 4, title: 'Documents', active: currentStep === 3, completed: currentStep > 3 }] : []),
+      { number: needsDocuments ? 5 : 4, title: 'Account Setup', active: currentStep === (needsDocuments ? 4 : 3), completed: false }
     ];
 
     return (
@@ -191,6 +195,10 @@ const SimpleRegisterForm: React.FC = () => {
       
       setFirstName(data.firstName);
       setEmail(data.email);
+      
+      // Store email in localStorage for document upload
+      localStorage.setItem('registration_email', data.email);
+      
       setOtpSent(true);
       setOtpTimer(600); // 10 minutes
       
@@ -245,7 +253,21 @@ const SimpleRegisterForm: React.FC = () => {
 
   const handleRoleSubmit = (data: RoleData) => {
     setSelectedRole(data.role);
-    setCurrentStep(3); // Move to password step
+    // If cook or delivery agent, go to document upload step
+    if (data.role === 'cook' || data.role === 'delivery_agent') {
+      setCurrentStep(3); // Move to document upload step
+    } else {
+      setCurrentStep(3); // Move to password step for customers
+    }
+  };
+
+  const handleDocumentsComplete = (documents: any[]) => {
+    setUploadedDocuments(documents);
+    setCurrentStep(4); // Move to password step after documents
+  };
+
+  const handleDocumentBack = () => {
+    setCurrentStep(2); // Go back to role selection
   };
 
   const handlePasswordSubmit = async (data: PasswordData) => {
@@ -267,24 +289,39 @@ const SimpleRegisterForm: React.FC = () => {
       const result = await apiCall('complete-registration/', finalData);
       console.log('Registration result:', result);
       
-      // Store tokens in localStorage with correct keys for AuthContext
-      if (result.tokens) {
-        localStorage.setItem('chefsync_token', result.tokens.access);
-        localStorage.setItem('chefsync_refresh_token', result.tokens.refresh);
-      }
-      
-      toast({
-        title: "Welcome to ChefSync!",
-        description: `Your account has been created successfully. Welcome aboard, ${result.user.name}!`,
-      });
-
-      // Update AuthContext with user data by calling login
-      if (result.user && result.tokens) {
-        // Use the login method to properly set authentication state
-        await login({ 
-          email: result.user.email, 
-          password: data.password 
+      // Show different messages based on role
+      if (selectedRole === 'customer') {
+        // Store tokens in localStorage with correct keys for AuthContext
+        if (result.tokens) {
+          localStorage.setItem('chefsync_token', result.tokens.access);
+          localStorage.setItem('chefsync_refresh_token', result.tokens.refresh);
+        }
+        
+        toast({
+          title: "Welcome to ChefSync!",
+          description: `Your account has been created successfully. Welcome aboard, ${result.user.name}!`,
         });
+
+        // Update AuthContext with user data by calling login
+        if (result.user && result.tokens) {
+          await login({ 
+            email: result.user.email, 
+            password: data.password 
+          });
+        }
+      } else {
+        // For cooks and delivery agents, don't store tokens and show pending approval message
+        // Clear any existing tokens to ensure they can't access the system
+        localStorage.removeItem('chefsync_token');
+        localStorage.removeItem('chefsync_refresh_token');
+        
+        toast({
+          title: "Registration Complete!",
+          description: "Your account is pending admin approval. You'll receive an email once approved.",
+        });
+        
+        // Navigate to approval status page or show pending message
+        setCurrentStep(5); // Show pending approval step
       }
       
     } catch (error: any) {
@@ -438,7 +475,13 @@ const SimpleRegisterForm: React.FC = () => {
     switch (currentStep) {
       case 1: return otpSent ? 'Verify Your Email' : 'Join ChefSync';
       case 2: return 'Choose Your Role';
-      case 3: return 'Complete Your Profile';
+      case 3: 
+        if (selectedRole === 'cook' || selectedRole === 'delivery_agent') {
+          return 'Upload Documents';
+        }
+        return 'Complete Your Profile';
+      case 4: return 'Complete Your Profile';
+      case 5: return 'Registration Complete';
       default: return 'Join ChefSync';
     }
   };
@@ -447,7 +490,13 @@ const SimpleRegisterForm: React.FC = () => {
     switch (currentStep) {
       case 1: return otpSent ? 'Enter the verification code sent to your email' : 'Enter your name and email to get started';
       case 2: return 'Select your role in the ChefSync community';
-      case 3: return 'Create a secure password';
+      case 3: 
+        if (selectedRole === 'cook' || selectedRole === 'delivery_agent') {
+          return 'Upload required documents for verification';
+        }
+        return 'Create a secure password';
+      case 4: return 'Create a secure password';
+      case 5: return 'Your account is pending admin approval';
       default: return 'Create your account to start your culinary journey';
     }
   };
@@ -589,7 +638,81 @@ const SimpleRegisterForm: React.FC = () => {
           </form>
         )}
 
-        {currentStep === 3 && (
+        {currentStep === 3 && (selectedRole === 'cook' || selectedRole === 'delivery_agent') && (
+          <DocumentUpload
+            role={selectedRole as 'cook' | 'delivery_agent'}
+            onDocumentsComplete={handleDocumentsComplete}
+            onBack={handleDocumentBack}
+          />
+        )}
+
+        {currentStep === 5 && (
+          <div className="text-center space-y-6 py-8">
+            <div className="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Clock className="w-12 h-12 text-white" />
+            </div>
+            
+            <div className="space-y-4">
+              <h3 className="text-2xl font-bold text-foreground">
+                Registration Complete!
+              </h3>
+              <p className="text-muted-foreground text-lg">
+                Thank you for registering as a <span className="font-semibold text-primary capitalize">{selectedRole}</span>
+              </p>
+            </div>
+
+            <Alert className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/20">
+              <Clock className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+                <strong>Your account is pending admin approval.</strong><br />
+                We're reviewing your application and documents. You'll receive an email notification once your account is approved.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-4 text-sm text-muted-foreground">
+              <p>What happens next?</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div className="p-4 border rounded-lg">
+                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <span className="text-blue-600 dark:text-blue-400 font-bold">1</span>
+                  </div>
+                  <p className="font-medium">Review</p>
+                  <p className="text-xs">Admin reviews your documents</p>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <span className="text-blue-600 dark:text-blue-400 font-bold">2</span>
+                  </div>
+                  <p className="font-medium">Approval</p>
+                  <p className="text-xs">Account gets approved</p>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <span className="text-blue-600 dark:text-blue-400 font-bold">3</span>
+                  </div>
+                  <p className="font-medium">Email</p>
+                  <p className="text-xs">You receive notification</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-center space-x-4">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/auth/login')}
+              >
+                Go to Login
+              </Button>
+              <Button 
+                onClick={() => navigate('/')}
+              >
+                Back to Home
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {((currentStep === 3 && selectedRole === 'customer') || currentStep === 4) && (
           <form onSubmit={passwordForm.handleSubmit(handlePasswordSubmit)} className="space-y-6">
             {/* Password */}
             <div className="space-y-3">

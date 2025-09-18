@@ -183,8 +183,15 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         replace: true,
         state: { from: 'login' }
       });
-    } catch (error) {
+    } catch (error: any) {
       dispatch({ type: 'SET_LOADING', payload: false });
+      
+      // Handle approval pending case
+      if (error.message === 'APPROVAL_PENDING') {
+        navigate('/approval-status', { replace: true });
+        return;
+      }
+      
       throw error;
     }
   };

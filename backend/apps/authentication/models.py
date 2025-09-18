@@ -52,6 +52,13 @@ class User(AbstractUser):
         ('delivery_agent', 'Delivery Agent'),
     ]
     
+    # Approval status choices
+    APPROVAL_STATUS_CHOICES = [
+        ('pending', 'Pending Approval'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
     user_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=100)
     phone_no = models.CharField(max_length=15, blank=True, null=True)
@@ -67,6 +74,12 @@ class User(AbstractUser):
     email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=255, blank=True, null=True)
     email_verification_expires = models.DateTimeField(blank=True, null=True)
+    
+    # Approval fields for cooks and delivery agents
+    approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS_CHOICES, default='approved', help_text="Approval status for cooks and delivery agents")
+    approval_notes = models.TextField(blank=True, null=True, help_text="Admin notes for approval/rejection")
+    approved_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_users', help_text="Admin who approved this user")
+    approved_at = models.DateTimeField(blank=True, null=True, help_text="When the user was approved")
     
     # Security fields
     failed_login_attempts = models.IntegerField(default=0)
@@ -87,10 +100,19 @@ class User(AbstractUser):
         """Create the appropriate profile model based on user role"""
         if self.role == 'customer':
             Customer.objects.get_or_create(user=self)
+            # Customers are automatically approved
+            self.approval_status = 'approved'
+            self.save()
         elif self.role == 'cook':
             Cook.objects.get_or_create(user=self)
+            # Cooks need admin approval
+            self.approval_status = 'pending'
+            self.save()
         elif self.role == 'delivery_agent':
             DeliveryAgent.objects.get_or_create(user=self)
+            # Delivery agents need admin approval
+            self.approval_status = 'pending'
+            self.save()
 
     def get_profile(self):
         """Get the user's profile model instance"""
@@ -157,6 +179,38 @@ class User(AbstractUser):
         self.account_locked = False
         self.account_locked_until = None
         self.save()
+    
+    def can_login(self):
+        """Check if user can login based on approval status"""
+        # Customers can always login
+        if self.role == 'customer':
+            return True
+        
+        # Cooks and delivery agents need approval
+        if self.role in ['cook', 'delivery_agent']:
+            return self.approval_status == 'approved'
+        
+        # Admins can always login
+        if self.role == 'admin':
+            return True
+        
+        return False
+    
+    def get_approval_message(self):
+        """Get appropriate message based on approval status"""
+        if self.role == 'customer':
+            return "Welcome! Your account is ready to use."
+        
+        if self.approval_status == 'pending':
+            return "Your account is pending admin approval. You'll receive an email once approved."
+        
+        if self.approval_status == 'rejected':
+            return f"Your account was not approved. {self.approval_notes or 'Please contact support for more information.'}"
+        
+        if self.approval_status == 'approved':
+            return "Your account has been approved! Welcome to ChefSync."
+        
+        return "Account status unknown. Please contact support."
 
     objects = UserManager()
 
@@ -211,6 +265,68 @@ class DeliveryAgent(models.Model):
     
     class Meta:
         db_table = 'DeliveryAgent'
+
+
+class DocumentType(models.Model):
+    """
+    Document types for different roles
+    """
+    DOCUMENT_CATEGORIES = [
+        ('cook', 'Cook Documents'),
+        ('delivery_agent', 'Delivery Agent Documents'),
+    ]
+    
+    name = models.CharField(max_length=100, help_text="Document type name (e.g., 'Driving License', 'Food Safety Certificate')")
+    category = models.CharField(max_length=20, choices=DOCUMENT_CATEGORIES, help_text="Category this document belongs to")
+    description = models.TextField(blank=True, null=True, help_text="Description of what this document is for")
+    is_required = models.BooleanField(default=True, help_text="Whether this document is required for approval")
+    allowed_file_types = models.JSONField(default=list, help_text="List of allowed file extensions (e.g., ['pdf', 'jpg', 'png'])")
+    max_file_size_mb = models.IntegerField(default=5, help_text="Maximum file size in MB")
+    is_single_page_only = models.BooleanField(default=True, help_text="Whether this document should be single page only")
+    max_pages = models.IntegerField(default=2, help_text="Maximum number of pages allowed (for PDFs)")
+    
+    def __str__(self):
+        return f"{self.get_category_display()} - {self.name}"
+    
+    class Meta:
+        db_table = 'document_types'
+        unique_together = ['name', 'category']
+
+
+class UserDocument(models.Model):
+    """
+    User uploaded documents for verification
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('needs_resubmission', 'Needs Resubmission'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
+    document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE)
+    file = models.URLField(max_length=500, help_text="Document file URL (Cloudinary or local)")
+    file_name = models.CharField(max_length=255, help_text="Original file name")
+    file_size = models.BigIntegerField(help_text="File size in bytes")
+    file_type = models.CharField(max_length=50, help_text="File MIME type")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    admin_notes = models.TextField(blank=True, null=True, help_text="Admin review notes")
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_documents')
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    # New field to control document visibility to admin
+    is_visible_to_admin = models.BooleanField(default=False, help_text="Whether admin can see this document")
+    cloudinary_public_id = models.CharField(max_length=255, blank=True, null=True, help_text="Cloudinary public ID for the file")
+    local_file_path = models.CharField(max_length=500, blank=True, null=True, help_text="Local file path for PDFs to avoid Cloudinary access issues")
+    
+    def __str__(self):
+        return f"{self.user.name} - {self.document_type.name}"
+    
+    class Meta:
+        db_table = 'user_documents'
+        ordering = ['-uploaded_at']
 
 
 class EmailOTP(models.Model):
@@ -354,3 +470,7 @@ class JWTToken(models.Model):
             revoked_at=timezone.now()
         )
         return count
+
+
+# DocumentType and UserDocument models are defined in migrations
+# and will be loaded automatically by Django
