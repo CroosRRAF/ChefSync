@@ -82,57 +82,28 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       label: 'Orders',
       href: '/admin/orders',
       icon: ShoppingCart,
-      badge: 5,
-      children: [
-        { label: 'All Orders', href: '/admin/orders', icon: ShoppingCart },
-        { label: 'Pending Orders', href: '/admin/orders/pending', icon: Package },
-        { label: 'In Progress', href: '/admin/orders/in-progress', icon: Activity },
-        { label: 'Completed', href: '/admin/orders/completed', icon: Package },
-        { label: 'Cancelled', href: '/admin/orders/cancelled', icon: Package }
-      ]
+      badge: 5
     },
     {
       label: 'Food Management',
       href: '/admin/food',
-      icon: ChefHat,
-      children: [
-        { label: 'All Foods', href: '/admin/food', icon: ChefHat },
-        { label: 'Categories', href: '/admin/food/categories', icon: Package },
-        { label: 'Ingredients', href: '/admin/food/ingredients', icon: Package }
-      ]
+      icon: ChefHat
     },
     {
       label: 'Analytics',
       href: '/admin/analytics',
-      icon: BarChart3,
-      children: [
-        { label: 'Overview', href: '/admin/analytics', icon: BarChart3 },
-        { label: 'Revenue Reports', href: '/admin/analytics/revenue', icon: CreditCard },
-        { label: 'User Analytics', href: '/admin/analytics/users', icon: Users },
-        { label: 'Performance', href: '/admin/analytics/performance', icon: Activity }
-      ]
+      icon: BarChart3
     },
     {
       label: 'Communications',
       href: '/admin/communications',
       icon: MessageSquare,
-      badge: 3,
-      children: [
-        { label: 'Notifications', href: '/admin/notifications', icon: Bell },
-        { label: 'Messages', href: '/admin/communications/messages', icon: MessageSquare },
-        { label: 'Announcements', href: '/admin/communications/announcements', icon: FileText }
-      ]
+      badge: 3
     },
     {
       label: 'Settings',
       href: '/admin/settings',
-      icon: Settings,
-      children: [
-        { label: 'General Settings', href: '/admin/settings', icon: Settings },
-        { label: 'Database', href: '/admin/system/database', icon: Database },
-        { label: 'Activity Logs', href: '/admin/system/logs', icon: FileText },
-        { label: 'System Health', href: '/admin/system/health', icon: Activity }
-      ]
+      icon: Settings
     }
   ];
 
@@ -197,8 +168,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   // Render navigation item
   const renderNavItem = (item: NavItem, level = 0) => {
     const isActive = isActiveRoute(item.href);
-    const hasChildren = item.children && item.children.length > 0;
-    const isExpanded = expandedItems.has(item.href) || isActive;
 
     return (
       <div key={item.href} className="space-y-1">
@@ -211,12 +180,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             isActive && "bg-primary/10 text-primary border-r-2 border-primary"
           )}
           onClick={() => {
-            if (hasChildren && !sidebarCollapsed) {
-              toggleExpanded(item.href);
-            } else {
-              navigate(item.href);
-              setMobileMenuOpen(false);
-            }
+            navigate(item.href);
+            setMobileMenuOpen(false);
           }}
         >
           <item.icon className="h-4 w-4 shrink-0" />
@@ -228,21 +193,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   {item.badge}
                 </Badge>
               )}
-              {hasChildren && !sidebarCollapsed && (
-                <ChevronRight className={cn(
-                  "h-4 w-4 shrink-0 transition-transform",
-                  isExpanded && "transform rotate-90"
-                )} />
-              )}
             </>
           )}
         </Button>
-        
-        {hasChildren && isExpanded && (!sidebarCollapsed || level > 0) && (
-          <div className="space-y-1 pl-6">
-            {item.children?.map(child => renderNavItem(child, level + 1))}
-          </div>
-        )}
       </div>
     );
   };
