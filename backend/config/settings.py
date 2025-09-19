@@ -65,6 +65,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'config.middleware.SecurityHeadersMiddleware',  # Custom security headers for OAuth
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -306,8 +307,9 @@ try:
 except Exception:
     SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None
 
-# In development, do not send COOP at all to avoid postMessage/window.closed warnings
+# In development, disable COOP to avoid postMessage/window.closed warnings with Google OAuth
 if DEBUG:
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
     SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 # Cloudinary Configuration
