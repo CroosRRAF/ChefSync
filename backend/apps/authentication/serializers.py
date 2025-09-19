@@ -554,11 +554,11 @@ class UserDocumentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'document_type', 'document_type_id', 'file', 'file_upload', 'file_name', 'file_size', 
             'file_type', 'status', 'status_display', 'admin_notes', 'reviewed_by_name', 
-            'reviewed_at', 'uploaded_at', 'updated_at', 'cloudinary_public_id'
+            'reviewed_at', 'uploaded_at', 'updated_at', 'cloudinary_public_id', 'converted_images', 'is_pdf_converted'
         ]
         read_only_fields = [
             'id', 'file_name', 'file_size', 'file_type', 'status', 'admin_notes', 
-            'reviewed_by', 'reviewed_at', 'uploaded_at', 'updated_at', 'cloudinary_public_id'
+            'reviewed_by', 'reviewed_at', 'uploaded_at', 'updated_at', 'cloudinary_public_id', 'converted_images', 'is_pdf_converted'
         ]
 
     def validate_document_type_id(self, value):
@@ -645,6 +645,7 @@ class UserDocumentSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         from django.conf import settings
+        from .services.pdf_service import PDFService, PDFValidationError, PDFConversionError
         
         document_type_id = validated_data.pop('document_type_id')
         document_type = DocumentType.objects.get(id=document_type_id)
@@ -666,154 +667,210 @@ class UserDocumentSerializer(serializers.ModelSerializer):
         if not user:
             raise serializers.ValidationError("User context is required for document upload")
         
+        # Check if this is a PDF file that needs conversion
+        is_pdf = file_name.lower().endswith('.pdf') or file_type == 'application/pdf'
+        converted_images = []
+        primary_file_url = None
+        cloudinary_public_id = None
+        local_file_path_str = None
         
-        # Check if we should use local storage
-        use_local = getattr(settings, 'USE_LOCAL_STORAGE', False)
-        
-        if use_local:
-            # Local storage implementation
-            import os
-            from pathlib import Path
-            
-            local_media_root = getattr(settings, 'LOCAL_MEDIA_ROOT', Path(__file__).resolve().parent.parent.parent / 'local_media')
-            
-            # Determine folder based on file type (matching Cloudinary structure)
-            if file_type and file_type.startswith('image/'):
-                folder_name = 'assets/images'
-            elif file_type == 'application/pdf':
-                folder_name = 'assets/documents/pdfs'
-            elif file_type in ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
-                folder_name = 'assets/documents/word'
-            elif file_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
-                folder_name = 'assets/documents/excel'
-            elif file_type in ['text/plain', 'text/csv']:
-                folder_name = 'assets/documents/text'
-            else:
-                folder_name = 'assets/documents/other'  # Default to other documents folder
-            
-            user_folder = local_media_root / folder_name / str(user.user_id)
-            user_folder.mkdir(parents=True, exist_ok=True)
-            
-            # Generate unique filename to avoid conflicts
-            import uuid
-            file_extension = file_name.split('.')[-1] if '.' in file_name else ''
-            unique_filename = f"{uuid.uuid4()}_{file_name}"
-            
-            # Save file locally
-            file_path = user_folder / unique_filename
-            with open(file_path, 'wb') as destination:
-                for chunk in file.chunks():
-                    destination.write(chunk)
-            
-            # Create local URL
-            file_url = f"/local_media/{folder_name}/{user.user_id}/{unique_filename}"
-            cloudinary_public_id = None
-        else:
-            # Cloudinary implementation
+        if is_pdf:
+            # Handle PDF conversion to images
             try:
-                import cloudinary
-                import cloudinary.uploader
-            except ImportError:
-                raise serializers.ValidationError("Cloudinary package not installed. Please install it with: pip install cloudinary")
-            
-            # Configure Cloudinary
-            cloudinary.config(
-                cloud_name=settings.CLOUDINARY_STORAGE['CLOUD_NAME'],
-                api_key=settings.CLOUDINARY_STORAGE['API_KEY'],
-                api_secret=settings.CLOUDINARY_STORAGE['API_SECRET'],
-                secure=True
-            )
-            
-            try:
-                # Determine resource type and folder based on file type
-                if file_type and file_type.startswith('image/'):
-                    resource_type = "image"
-                    folder = f"chefsync/assets/images/{user.user_id}"  # Images in assets/images folder
-                elif file_type == 'application/pdf':
-                    resource_type = "raw"
-                    folder = f"chefsync/assets/documents/pdfs/{user.user_id}"  # PDFs in assets/documents/pdfs folder
-                elif file_type in ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
-                    resource_type = "raw"
-                    folder = f"chefsync/assets/documents/word/{user.user_id}"  # Word docs in assets/documents/word folder
-                elif file_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
-                    resource_type = "raw"
-                    folder = f"chefsync/assets/documents/excel/{user.user_id}"  # Excel files in assets/documents/excel folder
-                elif file_type in ['text/plain', 'text/csv']:
-                    resource_type = "raw"
-                    folder = f"chefsync/assets/documents/text/{user.user_id}"  # Text files in assets/documents/text folder
-                else:
-                    resource_type = "raw"  # Default to raw for other file types
-                    folder = f"chefsync/assets/documents/other/{user.user_id}"  # Other files in assets/documents/other folder
+                pdf_service = PDFService()
+                conversion_result = pdf_service.validate_and_convert_pdf(
+                    file, 
+                    user.email, 
+                    document_type.name
+                )
                 
-                # Prepare upload options based on file type
-                upload_options = {
-                    'folder': folder,
-                    'resource_type': resource_type,
-                    'use_filename': True,
-                    'unique_filename': True,
-                    'overwrite': False,  # Don't overwrite existing files
-                    'invalidate': True,  # Invalidate CDN cache
-                }
+                if not conversion_result['success']:
+                    raise serializers.ValidationError(conversion_result['message'])
                 
-                # Add specific options for images
-                if resource_type == "image":
-                    upload_options.update({
-                        'quality': 'auto',  # Auto quality optimization
-                        'fetch_format': 'auto',  # Auto format selection
-                        'flags': 'progressive',  # Progressive loading for images
-                    })
+                converted_images = conversion_result['converted_images']
                 
-                # Add specific options for raw files (documents)
-                elif resource_type == "raw":
-                    upload_options.update({
-                        'tags': ['chefsync', 'document', file_type.split('/')[-1] if '/' in file_type else 'unknown'],
-                    })
+                # Use the first image as the primary file URL for the document
+                if converted_images:
+                    primary_file_url = converted_images[0]['image_url']
+                    cloudinary_public_id = converted_images[0]['public_id']
                 
-                upload_result = cloudinary.uploader.upload(file, **upload_options)
-                cloudinary_public_id = upload_result['public_id']
-                file_url = upload_result['secure_url']
+                # Store the original PDF locally for backup
+                try:
+                    import os
+                    from pathlib import Path
+                    import uuid
+                    
+                    local_media_root = getattr(settings, 'LOCAL_MEDIA_ROOT', Path(__file__).resolve().parent.parent.parent / 'local_media')
+                    local_folder = local_media_root / 'assets' / 'documents' / 'pdfs' / str(user.user_id)
+                    local_folder.mkdir(parents=True, exist_ok=True)
+                    
+                    unique_filename = f"{uuid.uuid4()}_{file_name}"
+                    local_file_path = local_folder / unique_filename
+                    
+                    # Save original PDF locally
+                    with open(local_file_path, 'wb') as local_file:
+                        for chunk in file.chunks():
+                            local_file.write(chunk)
+                    
+                    local_file_path_str = str(local_file_path)
+                    print(f"Stored original PDF locally at: {local_file_path}")
+                    
+                except Exception as local_save_error:
+                    print(f"Failed to save original PDF locally: {str(local_save_error)}")
                 
-                # For raw files (PDFs), also store locally to avoid Cloudinary access issues
-                if resource_type == 'raw':
-                    try:
-                        import os
-                        from pathlib import Path
-                        
-                        # Create local storage directory
-                        local_media_root = getattr(settings, 'LOCAL_MEDIA_ROOT', Path(__file__).resolve().parent.parent.parent / 'local_media')
-                        local_folder = local_media_root / 'assets' / 'documents' / 'pdfs' / str(user.user_id)
-                        local_folder.mkdir(parents=True, exist_ok=True)
-                        
-                        # Generate unique filename
-                        import uuid
-                        file_extension = file_name.split('.')[-1] if '.' in file_name else 'pdf'
-                        unique_filename = f"{uuid.uuid4()}_{file_name}"
-                        local_file_path = local_folder / unique_filename
-                        
-                        # Save file locally
-                        with open(local_file_path, 'wb') as local_file:
-                            for chunk in file.chunks():
-                                local_file.write(chunk)
-                        
-                        # Store local file path in the document
-                        local_file_url = f"/local_media/assets/documents/pdfs/{user.user_id}/{unique_filename}"
-                        print(f"Stored PDF locally at: {local_file_path}")
-                        print(f"Local file URL: {local_file_url}")
-                        
-                        # Store the local file path for later use
-                        local_file_path_str = str(local_file_path)
-                        
-                    except Exception as local_save_error:
-                        print(f"Failed to save PDF locally: {str(local_save_error)}")
-                        # Continue with Cloudinary URL even if local save fails
+            except (PDFValidationError, PDFConversionError) as e:
+                raise serializers.ValidationError(str(e))
             except Exception as e:
-                raise serializers.ValidationError(f"Failed to upload file to Cloudinary: {str(e)}")
+                raise serializers.ValidationError(f"PDF processing failed: {str(e)}")
+        else:
+            # Handle non-PDF files normally
+            # Check if we should use local storage
+            use_local = getattr(settings, 'USE_LOCAL_STORAGE', False)
+            
+            if use_local:
+                # Local storage implementation
+                import os
+                from pathlib import Path
+                
+                local_media_root = getattr(settings, 'LOCAL_MEDIA_ROOT', Path(__file__).resolve().parent.parent.parent / 'local_media')
+                
+                # Determine folder based on file type (matching Cloudinary structure)
+                if file_type and file_type.startswith('image/'):
+                    folder_name = 'assets/images'
+                elif file_type == 'application/pdf':
+                    folder_name = 'assets/documents/pdfs'
+                elif file_type in ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+                    folder_name = 'assets/documents/word'
+                elif file_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
+                    folder_name = 'assets/documents/excel'
+                elif file_type in ['text/plain', 'text/csv']:
+                    folder_name = 'assets/documents/text'
+                else:
+                    folder_name = 'assets/documents/other'  # Default to other documents folder
+                
+                user_folder = local_media_root / folder_name / str(user.user_id)
+                user_folder.mkdir(parents=True, exist_ok=True)
+                
+                # Generate unique filename to avoid conflicts
+                import uuid
+                file_extension = file_name.split('.')[-1] if '.' in file_name else ''
+                unique_filename = f"{uuid.uuid4()}_{file_name}"
+                
+                # Save file locally
+                file_path = user_folder / unique_filename
+                with open(file_path, 'wb') as destination:
+                    for chunk in file.chunks():
+                        destination.write(chunk)
+                
+                # Create local URL
+                primary_file_url = f"/local_media/{folder_name}/{user.user_id}/{unique_filename}"
+                cloudinary_public_id = None
+            else:
+                # Cloudinary implementation
+                try:
+                    import cloudinary
+                    import cloudinary.uploader
+                except ImportError:
+                    raise serializers.ValidationError("Cloudinary package not installed. Please install it with: pip install cloudinary")
+                
+                # Configure Cloudinary
+                cloudinary.config(
+                    cloud_name=settings.CLOUDINARY_STORAGE['CLOUD_NAME'],
+                    api_key=settings.CLOUDINARY_STORAGE['API_KEY'],
+                    api_secret=settings.CLOUDINARY_STORAGE['API_SECRET'],
+                    secure=True
+                )
+                
+                try:
+                    # Determine resource type and folder based on file type
+                    if file_type and file_type.startswith('image/'):
+                        resource_type = "image"
+                        folder = f"chefsync/assets/images/{user.user_id}"  # Images in assets/images folder
+                    elif file_type == 'application/pdf':
+                        resource_type = "raw"
+                        folder = f"chefsync/assets/documents/pdfs/{user.user_id}"  # PDFs in assets/documents/pdfs folder
+                    elif file_type in ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+                        resource_type = "raw"
+                        folder = f"chefsync/assets/documents/word/{user.user_id}"  # Word docs in assets/documents/word folder
+                    elif file_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
+                        resource_type = "raw"
+                        folder = f"chefsync/assets/documents/excel/{user.user_id}"  # Excel files in assets/documents/excel folder
+                    elif file_type in ['text/plain', 'text/csv']:
+                        resource_type = "raw"
+                        folder = f"chefsync/assets/documents/text/{user.user_id}"  # Text files in assets/documents/text folder
+                    else:
+                        resource_type = "raw"  # Default to raw for other file types
+                        folder = f"chefsync/assets/documents/other/{user.user_id}"  # Other files in assets/documents/other folder
+                    
+                    # Prepare upload options based on file type
+                    upload_options = {
+                        'folder': folder,
+                        'resource_type': resource_type,
+                        'use_filename': True,
+                        'unique_filename': True,
+                        'overwrite': False,  # Don't overwrite existing files
+                        'invalidate': True,  # Invalidate CDN cache
+                    }
+                    
+                    # Add specific options for images
+                    if resource_type == "image":
+                        upload_options.update({
+                            'quality': 'auto',  # Auto quality optimization
+                            'fetch_format': 'auto',  # Auto format selection
+                            'flags': 'progressive',  # Progressive loading for images
+                        })
+                    
+                    # Add specific options for raw files (documents)
+                    elif resource_type == "raw":
+                        upload_options.update({
+                            'tags': ['chefsync', 'document', file_type.split('/')[-1] if '/' in file_type else 'unknown'],
+                        })
+                    
+                    upload_result = cloudinary.uploader.upload(file, **upload_options)
+                    cloudinary_public_id = upload_result['public_id']
+                    primary_file_url = upload_result['secure_url']
+                    
+                    # For raw files (PDFs), also store locally to avoid Cloudinary access issues
+                    if resource_type == 'raw':
+                        try:
+                            import os
+                            from pathlib import Path
+                            
+                            # Create local storage directory
+                            local_media_root = getattr(settings, 'LOCAL_MEDIA_ROOT', Path(__file__).resolve().parent.parent.parent / 'local_media')
+                            local_folder = local_media_root / 'assets' / 'documents' / 'pdfs' / str(user.user_id)
+                            local_folder.mkdir(parents=True, exist_ok=True)
+                            
+                            # Generate unique filename
+                            import uuid
+                            file_extension = file_name.split('.')[-1] if '.' in file_name else 'pdf'
+                            unique_filename = f"{uuid.uuid4()}_{file_name}"
+                            local_file_path = local_folder / unique_filename
+                            
+                            # Save file locally
+                            with open(local_file_path, 'wb') as local_file:
+                                for chunk in file.chunks():
+                                    local_file.write(chunk)
+                            
+                            # Store local file path in the document
+                            local_file_url = f"/local_media/assets/documents/pdfs/{user.user_id}/{unique_filename}"
+                            print(f"Stored PDF locally at: {local_file_path}")
+                            print(f"Local file URL: {local_file_url}")
+                            
+                            # Store the local file path for later use
+                            local_file_path_str = str(local_file_path)
+                            
+                        except Exception as local_save_error:
+                            print(f"Failed to save PDF locally: {str(local_save_error)}")
+                            # Continue with Cloudinary URL even if local save fails
+                except Exception as e:
+                    raise serializers.ValidationError(f"Failed to upload file to Cloudinary: {str(e)}")
         
         # Create the document
         document = UserDocument.objects.create(
             user=user,
             document_type=document_type,
-            file=file_url,  # Store Cloudinary URL
+            file=primary_file_url,  # Store primary file URL (converted image for PDFs, original for others)
             file_name=file_name,
             file_size=file_size,
             file_type=file_type,
@@ -822,6 +879,13 @@ class UserDocumentSerializer(serializers.ModelSerializer):
             is_visible_to_admin=True,  # Make documents visible to admin for review from the start
             **validated_data
         )
+        
+        # Store converted images metadata if this was a PDF
+        if is_pdf and converted_images:
+            # Update the document with converted images metadata
+            document.converted_images = converted_images
+            document.is_pdf_converted = True
+            document.save()
         
         return document
 
