@@ -1,0 +1,4 @@
+{
+  "/api/communications/communications*": "/communications",
+  "/api/communications/templates*": "/templates"
+}

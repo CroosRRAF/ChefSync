@@ -7,11 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/context/AuthContext';
 import { apiClient } from '@/utils/fetcher';
 import InteractiveChart from '@/components/admin/InteractiveChart';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
+import {
+  BarChart3,
+  TrendingUp,
+  Users,
+  DollarSign,
   Package,
   Calendar,
   Clock,
@@ -30,24 +30,24 @@ interface AnalyticsData {
   new_users_this_week: number;
   new_users_this_month: number;
   user_growth: number;
-  
+
   total_chefs: number;
   active_chefs: number;
   pending_chef_approvals: number;
   chef_growth: number;
-  
+
   total_orders: number;
   orders_today: number;
   orders_this_week: number;
   orders_this_month: number;
   order_growth: number;
-  
+
   total_revenue: number;
   revenue_today: number;
   revenue_this_week: number;
   revenue_this_month: number;
   revenue_growth: number;
-  
+
   total_foods: number;
   active_foods: number;
   pending_approvals: number;
@@ -72,7 +72,7 @@ const AdminAnalytics: React.FC = () => {
     try {
       setIsLoading(true);
       console.log('Fetching analytics with timeRange:', timeRange);
-      const response = await apiClient.get(`/api/analytics/dashboard/stats/?range=${timeRange}`);
+      const response = await apiClient.get(`/analytics/dashboard/stats/?range=${timeRange}`);
       console.log('Analytics response:', response);
       setAnalytics(response.data || response);
     } catch (error) {
@@ -159,37 +159,36 @@ const AdminAnalytics: React.FC = () => {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Analytics Dashboard
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Business insights and performance metrics
-            </p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger className="w-48">
-                <Calendar className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Select time range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-                <SelectItem value="90d">Last 90 days</SelectItem>
-                <SelectItem value="1y">Last year</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={fetchAnalytics} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+    <div className="space-y-8">
+      {/* Time Range Selector */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Analytics Overview
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Business insights and performance metrics
+          </p>
         </div>
+        <div className="flex items-center space-x-3">
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-48">
+              <Calendar className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Select time range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="1y">Last year</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={fetchAnalytics} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+      </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -405,7 +404,6 @@ const AdminAnalytics: React.FC = () => {
         </CardContent>
       </Card>
     </div>
-  </AdminLayout>
   );
 };
 

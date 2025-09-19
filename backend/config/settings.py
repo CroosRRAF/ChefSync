@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'apps.authentication',
     'apps.analytics',
     'apps.admin_management',
+    'apps.communications',
     'apps.food',
     'apps.orders',
     'apps.payments',
