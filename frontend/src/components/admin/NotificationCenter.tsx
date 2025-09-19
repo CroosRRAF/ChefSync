@@ -59,12 +59,35 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const data = await adminService.getNotifications({
+      const response = await adminService.getNotifications({
         is_active: true
       });
-      setNotifications(data.slice(0, maxNotifications));
+      
+      // Handle paginated response
+      if (response && typeof response === 'object' && 'results' in response) {
+        const notificationsArray = response.results;
+        
+        if (Array.isArray(notificationsArray)) {
+          // Sort by creation date (newest first) and limit to maxNotifications
+          const sortedNotifications = [...notificationsArray].sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          ).slice(0, maxNotifications);
+          
+          setNotifications(sortedNotifications);
+        } else {
+          console.error('Results is not an array:', notificationsArray);
+          setError('Failed to load notifications: Invalid data format');
+          setNotifications([]);
+        }
+      } else {
+        console.error('Unexpected API response format:', response);
+        setError('Failed to load notifications: Invalid response format');
+        setNotifications([]);
+      }
     } catch (err) {
+      console.error('Error fetching notifications:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch notifications');
+      setNotifications([]);
     } finally {
       setLoading(false);
     }

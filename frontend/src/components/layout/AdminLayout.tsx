@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { performAdminSearch } from '@/utils/adminSearch';
+import { SearchResults } from '@/components/admin/SearchResults';
 import { useTheme } from '@/context/ThemeContext';
 import {
   LayoutDashboard,
@@ -27,7 +29,8 @@ import {
   HelpCircle,
   Home,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -61,6 +64,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
@@ -340,10 +348,83 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
           {/* Right Side */}
           <div className="flex items-center gap-3">
-            {/* Search */}
-            <Button variant="ghost" size="sm" className="hidden md:flex">
-              <Search className="h-4 w-4" />
-            </Button>
+            <div className="relative flex items-center">
+              {/* Search Bar */}
+              {searchOpen && (
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border px-3 py-2 w-80 animate-in slide-in-from-top-2">
+                  <Search className="h-4 w-4 text-gray-500" />
+                  <input
+                    type="text"
+                    placeholder="Search for anything..."
+                    className="flex-1 bg-transparent border-none outline-none text-sm"
+                    value={searchQuery}
+                    onChange={async (e) => {
+                      const query = e.target.value;
+                      setSearchQuery(query);
+                      
+                      if (query.length >= 2) {
+                        setSearchLoading(true);
+                        setSearchError(null);
+                        try {
+                          const results = await performAdminSearch(query);
+                          setSearchResults(results);
+                        } catch (err) {
+                          setSearchError('Failed to perform search');
+                          setSearchResults([]);
+                        } finally {
+                          setSearchLoading(false);
+                        }
+                      } else {
+                        setSearchResults([]);
+                      }
+                    }}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setSearchOpen(false);
+                        setSearchQuery('');
+                        setSearchResults([]);
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchOpen(false);
+                      setSearchQuery('');
+                      setSearchResults([]);
+                    }}
+                    className="h-6 w-6 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Search Results */}
+                  {(searchResults.length > 0 || searchLoading || searchError) && (
+                    <SearchResults
+                      results={searchResults}
+                      loading={searchLoading}
+                      error={searchError}
+                      onSelect={() => {
+                        setSearchOpen(false);
+                        setSearchQuery('');
+                        setSearchResults([]);
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+              {/* Search Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden md:flex"
+                onClick={() => setSearchOpen(true)}
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            </div>
 
             {/* Theme Toggle */}
             <Button variant="ghost" size="sm" onClick={toggleTheme}>
@@ -358,7 +439,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={user?.profile_image} />
+                    <AvatarImage src={user?.avatar} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
                       {user?.name ? getInitials(user.name) : 'AD'}
                     </AvatarFallback>

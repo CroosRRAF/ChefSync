@@ -453,7 +453,7 @@ class AdminService {
     type?: string;
     priority?: string;
     is_active?: boolean;
-  } = {}): Promise<AdminNotification[]> {
+  } = {}): Promise<{ count: number; next: string | null; previous: string | null; results: AdminNotification[] }> {
     try {
       const response = await apiClient.get(`${this.baseUrl}/notifications/`, {
         params: {

@@ -54,6 +54,7 @@ import AdminProfile from '@/pages/admin/Profile';
 import AdminReports from '@/pages/admin/Reports';
 import FoodManagement from '@/pages/admin/FoodManagement';
 import AdminNotifications from '@/pages/admin/Notifications';
+import Communications from '@/pages/admin/Communications';
 
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
@@ -401,7 +402,7 @@ const InnerRoutes: React.FC = () => {
         <Route path="/admin/communications" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <AdminNotifications />
+              <Communications />
             </AdminLayout>
           </ProtectedRoute>
         } />
