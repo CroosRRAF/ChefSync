@@ -26,14 +26,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { communicationService, type Feedback } from '@/services/communicationService';
+import { useTheme } from '@/context/ThemeContext';
+import { communicationService, type Communication } from '@/services/communicationService';
 import { Star, MessageCircle } from 'lucide-react';
 
 const FeedbackManagement: React.FC = () => {
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const { theme } = useTheme();
+  const [feedbacks, setFeedbacks] = useState<Communication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
+  const [selectedFeedback, setSelectedFeedback] = useState<Communication | null>(null);
   const [response, setResponse] = useState('');
   const [filter, setFilter] = useState({
     status: 'all',
@@ -72,7 +74,7 @@ const FeedbackManagement: React.FC = () => {
     if (!selectedFeedback || !response) return;
 
     try {
-      await communicationService.respondToFeedback(selectedFeedback.id, { response });
+      await communicationService.addResponse(selectedFeedback.id, { response });
       setSelectedFeedback(null);
       setResponse('');
       fetchFeedbacks();
@@ -83,18 +85,35 @@ const FeedbackManagement: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      in_progress: 'bg-blue-100 text-blue-800',
-      resolved: 'bg-green-100 text-green-800',
+      pending: {
+        backgroundColor: theme === 'light' ? '#FEF3C7' : 'rgba(245, 158, 11, 0.2)',
+        color: theme === 'light' ? '#92400E' : '#FCD34D'
+      },
+      in_progress: {
+        backgroundColor: theme === 'light' ? '#DBEAFE' : 'rgba(59, 130, 246, 0.2)',
+        color: theme === 'light' ? '#1E40AF' : '#93C5FD'
+      },
+      resolved: {
+        backgroundColor: theme === 'light' ? '#D1FAE5' : 'rgba(16, 185, 129, 0.2)',
+        color: theme === 'light' ? '#065F46' : '#A7F3D0'
+      },
     };
-    return styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800';
+    return styles[status as keyof typeof styles] || {
+      backgroundColor: theme === 'light' ? '#F3F4F6' : 'rgba(107, 114, 128, 0.2)',
+      color: theme === 'light' ? '#374151' : '#D1D5DB'
+    };
   };
 
   const renderStars = (rating: number) => {
     return Array(5).fill(0).map((_, index) => (
       <Star
         key={index}
-        className={`h-4 w-4 ${index < rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+        className={`h-4 w-4 ${index < rating ? 'fill-current' : ''}`}
+        style={{
+          color: index < rating 
+            ? (theme === 'light' ? '#F59E0B' : '#FBBF24')
+            : (theme === 'light' ? '#D1D5DB' : '#6B7280')
+        }}
       />
     ));
   };
@@ -102,7 +121,9 @@ const FeedbackManagement: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Customer Feedback</h2>
+        <h2 className="text-2xl font-bold" style={{
+          color: theme === 'light' ? '#111827' : '#F9FAFB'
+        }}>Customer Feedback</h2>
         <div className="flex gap-4">
           <Select
             value={filter.status}
@@ -136,7 +157,10 @@ const FeedbackManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border" style={{
+        borderColor: theme === 'light' ? '#E5E7EB' : '#374151',
+        backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
+      }}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -153,8 +177,12 @@ const FeedbackManagement: React.FC = () => {
               <TableRow key={feedback.id}>
                 <TableCell>
                   <div>
-                    <div className="font-medium">{feedback.user_name}</div>
-                    <div className="text-sm text-gray-500">{feedback.user_email}</div>
+                    <div className="font-medium" style={{
+                      color: theme === 'light' ? '#111827' : '#F9FAFB'
+                    }}>{feedback.user.name}</div>
+                    <div className="text-sm" style={{
+                      color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+                    }}>{feedback.user.email}</div>
                   </div>
                 </TableCell>
                 <TableCell>{feedback.subject}</TableCell>
@@ -162,7 +190,7 @@ const FeedbackManagement: React.FC = () => {
                   <div className="flex">{renderStars(feedback.rating)}</div>
                 </TableCell>
                 <TableCell>
-                  <Badge className={getStatusBadge(feedback.status)}>
+                  <Badge style={getStatusBadge(feedback.status)}>
                     {feedback.status.replace('_', ' ')}
                   </Badge>
                 </TableCell>
@@ -184,12 +212,18 @@ const FeedbackManagement: React.FC = () => {
                 <TableCell colSpan={6} className="text-center py-8">
                   {loading ? (
                     <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{
+                        borderColor: theme === 'light' ? '#2563EB' : '#3B82F6'
+                      }}></div>
                     </div>
                   ) : error ? (
-                    <div className="text-red-500">{error}</div>
+                    <div style={{
+                      color: theme === 'light' ? '#EF4444' : '#F87171'
+                    }}>{error}</div>
                   ) : (
-                    <div className="text-gray-500">No feedbacks found</div>
+                    <div style={{
+                      color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+                    }}>No feedbacks found</div>
                   )}
                 </TableCell>
               </TableRow>
@@ -209,12 +243,18 @@ const FeedbackManagement: React.FC = () => {
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <h4 className="font-medium">Customer Feedback</h4>
-              <p className="text-sm">{selectedFeedback?.message}</p>
+              <h4 className="font-medium" style={{
+                color: theme === 'light' ? '#111827' : '#F9FAFB'
+              }}>Customer Feedback</h4>
+              <p className="text-sm" style={{
+                color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+              }}>{selectedFeedback?.message}</p>
             </div>
             
             <div className="space-y-2">
-              <label htmlFor="response" className="text-sm font-medium">
+              <label htmlFor="response" className="text-sm font-medium" style={{
+                color: theme === 'light' ? '#111827' : '#F9FAFB'
+              }}>
                 Your Response
               </label>
               <Textarea

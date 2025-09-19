@@ -37,6 +37,7 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useTheme } from '@/context/ThemeContext';
 import { communicationService, type EmailTemplate } from '@/services/communicationService';
 import { Mail, FileText, Send, Trash2, Edit, Plus } from 'lucide-react';
 
@@ -51,6 +52,7 @@ const templateFormSchema = z.object({
 type TemplateFormValues = z.infer<typeof templateFormSchema>;
 
 const EmailTemplates: React.FC = () => {
+  const { theme } = useTheme();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -145,26 +147,49 @@ const EmailTemplates: React.FC = () => {
 
   const getTemplateTypeBadge = (type: string) => {
     const styles = {
-      welcome: 'bg-green-100 text-green-800',
-      order: 'bg-blue-100 text-blue-800',
-      alert: 'bg-red-100 text-red-800',
-      feedback: 'bg-purple-100 text-purple-800',
-      promotional: 'bg-yellow-100 text-yellow-800',
+      welcome: {
+        backgroundColor: theme === 'light' ? '#D1FAE5' : 'rgba(16, 185, 129, 0.2)',
+        color: theme === 'light' ? '#065F46' : '#A7F3D0'
+      },
+      order: {
+        backgroundColor: theme === 'light' ? '#DBEAFE' : 'rgba(59, 130, 246, 0.2)',
+        color: theme === 'light' ? '#1E40AF' : '#93C5FD'
+      },
+      alert: {
+        backgroundColor: theme === 'light' ? '#FECACA' : 'rgba(239, 68, 68, 0.2)',
+        color: theme === 'light' ? '#991B1B' : '#FCA5A5'
+      },
+      feedback: {
+        backgroundColor: theme === 'light' ? '#EDE9FE' : 'rgba(147, 51, 234, 0.2)',
+        color: theme === 'light' ? '#5B21B6' : '#C4B5FD'
+      },
+      promotional: {
+        backgroundColor: theme === 'light' ? '#FEF3C7' : 'rgba(245, 158, 11, 0.2)',
+        color: theme === 'light' ? '#92400E' : '#FCD34D'
+      },
     };
-    return styles[type as keyof typeof styles] || 'bg-gray-100 text-gray-800';
+    return styles[type as keyof typeof styles] || {
+      backgroundColor: theme === 'light' ? '#F3F4F6' : 'rgba(107, 114, 128, 0.2)',
+      color: theme === 'light' ? '#374151' : '#D1D5DB'
+    };
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Email Templates</h2>
+        <h2 className="text-2xl font-bold" style={{
+          color: theme === 'light' ? '#111827' : '#F9FAFB'
+        }}>Email Templates</h2>
         <Button onClick={() => { setIsCreating(true); setSelectedTemplate(null); form.reset(); }}>
           <Plus className="h-4 w-4 mr-2" />
           Create Template
         </Button>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border" style={{
+        borderColor: theme === 'light' ? '#E5E7EB' : '#374151',
+        backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
+      }}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -180,19 +205,27 @@ const EmailTemplates: React.FC = () => {
               <TableRow key={template.id}>
                 <TableCell>
                   <div>
-                    <div className="font-medium">{template.name}</div>
-                    <div className="text-sm text-gray-500">{template.subject}</div>
+                    <div className="font-medium" style={{
+                      color: theme === 'light' ? '#111827' : '#F9FAFB'
+                    }}>{template.name}</div>
+                    <div className="text-sm" style={{
+                      color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+                    }}>{template.subject}</div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge className={getTemplateTypeBadge(template.type)}>
+                  <Badge style={getTemplateTypeBadge(template.type)}>
                     {template.type}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {template.variables.map((variable, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
+                      <Badge key={index} variant="outline" className="text-xs" style={{
+                        borderColor: theme === 'light' ? '#D1D5DB' : '#6B7280',
+                        color: theme === 'light' ? '#6B7280' : '#D1D5DB',
+                        backgroundColor: theme === 'light' ? '#FFFFFF' : '#374151'
+                      }}>
                         {variable}
                       </Badge>
                     ))}
@@ -232,7 +265,9 @@ const EmailTemplates: React.FC = () => {
             ))}
             {templates.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={5} className="text-center py-8" style={{
+                  color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+                }}>
                   {loading ? 'Loading...' : 'No templates found'}
                 </TableCell>
               </TableRow>

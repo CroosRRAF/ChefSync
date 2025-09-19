@@ -29,6 +29,7 @@ import {
   Package
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { adminService, type DashboardStats, type AdminOrder, type AdminActivityLog } from '@/services/adminService';
 import InteractiveChart from '@/components/admin/InteractiveChart';
 import AdvancedDataTable from '@/components/admin/AdvancedDataTable';
@@ -38,6 +39,7 @@ import SystemHealthMonitor from '@/components/admin/SystemHealthMonitor';
 
 const ModernDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentOrders, setRecentOrders] = useState<AdminOrder[]>([]);
@@ -212,26 +214,40 @@ const ModernDashboard: React.FC = () => {
         {/* Header Skeleton */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-64 mb-2"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-96"></div>
+            <div className="h-8 rounded w-64 mb-2 animate-pulse" style={{
+              backgroundColor: theme === 'light' ? '#E5E7EB' : '#374151'
+            }}></div>
+            <div className="h-4 rounded w-96 animate-pulse" style={{
+              backgroundColor: theme === 'light' ? '#E5E7EB' : '#374151'
+            }}></div>
           </div>
           <div className="flex space-x-2">
-            <div className="h-9 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
-            <div className="h-9 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+            <div className="h-9 rounded w-20 animate-pulse" style={{
+              backgroundColor: theme === 'light' ? '#E5E7EB' : '#374151'
+            }}></div>
+            <div className="h-9 rounded w-20 animate-pulse" style={{
+              backgroundColor: theme === 'light' ? '#E5E7EB' : '#374151'
+            }}></div>
           </div>
         </div>
 
         {/* Stats Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-40 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+            <div key={i} className="h-40 rounded-lg animate-pulse" style={{
+              backgroundColor: theme === 'light' ? '#E5E7EB' : '#374151'
+            }}></div>
           ))}
         </div>
 
         {/* Charts Skeleton */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-80 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
-          <div className="h-80 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+          <div className="h-80 rounded-lg animate-pulse" style={{
+            backgroundColor: theme === 'light' ? '#E5E7EB' : '#374151'
+          }}></div>
+          <div className="h-80 rounded-lg animate-pulse" style={{
+            backgroundColor: theme === 'light' ? '#E5E7EB' : '#374151'
+          }}></div>
         </div>
       </div>
     );
@@ -242,8 +258,12 @@ const ModernDashboard: React.FC = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-            <p className="text-red-600 mt-2">Error loading dashboard data</p>
+            <h1 className="text-3xl font-bold" style={{
+              color: theme === 'light' ? '#111827' : '#F9FAFB'
+            }}>Dashboard</h1>
+            <p className="mt-2" style={{
+              color: theme === 'light' ? '#EF4444' : '#F87171'
+            }}>Error loading dashboard data</p>
           </div>
           <Button onClick={handleRefresh} variant="outline">
             <RefreshCw className="h-4 w-4 mr-2" />
@@ -259,10 +279,14 @@ const ModernDashboard: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-3xl font-bold" style={{
+              color: theme === 'light' ? '#111827' : '#F9FAFB'
+            }}>
               Welcome back{user?.name ? `, ${user.name}` : ''}! 👋
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
+            <p className="mt-2" style={{
+              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+            }}>
               Here's what's happening with your platform today.
             </p>
           </div>
@@ -285,111 +309,186 @@ const ModernDashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {/* Total Users */}
           <Card 
-            className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800 hover:shadow-lg transition-all duration-200 cursor-pointer group"
+            className="border hover:shadow-lg transition-all duration-200 cursor-pointer group"
+            style={{
+              background: theme === 'light' ? 
+                'linear-gradient(135deg, #EBF4FF 0%, #DBEAFE 100%)' : 
+                'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%)',
+              borderColor: theme === 'light' ? '#BFDBFE' : '#1E3A8A',
+              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
+            }}
             onClick={() => handleCardClick('/admin/users')}
           >
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total Users</p>
-                  <p className="text-3xl font-bold text-blue-900 dark:text-blue-100 mt-2">
+                  <p className="text-sm font-medium" style={{
+                    color: theme === 'light' ? '#2563EB' : '#3B82F6'
+                  }}>Total Users</p>
+                  <p className="text-3xl font-bold mt-2" style={{
+                    color: theme === 'light' ? '#1E3A8A' : '#93C5FD'
+                  }}>
                     {stats?.total_users || 0}
                   </p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  <p className="text-xs mt-1" style={{
+                    color: theme === 'light' ? '#2563EB' : '#3B82F6'
+                  }}>
                     {stats?.active_users || 0} active
                   </p>
                 </div>
-                <div className="bg-blue-500 p-3 rounded-full group-hover:bg-blue-600 transition-colors">
+                <div className="p-3 rounded-full group-hover:opacity-90 transition-opacity" style={{
+                  backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6'
+                }}>
                   <Users className="h-6 w-6 text-white" />
                 </div>
               </div>
               <div className="flex items-center justify-end mt-4">
-                <ArrowRight className="h-4 w-4 text-blue-500 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" style={{
+                  color: theme === 'light' ? '#2563EB' : '#3B82F6'
+                }} />
               </div>
             </CardContent>
           </Card>
 
           {/* Total Orders */}
           <Card 
-            className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-all duration-200 cursor-pointer group"
+            className="border hover:shadow-lg transition-all duration-200 cursor-pointer group"
+            style={{
+              background: theme === 'light' ? 
+                'linear-gradient(135deg, #F3E8FF 0%, #EDE9FE 100%)' : 
+                'linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(147, 51, 234, 0.05) 100%)',
+              borderColor: theme === 'light' ? '#C4B5FD' : '#5B21B6',
+              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
+            }}
             onClick={() => handleCardClick('/admin/orders')}
           >
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Total Orders</p>
-                  <p className="text-3xl font-bold text-purple-900 dark:text-purple-100 mt-2">
+                  <p className="text-sm font-medium" style={{
+                    color: theme === 'light' ? '#7C3AED' : '#A78BFA'
+                  }}>Total Orders</p>
+                  <p className="text-3xl font-bold mt-2" style={{
+                    color: theme === 'light' ? '#5B21B6' : '#C4B5FD'
+                  }}>
                     {stats?.total_orders || 0}
                   </p>
-                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                  <p className="text-xs mt-1" style={{
+                    color: theme === 'light' ? '#7C3AED' : '#A78BFA'
+                  }}>
                     {stats?.orders_today || 0} today
                   </p>
                 </div>
-                <div className="bg-purple-500 p-3 rounded-full group-hover:bg-purple-600 transition-colors">
+                <div className="p-3 rounded-full group-hover:opacity-90 transition-opacity" style={{
+                  backgroundColor: theme === 'light' ? '#7C3AED' : '#8B5CF6'
+                }}>
                   <ShoppingCart className="h-6 w-6 text-white" />
                 </div>
               </div>
               <div className="flex items-center justify-end mt-4">
-                <ArrowRight className="h-4 w-4 text-purple-500 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" style={{
+                  color: theme === 'light' ? '#7C3AED' : '#8B5CF6'
+                }} />
               </div>
             </CardContent>
           </Card>
 
           {/* Total Revenue */}
           <Card 
-            className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800 hover:shadow-lg transition-all duration-200 cursor-pointer group"
+            className="border hover:shadow-lg transition-all duration-200 cursor-pointer group"
+            style={{
+              background: theme === 'light' ? 
+                'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)' : 
+                'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%)',
+              borderColor: theme === 'light' ? '#A7F3D0' : '#047857',
+              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
+            }}
             onClick={() => handleCardClick('/admin/analytics')}
           >
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-600 dark:text-green-400">Total Revenue</p>
-                  <p className="text-3xl font-bold text-green-900 dark:text-green-100 mt-2">
+                  <p className="text-sm font-medium" style={{
+                    color: theme === 'light' ? '#10B981' : '#34D399'
+                  }}>Total Revenue</p>
+                  <p className="text-3xl font-bold mt-2" style={{
+                    color: theme === 'light' ? '#047857' : '#6EE7B7'
+                  }}>
                     ${(stats?.total_revenue || 0).toLocaleString()}
                   </p>
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  <p className="text-xs mt-1" style={{
+                    color: theme === 'light' ? '#10B981' : '#34D399'
+                  }}>
                     ${(stats?.revenue_today || 0).toLocaleString()} today
                   </p>
                 </div>
-                <div className="bg-green-500 p-3 rounded-full group-hover:bg-green-600 transition-colors">
+                <div className="p-3 rounded-full group-hover:opacity-90 transition-opacity" style={{
+                  backgroundColor: theme === 'light' ? '#10B981' : '#34D399'
+                }}>
                   <DollarSign className="h-6 w-6 text-white" />
                 </div>
               </div>
               <div className="flex items-center justify-end mt-4">
-                <ArrowRight className="h-4 w-4 text-green-500 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" style={{
+                  color: theme === 'light' ? '#10B981' : '#34D399'
+                }} />
               </div>
             </CardContent>
           </Card>
 
           {/* Total Food Items */}
           <Card 
-            className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800 hover:shadow-lg transition-all duration-200 cursor-pointer group"
+            className="border hover:shadow-lg transition-all duration-200 cursor-pointer group"
+            style={{
+              background: theme === 'light' ? 
+                'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)' : 
+                'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%)',
+              borderColor: theme === 'light' ? '#FCD34D' : '#92400E',
+              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
+            }}
             onClick={() => handleCardClick('/admin/analytics')}
           >
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Total Food Items</p>
-                  <p className="text-3xl font-bold text-orange-900 dark:text-orange-100 mt-2">
+                  <p className="text-sm font-medium" style={{
+                    color: theme === 'light' ? '#F59E0B' : '#FBBF24'
+                  }}>Total Food Items</p>
+                  <p className="text-3xl font-bold mt-2" style={{
+                    color: theme === 'light' ? '#92400E' : '#FCD34D'
+                  }}>
                     {stats?.total_foods || 0}
                   </p>
-                  <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                  <p className="text-xs mt-1" style={{
+                    color: theme === 'light' ? '#F59E0B' : '#FBBF24'
+                  }}>
                     {stats?.active_foods || 0} active
                   </p>
                 </div>
-                <div className="bg-orange-500 p-3 rounded-full group-hover:bg-orange-600 transition-colors">
+                <div className="p-3 rounded-full group-hover:opacity-90 transition-opacity" style={{
+                  backgroundColor: theme === 'light' ? '#F59E0B' : '#FBBF24'
+                }}>
                   <Package className="h-6 w-6 text-white" />
                 </div>
               </div>
               <div className="flex items-center justify-end mt-4">
-                <ArrowRight className="h-4 w-4 text-orange-500 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" style={{
+                  color: theme === 'light' ? '#F59E0B' : '#FBBF24'
+                }} />
               </div>
             </CardContent>
           </Card>
 
           {/* New Users (1 week) */}
           <Card 
-            className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 border-indigo-200 dark:border-indigo-800 hover:shadow-lg transition-all duration-200 cursor-pointer group"
+            className="border hover:shadow-lg transition-all duration-200 cursor-pointer group"
+            style={{
+              background: theme === 'light' ? 
+                'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' : 
+                'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.05) 100%)',
+              borderColor: theme === 'light' ? '#C7D2FE' : '#3730A3',
+              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
+            }}
             onClick={() => handleCardClick('/admin/users')}
           >
             <CardContent className="p-6">

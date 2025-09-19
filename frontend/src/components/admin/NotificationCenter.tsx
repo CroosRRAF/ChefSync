@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { adminService, type AdminNotification } from '@/services/adminService';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 
 interface NotificationCenterProps {
   className?: string;
@@ -46,6 +47,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   refreshInterval = 30000 // 30 seconds
 }) => {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,38 +128,62 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   }, []);
 
   // Get notification icon
-  const getNotificationIcon = (type: string, priority: string) => {
+  const getNotificationIcon = (type: string, priority: string, theme: 'light' | 'dark') => {
     const iconClass = "h-4 w-4";
     
     if (priority === 'high') {
-      return <AlertTriangle className={`${iconClass} text-red-500`} />;
+      return <AlertTriangle className={iconClass} style={{
+        color: theme === 'light' ? '#EF4444' : '#F87171'
+      }} />;
     }
     
     switch (type) {
       case 'system':
-        return <Settings className={`${iconClass} text-blue-500`} />;
+        return <Settings className={iconClass} style={{
+          color: theme === 'light' ? '#3B82F6' : '#60A5FA'
+        }} />;
       case 'user':
-        return <Info className={`${iconClass} text-green-500`} />;
+        return <Info className={iconClass} style={{
+          color: theme === 'light' ? '#10B981' : '#34D399'
+        }} />;
       case 'order':
-        return <CheckCircle className={`${iconClass} text-purple-500`} />;
+        return <CheckCircle className={iconClass} style={{
+          color: theme === 'light' ? '#7C3AED' : '#A78BFA'
+        }} />;
       case 'error':
-        return <XCircle className={`${iconClass} text-red-500`} />;
+        return <XCircle className={iconClass} style={{
+          color: theme === 'light' ? '#EF4444' : '#F87171'
+        }} />;
       default:
-        return <Info className={`${iconClass} text-gray-500`} />;
+        return <Info className={iconClass} style={{
+          color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+        }} />;
     }
   };
 
   // Get priority color
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: string, theme: 'light' | 'dark') => {
     switch (priority) {
       case 'high':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+        return {
+          backgroundColor: theme === 'light' ? '#FEF2F2' : 'rgba(239, 68, 68, 0.15)',
+          color: theme === 'light' ? '#EF4444' : '#F87171'
+        };
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
+        return {
+          backgroundColor: theme === 'light' ? '#FFFBEB' : 'rgba(245, 158, 11, 0.15)',
+          color: theme === 'light' ? '#FACC15' : '#FCD34D'
+        };
       case 'low':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+        return {
+          backgroundColor: theme === 'light' ? '#ECFDF5' : 'rgba(16, 185, 129, 0.15)',
+          color: theme === 'light' ? '#10B981' : '#34D399'
+        };
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+        return {
+          backgroundColor: theme === 'light' ? '#F9FAFB' : 'rgba(107, 114, 128, 0.15)',
+          color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+        };
     }
   };
 
@@ -304,13 +330,17 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       {filteredNotifications.map((notification) => (
                         <div
                           key={notification.id}
-                          className={`p-4 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
-                            !notification.is_read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-                          }`}
+                          className="p-4 border-b hover:opacity-90 transition-colors"
+                          style={{
+                            borderBottomColor: theme === 'light' ? '#E5E7EB' : '#374151',
+                            backgroundColor: !notification.is_read 
+                              ? (theme === 'light' ? '#EBF4FF' : 'rgba(59, 130, 246, 0.1)') 
+                              : 'transparent'
+                          }}
                         >
                           <div className="flex items-start space-x-3">
                             <div className="flex-shrink-0 mt-1">
-                              {getNotificationIcon(notification.notification_type, notification.priority)}
+                              {getNotificationIcon(notification.notification_type, notification.priority, theme)}
                             </div>
                             
                             <div className="flex-1 min-w-0">
@@ -323,12 +353,15 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                                 <div className="flex items-center space-x-2">
                                   <Badge 
                                     variant="secondary" 
-                                    className={`text-xs ${getPriorityColor(notification.priority)}`}
+                                    className="text-xs"
+                                    style={getPriorityColor(notification.priority, theme)}
                                   >
                                     {notification.priority}
                                   </Badge>
                                   {!notification.is_read && (
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                    <div className="w-2 h-2 rounded-full" style={{
+                                      backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6'
+                                    }}></div>
                                   )}
                                 </div>
                               </div>

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useUserStore } from '@/store/userStore';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { apiClient } from '@/utils/fetcher';
 import { adminService } from '@/services/adminService';
 import { 
@@ -46,6 +47,7 @@ interface AdminOrder {
 
 const OrderManagement: React.FC = () => {
   const { user } = useUserStore();
+  const { theme } = useTheme();
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState<AdminOrder[]>([]);
@@ -286,29 +288,55 @@ const OrderManagement: React.FC = () => {
   };
 
   const getStatusColor = (status: AdminOrder['status']) => {
-    switch (status) {
-      case 'cart': return 'bg-gray-500';
-      case 'pending': return 'bg-yellow-500';
-      case 'confirmed': return 'bg-blue-500';
-      case 'preparing': return 'bg-orange-500';
-      case 'ready': return 'bg-green-500';
-      case 'out_for_delivery': return 'bg-purple-500';
-      case 'delivered': return 'bg-emerald-500';
-      case 'cancelled': return 'bg-red-500';
-      case 'refunded': return 'bg-indigo-500';
-      default: return 'bg-gray-500';
-    }
+    const colors = {
+      light: {
+        cart: '#6B7280',
+        pending: '#D97706',
+        confirmed: '#2563EB', 
+        preparing: '#EA580C',
+        ready: '#16A34A',
+        out_for_delivery: '#7C3AED',
+        delivered: '#059669',
+        cancelled: '#DC2626',
+        refunded: '#4338CA'
+      },
+      dark: {
+        cart: '#9CA3AF',
+        pending: '#FBBF24',
+        confirmed: '#3B82F6',
+        preparing: '#FB923C', 
+        ready: '#22C55E',
+        out_for_delivery: '#8B5CF6',
+        delivered: '#10B981',
+        cancelled: '#EF4444',
+        refunded: '#6366F1'
+      }
+    };
+    
+    const themeColors = theme === 'dark' ? colors.dark : colors.light;
+    return themeColors[status] || themeColors.cart;
   };
 
   const getPaymentColor = (status: AdminOrder['payment_status']) => {
-    switch (status) {
-      case 'paid': return 'bg-green-500';
-      case 'pending': return 'bg-yellow-500';
-      case 'failed': return 'bg-red-500';
-      case 'refunded': return 'bg-blue-500';
-      case 'partial_refund': return 'bg-orange-500';
-      default: return 'bg-gray-500';
-    }
+    const colors = {
+      light: {
+        paid: '#16A34A',
+        pending: '#D97706',
+        failed: '#DC2626',
+        refunded: '#2563EB',
+        partial_refund: '#EA580C'
+      },
+      dark: {
+        paid: '#22C55E',
+        pending: '#FBBF24',
+        failed: '#EF4444', 
+        refunded: '#3B82F6',
+        partial_refund: '#FB923C'
+      }
+    };
+    
+    const themeColors = theme === 'dark' ? colors.dark : colors.light;
+    return themeColors[status] || themeColors.pending;
   };
 
   const getStatusIcon = (status: AdminOrder['status']) => {
@@ -501,13 +529,29 @@ const OrderManagement: React.FC = () => {
     return (
       <div className="space-y-8">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+          <div 
+            className="h-8 rounded w-1/4"
+            style={{
+              backgroundColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+            }}
+          ></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div 
+                key={i} 
+                className="h-24 rounded"
+                style={{
+                  backgroundColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+                }}
+              ></div>
             ))}
           </div>
-          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div 
+            className="h-96 rounded"
+            style={{
+              backgroundColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+            }}
+          ></div>
         </div>
       </div>
     );
@@ -518,10 +562,19 @@ const OrderManagement: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 
+            className="text-2xl font-bold"
+            style={{
+              color: theme === 'dark' ? '#F9FAFB' : '#111827'
+            }}
+          >
             Order Management
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p 
+            style={{
+              color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+            }}
+          >
             Monitor and manage all system orders
           </p>
         </div>
@@ -542,12 +595,22 @@ const OrderManagement: React.FC = () => {
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search 
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
+                    style={{
+                      color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                    }}
+                  />
                   <Input
                     placeholder="Search by order number, customer name, or email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
+                    style={{
+                      backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+                      borderColor: theme === 'dark' ? '#374151' : '#D1D5DB',
+                      color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                    }}
                   />
                 </div>
               </div>
@@ -585,49 +648,128 @@ const OrderManagement: React.FC = () => {
       {/* Assignment Modal */}
       {showAssignmentModal && selectedOrder && assignmentType && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg max-w-md w-full mx-4">
+          <div 
+            className="rounded-lg max-w-md w-full mx-4"
+            style={{
+              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF'
+            }}
+          >
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <ChefHat className="h-6 w-6 text-blue-500 mr-3" />
-                <h3 className="text-lg font-semibold">
+                <ChefHat 
+                  className="h-6 w-6 mr-3"
+                  style={{
+                    color: theme === 'dark' ? '#3B82F6' : '#2563EB'
+                  }}
+                />
+                <h3 
+                  className="text-lg font-semibold"
+                  style={{
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                  }}
+                >
                   Assign {assignmentType === 'chef' ? 'Chef' : 'Delivery Partner'}
                 </h3>
               </div>
               <div className="mb-6">
-                <p className="text-gray-600 mb-3">
+                <p 
+                  className="mb-3"
+                  style={{
+                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                  }}
+                >
                   Select a {assignmentType === 'chef' ? 'chef' : 'delivery partner'} for order <strong>#{selectedOrder.order_number}</strong>
                 </p>
-                <div className="bg-gray-50 p-3 rounded-lg mb-4">
-                  <div className="text-sm text-gray-600">
+                <div 
+                  className="p-3 rounded-lg mb-4"
+                  style={{
+                    backgroundColor: theme === 'dark' ? '#111827' : '#F9FAFB'
+                  }}
+                >
+                  <div 
+                    className="text-sm"
+                    style={{
+                      color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                    }}
+                  >
                     <strong>Customer:</strong> {selectedOrder.customer_name}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div 
+                    className="text-sm"
+                    style={{
+                      color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                    }}
+                  >
                     <strong>Items:</strong> {selectedOrder.items_count} items
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div 
+                    className="text-sm"
+                    style={{
+                      color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                    }}
+                  >
                     <strong>Total:</strong> ${selectedOrder.total_amount.toFixed(2)}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label 
+                    className="text-sm font-medium"
+                    style={{
+                      color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                    }}
+                  >
                     Available {assignmentType === 'chef' ? 'Chefs' : 'Delivery Partners'}:
                   </label>
-                  <div className="max-h-48 overflow-y-auto border rounded-lg">
+                  <div 
+                    className="max-h-48 overflow-y-auto border rounded-lg"
+                    style={{
+                      borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+                    }}
+                  >
                     {(assignmentType === 'chef' ? availableChefs : availablePartners).map((resource: any) => (
                       <div
                         key={resource.id}
-                        className="p-3 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer"
+                        className="p-3 border-b last:border-b-0 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                        style={{
+                          borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+                        }}
                         onClick={() => confirmAssignment(resource.id)}
                       >
-                        <div className="font-medium">{resource.name}</div>
-                        <div className="text-sm text-gray-600">{resource.email}</div>
+                        <div 
+                          className="font-medium"
+                          style={{
+                            color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                          }}
+                        >
+                          {resource.name}
+                        </div>
+                        <div 
+                          className="text-sm"
+                          style={{
+                            color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                          }}
+                        >
+                          {resource.email}
+                        </div>
                         {resource.phone && (
-                          <div className="text-sm text-gray-600">{resource.phone}</div>
+                          <div 
+                            className="text-sm"
+                            style={{
+                              color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                            }}
+                          >
+                            {resource.phone}
+                          </div>
                         )}
                       </div>
                     ))}
                     {(assignmentType === 'chef' ? availableChefs : availablePartners).length === 0 && (
-                      <div className="p-4 text-center text-gray-500">
+                      <div 
+                        className="p-4 text-center"
+                        style={{
+                          color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                        }}
+                      >
                         No available {assignmentType === 'chef' ? 'chefs' : 'delivery partners'} found
                       </div>
                     )}
@@ -674,13 +816,32 @@ const OrderManagement: React.FC = () => {
                   onMouseEnter={(e) => handleOrderPreview(order, e)}
                   onMouseLeave={handlePreviewClose}
                 >
-                  <TableCell className="font-medium">
+                  <TableCell 
+                    className="font-medium"
+                    style={{
+                      color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                    }}
+                  >
                     #{order.order_number}
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{order.customer_name}</div>
-                      <div className="text-sm text-muted-foreground">{order.customer_email}</div>
+                      <div 
+                        className="font-medium"
+                        style={{
+                          color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                        }}
+                      >
+                        {order.customer_name}
+                      </div>
+                      <div 
+                        className="text-sm"
+                        style={{
+                          color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                        }}
+                      >
+                        {order.customer_email}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -690,8 +851,12 @@ const OrderManagement: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Badge 
-                      variant="secondary" 
-                      className={`${getStatusColor(order.status)} text-white`}
+                      variant="secondary"
+                      className="text-white"
+                      style={{
+                        backgroundColor: getStatusColor(order.status),
+                        color: '#FFFFFF'
+                      }}
                     >
                       {getStatusIcon(order.status)}
                       <span className="ml-1">{order.status.replace('_', ' ')}</span>
@@ -699,16 +864,30 @@ const OrderManagement: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Badge 
-                      variant="outline" 
-                      className={`${getPaymentColor(order.payment_status)} text-white`}
+                      variant="secondary"
+                      className="text-white"
+                      style={{
+                        backgroundColor: getPaymentColor(order.payment_status),
+                        color: '#FFFFFF'
+                      }}
                     >
                       {order.payment_status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell 
+                    className="font-medium"
+                    style={{
+                      color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                    }}
+                  >
                     ${order.total_amount.toFixed(2)}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell 
+                    className="text-sm"
+                    style={{
+                      color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                    }}
+                  >
                     {new Date(order.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
@@ -763,24 +942,66 @@ const OrderManagement: React.FC = () => {
       {/* Status Change Modal */}
       {showStatusModal && selectedOrder && selectedNewStatus && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full mx-4">
+          <div 
+            className="rounded-lg max-w-md w-full mx-4"
+            style={{
+              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF'
+            }}
+          >
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <AlertCircle className="h-6 w-6 text-yellow-500 mr-3" />
-                <h3 className="text-lg font-semibold">Confirm Status Change</h3>
+                <AlertCircle 
+                  className="h-6 w-6 mr-3"
+                  style={{
+                    color: theme === 'dark' ? '#FBBF24' : '#D97706'
+                  }}
+                />
+                <h3 
+                  className="text-lg font-semibold"
+                  style={{
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                  }}
+                >
+                  Confirm Status Change
+                </h3>
               </div>
               <div className="mb-6">
-                <p className="text-gray-600 mb-3">
+                <p 
+                  className="mb-3"
+                  style={{
+                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                  }}
+                >
                   Are you sure you want to change the status of order <strong>#{selectedOrder.order_number}</strong> to <strong>{selectedNewStatus.replace('_', ' ')}</strong>?
                 </p>
-                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                <div 
+                  className="p-3 rounded-lg"
+                  style={{
+                    backgroundColor: theme === 'dark' ? '#111827' : '#F9FAFB'
+                  }}
+                >
+                  <div 
+                    className="text-sm"
+                    style={{
+                      color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                    }}
+                  >
                     <strong>Customer:</strong> {selectedOrder.customer_name}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                  <div 
+                    className="text-sm"
+                    style={{
+                      color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                    }}
+                  >
                     <strong>Current Status:</strong> {selectedOrder.status.replace('_', ' ')}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                  <div 
+                    className="text-sm"
+                    style={{
+                      color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                    }}
+                  >
                     <strong>New Status:</strong> {selectedNewStatus.replace('_', ' ')}
                   </div>
                 </div>
@@ -808,46 +1029,93 @@ const OrderManagement: React.FC = () => {
             transform: 'translate(-50%, -100%)'
           }}
         >
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-4 w-80 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95">
+          <div 
+            className="border rounded-xl shadow-xl p-4 w-80 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95"
+            style={{
+              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+              borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+            }}
+          >
             <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+              <div 
+                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                style={{
+                  background: theme === 'dark' 
+                    ? 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)'
+                    : 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)'
+                }}
+              >
                 {previewOrder.order_number.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+                <h3 
+                  className="font-semibold truncate"
+                  style={{
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                  }}
+                >
                   Order #{previewOrder.order_number}
                 </h3>
-                <p className="text-sm text-gray-500 truncate">{previewOrder.customer_name}</p>
+                <p 
+                  className="text-sm truncate"
+                  style={{
+                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                  }}
+                >
+                  {previewOrder.customer_name}
+                </p>
               </div>
             </div>
             
             <div className="grid grid-cols-2 gap-3 text-sm mb-3">
               <div className="flex items-center space-x-2">
-                <span className="font-medium text-gray-700 dark:text-gray-300">Status:</span>
+                <span 
+                  className="font-medium"
+                  style={{
+                    color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                  }}
+                >
+                  Status:
+                </span>
                 <Badge 
-                  variant={
-                    previewOrder.status === 'delivered' ? 'default' :
-                    previewOrder.status === 'cancelled' ? 'destructive' :
-                    previewOrder.status === 'pending' ? 'secondary' : 'outline'
-                  }
-                  className={`text-xs ${
-                    previewOrder.status === 'delivered' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                    previewOrder.status === 'cancelled' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                    previewOrder.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                    'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                  }`}
+                  variant="secondary"
+                  style={{
+                    backgroundColor: 
+                      previewOrder.status === 'delivered' ? (theme === 'dark' ? '#14532D' : '#F0FDF4') :
+                      previewOrder.status === 'cancelled' ? (theme === 'dark' ? '#7F1D1D' : '#FEF2F2') :
+                      previewOrder.status === 'pending' ? (theme === 'dark' ? '#92400E' : '#FFFBEB') :
+                      (theme === 'dark' ? '#1E3A8A' : '#EFF6FF'),
+                    color:
+                      previewOrder.status === 'delivered' ? (theme === 'dark' ? '#22C55E' : '#16A34A') :
+                      previewOrder.status === 'cancelled' ? (theme === 'dark' ? '#FCA5A5' : '#DC2626') :
+                      previewOrder.status === 'pending' ? (theme === 'dark' ? '#FBBF24' : '#D97706') :
+                      (theme === 'dark' ? '#3B82F6' : '#2563EB')
+                  }}
+                  className="text-xs"
                 >
                   {previewOrder.status.replace('_', ' ')}
                 </Badge>
               </div>
               <div className="flex items-center space-x-2">
-                <span className="font-medium text-gray-700 dark:text-gray-300">Payment:</span>
+                <span 
+                  className="font-medium"
+                  style={{
+                    color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                  }}
+                >
+                  Payment:
+                </span>
                 <Badge 
-                  variant={previewOrder.payment_status === 'paid' ? 'default' : 'secondary'}
-                  className={`text-xs ${
-                    previewOrder.payment_status === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                    'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                  }`}
+                  variant="secondary"
+                  style={{
+                    backgroundColor: previewOrder.payment_status === 'paid' 
+                      ? (theme === 'dark' ? '#14532D' : '#F0FDF4')
+                      : (theme === 'dark' ? '#1F2937' : '#F3F4F6'),
+                    color: previewOrder.payment_status === 'paid'
+                      ? (theme === 'dark' ? '#22C55E' : '#16A34A')
+                      : (theme === 'dark' ? '#D1D5DB' : '#374151')
+                  }}
+                  className="text-xs"
                 >
                   {previewOrder.payment_status}
                 </Badge>
@@ -856,17 +1124,55 @@ const OrderManagement: React.FC = () => {
             
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <span className="font-medium text-gray-700 dark:text-gray-300">Items:</span>
-                <span className="ml-2 text-gray-900 dark:text-white font-semibold">{previewOrder.items_count}</span>
+                <span 
+                  className="font-medium"
+                  style={{
+                    color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                  }}
+                >
+                  Items:
+                </span>
+                <span 
+                  className="ml-2 font-semibold"
+                  style={{
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                  }}
+                >
+                  {previewOrder.items_count}
+                </span>
               </div>
               <div>
-                <span className="font-medium text-gray-700 dark:text-gray-300">Total:</span>
-                <span className="ml-2 text-gray-900 dark:text-white font-semibold">${previewOrder.total_amount.toFixed(2)}</span>
+                <span 
+                  className="font-medium"
+                  style={{
+                    color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                  }}
+                >
+                  Total:
+                </span>
+                <span 
+                  className="ml-2 font-semibold"
+                  style={{
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                  }}
+                >
+                  ${previewOrder.total_amount.toFixed(2)}
+                </span>
               </div>
             </div>
             
-            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between text-xs text-gray-500">
+            <div 
+              className="mt-4 pt-3 border-t"
+              style={{
+                borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+              }}
+            >
+              <div 
+                className="flex items-center justify-between text-xs"
+                style={{
+                  color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                }}
+              >
                 <div className="flex items-center space-x-1">
                   <Calendar className="h-3 w-3" />
                   <span>Ordered: {new Date(previewOrder.created_at).toLocaleDateString()}</span>
@@ -883,18 +1189,40 @@ const OrderManagement: React.FC = () => {
       {/* Order Detail Modal */}
       {showOrderDetail && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+          <div 
+            className="rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden"
+            style={{
+              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF'
+            }}
+          >
             <div className="p-6 flex flex-col h-full max-h-[90vh]">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
+                  <div 
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4"
+                    style={{
+                      background: theme === 'dark' 
+                        ? 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)'
+                        : 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)'
+                    }}
+                  >
                     {selectedOrder.order_number.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h2 
+                      className="text-xl font-bold"
+                      style={{
+                        color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                      }}
+                    >
                       Order #{selectedOrder.order_number}
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p 
+                      className="text-sm"
+                      style={{
+                        color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                      }}
+                    >
                       {new Date(selectedOrder.created_at).toLocaleString()}
                     </p>
                   </div>
@@ -907,8 +1235,20 @@ const OrderManagement: React.FC = () => {
               {orderDetailLoading ? (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full inline-block mb-2"></div>
-                    <p className="text-gray-600 dark:text-gray-400">Loading order details...</p>
+                    <div 
+                      className="animate-spin h-8 w-8 border-4 border-t-transparent rounded-full inline-block mb-2"
+                      style={{
+                        borderColor: theme === 'dark' ? '#374151' : '#E5E7EB',
+                        borderTopColor: 'transparent'
+                      }}
+                    ></div>
+                    <p 
+                      style={{
+                        color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                      }}
+                    >
+                      Loading order details...
+                    </p>
                   </div>
                 </div>
               ) : orderDetails ? (
@@ -1170,9 +1510,28 @@ const OrderManagement: React.FC = () => {
               ) : (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Failed to load order details</h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">Please try again or contact support if the problem persists.</p>
+                    <AlertCircle 
+                      className="h-12 w-12 mx-auto mb-4"
+                      style={{
+                        color: theme === 'dark' ? '#EF4444' : '#DC2626'
+                      }}
+                    />
+                    <h3 
+                      className="text-lg font-medium mb-2"
+                      style={{
+                        color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                      }}
+                    >
+                      Failed to load order details
+                    </h3>
+                    <p 
+                      className="mb-4"
+                      style={{
+                        color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                      }}
+                    >
+                      Please try again or contact support if the problem persists.
+                    </p>
                     <Button onClick={() => setShowOrderDetail(false)} variant="outline">
                       Close
                     </Button>
@@ -1180,8 +1539,18 @@ const OrderManagement: React.FC = () => {
                 </div>
               )}
 
-              <div className="pt-4 mt-auto border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                <div className="flex items-center text-sm text-gray-500">
+              <div 
+                className="pt-4 mt-auto border-t flex justify-between items-center"
+                style={{
+                  borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+                }}
+              >
+                <div 
+                  className="flex items-center text-sm"
+                  style={{
+                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                  }}
+                >
                   <Clock className="h-4 w-4 mr-1" />
                   <span>Last updated: {new Date(selectedOrder.updated_at).toLocaleString()}</span>
                 </div>

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { adminService, type SystemHealth } from '@/services/adminService';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 
 interface SystemHealthMonitorProps {
   className?: string;
@@ -36,6 +37,7 @@ const SystemHealthMonitor: React.FC<SystemHealthMonitorProps> = ({
   showDetails = true
 }) => {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,43 +61,70 @@ const SystemHealthMonitor: React.FC<SystemHealthMonitorProps> = ({
   }, [user]);
 
   // Get health status
-  const getHealthStatus = (score: number) => {
-    if (score >= 80) return { status: 'excellent', color: 'text-green-600', bg: 'bg-green-100' };
-    if (score >= 60) return { status: 'good', color: 'text-yellow-600', bg: 'bg-yellow-100' };
-    if (score >= 40) return { status: 'warning', color: 'text-orange-600', bg: 'bg-orange-100' };
-    return { status: 'critical', color: 'text-red-600', bg: 'bg-red-100' };
+  const getHealthStatus = (score: number, theme: 'light' | 'dark') => {
+    if (score >= 80) return { 
+      status: 'excellent', 
+      color: theme === 'light' ? '#10B981' : '#34D399', 
+      bg: theme === 'light' ? '#ECFDF5' : 'rgba(16, 185, 129, 0.15)' 
+    };
+    if (score >= 60) return { 
+      status: 'good', 
+      color: theme === 'light' ? '#FACC15' : '#FCD34D', 
+      bg: theme === 'light' ? '#FFFBEB' : 'rgba(245, 158, 11, 0.15)' 
+    };
+    if (score >= 40) return { 
+      status: 'warning', 
+      color: theme === 'light' ? '#F59E0B' : '#FBBF24', 
+      bg: theme === 'light' ? '#FFFBEB' : 'rgba(245, 158, 11, 0.15)' 
+    };
+    return { 
+      status: 'critical', 
+      color: theme === 'light' ? '#EF4444' : '#F87171', 
+      bg: theme === 'light' ? '#FEF2F2' : 'rgba(239, 68, 68, 0.15)' 
+    };
   };
 
   // Get health icon
-  const getHealthIcon = (status: string) => {
+  const getHealthIcon = (status: string, theme: 'light' | 'dark') => {
+    const iconClass = 'h-5 w-5';
     switch (status) {
       case 'excellent':
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
+        return <CheckCircle className={iconClass} style={{
+          color: theme === 'light' ? '#10B981' : '#34D399'
+        }} />;
       case 'good':
-        return <CheckCircle className="h-5 w-5 text-yellow-600" />;
+        return <CheckCircle className={iconClass} style={{
+          color: theme === 'light' ? '#FACC15' : '#FCD34D'
+        }} />;
       case 'warning':
-        return <AlertTriangle className="h-5 w-5 text-orange-600" />;
+        return <AlertTriangle className={iconClass} style={{
+          color: theme === 'light' ? '#F59E0B' : '#FBBF24'
+        }} />;
       case 'critical':
-        return <XCircle className="h-5 w-5 text-red-600" />;
+        return <XCircle className={iconClass} style={{
+          color: theme === 'light' ? '#EF4444' : '#F87171'
+        }} />;
       default:
-        return <Info className="h-5 w-5 text-gray-600" />;
+        return <Info className={iconClass} style={{
+          color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+        }} />;
     }
   };
 
   // Get usage color
-  const getUsageColor = (usage: number) => {
-    if (usage >= 90) return 'text-red-600';
-    if (usage >= 80) return 'text-orange-600';
-    if (usage >= 60) return 'text-yellow-600';
-    return 'text-green-600';
+  const getUsageColor = (usage: number, theme: 'light' | 'dark') => {
+    if (usage >= 90) return theme === 'light' ? '#EF4444' : '#F87171';
+    if (usage >= 80) return theme === 'light' ? '#F59E0B' : '#FBBF24';
+    if (usage >= 60) return theme === 'light' ? '#FACC15' : '#FCD34D';
+    return theme === 'light' ? '#10B981' : '#34D399';
   };
 
   // Get progress color
-  const getProgressColor = (usage: number) => {
-    if (usage >= 90) return 'bg-red-500';
-    if (usage >= 80) return 'bg-orange-500';
-    if (usage >= 60) return 'bg-yellow-500';
-    return 'bg-green-500';
+  const getProgressColor = (usage: number, theme: 'light' | 'dark') => {
+    if (usage >= 90) return theme === 'light' ? '#EF4444' : '#F87171';
+    if (usage >= 80) return theme === 'light' ? '#F59E0B' : '#FBBF24';
+    if (usage >= 60) return theme === 'light' ? '#FACC15' : '#FCD34D';
+    return theme === 'light' ? '#10B981' : '#34D399';
   };
 
   // Auto refresh effect
@@ -164,7 +193,7 @@ const SystemHealthMonitor: React.FC<SystemHealthMonitorProps> = ({
     return null;
   }
 
-  const healthStatus = getHealthStatus(health.health_score);
+  const healthStatus = getHealthStatus(health.health_score, theme);
 
   return (
     <Card className={className}>
@@ -192,12 +221,17 @@ const SystemHealthMonitor: React.FC<SystemHealthMonitorProps> = ({
         {/* Overall Health Score */}
         <div className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-2">
-            {getHealthIcon(healthStatus.status)}
-            <span className={`text-2xl font-bold ${healthStatus.color}`}>
+            {getHealthIcon(healthStatus.status, theme)}
+            <span className="text-2xl font-bold" style={{
+              color: healthStatus.color
+            }}>
               {health.health_score.toFixed(1)}%
             </span>
           </div>
-          <Badge className={`${healthStatus.bg} ${healthStatus.color} border-0`}>
+          <Badge className="border-0" style={{
+            backgroundColor: healthStatus.bg,
+            color: healthStatus.color
+          }}>
             {healthStatus.status.toUpperCase()}
           </Badge>
         </div>
@@ -208,10 +242,14 @@ const SystemHealthMonitor: React.FC<SystemHealthMonitorProps> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Cpu className="h-4 w-4 text-blue-600" />
+                <Cpu className="h-4 w-4" style={{
+                  color: theme === 'light' ? '#3B82F6' : '#60A5FA'
+                }} />
                 <span className="text-sm font-medium">CPU Usage</span>
               </div>
-              <span className={`text-sm font-medium ${getUsageColor(health.cpu_usage)}`}>
+              <span className="text-sm font-medium" style={{
+                color: getUsageColor(health.cpu_usage, theme)
+              }}>
                 {health.cpu_usage.toFixed(1)}%
               </span>
             </div>
@@ -225,10 +263,14 @@ const SystemHealthMonitor: React.FC<SystemHealthMonitorProps> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <MemoryStick className="h-4 w-4 text-green-600" />
+                <MemoryStick className="h-4 w-4" style={{
+                  color: theme === 'light' ? '#10B981' : '#34D399'
+                }} />
                 <span className="text-sm font-medium">Memory Usage</span>
               </div>
-              <span className={`text-sm font-medium ${getUsageColor(health.memory_usage)}`}>
+              <span className="text-sm font-medium" style={{
+                color: getUsageColor(health.memory_usage, theme)
+              }}>
                 {health.memory_usage.toFixed(1)}%
               </span>
             </div>
@@ -242,10 +284,14 @@ const SystemHealthMonitor: React.FC<SystemHealthMonitorProps> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <HardDrive className="h-4 w-4 text-purple-600" />
+                <HardDrive className="h-4 w-4" style={{
+                  color: theme === 'light' ? '#7C3AED' : '#A78BFA'
+                }} />
                 <span className="text-sm font-medium">Disk Usage</span>
               </div>
-              <span className={`text-sm font-medium ${getUsageColor(health.disk_usage)}`}>
+              <span className="text-sm font-medium" style={{
+                color: getUsageColor(health.disk_usage, theme)
+              }}>
                 {health.disk_usage.toFixed(1)}%
               </span>
             </div>

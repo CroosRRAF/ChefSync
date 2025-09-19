@@ -185,8 +185,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             "w-full justify-start gap-3 text-left font-normal",
             level > 0 && "ml-6 w-[calc(100%-1.5rem)]",
             sidebarCollapsed && !level && "justify-center px-2",
-            isActive && "bg-primary/10 text-primary border-r-2 border-primary"
-          )}
+            isActive && "border-r-2"
+          )} style={isActive ? {
+            backgroundColor: theme === 'light' ? '#EBF4FF' : '#1E3A8A20',
+            color: theme === 'light' ? '#2563EB' : '#3B82F6',
+            borderRightColor: theme === 'light' ? '#2563EB' : '#3B82F6'
+          } : {}}
           onClick={() => {
             navigate(item.href);
             setMobileMenuOpen(false);
@@ -222,17 +226,25 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="h-screen flex bg-gray-50 dark:bg-gray-900">
+    <div className="h-screen flex bg-gray-50 dark:bg-gray-900" style={{
+      backgroundColor: theme === 'light' ? '#F9FAFB' : '#111827'
+    }}>
       {/* Desktop Sidebar */}
       <aside className={cn(
-        "hidden lg:flex flex-col border-r bg-white dark:bg-gray-800 transition-all duration-300",
+        "hidden lg:flex flex-col border-r transition-all duration-300",
         sidebarCollapsed ? "w-16" : "w-64"
-      )}>
+      )} style={{
+        backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
+        borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
+      }}>
         {/* Sidebar Header */}
         <div className="p-4 border-b flex items-center justify-between">
           {!sidebarCollapsed && (
             <Link to="/admin/dashboard" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold" style={{
+                backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6',
+                color: '#FFFFFF'
+              }}>
                 C
               </div>
               <span className="font-bold text-lg">ChefSync Admin</span>
@@ -258,10 +270,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         {/* Sidebar Footer */}
         <div className="p-4 border-t">
           {!sidebarCollapsed && (
-            <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-700">
+            <div className="flex items-center gap-3 p-2 rounded-lg" style={{
+              backgroundColor: theme === 'light' ? '#F9FAFB' : '#374151'
+            }}>
               <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.profile_image} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                <AvatarImage src={user?.avatar} />
+                <AvatarFallback className="text-sm" style={{
+                  backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6',
+                  color: '#FFFFFF'
+                }}>
                   {user?.name ? getInitials(user.name) : 'AD'}
                 </AvatarFallback>
               </Avatar>
@@ -281,7 +298,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             {/* Mobile Header */}
             <div className="p-4 border-b">
               <Link to="/admin/dashboard" className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold" style={{
+                  backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6',
+                  color: '#FFFFFF'
+                }}>
                   C
                 </div>
                 <span className="font-bold text-lg">ChefSync Admin</span>
@@ -297,10 +317,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
             {/* Mobile Footer */}
             <div className="p-4 border-t">
-              <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-700">
+              <div className="flex items-center gap-3 p-2 rounded-lg" style={{
+                backgroundColor: theme === 'light' ? '#F9FAFB' : '#374151'
+              }}>
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user?.profile_image} />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                  <AvatarImage src={user?.avatar} />
+                  <AvatarFallback className="text-sm" style={{
+                    backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6',
+                    color: '#FFFFFF'
+                  }}>
                     {user?.name ? getInitials(user.name) : 'AD'}
                   </AvatarFallback>
                 </Avatar>
@@ -317,7 +342,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0">
         {/* Top Header */}
-        <header className="h-16 border-b bg-white dark:bg-gray-800 flex items-center justify-between px-4 lg:px-6">
+        <header className="h-16 border-b flex items-center justify-between px-4 lg:px-6" style={{
+          backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
+          borderBottomColor: theme === 'light' ? '#E5E7EB' : '#374151'
+        }}>
           {/* Left Side */}
           <div className="flex items-center gap-4">
             {/* Mobile Menu Button */}
@@ -331,7 +359,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </Button>
 
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-2 text-sm" style={{
+              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+            }}>
               <Home className="h-4 w-4" />
               <span>/</span>
               {pageInfo.parent && (
@@ -340,7 +370,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   <span>/</span>
                 </>
               )}
-              <span className="text-gray-900 dark:text-white font-medium">
+              <span className="font-medium" style={{
+                color: theme === 'light' ? '#111827' : '#F9FAFB'
+              }}>
                 {pageInfo.current.label}
               </span>
             </div>
@@ -351,7 +383,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             <div className="relative flex items-center">
               {/* Search Bar */}
               {searchOpen && (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border px-3 py-2 w-80 animate-in slide-in-from-top-2">
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2 rounded-lg shadow-lg border px-3 py-2 w-80 animate-in slide-in-from-top-2" style={{
+                  backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
+                  borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
+                }}>
                   <Search className="h-4 w-4 text-gray-500" />
                   <input
                     type="text"
@@ -440,7 +475,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
                     <AvatarImage src={user?.avatar} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
+                    <AvatarFallback style={{
+                      backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6',
+                      color: '#FFFFFF'
+                    }}>
                       {user?.name ? getInitials(user.name) : 'AD'}
                     </AvatarFallback>
                   </Avatar>
@@ -479,7 +517,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+        <main className="flex-1 overflow-y-auto" style={{
+          backgroundColor: theme === 'light' ? '#F9FAFB' : '#111827'
+        }}>
           <div className="p-6">
             {children}
           </div>

@@ -19,12 +19,14 @@ import {
   DollarSign
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { adminService, type AdminUser, type UserListResponse } from '@/services/adminService';
 import AdvancedDataTable from '@/components/admin/AdvancedDataTable';
 import AdvancedStatsCard from '@/components/admin/AdvancedStatsCard';
 
 const EnhancedUserManagement: React.FC = () => {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -272,19 +274,38 @@ const EnhancedUserManagement: React.FC = () => {
       sortable: true,
       render: (value: string, row: AdminUser) => (
         <div 
-          className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded transition-colors relative group"
+          className="flex items-center space-x-3 cursor-pointer p-2 rounded transition-all duration-200 relative group hover:bg-gray-50 dark:hover:bg-gray-800"
           onMouseEnter={(e) => handleUserPreview(row, e)}
           onMouseLeave={handlePreviewClose}
           onClick={() => handleUserDetail(row)}
         >
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+          <div 
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm"
+            style={{
+              background: theme === 'dark' 
+                ? 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)'
+                : 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)'
+            }}
+          >
             {value.charAt(0).toUpperCase()}
           </div>
           <div>
-            <div className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+            <div 
+              className="font-medium transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400"
+              style={{
+                color: theme === 'dark' ? '#F9FAFB' : '#111827'
+              }}
+            >
               {value}
             </div>
-            <div className="text-sm text-gray-500">{row.email}</div>
+            <div 
+              className="text-sm"
+              style={{
+                color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+              }}
+            >
+              {row.email}
+            </div>
           </div>
         </div>
       )
@@ -295,17 +316,19 @@ const EnhancedUserManagement: React.FC = () => {
       sortable: true,
       render: (value: string) => (
         <Badge 
-          variant={
-            value === 'admin' ? 'default' :
-            value === 'cook' ? 'secondary' :
-            value === 'delivery_agent' ? 'outline' : 'secondary'
-          }
-          className={
-            value === 'admin' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-            value === 'cook' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
-            value === 'delivery_agent' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-          }
+          variant="secondary"
+          style={{
+            backgroundColor: 
+              value === 'admin' ? (theme === 'dark' ? '#7F1D1D' : '#FEF2F2') :
+              value === 'cook' ? (theme === 'dark' ? '#92400E' : '#FFFBEB') :
+              value === 'delivery_agent' ? (theme === 'dark' ? '#1E3A8A' : '#EFF6FF') :
+              (theme === 'dark' ? '#14532D' : '#F0FDF4'),
+            color:
+              value === 'admin' ? (theme === 'dark' ? '#FCA5A5' : '#DC2626') :
+              value === 'cook' ? (theme === 'dark' ? '#FBBF24' : '#D97706') :
+              value === 'delivery_agent' ? (theme === 'dark' ? '#3B82F6' : '#2563EB') :
+              (theme === 'dark' ? '#22C55E' : '#16A34A')
+          }}
         >
           {value === 'delivery_agent' ? 'Delivery' : value.charAt(0).toUpperCase() + value.slice(1)}
         </Badge>
@@ -317,8 +340,24 @@ const EnhancedUserManagement: React.FC = () => {
       sortable: true,
       render: (value: boolean) => (
         <div className="flex items-center space-x-2">
-          <div className={`w-2 h-2 rounded-full ${value ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          <Badge variant={value ? 'default' : 'destructive'} className="text-xs">
+          <div 
+            className="w-2 h-2 rounded-full"
+            style={{
+              backgroundColor: value ? '#22C55E' : '#EF4444'
+            }}
+          ></div>
+          <Badge 
+            variant="secondary"
+            style={{
+              backgroundColor: value 
+                ? (theme === 'dark' ? '#14532D' : '#F0FDF4')
+                : (theme === 'dark' ? '#7F1D1D' : '#FEF2F2'),
+              color: value 
+                ? (theme === 'dark' ? '#22C55E' : '#16A34A')
+                : (theme === 'dark' ? '#FCA5A5' : '#DC2626')
+            }}
+            className="text-xs"
+          >
             {value ? 'Active' : 'Inactive'}
           </Badge>
         </div>
@@ -330,7 +369,14 @@ const EnhancedUserManagement: React.FC = () => {
       sortable: true,
       align: 'center' as const,
       render: (value: number) => (
-        <span className="font-medium">{value}</span>
+        <span 
+          className="font-medium"
+          style={{
+            color: theme === 'dark' ? '#F9FAFB' : '#111827'
+          }}
+        >
+          {value}
+        </span>
       )
     },
     {
@@ -339,7 +385,14 @@ const EnhancedUserManagement: React.FC = () => {
       sortable: true,
       align: 'right' as const,
       render: (value: number) => (
-        <span className="font-medium">${value.toFixed(2)}</span>
+        <span 
+          className="font-medium"
+          style={{
+            color: theme === 'dark' ? '#F9FAFB' : '#111827'
+          }}
+        >
+          ${value.toFixed(2)}
+        </span>
       )
     },
     {
@@ -347,7 +400,12 @@ const EnhancedUserManagement: React.FC = () => {
       title: 'Last Login',
       sortable: true,
       render: (value: string | null) => (
-        <span className="text-sm text-gray-500">
+        <span 
+          className="text-sm"
+          style={{
+            color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+          }}
+        >
           {value ? new Date(value).toLocaleDateString() : 'Never'}
         </span>
       )
@@ -364,11 +422,12 @@ const EnhancedUserManagement: React.FC = () => {
               e.stopPropagation();
               handleUserUpdate(row.id, { is_active: !row.is_active });
             }}
-            className={`h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-              row.is_active 
-                ? 'text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300' 
-                : 'text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300'
-            }`}
+            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+            style={{
+              color: row.is_active 
+                ? (theme === 'dark' ? '#FCA5A5' : '#DC2626')
+                : (theme === 'dark' ? '#22C55E' : '#16A34A')
+            }}
             title={row.is_active ? 'Deactivate User' : 'Activate User'}
           >
             {row.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
@@ -380,7 +439,10 @@ const EnhancedUserManagement: React.FC = () => {
               e.stopPropagation();
               handleUserDetail(row);
             }}
-            className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/20"
+            className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+            style={{
+              color: theme === 'dark' ? '#3B82F6' : '#2563EB'
+            }}
             title="View Details"
           >
             <Eye className="h-4 w-4" />
@@ -451,8 +513,20 @@ const EnhancedUserManagement: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <h1 
+            className="text-2xl font-bold"
+            style={{
+              color: theme === 'dark' ? '#F9FAFB' : '#111827'
+            }}
+          >
+            User Management
+          </h1>
+          <p 
+            className="mt-1"
+            style={{
+              color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+            }}
+          >
             Manage users, roles, and permissions across your platform.
           </p>
         </div>
@@ -510,16 +584,32 @@ const EnhancedUserManagement: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search 
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
+                  style={{
+                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                  }}
+                />
                 <input
                   type="text"
                   placeholder="Search by name, email, or phone..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-80"
+                  className="pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:border-transparent w-80"
+                  style={{
+                    backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+                    borderColor: theme === 'dark' ? '#374151' : '#D1D5DB',
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827',
+                    '--tw-ring-color': theme === 'dark' ? '#3B82F6' : '#2563EB'
+                  } as React.CSSProperties}
                   value={filters.search}
                   onChange={(e) => handleSearch(e.target.value)}
                 />
               </div>
-              <span className="text-sm text-gray-500">
+              <span 
+                className="text-sm"
+                style={{
+                  color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                }}
+              >
                 {pagination.total} users found
                 {filters.search && ` for "${filters.search}"`}
               </span>
@@ -535,7 +625,14 @@ const EnhancedUserManagement: React.FC = () => {
           
           {/* Quick Filter Buttons */}
           <div className="flex items-center space-x-2 flex-wrap gap-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Filters:</span>
+            <span 
+              className="text-sm font-medium"
+              style={{
+                color: theme === 'dark' ? '#D1D5DB' : '#374151'
+              }}
+            >
+              Quick Filters:
+            </span>
             <Button
               variant={filters.role === '' ? 'default' : 'outline'}
               size="sm"
@@ -576,15 +673,38 @@ const EnhancedUserManagement: React.FC = () => {
       </Card>
 
       {/* Main Content */}
-      <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
+      <Card 
+        className="shadow-sm border-0"
+        style={{
+          background: theme === 'dark' 
+            ? 'linear-gradient(135deg, #1F2937 0%, #111827 100%)'
+            : 'linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 100%)',
+          borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+        }}
+      >
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
-                <Users className="h-5 w-5 mr-2 text-blue-600" />
+              <CardTitle 
+                className="text-xl font-semibold flex items-center"
+                style={{
+                  color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                }}
+              >
+                <Users 
+                  className="h-5 w-5 mr-2"
+                  style={{
+                    color: theme === 'dark' ? '#3B82F6' : '#2563EB'
+                  }}
+                />
                 All Users
               </CardTitle>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p 
+                className="text-sm mt-1"
+                style={{
+                  color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                }}
+              >
                 Manage all users across your platform • {pagination.total} total users
               </p>
             </div>
@@ -630,42 +750,99 @@ const EnhancedUserManagement: React.FC = () => {
             transform: 'translate(-50%, -100%)'
           }}
         >
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-4 w-80 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95">
+          <div 
+            className="border rounded-xl shadow-xl p-4 w-80 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95"
+            style={{
+              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+              borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+            }}
+          >
             <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+              <div 
+                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                style={{
+                  background: theme === 'dark' 
+                    ? 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)'
+                    : 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)'
+                }}
+              >
                 {previewUser.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-gray-900 dark:text-white truncate">{previewUser.name}</h3>
-                <p className="text-sm text-gray-500 truncate">{previewUser.email}</p>
+                <h3 
+                  className="font-semibold truncate"
+                  style={{
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                  }}
+                >
+                  {previewUser.name}
+                </h3>
+                <p 
+                  className="text-sm truncate"
+                  style={{
+                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                  }}
+                >
+                  {previewUser.email}
+                </p>
               </div>
             </div>
             
             <div className="grid grid-cols-2 gap-3 text-sm mb-3">
               <div className="flex items-center space-x-2">
-                <span className="font-medium text-gray-700 dark:text-gray-300">Role:</span>
+                <span 
+                  className="font-medium"
+                  style={{
+                    color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                  }}
+                >
+                  Role:
+                </span>
                 <Badge 
-                  variant={
-                    previewUser.role === 'admin' ? 'default' :
-                    previewUser.role === 'cook' ? 'secondary' :
-                    previewUser.role === 'delivery_agent' ? 'outline' : 'secondary'
-                  }
-                  className={`text-xs ${
-                    previewUser.role === 'admin' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                    previewUser.role === 'cook' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
-                    previewUser.role === 'delivery_agent' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                  }`}
+                  variant="secondary"
+                  style={{
+                    backgroundColor: 
+                      previewUser.role === 'admin' ? (theme === 'dark' ? '#7F1D1D' : '#FEF2F2') :
+                      previewUser.role === 'cook' ? (theme === 'dark' ? '#92400E' : '#FFFBEB') :
+                      previewUser.role === 'delivery_agent' ? (theme === 'dark' ? '#1E3A8A' : '#EFF6FF') :
+                      (theme === 'dark' ? '#14532D' : '#F0FDF4'),
+                    color:
+                      previewUser.role === 'admin' ? (theme === 'dark' ? '#FCA5A5' : '#DC2626') :
+                      previewUser.role === 'cook' ? (theme === 'dark' ? '#FBBF24' : '#D97706') :
+                      previewUser.role === 'delivery_agent' ? (theme === 'dark' ? '#3B82F6' : '#2563EB') :
+                      (theme === 'dark' ? '#22C55E' : '#16A34A')
+                  }}
+                  className="text-xs"
                 >
                   {previewUser.role === 'delivery_agent' ? 'Delivery' : previewUser.role.charAt(0).toUpperCase() + previewUser.role.slice(1)}
                 </Badge>
               </div>
               <div className="flex items-center space-x-2">
-                <span className="font-medium text-gray-700 dark:text-gray-300">Status:</span>
+                <span 
+                  className="font-medium"
+                  style={{
+                    color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                  }}
+                >
+                  Status:
+                </span>
                 <div className="flex items-center space-x-1">
-                  <div className={`w-2 h-2 rounded-full ${previewUser.is_active ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <div 
+                    className="w-2 h-2 rounded-full"
+                    style={{
+                      backgroundColor: previewUser.is_active ? '#22C55E' : '#EF4444'
+                    }}
+                  ></div>
                   <Badge 
-                    variant={previewUser.is_active ? 'default' : 'destructive'} 
+                    variant="secondary"
+                    style={{
+                      backgroundColor: previewUser.is_active 
+                        ? (theme === 'dark' ? '#14532D' : '#F0FDF4')
+                        : (theme === 'dark' ? '#7F1D1D' : '#FEF2F2'),
+                      color: previewUser.is_active 
+                        ? (theme === 'dark' ? '#22C55E' : '#16A34A')
+                        : (theme === 'dark' ? '#FCA5A5' : '#DC2626')
+                    }}
                     className="text-xs"
                   >
                     {previewUser.is_active ? 'Active' : 'Inactive'}
@@ -676,17 +853,55 @@ const EnhancedUserManagement: React.FC = () => {
             
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <span className="font-medium text-gray-700 dark:text-gray-300">Orders:</span>
-                <span className="ml-2 text-gray-900 dark:text-white font-semibold">{previewUser.total_orders}</span>
+                <span 
+                  className="font-medium"
+                  style={{
+                    color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                  }}
+                >
+                  Orders:
+                </span>
+                <span 
+                  className="ml-2 font-semibold"
+                  style={{
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                  }}
+                >
+                  {previewUser.total_orders}
+                </span>
               </div>
               <div>
-                <span className="font-medium text-gray-700 dark:text-gray-300">Spent:</span>
-                <span className="ml-2 text-gray-900 dark:text-white font-semibold">${previewUser.total_spent.toFixed(2)}</span>
+                <span 
+                  className="font-medium"
+                  style={{
+                    color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                  }}
+                >
+                  Spent:
+                </span>
+                <span 
+                  className="ml-2 font-semibold"
+                  style={{
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                  }}
+                >
+                  ${previewUser.total_spent.toFixed(2)}
+                </span>
               </div>
             </div>
             
-            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between text-xs text-gray-500">
+            <div 
+              className="mt-4 pt-3 border-t"
+              style={{
+                borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+              }}
+            >
+              <div 
+                className="flex items-center justify-between text-xs"
+                style={{
+                  color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                }}
+              >
                 <div className="flex items-center space-x-1">
                   <Calendar className="h-3 w-3" />
                   <span>Joined: {new Date(previewUser.date_joined).toLocaleDateString()}</span>
@@ -703,10 +918,22 @@ const EnhancedUserManagement: React.FC = () => {
       {/* User Detail Modal */}
       {showUserDetail && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div 
+            className="rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+            style={{
+              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF'
+            }}
+          >
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">User Details</h2>
+                <h2 
+                  className="text-2xl font-bold"
+                  style={{
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                  }}
+                >
+                  User Details
+                </h2>
                 <div className="flex items-center space-x-2">
                   <Button
                     variant="outline"
@@ -744,8 +971,20 @@ const EnhancedUserManagement: React.FC = () => {
 
               {userDetailLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-                  <span className="ml-2 text-gray-600">Loading user details...</span>
+                  <RefreshCw 
+                    className="h-8 w-8 animate-spin"
+                    style={{
+                      color: theme === 'dark' ? '#3B82F6' : '#2563EB'
+                    }}
+                  />
+                  <span 
+                    className="ml-2"
+                    style={{
+                      color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                    }}
+                  >
+                    Loading user details...
+                  </span>
                 </div>
               ) : userDetails ? (
                 <div className="space-y-6">
@@ -760,12 +999,35 @@ const EnhancedUserManagement: React.FC = () => {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                            <Users className="h-6 w-6 text-gray-500" />
+                          <div 
+                            className="w-12 h-12 rounded-full flex items-center justify-center"
+                            style={{
+                              backgroundColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+                            }}
+                          >
+                            <Users 
+                              className="h-6 w-6"
+                              style={{
+                                color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                              }}
+                            />
                           </div>
                           <div>
-                            <h3 className="font-semibold text-lg">{userDetails?.name || 'Loading...'}</h3>
-                            <p className="text-gray-600">{userDetails?.email || 'Loading...'}</p>
+                            <h3 
+                              className="font-semibold text-lg"
+                              style={{
+                                color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                              }}
+                            >
+                              {userDetails?.name || 'Loading...'}
+                            </h3>
+                            <p 
+                              style={{
+                                color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                              }}
+                            >
+                              {userDetails?.email || 'Loading...'}
+                            </p>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -774,7 +1036,12 @@ const EnhancedUserManagement: React.FC = () => {
                             <select
                               value={userDetails?.role || ''}
                               onChange={(e) => userDetails && handleUserUpdate(userDetails.id, { role: e.target.value })}
-                              className="ml-2 px-2 py-1 border border-gray-300 rounded text-sm"
+                              className="ml-2 px-2 py-1 border rounded text-sm"
+                              style={{
+                                backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+                                borderColor: theme === 'dark' ? '#374151' : '#D1D5DB',
+                                color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                              }}
                               disabled={!userDetails || userDetailLoading}
                             >
                               <option value="customer">Customer</option>
@@ -814,7 +1081,12 @@ const EnhancedUserManagement: React.FC = () => {
                               value={userDetails?.phone_no || ''}
                               onChange={(e) => setUserDetails(userDetails ? {...userDetails, phone_no: e.target.value} : null)}
                               onBlur={(e) => userDetails && handleUserUpdate(userDetails.id, { phone_no: e.target.value })}
-                              className="ml-2 px-2 py-1 border border-gray-300 rounded text-sm w-32"
+                              className="ml-2 px-2 py-1 border rounded text-sm w-32"
+                              style={{
+                                backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+                                borderColor: theme === 'dark' ? '#374151' : '#D1D5DB',
+                                color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                              }}
                               placeholder="Phone number"
                               disabled={!userDetails || userDetailLoading}
                             />
@@ -826,7 +1098,12 @@ const EnhancedUserManagement: React.FC = () => {
                               value={userDetails?.address || ''}
                               onChange={(e) => setUserDetails(userDetails ? {...userDetails, address: e.target.value} : null)}
                               onBlur={(e) => userDetails && handleUserUpdate(userDetails.id, { address: e.target.value })}
-                              className="ml-2 px-2 py-1 border border-gray-300 rounded text-sm w-32"
+                              className="ml-2 px-2 py-1 border rounded text-sm w-32"
+                              style={{
+                                backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+                                borderColor: theme === 'dark' ? '#374151' : '#D1D5DB',
+                                color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                              }}
                               placeholder="Address"
                               disabled={!userDetails || userDetailLoading}
                             />
@@ -856,17 +1133,51 @@ const EnhancedUserManagement: React.FC = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-2 gap-4">
-                          <div className="text-center p-4 bg-blue-50 rounded-lg">
-                            <div className="text-2xl font-bold text-blue-600">
+                          <div 
+                            className="text-center p-4 rounded-lg"
+                            style={{
+                              backgroundColor: theme === 'dark' ? '#1E3A8A' : '#EFF6FF'
+                            }}
+                          >
+                            <div 
+                              className="text-2xl font-bold"
+                              style={{
+                                color: theme === 'dark' ? '#3B82F6' : '#2563EB'
+                              }}
+                            >
                               {userDetails?.statistics?.total_orders || 0}
                             </div>
-                            <div className="text-sm text-gray-600">Total Orders</div>
+                            <div 
+                              className="text-sm"
+                              style={{
+                                color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                              }}
+                            >
+                              Total Orders
+                            </div>
                           </div>
-                          <div className="text-center p-4 bg-green-50 rounded-lg">
-                            <div className="text-2xl font-bold text-green-600">
+                          <div 
+                            className="text-center p-4 rounded-lg"
+                            style={{
+                              backgroundColor: theme === 'dark' ? '#14532D' : '#F0FDF4'
+                            }}
+                          >
+                            <div 
+                              className="text-2xl font-bold"
+                              style={{
+                                color: theme === 'dark' ? '#22C55E' : '#16A34A'
+                              }}
+                            >
                               ${userDetails?.statistics?.total_spent?.toFixed(2) || '0.00'}
                             </div>
-                            <div className="text-sm text-gray-600">Total Spent</div>
+                            <div 
+                              className="text-sm"
+                              style={{
+                                color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                              }}
+                            >
+                              Total Spent
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -882,19 +1193,53 @@ const EnhancedUserManagement: React.FC = () => {
                       <CardContent>
                         <div className="space-y-3">
                           {userDetails.recent_orders.map((order: any) => (
-                            <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div 
+                              key={order.id} 
+                              className="flex items-center justify-between p-3 border rounded-lg"
+                              style={{
+                                borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+                              }}
+                            >
                               <div>
-                                <div className="font-medium">Order #{order.order_number}</div>
-                                <div className="text-sm text-gray-600">
+                                <div 
+                                  className="font-medium"
+                                  style={{
+                                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                                  }}
+                                >
+                                  Order #{order.order_number}
+                                </div>
+                                <div 
+                                  className="text-sm"
+                                  style={{
+                                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                                  }}
+                                >
                                   {new Date(order.created_at).toLocaleDateString()}
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="font-medium">${order.total_amount}</div>
-                                <Badge variant={
-                                  order.status === 'delivered' ? 'default' :
-                                  order.status === 'cancelled' ? 'destructive' : 'secondary'
-                                }>
+                                <div 
+                                  className="font-medium"
+                                  style={{
+                                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                                  }}
+                                >
+                                  ${order.total_amount}
+                                </div>
+                                <Badge 
+                                  variant="secondary"
+                                  style={{
+                                    backgroundColor: 
+                                      order.status === 'delivered' ? (theme === 'dark' ? '#14532D' : '#F0FDF4') :
+                                      order.status === 'cancelled' ? (theme === 'dark' ? '#7F1D1D' : '#FEF2F2') : 
+                                      (theme === 'dark' ? '#1F2937' : '#F3F4F6'),
+                                    color:
+                                      order.status === 'delivered' ? (theme === 'dark' ? '#22C55E' : '#16A34A') :
+                                      order.status === 'cancelled' ? (theme === 'dark' ? '#FCA5A5' : '#DC2626') :
+                                      (theme === 'dark' ? '#D1D5DB' : '#374151')
+                                  }}
+                                >
                                   {order.status}
                                 </Badge>
                               </div>
@@ -914,12 +1259,42 @@ const EnhancedUserManagement: React.FC = () => {
                       <CardContent>
                         <div className="space-y-3">
                           {userDetails.activity_logs.map((log: any) => (
-                            <div key={log.id} className="flex items-start space-x-3 p-3 border rounded-lg">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                            <div 
+                              key={log.id} 
+                              className="flex items-start space-x-3 p-3 border rounded-lg"
+                              style={{
+                                borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+                              }}
+                            >
+                              <div 
+                                className="w-2 h-2 rounded-full mt-2"
+                                style={{
+                                  backgroundColor: theme === 'dark' ? '#3B82F6' : '#2563EB'
+                                }}
+                              ></div>
                               <div className="flex-1">
-                                <div className="font-medium">{log.action}</div>
-                                <div className="text-sm text-gray-600">{log.description}</div>
-                                <div className="text-xs text-gray-500 mt-1">
+                                <div 
+                                  className="font-medium"
+                                  style={{
+                                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                                  }}
+                                >
+                                  {log.action}
+                                </div>
+                                <div 
+                                  className="text-sm"
+                                  style={{
+                                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                                  }}
+                                >
+                                  {log.description}
+                                </div>
+                                <div 
+                                  className="text-xs mt-1"
+                                  style={{
+                                    color: theme === 'dark' ? '#6B7280' : '#9CA3AF'
+                                  }}
+                                >
                                   {new Date(log.timestamp).toLocaleString()}
                                 </div>
                               </div>
@@ -931,7 +1306,12 @@ const EnhancedUserManagement: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
+                <div 
+                  className="text-center py-8"
+                  style={{
+                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                  }}
+                >
                   Failed to load user details
                 </div>
               )}

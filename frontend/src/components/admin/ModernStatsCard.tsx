@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useTheme } from '@/context/ThemeContext';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -36,57 +37,57 @@ interface ModernStatsCardProps {
   sparklineData?: number[];
 }
 
-const colorVariants = {
+const getColorVariants = (theme: 'light' | 'dark') => ({
   blue: {
-    bg: 'from-blue-500/10 to-blue-600/10',
-    iconBg: 'bg-gradient-to-br from-blue-500 to-blue-600',
-    border: 'border-blue-200 dark:border-blue-800',
-    accent: 'text-blue-600 dark:text-blue-400',
-    sparkline: 'stroke-blue-500'
+    bg: theme === 'light' ? 'linear-gradient(135deg, #EBF4FF 0%, #DBEAFE 100%)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%)',
+    iconBg: theme === 'light' ? 'linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)' : 'linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)',
+    border: theme === 'light' ? '#BFDBFE' : '#1E3A8A',
+    accent: theme === 'light' ? '#2563EB' : '#3B82F6',
+    sparkline: theme === 'light' ? '#2563EB' : '#3B82F6'
   },
   green: {
-    bg: 'from-green-500/10 to-emerald-600/10',
-    iconBg: 'bg-gradient-to-br from-green-500 to-emerald-600',
-    border: 'border-green-200 dark:border-green-800',
-    accent: 'text-green-600 dark:text-green-400',
-    sparkline: 'stroke-green-500'
+    bg: theme === 'light' ? 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)' : 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%)',
+    iconBg: theme === 'light' ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)' : 'linear-gradient(135deg, #34D399 0%, #10B981 100%)',
+    border: theme === 'light' ? '#A7F3D0' : '#047857',
+    accent: theme === 'light' ? '#10B981' : '#34D399',
+    sparkline: theme === 'light' ? '#10B981' : '#34D399'
   },
   yellow: {
-    bg: 'from-yellow-500/10 to-amber-600/10',
-    iconBg: 'bg-gradient-to-br from-yellow-500 to-amber-600',
-    border: 'border-yellow-200 dark:border-yellow-800',
-    accent: 'text-yellow-600 dark:text-yellow-400',
-    sparkline: 'stroke-yellow-500'
+    bg: theme === 'light' ? 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)' : 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%)',
+    iconBg: theme === 'light' ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)' : 'linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)',
+    border: theme === 'light' ? '#FCD34D' : '#92400E',
+    accent: theme === 'light' ? '#F59E0B' : '#FBBF24',
+    sparkline: theme === 'light' ? '#F59E0B' : '#FBBF24'
   },
   red: {
-    bg: 'from-red-500/10 to-rose-600/10',
-    iconBg: 'bg-gradient-to-br from-red-500 to-rose-600',
-    border: 'border-red-200 dark:border-red-800',
-    accent: 'text-red-600 dark:text-red-400',
-    sparkline: 'stroke-red-500'
+    bg: theme === 'light' ? 'linear-gradient(135deg, #FEF2F2 0%, #FECACA 100%)' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%)',
+    iconBg: theme === 'light' ? 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)' : 'linear-gradient(135deg, #F87171 0%, #EF4444 100%)',
+    border: theme === 'light' ? '#FCA5A5' : '#991B1B',
+    accent: theme === 'light' ? '#EF4444' : '#F87171',
+    sparkline: theme === 'light' ? '#EF4444' : '#F87171'
   },
   purple: {
-    bg: 'from-purple-500/10 to-violet-600/10',
-    iconBg: 'bg-gradient-to-br from-purple-500 to-violet-600',
-    border: 'border-purple-200 dark:border-purple-800',
-    accent: 'text-purple-600 dark:text-purple-400',
-    sparkline: 'stroke-purple-500'
+    bg: theme === 'light' ? 'linear-gradient(135deg, #F3E8FF 0%, #EDE9FE 100%)' : 'linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(147, 51, 234, 0.05) 100%)',
+    iconBg: theme === 'light' ? 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)' : 'linear-gradient(135deg, #A78BFA 0%, #8B5CF6 100%)',
+    border: theme === 'light' ? '#C4B5FD' : '#5B21B6',
+    accent: theme === 'light' ? '#7C3AED' : '#A78BFA',
+    sparkline: theme === 'light' ? '#7C3AED' : '#A78BFA'
   },
   indigo: {
-    bg: 'from-indigo-500/10 to-blue-600/10',
-    iconBg: 'bg-gradient-to-br from-indigo-500 to-blue-600',
-    border: 'border-indigo-200 dark:border-indigo-800',
-    accent: 'text-indigo-600 dark:text-indigo-400',
-    sparkline: 'stroke-indigo-500'
+    bg: theme === 'light' ? 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' : 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.05) 100%)',
+    iconBg: theme === 'light' ? 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)' : 'linear-gradient(135deg, #818CF8 0%, #6366F1 100%)',
+    border: theme === 'light' ? '#C7D2FE' : '#3730A3',
+    accent: theme === 'light' ? '#6366F1' : '#818CF8',
+    sparkline: theme === 'light' ? '#6366F1' : '#818CF8'
   },
   teal: {
-    bg: 'from-teal-500/10 to-cyan-600/10',
-    iconBg: 'bg-gradient-to-br from-teal-500 to-cyan-600',
-    border: 'border-teal-200 dark:border-teal-800',
-    accent: 'text-teal-600 dark:text-teal-400',
-    sparkline: 'stroke-teal-500'
+    bg: theme === 'light' ? 'linear-gradient(135deg, #F0FDFA 0%, #CCFBF1 100%)' : 'linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(20, 184, 166, 0.05) 100%)',
+    iconBg: theme === 'light' ? 'linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)' : 'linear-gradient(135deg, #5EEAD4 0%, #2DD4BF 100%)',
+    border: theme === 'light' ? '#99F6E4' : '#134E4A',
+    accent: theme === 'light' ? '#14B8A6' : '#5EEAD4',
+    sparkline: theme === 'light' ? '#14B8A6' : '#5EEAD4'
   }
-};
+});
 
 const ModernStatsCard: React.FC<ModernStatsCardProps> = ({
   title,
@@ -101,6 +102,8 @@ const ModernStatsCard: React.FC<ModernStatsCardProps> = ({
   showSparkline = false,
   sparklineData = []
 }) => {
+  const { theme } = useTheme();
+  const colorVariants = getColorVariants(theme);
   const colors = colorVariants[color];
 
   const formatValue = (val: string | number): string => {
@@ -135,14 +138,25 @@ const ModernStatsCard: React.FC<ModernStatsCardProps> = ({
 
   if (isLoading) {
     return (
-      <Card className={cn("overflow-hidden animate-pulse", className)}>
+      <Card className={cn("overflow-hidden animate-pulse", className)} style={{
+        background: theme === 'light' ? '#F9FAFB' : '#1F2937',
+        borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
+      }}>
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
-            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+            <div className="h-4 rounded w-24" style={{
+              backgroundColor: theme === 'light' ? '#E5E7EB' : '#4B5563'
+            }}></div>
+            <div className="h-8 w-8 rounded-lg" style={{
+              backgroundColor: theme === 'light' ? '#E5E7EB' : '#4B5563'
+            }}></div>
           </div>
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16 mb-2"></div>
-          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+          <div className="h-8 rounded w-16 mb-2" style={{
+            backgroundColor: theme === 'light' ? '#E5E7EB' : '#4B5563'
+          }}></div>
+          <div className="h-3 rounded w-20" style={{
+            backgroundColor: theme === 'light' ? '#E5E7EB' : '#4B5563'
+          }}></div>
         </CardContent>
       </Card>
     );
@@ -151,25 +165,30 @@ const ModernStatsCard: React.FC<ModernStatsCardProps> = ({
   return (
     <Card className={cn(
       "group relative overflow-hidden hover:shadow-lg transition-all duration-300",
-      "bg-gradient-to-br", colors.bg,
       className
-    )}>
+    )} style={{
+      background: colors.bg,
+      borderColor: colors.border
+    }}>
       <CardContent className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <div className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg",
-              colors.iconBg
-            )}>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg" style={{
+              background: colors.iconBg
+            }}>
               {icon}
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <h3 className="text-sm font-medium" style={{
+                color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+              }}>
                 {title}
               </h3>
               {subtitle && (
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                <p className="text-xs mt-1" style={{
+                  color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+                }}>
                   {subtitle}
                 </p>
               )}
@@ -199,7 +218,9 @@ const ModernStatsCard: React.FC<ModernStatsCardProps> = ({
 
         {/* Main Value */}
         <div className="mb-4">
-          <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+          <div className="text-3xl font-bold mb-1" style={{
+            color: theme === 'light' ? '#111827' : '#F9FAFB'
+          }}>
             {formatValue(value)}
           </div>
           
@@ -218,7 +239,9 @@ const ModernStatsCard: React.FC<ModernStatsCardProps> = ({
                 )}
                 <span>{Math.abs(trend.value)}%</span>
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-xs" style={{
+                color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+              }}>
                 {trend.period}
               </span>
             </div>
@@ -238,14 +261,14 @@ const ModernStatsCard: React.FC<ModernStatsCardProps> = ({
               <path
                 d={generateSparklinePath(sparklineData)}
                 fill="none"
-                stroke="currentColor"
+                stroke={colors.sparkline}
                 strokeWidth="2"
-                className={cn("transition-all", colors.accent)}
+                className="transition-all"
               />
               <path
                 d={`${generateSparklinePath(sparklineData)} L 100,30 L 0,30 Z`}
                 fill={`url(#gradient-${color})`}
-                className={colors.accent}
+                style={{ color: colors.sparkline }}
               />
             </svg>
           </div>

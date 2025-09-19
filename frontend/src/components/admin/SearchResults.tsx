@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '@/context/ThemeContext';
 import {
   User,
   ShoppingCart,
@@ -19,6 +20,7 @@ interface SearchResultsProps {
 
 export function SearchResults({ results, loading, error, onSelect }: SearchResultsProps) {
   const navigate = useNavigate();
+  const { theme } = useTheme();
 
   const getIcon = (type: SearchResult['type']) => {
     switch (type) {
@@ -42,8 +44,13 @@ export function SearchResults({ results, loading, error, onSelect }: SearchResul
 
   if (loading) {
     return (
-      <div className="absolute top-full left-0 right-0 mt-2 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border max-h-96 overflow-y-auto z-50">
-        <div className="px-4 py-2 text-sm text-gray-500">
+      <div className="absolute top-full left-0 right-0 mt-2 py-2 rounded-lg shadow-lg border max-h-96 overflow-y-auto z-50" style={{
+        backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
+        borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
+      }}>
+        <div className="px-4 py-2 text-sm" style={{
+          color: theme === 'light' ? '#6B7280' : '#9CA3AF'
+        }}>
           Searching...
         </div>
       </div>
