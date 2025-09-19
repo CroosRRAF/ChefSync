@@ -155,6 +155,9 @@ const OTPRegistrationForm: React.FC = () => {
 
       await apiCall('verify-otp/', requestData);
       
+      // Store email in localStorage for document upload
+      localStorage.setItem('registration_email', registrationData.email!);
+      
       setOtpVerified(true);
       setCurrentStep(3);
       

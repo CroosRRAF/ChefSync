@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChefSync - Account {{ status|title }}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #fef7ed 0%, #f0fdf4 100%);
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(255, 107, 53, 0.1), 0 8px 16px rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(255, 107, 53, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #FF6B35 0%, #22C55E 100%);
+            color: white;
+            padding: 50px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+            animation: shimmer 3s ease-in-out infinite;
+        }
+        @keyframes shimmer {
+            0%, 100% { transform: translateX(-100%) translateY(-100%) rotate(30deg); }
+            50% { transform: translateX(100%) translateY(100%) rotate(30deg); }
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 1;
+            font-size: 36px;
+            font-weight: bold;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 800;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 1;
+        }
+        .header p {
+            margin: 15px 0 0 0;
+            opacity: 0.95;
+            font-size: 18px;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+        }
+        .content {
+            padding: 50px 40px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 16px 32px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 18px;
+            margin-bottom: 40px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .status-approved {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+            border: 3px solid #10b981;
+        }
+        .status-rejected {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            color: #991b1b;
+            border: 3px solid #ef4444;
+        }
+        .greeting {
+            font-size: 24px;
+            color: #1f2937;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+        .message {
+            font-size: 18px;
+            color: #4b5563;
+            margin-bottom: 40px;
+            line-height: 1.7;
+        }
+        .next-steps {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 16px;
+            padding: 35px;
+            margin: 40px 0;
+            border-left: 6px solid #FF6B35;
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.1);
+        }
+        .next-steps h3 {
+            margin: 0 0 20px 0;
+            color: #1f2937;
+            font-size: 22px;
+            font-weight: 700;
+        }
+        .next-steps ul {
+            margin: 0;
+            padding-left: 25px;
+        }
+        .next-steps li {
+            margin-bottom: 12px;
+            color: #4b5563;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #FF6B35 0%, #22C55E 100%);
+            color: white;
+            text-decoration: none;
+            padding: 18px 40px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 18px;
+            margin: 30px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(255, 107, 53, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px rgba(255, 107, 53, 0.4);
+        }
+        .login-details {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-left: 6px solid #FCD34D;
+            padding: 30px;
+            margin: 35px 0;
+            border-radius: 0 12px 12px 0;
+            box-shadow: 0 4px 12px rgba(252, 211, 77, 0.2);
+        }
+        .login-details h4 {
+            margin: 0 0 15px 0;
+            color: #92400e;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .login-details p {
+            margin: 8px 0;
+            color: #78350f;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .footer {
+            background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+            padding: 40px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 8px 0;
+            color: #6b7280;
+            font-size: 16px;
+        }
+        .social-links {
+            margin: 25px 0;
+        }
+        .social-links a {
+            display: inline-block;
+            margin: 0 15px;
+            color: #FF6B35;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: color 0.3s ease;
+        }
+        .social-links a:hover {
+            color: #22C55E;
+        }
+        .notes {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border: 2px solid #fecaca;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 35px 0;
+            box-shadow: 0 4px 12px rgba(254, 202, 202, 0.3);
+        }
+        .notes h4 {
+            margin: 0 0 15px 0;
+            color: #991b1b;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .notes p {
+            margin: 0;
+            color: #7f1d1d;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #FF6B35, #22C55E, transparent);
+            margin: 40px 0;
+            border-radius: 1px;
+        }
+        .highlight {
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 107, 53, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🍳</div>
+            <h1>ChefSync</h1>
+            <p>Your Culinary Journey Starts Here</p>
+        </div>
+        
+        <div class="content">
+            <div class="status-badge status-{{ status }}">
+                {% if status == 'approved' %}
+                    🎉 Account Approved
+                {% else %}
+                    ❌ Account Not Approved
+                {% endif %}
+            </div>
+            
+            <div class="greeting">
+                Hello {{ user_name }},
+            </div>
+            
+            <div class="message">
+                {% if status == 'approved' %}
+                    <p><strong>Congratulations! 🎉</strong> Your {{ role_display }} account has been approved and is now active on ChefSync.</p>
+                    <p>We're excited to have you join our community of talented culinary professionals! Your journey to connect with food lovers starts now.</p>
+                {% else %}
+                    <p>We regret to inform you that your {{ role_display }} account application was not approved at this time.</p>
+                    {% if admin_notes %}
+                        <div class="notes">
+                            <h4>📝 Admin Notes:</h4>
+                            <p>{{ admin_notes }}</p>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+            
+            {% if status == 'approved' %}
+                <div class="next-steps">
+                    <h3>🚀 What's Next?</h3>
+                    <ul>
+                        <li>Log in to your ChefSync account</li>
+                        <li>Complete your profile setup with photos and descriptions</li>
+                        <li>Explore the platform features and tools</li>
+                        <li>Start connecting with customers and building your reputation</li>
+                        <li>Set up your menu and pricing</li>
+                    </ul>
+                </div>
+                
+                <div class="login-details">
+                    <h4>🔐 Your Login Details</h4>
+                    <p><strong>Email:</strong> {{ user_email }}</p>
+                    <p><strong>Password:</strong> Use the password you created during registration</p>
+                </div>
+                
+                <div class="highlight">
+                    <p style="margin: 0; font-size: 18px; font-weight: 600; color: #1f2937; text-align: center;">
+                        Ready to start your culinary journey? Let's get cooking! 👨‍🍳👩‍🍳
+                    </p>
+                </div>
+                
+                <div style="text-align: center;">
+                    <a href="{{ login_url }}" class="cta-button">Login to ChefSync</a>
+                </div>
+            {% else %}
+                <div class="next-steps">
+                    <h3>📝 Next Steps</h3>
+                    <ul>
+                        <li>Review the admin notes above carefully</li>
+                        <li>Address any issues or requirements mentioned</li>
+                        <li>Update your application with additional information if needed</li>
+                        <li>Resubmit your application when ready</li>
+                        <li>Contact our support team for assistance</li>
+                    </ul>
+                </div>
+                
+                <div style="text-align: center;">
+                    <a href="{{ support_url }}" class="cta-button">Contact Support</a>
+                </div>
+            {% endif %}
+            
+            <div class="divider"></div>
+            
+            <div style="text-align: center; color: #6b7280; font-size: 16px;">
+                <p><strong>Need Help?</strong></p>
+                <p>Our support team is here to help you succeed on ChefSync. Don't hesitate to reach out!</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>ChefSync Team</strong></p>
+            <p>Connecting Culinary Talents with Food Lovers</p>
+            <div class="social-links">
+                <a href="#">Website</a>
+                <a href="#">Support</a>
+                <a href="#">Privacy Policy</a>
+            </div>
+            <p style="margin-top: 25px; font-size: 14px; color: #9ca3af;">
+                This email was sent to {{ user_email }}. If you didn't request this, please ignore this email.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

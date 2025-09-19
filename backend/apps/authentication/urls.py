@@ -51,4 +51,20 @@ urlpatterns = [
     path('tokens/', views.user_tokens, name='user_tokens'),
     path('tokens/revoke/', views.revoke_token, name='revoke_token'),
     path('tokens/revoke-all/', views.revoke_all_tokens, name='revoke_all_tokens'),
+    
+    # Document Management
+    path('documents/types/', views.get_document_types, name='get_document_types'),
+    path('documents/upload/', views.upload_document, name='upload_document'),
+    path('documents/upload-registration/', views.upload_document_during_registration, name='upload_document_during_registration'),
+    path('documents/', views.get_user_documents, name='get_user_documents'),
+    path('documents/<int:document_id>/delete/', views.delete_document, name='delete_document'),
+    path('documents/proxy-download/', views.proxy_document_download, name='proxy_document_download'),
+    
+    # Admin Approval Management
+    path('admin/pending-approvals/', views.get_pending_approvals, name='get_pending_approvals'),
+    path('admin/user/<int:user_id>/', views.get_user_for_approval, name='get_user_for_approval'),
+    path('admin/user/<int:user_id>/approve/', views.approve_user, name='approve_user'),
+    path('approval-status/', views.check_approval_status, name='check_approval_status'),
+    path('check-user-status/', views.check_user_status, name='check_user_status'),
+    path('check-email-availability/', views.check_email_availability, name='check_email_availability'),
 ]

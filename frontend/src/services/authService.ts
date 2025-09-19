@@ -20,11 +20,28 @@ const getSecureToken = (): string | null => {
   }
 };
 
+const getRefreshToken = (): string | null => {
+  try {
+    return localStorage.getItem('chefsync_refresh_token');
+  } catch (error) {
+    console.error('Error accessing refresh token from localStorage:', error);
+    return null;
+  }
+};
+
 const setSecureToken = (token: string): void => {
   try {
     localStorage.setItem('access_token', token);
   } catch (error) {
     console.error('Error setting token in localStorage:', error);
+  }
+};
+
+const setRefreshToken = (token: string): void => {
+  try {
+    localStorage.setItem('chefsync_refresh_token', token);
+  } catch (error) {
+    console.error('Error setting refresh token in localStorage:', error);
   }
 };
 
@@ -97,14 +114,24 @@ api.interceptors.response.use(
             refresh: refreshToken,
           });
           
-          const { access } = response.data;
+          const { access, refresh } = response.data;
           setSecureToken(access);
+          if (refresh) {
+            setRefreshToken(refresh);
+          }
+          
+          console.log('Token refresh successful');
           
           // Retry original request with new token
           originalRequest.headers.Authorization = `Bearer ${access}`;
           return api(originalRequest);
+        } else {
+          console.log('No refresh token available');
+          removeSecureTokens();
+          window.location.href = '/auth/login';
         }
       } catch (refreshError) {
+        console.log('Token refresh failed:', refreshError);
         // Refresh failed, redirect to login
         removeSecureTokens();
         window.location.href = '/auth/login';
@@ -201,6 +228,23 @@ class AuthService {
       
       return response.data;
     } catch (error: any) {
+      // Check if it's an approval status error
+      if (error.response?.status === 403 && error.response?.data?.approval_status) {
+        // Store user data temporarily for approval status page
+        localStorage.setItem('pending_user_data', JSON.stringify({
+          email: error.response.data.email || credentials.email,
+          approval_status: error.response.data.approval_status,
+          message: error.response.data.message
+        }));
+        
+        // Throw specific error based on approval status
+        if (error.response.data.approval_status === 'pending') {
+          throw new Error('APPROVAL_PENDING');
+        } else if (error.response.data.approval_status === 'rejected') {
+          throw new Error('APPROVAL_REJECTED');
+        }
+      }
+      
       const formattedError = formatErrorMessage(error);
       throw new Error(formattedError);
     }

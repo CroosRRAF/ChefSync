@@ -4,8 +4,20 @@ import { adminService, type DashboardStats } from './adminService';
 class AnalyticsService {
   async getDashboardStats(): Promise<DashboardStats> {
     try {
-      // Use the new admin service for real-time data
-      return await adminService.getDashboardStats();
+      const response = await fetch(`${this.baseUrl}/dashboard/stats/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('chefsync_token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       // Return mock data for development if admin service fails

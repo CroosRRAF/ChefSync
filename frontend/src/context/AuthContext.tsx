@@ -169,8 +169,27 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       
       // Set both auth context and user store state
       dispatch({ type: 'SET_USER', payload: { user: frontendUser, token: response.access } });
-    } catch (error) {
+      
+      // Add another small delay after state update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Get the role-specific dashboard path
+      const dashboardPath = getRoleBasedPath(frontendUser.role);
+      
+      // Force navigate to the dashboard path with state
+      navigate(dashboardPath, { 
+        replace: true,
+        state: { from: 'login' }
+      });
+    } catch (error: any) {
       dispatch({ type: 'SET_LOADING', payload: false });
+      
+      // Handle approval pending case
+      if (error.message === 'APPROVAL_PENDING') {
+        navigate('/approval-status', { replace: true });
+        return;
+      }
+      
       throw error;
     }
   };

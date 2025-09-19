@@ -51,6 +51,8 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
+    'cloudinary_storage',
+    'cloudinary',
     
     # Local apps
     'apps.authentication',
@@ -65,6 +67,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'config.middleware.SecurityHeadersMiddleware',  # Custom security headers for OAuth
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -80,7 +83,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -98,14 +101,19 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Database configuration - MySQL is now the default
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
+        'NAME': config('DB_NAME', default='chefsync_db'),
+        'USER': config('DB_USER', default='root'),
+        'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
     }
 }
 
@@ -198,7 +206,7 @@ SIMPLE_JWT = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:8080,http://127.0.0.1:8080,http://localhost:8081,http://127.0.0.1:8081,http://localhost:5173,http://127.0.0.1:5173').split(',')
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:8080,http://127.0.0.1:8080,http://localhost:8081,http://127.0.0.1:8081,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:8080,http://0.0.0.0:8081').split(',')
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)  # Temporarily allow all origins for development
 CORS_ALLOW_METHODS = [
@@ -261,8 +269,8 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@chefsync.com'
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:8080')
 
 # Google OAuth Configuration
-GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID', default='123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com')
-GOOGLE_OAUTH_CLIENT_SECRET = config('GOOGLE_OAUTH_CLIENT_SECRET', default='GOCSPX-abcdefghijklmnopqrstuvwxyz123456')
+GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID', default='')
+GOOGLE_OAUTH_CLIENT_SECRET = config('GOOGLE_OAUTH_CLIENT_SECRET', default='')
 
 # Google OAuth Settings
 SOCIALACCOUNT_PROVIDERS = {
@@ -278,8 +286,6 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-# Security Settings
-SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
@@ -292,3 +298,41 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # For reverse pro
 OTP_EXPIRY_MINUTES = config('OTP_EXPIRY_MINUTES', default=30, cast=int)  # Extended to 30 minutes
 OTP_LENGTH = config('OTP_LENGTH', default=6, cast=int)
 EMAIL_VERIFICATION_REQUIRED = config('EMAIL_VERIFICATION_REQUIRED', default=True, cast=bool)
+
+# Cross-Origin Policies (to support OAuth popups in dev)
+# Default to a safe value, but relax further in DEBUG below
+SECURE_CROSS_ORIGIN_OPENER_POLICY = config('SECURE_CROSS_ORIGIN_OPENER_POLICY', default='same-origin-allow-popups')
+# Leave COEP disabled unless you specifically need cross-origin isolation
+# (Setting to None means Django won't set the header)
+try:
+    SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None if config('SECURE_CROSS_ORIGIN_EMBEDDER_POLICY', default='').strip() == '' else config('SECURE_CROSS_ORIGIN_EMBEDDER_POLICY')
+except Exception:
+    SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None
+
+# In development, disable COOP to avoid postMessage/window.closed warnings with Google OAuth
+if DEBUG:
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+
+# Cloudinary Configuration
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME', default='durdb7hxw'),
+    'API_KEY': config('CLOUDINARY_API_KEY', default='647168559376263'),
+    'API_SECRET': config('CLOUDINARY_API_SECRET', default='6SRLFCnJzUmcxEkYBs28njXmyhM'),
+    'SECURE': True,
+}
+
+# Poppler Configuration for PDF processing
+POPPLER_PATH = r'C:\poppler\poppler-23.08.0\Library\bin'
+
+# File Storage Configuration - Using Cloudinary
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticCloudinaryStorage'
+
+# Fallback local storage settings
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Local file storage fallback for Cloudinary issues
+USE_LOCAL_STORAGE = config('USE_LOCAL_STORAGE', default=False, cast=bool)
+LOCAL_MEDIA_ROOT = BASE_DIR / 'local_media'
