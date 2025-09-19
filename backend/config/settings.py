@@ -320,6 +320,9 @@ CLOUDINARY_STORAGE = {
     'SECURE': True,
 }
 
+# Poppler Configuration for PDF processing
+POPPLER_PATH = r'C:\poppler\poppler-23.08.0\Library\bin'
+
 # File Storage Configuration - Using Cloudinary
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticCloudinaryStorage'

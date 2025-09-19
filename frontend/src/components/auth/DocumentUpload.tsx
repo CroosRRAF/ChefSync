@@ -15,7 +15,8 @@ import {
   AlertCircle, 
   Loader2,
   Download,
-  Eye
+  Eye,
+  ArrowRight
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -37,6 +38,8 @@ interface UploadedFile {
   error?: string;
   preview?: string;
   documentId?: number;
+  isPdfConverted?: boolean;
+  convertedImages?: any[];
 }
 
 interface DocumentUploadProps {
@@ -53,6 +56,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [selectedDocumentType, setSelectedDocumentType] = useState<DocumentType | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const [uploadedDocumentTypes, setUploadedDocumentTypes] = useState<Set<number>>(new Set());
   const { toast } = useToast();
 
@@ -97,8 +101,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     fetchDocumentTypes();
   }, [role, toast]);
 
-  const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) {
+  const getFileIcon = (fileType: string, isPdfConverted?: boolean) => {
+    if (fileType.startsWith('image/') || isPdfConverted) {
       return <Image className="w-5 h-5" />;
     } else if (fileType === 'application/pdf') {
       return <FileText className="w-5 h-5" />;
@@ -156,10 +160,74 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       return `File type '.${fileExtension}' is not allowed. Please upload a file with one of these formats: ${allowedTypesDisplay}`;
     }
 
+    // Basic PDF validation (header check will be done in async validation)
+    if (fileExtension === 'pdf') {
+      // Additional size check for PDFs
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit for PDFs
+        return "PDF file is too large. Maximum size allowed is 10MB.";
+      }
+    }
+
     return null;
   };
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  const validatePDFFile = async (file: File): Promise<string | null> => {
+    try {
+      // First check PDF header
+      const headerCheck = await new Promise<string | null>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          // Check PDF header (%PDF)
+          const header = String.fromCharCode(uint8Array[0], uint8Array[1], uint8Array[2], uint8Array[3]);
+          if (header !== '%PDF') {
+            resolve("Invalid PDF file. Please ensure the file is a valid PDF document.");
+            return;
+          }
+          resolve(null);
+        };
+        reader.onerror = () => {
+          resolve("Error reading PDF file. Please try again.");
+        };
+        reader.readAsArrayBuffer(file.slice(0, 1024)); // Read first 1KB to check header
+      });
+
+      if (headerCheck) {
+        return headerCheck;
+      }
+
+      // Now check page count using pdf-lib
+      try {
+        const { PDFDocument } = await import('pdf-lib');
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        const pageCount = pdfDoc.getPageCount();
+        
+        if (pageCount > 3) {
+          return `PDF has ${pageCount} pages. Maximum allowed is 3 pages. Please use a PDF with fewer pages.`;
+        }
+        
+        if (pageCount === 0) {
+          return "PDF appears to be empty or corrupted. Please check your file.";
+        }
+        
+        return null; // PDF is valid
+      } catch (pdfError) {
+        console.error('PDF parsing error:', pdfError);
+        // If pdf-lib fails, we'll let the backend handle the validation
+        // This provides a fallback for edge cases
+        console.log('Falling back to backend validation for PDF page count');
+        return null;
+      }
+    } catch (error) {
+      console.error('PDF validation error:', error);
+      return "Error validating PDF file. Please try again.";
+    }
+  };
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (!selectedDocumentType) {
       toast({
         title: "Select Document Type",
@@ -169,29 +237,58 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       return;
     }
 
-    const newFiles: UploadedFile[] = acceptedFiles.map(file => {
-      const error = validateFile(file, selectedDocumentType);
-      const id = Math.random().toString(36).substr(2, 9);
-      
-      return {
-        id,
-        file,
-        documentType: selectedDocumentType,
-        status: error ? 'error' : 'pending',
-        progress: 0,
-        error,
-        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
-      };
-    });
-
-    setUploadedFiles(prev => [...prev, ...newFiles]);
-
-    // Auto-upload valid files
-    newFiles.forEach(uploadedFile => {
-      if (uploadedFile.status === 'pending') {
-        uploadFile(uploadedFile);
+    setIsValidating(true);
+    const newFiles: UploadedFile[] = [];
+    
+    try {
+      // Validate files (including async PDF validation)
+      for (const file of acceptedFiles) {
+        const id = Math.random().toString(36).substr(2, 9);
+        let error: string | null = null;
+        
+        // Basic validation
+        error = validateFile(file, selectedDocumentType);
+        
+      // If it's a PDF and basic validation passed, do async PDF validation
+      if (!error && file.name.toLowerCase().endsWith('.pdf')) {
+        try {
+          error = await validatePDFFile(file);
+        } catch (validationError) {
+          console.error('PDF validation failed:', validationError);
+          // If client-side validation fails, let the backend handle it
+          error = null;
+        }
       }
-    });
+        
+        newFiles.push({
+          id,
+          file,
+          documentType: selectedDocumentType,
+          status: error ? 'error' : 'pending',
+          progress: 0,
+          error,
+          preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
+        });
+      }
+
+      setUploadedFiles(prev => [...prev, ...newFiles]);
+
+      // Auto-upload valid files
+      newFiles.forEach(uploadedFile => {
+        if (uploadedFile.status === 'pending') {
+          uploadFile(uploadedFile);
+        }
+      });
+    } catch (error) {
+      console.error('Error during file validation:', error);
+      toast({
+        title: "Validation Error",
+        description: "An error occurred while validating files. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsValidating(false);
+    }
   }, [selectedDocumentType, toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -284,16 +381,28 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       
       setUploadedFiles(prev => prev.map(file => 
         file.id === uploadedFile.id 
-          ? { ...file, status: 'success', progress: 100, documentId: result.document.id }
+          ? { 
+              ...file, 
+              status: 'success', 
+              progress: 100, 
+              documentId: result.document.id,
+              isPdfConverted: result.document.is_pdf_converted || false,
+              convertedImages: result.document.converted_images || []
+            }
           : file
       ));
 
       // Add document type to uploaded set
       setUploadedDocumentTypes(prev => new Set([...prev, uploadedFile.documentType.id]));
 
+      const isPdfConverted = result.document.is_pdf_converted || false;
+      const convertedImagesCount = result.document.converted_images?.length || 0;
+      
       toast({
         title: "File Uploaded",
-        description: `${uploadedFile.file.name} has been uploaded successfully.`,
+        description: isPdfConverted 
+          ? `${uploadedFile.file.name} has been converted to ${convertedImagesCount} image(s) and uploaded successfully.`
+          : `${uploadedFile.file.name} has been uploaded successfully.`,
       });
     } catch (error: any) {
       clearInterval(progressInterval);
@@ -350,6 +459,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         return <AlertCircle className="w-5 h-5 text-red-500" />;
       case 'uploading':
         return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
+      case 'pending':
+        return <Loader2 className="w-5 h-5 text-yellow-500 animate-spin" />;
       default:
         return <File className="w-5 h-5 text-gray-500" />;
     }
@@ -363,6 +474,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         return 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800';
       case 'uploading':
         return 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800';
+      case 'pending':
+        return 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-800';
       default:
         return 'bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-800';
     }
@@ -391,24 +504,42 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
+      <div className="text-center space-y-4">
         <h2 className="text-2xl font-bold text-foreground mb-2">
           Upload Required Documents
         </h2>
-        <p className="text-muted-foreground">
-          {role === 'cook' 
-            ? 'Please upload your cooking credentials and certifications'
-            : 'Please upload your delivery-related documents and licenses'
-          }
-        </p>
+        <div className="max-w-2xl mx-auto">
+          <p className="text-muted-foreground text-lg mb-3">
+            {role === 'cook' 
+              ? 'Please upload your cooking credentials and certifications to verify your culinary expertise'
+              : 'Please upload your delivery-related documents and licenses to verify your delivery capabilities'
+            }
+          </p>
+          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+              📋 Document Requirements
+            </h3>
+            <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 text-left">
+              <li>• Upload clear, high-quality images or PDF files</li>
+              <li>• Maximum file size: 15MB per document</li>
+              <li>• Supported formats: PDF, JPG, PNG, JPEG</li>
+              <li>• PDF files will be automatically converted to images</li>
+              <li>• All documents are securely stored and encrypted</li>
+              <li>• Your documents will be reviewed by our admin team</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       {/* Document Type Selection */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Select Document Type</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Select Document Type
+          </CardTitle>
           <CardDescription>
-            Choose the type of document you want to upload
+            Choose the type of document you want to upload. Click on a document type to select it, then upload your files below.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -461,11 +592,16 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       {selectedDocumentType && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Upload className="w-5 h-5" />
               Upload {selectedDocumentType.name}
             </CardTitle>
             <CardDescription>
               {selectedDocumentType.description}
+              <br />
+              <span className="text-sm text-muted-foreground mt-1 block">
+                Drag and drop your files here or click to browse. You can upload multiple files of the same type.
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -474,21 +610,40 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
                 isDragActive
                   ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/25 hover:border-primary/50'
+                  : isValidating
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                    : 'border-muted-foreground/25 hover:border-primary/50'
               }`}
             >
-              <input {...getInputProps()} />
-              <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <input {...getInputProps()} disabled={isValidating} />
+              {isValidating ? (
+                <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-500 animate-spin" />
+              ) : (
+                <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              )}
               <p className="text-lg font-medium mb-2">
-                {isDragActive ? 'Drop files here' : 'Drag & drop files here'}
+                {isValidating 
+                  ? 'Validating files...' 
+                  : isDragActive 
+                    ? 'Drop files here' 
+                    : 'Drag & drop files here'
+                }
               </p>
               <p className="text-sm text-muted-foreground mb-4">
-                or click to select files
+                {isValidating ? 'Please wait while we validate your files' : 'or click to select files'}
               </p>
               <p className="text-xs text-muted-foreground">
                 Allowed: {getAllowedFileTypes(selectedDocumentType).map(t => `.${t}`).join(', ')} • 
                 Max size: {selectedDocumentType.max_file_size_mb}MB
               </p>
+              {getAllowedFileTypes(selectedDocumentType).includes('pdf') && (
+                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    📄 PDF files will be automatically converted to images for better viewing and storage.
+                    Maximum 3 pages allowed. We'll validate your PDF before upload.
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -498,9 +653,12 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       {uploadedFiles.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Uploaded Documents</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CheckCircle className="w-5 h-5" />
+              Uploaded Documents
+            </CardTitle>
             <CardDescription>
-              Review your uploaded documents
+              Review your uploaded documents. You can remove files or retry failed uploads.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -520,16 +678,34 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                         />
                       ) : (
                         <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
-                          {getFileIcon(uploadedFile.file.type)}
+                          {getFileIcon(uploadedFile.file.type, uploadedFile.isPdfConverted)}
                         </div>
                       )}
                       <div>
-                        <p className="font-medium">{uploadedFile.file.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{uploadedFile.file.name}</p>
+                          {uploadedFile.isPdfConverted && (
+                            <Badge variant="secondary" className="text-xs">
+                              PDF → Image
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           {uploadedFile.documentType.name} • {formatFileSize(uploadedFile.file.size)}
+                          {uploadedFile.isPdfConverted && uploadedFile.convertedImages && (
+                            <span className="ml-2 text-blue-600">
+                              ({uploadedFile.convertedImages.length} page{uploadedFile.convertedImages.length > 1 ? 's' : ''})
+                            </span>
+                          )}
                         </p>
                         {uploadedFile.error && (
                           <p className="text-sm text-red-600">{uploadedFile.error}</p>
+                        )}
+                        {uploadedFile.status === 'pending' && !uploadedFile.error && (
+                          <p className="text-sm text-yellow-600">Validating file...</p>
+                        )}
+                        {uploadedFile.status === 'uploading' && (
+                          <p className="text-sm text-blue-600">Uploading...</p>
                         )}
                       </div>
                     </div>
@@ -568,7 +744,13 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       {/* Progress Summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Document Status</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Document Status
+          </CardTitle>
+          <CardDescription>
+            Track your document upload progress. All required documents must be uploaded before you can continue.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -624,23 +806,35 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       </Card>
 
       {/* Action Buttons */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack}>
-          Back
+      <div className="flex justify-between items-center pt-4 border-t">
+        <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
+          <ArrowRight className="w-4 h-4 rotate-180" />
+          Back to Role Selection
         </Button>
-        <Button 
-          onClick={handleContinue}
-          disabled={!allRequiredUploaded || isUploading}
-        >
-          {isUploading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Uploading...
-            </>
-          ) : (
-            'Continue'
+        <div className="text-right">
+          {!allRequiredUploaded && (
+            <p className="text-sm text-muted-foreground mb-2">
+              {requiredDocuments.length - uploadedRequiredDocs.length} required document(s) remaining
+            </p>
           )}
-        </Button>
+          <Button 
+            onClick={handleContinue}
+            disabled={!allRequiredUploaded || isUploading}
+            className="flex items-center gap-2"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                Continue to Account Setup
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

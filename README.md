@@ -26,6 +26,7 @@ A comprehensive food delivery platform with **JWT authentication**, **Google OAu
 - Node.js 18+
 - MySQL 8.0+
 - Git
+- **Poppler for Windows** (Required for PDF processing - see [POPPLER_INSTALLATION.md](backend/POPPLER_INSTALLATION.md))
 
 ### Backend (Django)
 ```bash
@@ -466,9 +467,11 @@ POST /api/auth/delivery-agent/create/  # Create delivery profile
 ### Document Upload Features
 - **Drag & Drop Interface**: User-friendly file upload experience
 - **File Validation**: Type and size restrictions (PDF, JPG, PNG, JPEG)
+- **PDF Processing**: Automatic PDF to image conversion with page validation
 - **Progress Indicators**: Real-time upload feedback
 - **Document Management**: Preview, delete, and retry functionality
 - **Cloud Storage**: Secure Cloudinary integration
+- **Multi-format Support**: PDF, JPG, PNG, JPEG with automatic optimization
 
 ## 👥 Admin Approval System
 
@@ -628,6 +631,7 @@ npm test
 5. **Build Error**: Check Node.js version and dependencies
 6. **Email Not Sending**: Check SMTP configuration and credentials
 7. **Document Upload Fails**: Verify Cloudinary configuration
+8. **PDF Processing Error**: See [POPPLER_INSTALLATION.md](backend/POPPLER_INSTALLATION.md) for complete setup guide
 
 #### Getting Help
 - Check existing issues in the repository

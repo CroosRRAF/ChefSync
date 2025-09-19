@@ -320,6 +320,8 @@ class UserDocument(models.Model):
     is_visible_to_admin = models.BooleanField(default=False, help_text="Whether admin can see this document")
     cloudinary_public_id = models.CharField(max_length=255, blank=True, null=True, help_text="Cloudinary public ID for the file")
     local_file_path = models.CharField(max_length=500, blank=True, null=True, help_text="Local file path for PDFs to avoid Cloudinary access issues")
+    converted_images = models.JSONField(blank=True, null=True, help_text="Metadata for converted images (for PDFs converted to images)")
+    is_pdf_converted = models.BooleanField(default=False, help_text="Whether this document was converted from PDF to images")
     
     def __str__(self):
         return f"{self.user.name} - {self.document_type.name}"
