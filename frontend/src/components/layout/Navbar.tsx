@@ -16,8 +16,8 @@ import {
   Heart,
   Search
 } from 'lucide-react';
-import { cn } from '@/libs/utils';
 import logo from '@/assets/logo.svg';
+import { cn } from '@/libs/utils';
 
 interface NavbarProps {
   className?: string;
