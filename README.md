@@ -1,6 +1,103 @@
 # 🍽️ ChefSync - Food Delivery Platform
 
-A comprehensive food delivery platform with **JWT authentication**, **Google OAuth**, **email verification**, **role-based dashboards**, **document upload system**, and **admin approval workflows**.
+A comprehensive food delivery platform with JWT authentication, Google OAuth, email verification, role-based dashboards, document upload system, and admin approval workflows.
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.11+
+- Node.js 18+
+- MySQL 8.0+
+- Git
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <your-repository-url>
+   cd ChefSync
+   ```
+
+2. **Setup Backend** (see [backend/README.md](backend/README.md) for detailed instructions)
+   ```bash
+   cd backend
+   python -m venv venv
+   venv\Scripts\activate  # Windows
+   pip install -r requirements.txt
+   cp env.example .env
+   python manage.py migrate
+   python manage.py runserver
+   ```
+
+3. **Setup Frontend** (see [frontend/README.md](frontend/README.md) for detailed instructions)
+   ```bash
+   cd frontend
+   npm install
+   cp .env.example .env.local
+   npm run dev
+   ```
+
+## 📁 Project Structure
+
+```
+ChefSync/
+├── backend/          # Django REST API Backend
+├── frontend/         # React Frontend Application
+├── admin-config/     # Admin Configuration Files
+└── README.md        # This file
+```
+
+## 🔧 Tech Stack
+
+### Backend
+- **Django** - Web framework
+- **Django REST Framework** - API development
+- **MySQL** - Database
+- **JWT** - Authentication
+- **Google OAuth** - Social login
+- **Cloudinary** - File storage
+- **Brevo** - Email service
+
+### Frontend
+- **React** - UI library
+- **TypeScript** - Type safety
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling
+- **Shadcn/UI** - Component library
+- **Zustand** - State management
+
+## 🎯 Features
+
+- 🔐 **Multi-role Authentication** (Customer, Cook, Delivery Agent, Admin)
+- 📧 **Email Verification** with OTP
+- 🔄 **Google OAuth Integration**
+- 📄 **Document Upload System** with PDF processing
+- 👥 **Admin Approval Workflows**
+- 📊 **Role-based Dashboards**
+- 🛡️ **JWT Token Management**
+- 📱 **Responsive Design**
+
+## 📚 Documentation
+
+- [Backend Setup Guide](backend/README.md)
+- [Frontend Setup Guide](frontend/README.md)
+- [Admin Configuration](admin-config/README.md)
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+**Made with ❤️ by the ChefSync Team**
 
 ## 📋 Table of Contents
 

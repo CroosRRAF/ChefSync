@@ -3,7 +3,7 @@ import { toast } from '@/components/ui/use-toast';
 
 // Use Vite dev proxy by default to avoid protocol mismatches in development.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
-const MOCK_SERVER_URL = 'http://localhost:3001/api';
+
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -19,18 +19,7 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // If the main server is down (network error or 404), try the mock server
-    if ((error.message === 'Network Error' || error.response?.status === 404) && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      // Switch to mock server
-      originalRequest.baseURL = `${MOCK_SERVER_URL}/communications`;
-      
-      try {
-        return await axios(originalRequest);
-      } catch (mockError) {
-        return Promise.reject(error); // If mock fails too, return original error
-      }
+
     }
     
     return Promise.reject(error);
