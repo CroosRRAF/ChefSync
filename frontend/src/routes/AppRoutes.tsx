@@ -47,7 +47,7 @@ import CookSettings from '@/pages/cook/Settings';
 import CookProfile from '@/pages/cook/Profile';
 
 // Admin pages
-import ModernDashboard from '@/pages/admin/ModernDashboard';
+import UnifiedAdminDashboard from '@/pages/admin/UnifiedAdminDashboard';
 import AdminManageUsers from '@/pages/admin/ManageUsers';
 import AdminOrders from '@/pages/admin/Orders';
 import AdminAnalytics from '@/pages/admin/Analytics';
@@ -376,7 +376,7 @@ const InnerRoutes: React.FC = () => {
         <Route path="/admin/dashboard" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <ModernDashboard />
+              <UnifiedAdminDashboard />
             </AdminLayout>
           </ProtectedRoute>
         } />
