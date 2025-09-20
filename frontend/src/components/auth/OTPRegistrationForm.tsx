@@ -92,7 +92,7 @@ const OTPRegistrationForm: React.FC = () => {
   }, [otpTimer]);
 
   const apiCall = async (endpoint: string, data: any) => {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/${endpoint}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}auth/${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

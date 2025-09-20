@@ -45,7 +45,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from '@/lib/utils';
+import { cn } from '@/libs/utils';
 import NotificationCenter from '@/components/admin/NotificationCenter';
 
 interface AdminLayoutProps {
@@ -85,6 +85,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       label: 'User Management',
       href: '/admin/users',
       icon: Users
+    },
+    {
+      label: 'Approvals',
+      href: '/admin/approvals',
+      icon: Shield,
+      badge: 0 // Will be updated with actual count
     },
     {
       label: 'Orders',

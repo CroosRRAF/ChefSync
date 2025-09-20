@@ -34,6 +34,8 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
     try {
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+      const res = await fetch(`${apiUrl}/auth/google/login/`, {
       // Add debug logging
       console.log('Google OAuth credentialResponse:', credentialResponse);
       
@@ -132,6 +134,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
         theme="outline"
         size="large"
         text={mode === 'login' ? 'signin_with' : 'signup_with'}
+        width="300"
         // Avoid passing width="100%" which causes GSI width invalid warnings; let it fill container.
       />
     </div>

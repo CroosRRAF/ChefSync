@@ -1,7 +1,8 @@
 import axios, { AxiosError } from 'axios';
 import { toast } from '@/components/ui/use-toast';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+// Use Vite dev proxy by default to avoid protocol mismatches in development.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const MOCK_SERVER_URL = 'http://localhost:3001/api';
 
 // Create axios instance with default config

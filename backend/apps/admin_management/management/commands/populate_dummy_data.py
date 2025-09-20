@@ -20,6 +20,7 @@ from apps.admin_management.models import (
 from apps.food.models import Cuisine, FoodCategory, Food, FoodImage, FoodReview
 from apps.orders.models import Order, OrderItem, OrderStatusHistory, CartItem
 from apps.payments.models import Payment, Refund, PaymentMethod, Transaction
+from apps.users.models import ChefProfile, DeliveryProfile
 
 
 class Command(BaseCommand):
@@ -100,6 +101,10 @@ class Command(BaseCommand):
         Cook.objects.all().delete()
         Customer.objects.all().delete()
         User.objects.all().delete()
+        
+        # Clear profile models
+        ChefProfile.objects.all().delete()
+        DeliveryProfile.objects.all().delete()
 
         self.stdout.write(self.style.SUCCESS('Existing data cleared.'))
 
@@ -170,6 +175,19 @@ class Command(BaseCommand):
                 rating_avg=round(random.uniform(3.5, 5.0), 1),
                 availability_hours='09:00-22:00'
             )
+            # Create ChefProfile with approval status
+            approval_status = 'pending' if i < 4 else 'approved'  # First 4 pending, rest approved
+            ChefProfile.objects.create(
+                user=user,
+                specialty_cuisines=[random.choice(specialties)],
+                experience_years=random.randint(2, 15),
+                bio=f'Experienced chef specializing in {random.choice(specialties)} cuisine.',
+                approval_status=approval_status,  # Explicitly set approval_status
+                rating_average=round(random.uniform(3.5, 5.0), 1),
+                total_orders=random.randint(10, 200),
+                total_reviews=random.randint(5, 50),
+                is_featured=random.choice([True, False])
+            )
             cook_users.append(user)
 
         # Create delivery agent users
@@ -194,6 +212,18 @@ class Command(BaseCommand):
                 vehicle_number=random.choice(vehicle_numbers),
                 current_location=f'Location {random.randint(1, 10)}',
                 is_available=random.choice([True, True, True, False])  # 75% available
+            )
+            # Create DeliveryProfile
+            DeliveryProfile.objects.create(
+                user=user,
+                vehicle_type=random.choice(vehicles).lower(),
+                vehicle_number=random.choice(vehicle_numbers),
+                license_number=f'LIC{random.randint(100000, 999999)}',
+                is_available=random.choice([True, True, True, False]),
+                rating_average=round(random.uniform(3.0, 5.0), 1),
+                total_deliveries=random.randint(10, 500),
+                total_earnings=round(random.uniform(500, 5000), 2),
+                approval_status='approved'  # All delivery agents are approved by default
             )
             delivery_users.append(user)
 

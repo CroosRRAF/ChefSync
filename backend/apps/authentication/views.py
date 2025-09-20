@@ -1,6 +1,6 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import login, logout
@@ -20,6 +20,7 @@ from .serializers import (
     DocumentTypeSerializer, UserDocumentSerializer, UserApprovalSerializer, UserApprovalActionSerializer
 )
 from .models import User, Customer, Cook, DeliveryAgent
+from .permissions import IsAdminUser
 from django.apps import apps
 
 # Get models from Django's app registry to avoid import issues
@@ -754,6 +755,191 @@ class UserViewSet(viewsets.ModelViewSet):
             )
         
         return queryset
+
+
+# Admin Approval Management Views
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def pending_approvals(request):
+    """
+    Get pending user approvals filtered by role
+    """
+    try:
+        role = request.query_params.get('role')
+        if not role:
+            return Response(
+                {'error': 'Role parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate role
+        valid_roles = ['cook', 'delivery_agent']
+        if role not in valid_roles:
+            return Response(
+                {'error': f'Invalid role. Must be one of: {valid_roles}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if role == 'cook':
+            # For cooks, check ChefProfile.approval_status
+            from apps.users.models import ChefProfile
+            pending_profiles = ChefProfile.objects.filter(approval_status='pending')
+            pending_users = [profile.user for profile in pending_profiles]
+        elif role == 'delivery_agent':
+            # For delivery agents, check DeliveryProfile.approval_status
+            from apps.users.models import DeliveryProfile
+            pending_profiles = DeliveryProfile.objects.filter(approval_status='pending')
+            pending_users = [profile.user for profile in pending_profiles]
+
+        users_data = []
+        for user in pending_users:
+            users_data.append({
+                'id': user.user_id,
+                'name': user.name or f"{user.first_name} {user.last_name}".strip(),
+                'email': user.email,
+                'role': user.role,
+                'phone_no': user.phone_no,
+                'address': user.address,
+                'created_at': user.date_joined,
+                'approval_status': 'pending'
+            })
+
+        return Response({
+            'users': users_data,
+            'count': len(users_data)
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch pending approvals: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def approve_cook(request, user_id):
+    """
+    Approve a cook application
+    """
+    try:
+        user = get_object_or_404(User, user_id=user_id, role='cook')
+
+        # Get or create ChefProfile
+        from apps.users.models import ChefProfile
+        chef_profile, created = ChefProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'specialty_cuisines': [],
+                'experience_years': 0,
+                'bio': '',
+                'approval_status': 'pending',
+                'rating_average': 0.0,
+                'total_orders': 0,
+                'total_reviews': 0,
+                'is_featured': False
+            }
+        )
+
+        if chef_profile.approval_status == 'approved':
+            return Response(
+                {'error': 'Cook is already approved'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Update approval status
+        chef_profile.approval_status = 'approved'
+        chef_profile.save()
+
+        # Also activate the user if not already active
+        if not user.is_active:
+            user.is_active = True
+            user.save()
+
+        return Response({
+            'message': 'Cook approved successfully',
+            'user': {
+                'id': user.user_id,
+                'name': user.name,
+                'email': user.email,
+                'role': user.role,
+                'is_active': user.is_active
+            }
+        }, status=status.HTTP_200_OK)
+
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'Cook not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to approve cook: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def approve_delivery_agent(request, user_id):
+    """
+    Approve a delivery agent application
+    """
+    try:
+        user = get_object_or_404(User, user_id=user_id, role='delivery_agent')
+
+        # Get or create DeliveryProfile
+        from apps.users.models import DeliveryProfile
+        delivery_profile, created = DeliveryProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'vehicle_type': 'bike',
+                'vehicle_number': '',
+                'license_number': '',
+                'is_available': True,
+                'rating_average': 0.0,
+                'total_deliveries': 0,
+                'total_earnings': 0.0,
+                'approval_status': 'pending'
+            }
+        )
+
+        if delivery_profile.approval_status == 'approved':
+            return Response(
+                {'error': 'Delivery agent is already approved'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Update approval status
+        delivery_profile.approval_status = 'approved'
+        delivery_profile.save()
+
+        # Also activate the user if not already active
+        if not user.is_active:
+            user.is_active = True
+            user.save()
+
+        return Response({
+            'message': 'Delivery agent approved successfully',
+            'user': {
+                'id': user.user_id,
+                'name': user.name,
+                'email': user.email,
+                'role': user.role,
+                'is_active': user.is_active
+            }
+        }, status=status.HTTP_200_OK)
+
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'Delivery agent not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to approve delivery agent: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 # Document Management Endpoints

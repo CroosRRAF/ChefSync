@@ -211,7 +211,7 @@ const OrderManagement: React.FC = () => {
   const updateOrderStatus = async (orderId: string, newStatus: AdminOrder['status']) => {
     try {
       // Use the correct API endpoint for status updates
-      const response = await apiClient.patch(`/api/admin/orders/${orderId}/update_status/`, { 
+      const response = await apiClient.patch(`admin/orders/${orderId}/update_status/`, { 
         status: newStatus 
       });
 
@@ -380,8 +380,8 @@ const OrderManagement: React.FC = () => {
   const fetchAvailableResources = async () => {
     try {
       const [chefsResponse, partnersResponse] = await Promise.all([
-        apiClient.get('/api/admin/orders/available_chefs/'),
-        apiClient.get('/api/admin/orders/available_delivery_partners/')
+        apiClient.get('admin/orders/available_chefs/'),
+        apiClient.get('admin/orders/available_delivery_partners/')
       ]);
 
       // Check responses
@@ -426,7 +426,7 @@ const OrderManagement: React.FC = () => {
         ? { chef_id: resourceId } 
         : { partner_id: resourceId };
       
-      const response = await apiClient.patch(`/api/admin/orders/${selectedOrder.id}/${endpoint}/`, data);
+      const response = await apiClient.patch(`admin/orders/${selectedOrder.id}/${endpoint}/`, data);
 
       if (response.status >= 200 && response.status < 300) {
         // Update local state
