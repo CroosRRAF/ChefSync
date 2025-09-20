@@ -25,6 +25,8 @@ config = Config(RepositoryEnv(BASE_DIR / '.env'))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-3oo5lepmhh(qlf-m^s+ftjk=g0r7)h-jb$2vzu%1g7&jq0a32o')
+# Optional: allow using a separate JWT signing key; falls back to SECRET_KEY if not provided
+JWT_SIGNING_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
@@ -177,7 +179,7 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
+    'SIGNING_KEY': JWT_SIGNING_KEY,
     'VERIFYING_KEY': None,
     'AUDIENCE': None,
     'ISSUER': None,
