@@ -45,13 +45,16 @@ import CookSettings from '@/pages/cook/Settings';
 import CookProfile from '@/pages/cook/Profile';
 
 // Admin pages
-import AdminDashboard from '@/pages/admin/Dashboard';
+import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminManageUsers from '@/pages/admin/ManageUsers';
 import AdminOrders from '@/pages/admin/Orders';
 import AdminAnalytics from '@/pages/admin/Analytics';
 import AdminSettings from '@/pages/admin/Settings';
 import AdminProfile from '@/pages/admin/Profile';
 import AdminReports from '@/pages/admin/Reports';
+import UserApproval from '@/pages/admin/UserApproval';
+import CookApprovals from '@/pages/admin/CookApprovals';
+import DeliveryAgentApprovals from '@/pages/admin/DeliveryAgentApprovals';
 import FoodManagement from '@/pages/admin/FoodManagement';
 import AdminNotifications from '@/pages/admin/Notifications';
 import Communications from '@/pages/admin/Communications';
@@ -404,6 +407,21 @@ const InnerRoutes: React.FC = () => {
             <AdminLayout>
               <Communications />
             </AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/approvals" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <UserApproval />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/approvals/cooks" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <CookApprovals />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/approvals/delivery-agents" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <DeliveryAgentApprovals />
           </ProtectedRoute>
         } />
 
