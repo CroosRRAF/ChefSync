@@ -443,22 +443,6 @@ const InnerRoutes: React.FC = () => {
             </AdminLayout>
           </ProtectedRoute>
         } />
-        <Route path="/admin/approvals" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <UserApproval />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/approvals/cooks" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <CookApprovals />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/approvals/delivery-agents" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <DeliveryAgentApprovals />
-          </ProtectedRoute>
-        } />
-
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
       </Routes>
