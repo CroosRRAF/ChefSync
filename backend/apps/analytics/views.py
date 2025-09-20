@@ -37,7 +37,6 @@ class DashboardViewSet(viewsets.ViewSet):
         active_users = User.objects.filter(is_active=True).count()
         new_users_this_week = User.objects.filter(date_joined__gte=week_ago).count()
         new_users_this_month = User.objects.filter(date_joined__gte=month_ago).count()
-        new_users_today = User.objects.filter(date_joined__date=today).count()
         
         # Chef statistics
         total_chefs = User.objects.filter(role='cook').count()
@@ -104,7 +103,10 @@ class DashboardViewSet(viewsets.ViewSet):
             
             'total_foods': total_foods,
             'active_foods': active_foods,
-            'pending_approvals': 0,  # Calculate based on pending chef/food approvals
+            'pending_approvals': User.objects.filter(
+                role__in=['cook', 'delivery_agent'],
+                approval_status='pending'
+            ).count(),
         }
         
         serializer = DashboardStatsSerializer(stats_data)

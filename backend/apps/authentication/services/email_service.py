@@ -1,279 +1,350 @@
-from django.core.mail import send_mail
+"""
+Email service for sending beautiful HTML emails
+"""
+from django.core.mail import EmailMultiAlternatives, send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
-from ..models import EmailOTP
-from string import Template
-import logging
+from django.utils.html import strip_tags
+from django.utils import timezone
+from datetime import timedelta
+import random
+import string
+import base64
+import os
+from apps.authentication.models import EmailOTP
 
-logger = logging.getLogger(__name__)
 
 class EmailService:
+    """Service for sending beautiful HTML emails"""
+    
     @staticmethod
-    def send_otp(email, purpose='registration', user_name=None):
+    def get_logo_base64():
+        """Get the logo as base64 encoded string with fallback handling"""
+        try:
+            logo_path = os.path.join(settings.BASE_DIR, 'templates', 'emails', 'logo.svg')
+            if os.path.exists(logo_path):
+                with open(logo_path, 'rb') as logo_file:
+                    logo_data = logo_file.read()
+                    if logo_data:  # Check if file is not empty
+                        return base64.b64encode(logo_data).decode('utf-8')
+            
+            # Fallback: return None so template can show emoji instead
+            print("Logo file not found or empty, template will use emoji fallback")
+            return None
+        except Exception as e:
+            print(f"Failed to load logo: {e}, using emoji fallback")
+            return None
+    
+    @staticmethod
+    def send_otp(email, purpose='registration', user_name='User'):
         """
         Send OTP to email for verification
+        
+        Args:
+            email: Email address to send OTP to
+            purpose: Purpose of OTP ('registration', 'password_reset', 'email_verification')
+            user_name: Name of the user (optional)
+        
+        Returns:
+            dict: {'success': bool, 'message': str}
         """
         try:
-            # Create OTP
-            otp_obj = EmailOTP.objects.create(
+            # Generate OTP
+            otp_length = getattr(settings, 'OTP_LENGTH', 6)
+            otp = ''.join(random.choices(string.digits, k=otp_length))
+            
+            # Set expiry time
+            expiry_minutes = getattr(settings, 'OTP_EXPIRY_MINUTES', 10)
+            expires_at = timezone.now() + timedelta(minutes=expiry_minutes)
+            
+            # Delete any existing OTPs for this email and purpose
+            EmailOTP.objects.filter(email=email, purpose=purpose, is_used=False).delete()
+            
+            # Create new OTP record
+            otp_record = EmailOTP.objects.create(
                 email=email,
-                purpose=purpose
+                otp=otp,
+                purpose=purpose,
+                expires_at=expires_at
             )
             
-            # Prepare email content
-            context = {
-                'otp': otp_obj.otp,
-                'user_name': user_name or 'User',
-                'purpose': purpose,
-                'expiry_minutes': getattr(settings, 'OTP_EXPIRY_MINUTES', 10)
-            }
-            
-            # Email templates
-            subject_map = {
-                'registration': 'Verify Your Email - ChefSync Registration',
-                'password_reset': 'Password Reset OTP - ChefSync',
-                'email_verification': 'Email Verification OTP - ChefSync'
-            }
-            
-            subject = subject_map.get(purpose, 'OTP Verification - ChefSync')
-
-            # Purpose-specific body line
+            # Prepare email content (remove emojis to avoid spam filters)
             if purpose == 'registration':
-                body_line = 'Thank you for registering with ChefSync! Please use the verification code below to complete your sign up.'
+                subject = 'ChefSync - Email Verification Code'
             elif purpose == 'password_reset':
-                body_line = 'Use the following code to reset your password securely.'
-            elif purpose == 'email_verification':
-                body_line = 'Please use the code below to verify your email address.'
+                subject = 'ChefSync - Password Reset Code'
             else:
-                body_line = 'Use the verification code below.'
-
-            # HTML message (responsive, email-client friendly with inline CSS) using Template to avoid f-string brace conflicts
-            html_template = Template("""
-            <!DOCTYPE html>
-            <html lang=\"en\">
-            <head>
-              <meta charset=\"utf-8\">
-              <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-              <meta http-equiv=\"x-ua-compatible\" content=\"ie=edge\">
-              <title>$subject</title>
-              <style>
-                /* Client-specific styles */
-                /* Force Outlook to provide a \"view in browser\" message */
-                #outlook a{padding:0;}
-                /* Force Hotmail to display emails at full width */
-                .ReadMsgBody{width:100%;}
-                .ExternalClass{width:100%;}
-                /* Force Hotmail to display normal line spacing */
-                .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div{line-height:100%;}
-                /* Prevent WebKit and Windows mobile changing default text sizes */
-                body, table, td, a{-webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;}
-                /* Remove spacing between tables in Outlook 2007 and up */
-                table, td{mso-table-lspace:0pt; mso-table-rspace:0pt;}
-                /* Fix for Yahoo truncation */
-                .yshortcuts a{border-bottom:none !important;}
-                /* Reset styles */
-                img{border:0; height:auto; line-height:100%; outline:none; text-decoration:none;}
-                table{border-collapse:collapse !important;}
-                body{margin:0 !important; padding:0 !important; width:100% !important;}
-                /* Responsive styles */
-                @media screen and (max-width: 600px) {
-                  .container{width:100% !important;}
-                  .p-24{padding:16px !important;}
-                  .hero-title{font-size:22px !important;}
-                  .otp{font-size:28px !important; letter-spacing:6px !important;}
-                }
-              </style>
-            </head>
-            <body style=\"background-color:#0b0d12; margin:0; padding:0;\">
-              <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" role=\"presentation\">
-                <tr>
-                  <td align=\"center\" style=\"padding:24px;\">
-                    <table width=\"600\" class=\"container\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"width:600px; max-width:600px; background:linear-gradient(180deg,#0b0d12,#0f1320); border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.35);\">
-                      <!-- Header / Brand -->
-                      <tr>
-                        <td align=\"center\" style=\"padding:32px 24px 16px 24px; background:linear-gradient(135deg,#7c3aed,#2563eb);\">
-                          <table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\">
-                            <tr>
-                              <td align=\"center\" style=\"background:rgba(255,255,255,0.15); padding:12px 16px; border-radius:12px;\">
-                                <span style=\"display:inline-block; font-family:Arial,Helvetica,sans-serif; color:#ffffff; font-weight:700; font-size:18px; letter-spacing:0.5px;\">ChefSync</span>
-                              </td>
-                            </tr>
-                          </table>
-                          <div style=\"height:16px\"></div>
-                          <div class=\"hero-title\" style=\"font-family:Arial,Helvetica,sans-serif; color:#f8fafc; font-size:24px; font-weight:800; letter-spacing:0.3px;\">$subject</div>
-                          <div style=\"height:8px\"></div>
-                          <div style=\"font-family:Arial,Helvetica,sans-serif; color:#e2e8f0; font-size:14px;\">
-                            Hello $user_name,
-                          </div>
-                        </td>
-                      </tr>
-
-                      <!-- Body -->
-                      <tr>
-                        <td class=\"p-24\" style=\"padding:24px;\">
-                          <table width=\"100%\" role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\">
-                            <tr>
-                              <td style=\"font-family:Arial,Helvetica,sans-serif; color:#cbd5e1; font-size:15px; line-height:1.7;\">$body_line</td>
-                            </tr>
-                          </table>
-
-                          <div style=\"height:20px\"></div>
-
-                          <!-- OTP Box -->
-                          <table width=\"100%\" role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:rgba(59,130,246,0.08); border:1px solid rgba(99,102,241,0.35); border-radius:14px;\">
-                            <tr>
-                              <td align=\"center\" style=\"padding:24px;\">
-                                <div style=\"font-family:Arial,Helvetica,sans-serif; color:#94a3b8; font-size:12px; letter-spacing:0.6px; text-transform:uppercase;\">Your verification code</div>
-                                <div class=\"otp\" style=\"font-family:Consolas,Monaco,'Courier New',monospace; color:#a78bfa; font-weight:800; font-size:34px; letter-spacing:10px; padding:10px 0;\">$otp</div>
-                                <div style=\"font-family:Arial,Helvetica,sans-serif; color:#94a3b8; font-size:12px;\">Do not share this code with anyone.</div>
-                              </td>
-                            </tr>
-                          </table>
-
-                          <div style=\"height:16px\"></div>
-
-                          <!-- Info -->
-                          <table width=\"100%\" role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\">
-                            <tr>
-                              <td style=\"font-family:Arial,Helvetica,sans-serif; color:#a1a1aa; font-size:13px;\">⏰ This code expires in <strong style=\"color:#e5e7eb\">$expiry_minutes minutes</strong>.</td>
-                            </tr>
-                            <tr>
-                              <td style=\"font-family:Arial,Helvetica,sans-serif; color:#737373; font-size:12px; padding-top:10px;\">
-                                If you didn’t request this, you can safely ignore this email.
-                              </td>
-                            </tr>
-                          </table>
-                        </td>
-                      </tr>
-
-                      <!-- Footer -->
-                      <tr>
-                        <td align=\"center\" style=\"padding:16px 24px 28px 24px; border-top:1px solid rgba(148,163,184,0.15);\">
-                          <div style=\"font-family:Arial,Helvetica,sans-serif; color:#94a3b8; font-size:11px;\">
-                            © 2024 ChefSync • All rights reserved
-                          </div>
-                          <div style=\"height:6px\"></div>
-                          <div style=\"font-family:Arial,Helvetica,sans-serif; color:#6b7280; font-size:11px;\">This is an automated message, please do not reply.</div>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-            </body>
-            </html>
-            """)
-
-            html_message = html_template.safe_substitute(
-                subject=subject,
-                user_name=context['user_name'],
-                otp=context['otp'],
-                expiry_minutes=context['expiry_minutes'],
-                body_line=body_line,
-            )
+                subject = 'ChefSync - Verification Code'
             
-            # Plain text message
-            message = f"""
-            Hello {context['user_name']}!
+            # Prepare context for HTML template
+            context = {
+                'user_name': user_name,
+                'email': email,
+                'otp_code': otp,
+                'purpose': purpose,
+                'expiry_minutes': expiry_minutes,
+                'frontend_url': getattr(settings, 'FRONTEND_URL', 'http://localhost:8080'),
+            }
             
-            Thank you for registering with ChefSync! 
+            # Render HTML email template
+            html_content = render_to_string('emails/otp_email_beautiful.html', context)
             
-            Your verification code is: {context['otp']}
-            
-            This OTP will expire in {context['expiry_minutes']} minutes.
-            
-            If you didn't request this verification, please ignore this email.
-            
-            Best regards,
-            ChefSync Team
+            # Create plain text version
+            text_content = f"""
+Hello {user_name},
+
+Please use the verification code below:
+
+Verification Code: {otp}
+
+This code will expire in {expiry_minutes} minutes.
+
+If you didn't request this code, please ignore this email.
+
+Best regards,
+The ChefSync Team
             """
             
-            # Send email
-            send_mail(
+            # Send email with HTML template
+            email_message = EmailMultiAlternatives(
                 subject=subject,
-                message=message,
+                body=text_content,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                html_message=html_message,
-                fail_silently=False
+                to=[email],
+                headers={
+                    'X-Priority': '3',
+                    'X-MSMail-Priority': 'Normal',
+                    'X-Mailer': 'ChefSync Application',
+                }
             )
             
-            logger.info(f"OTP sent successfully to {email} for {purpose}")
+            # Attach HTML version
+            email_message.attach_alternative(html_content, "text/html")
+            
+            # Send email (do not fail silently so errors are visible during troubleshooting)
+            sent_count = email_message.send(fail_silently=False)
+            if sent_count == 0:
+                raise Exception('No emails were sent by the SMTP backend')
+            
+            print(f"✅ Email sent successfully to {email} with OTP: {otp}")  # Debug log
+            
             return {
                 'success': True,
-                'message': 'OTP sent successfully',
-                'otp_id': otp_obj.id
+                'message': f'Verification code sent to {email}'
             }
             
         except Exception as e:
-            logger.error(f"Failed to send OTP to {email}: {str(e)}")
+            # Log the exception for debugging and return structured error
+            import traceback
+            tb = traceback.format_exc()
+            print(f"Failed to send OTP: {repr(e)}\n{tb}")
             return {
                 'success': False,
-                'message': f'Failed to send OTP: {str(e)}'
+                'message': f'Failed to send verification code: {str(e)}',
+                'details': tb
             }
     
     @staticmethod
     def verify_otp(email, otp, purpose='registration'):
         """
-        Verify OTP for given email and purpose
+        Verify OTP for email verification
+        
+        Args:
+            email: Email address
+            otp: OTP code to verify
+            purpose: Purpose of OTP ('registration', 'password_reset', 'email_verification')
+        
+        Returns:
+            dict: {'success': bool, 'message': str}
         """
         try:
-            otp_obj = EmailOTP.objects.filter(
+            # Find the OTP record
+            otp_record = EmailOTP.objects.filter(
                 email=email,
-                otp=otp,
                 purpose=purpose,
                 is_used=False
-            ).first()
+            ).order_by('-created_at').first()
             
-            if not otp_obj:
-                # Check if OTP exists but was already used
-                used_otp = EmailOTP.objects.filter(
-                    email=email,
-                    otp=otp,
-                    purpose=purpose,
-                    is_used=True
-                ).first()
+            if not otp_record:
+                return {
+                    'success': False,
+                    'message': 'No verification code found for this email'
+                }
+            
+            # Check if OTP has expired
+            if timezone.now() > otp_record.expires_at:
+                otp_record.is_used = True  # Mark as used to prevent reuse
+                otp_record.save()
+                return {
+                    'success': False,
+                    'message': 'Verification code has expired. Please request a new one.'
+                }
+            
+            # Check if OTP matches
+            if otp_record.otp != otp:
+                # Increment attempts
+                otp_record.attempts += 1
+                otp_record.save()
                 
-                if used_otp:
+                # If too many attempts, mark as used
+                if otp_record.attempts >= 3:
+                    otp_record.is_used = True
+                    otp_record.save()
                     return {
                         'success': False,
-                        'message': 'This verification code has already been used. Please request a new code.'
+                        'message': 'Too many failed attempts. Please request a new verification code.'
                     }
                 
                 return {
                     'success': False,
-                    'message': 'Invalid verification code. Please check your code and try again.'
+                    'message': 'Invalid verification code. Please try again.'
                 }
             
-            if not otp_obj.is_valid():
-                return {
-                    'success': False,
-                    'message': 'Verification code has expired. Please request a new code.'
-                }
-            
-            # Mark OTP as used
-            otp_obj.mark_as_used()
+            # OTP is valid - mark as used
+            otp_record.is_used = True
+            otp_record.save()
             
             return {
                 'success': True,
-                'message': 'Email verified successfully'
+                'message': 'Verification code verified successfully'
             }
             
         except Exception as e:
-            logger.error(f"Failed to verify OTP for {email}: {str(e)}")
+            print(f"Failed to verify OTP: {e}")
             return {
                 'success': False,
-                'message': f'Verification failed: {str(e)}'
+                'message': f'Failed to verify code: {str(e)}'
             }
     
     @staticmethod
-    def cleanup_expired_otps():
+    def send_approval_email(user, status, admin_notes=None):
         """
-        Clean up expired OTP records
+        Send approval/rejection email to user
+        
+        Args:
+            user: User instance
+            status: 'approved' or 'rejected'
+            admin_notes: Optional admin notes for rejection
         """
-        from django.utils import timezone
-        expired_count = EmailOTP.objects.filter(
-            expires_at__lt=timezone.now()
-        ).delete()[0]
-        logger.info(f"Cleaned up {expired_count} expired OTP records")
-        return expired_count
+        try:
+            # Get logo as base64
+            logo_base64 = EmailService.get_logo_base64()
+            
+            # Prepare context for email template
+            context = {
+                'user_name': user.name,
+                'user_email': user.email,
+                'role_display': user.get_role_display(),
+                'status': status,
+                'admin_notes': admin_notes,
+                'login_url': f"{settings.FRONTEND_URL}/auth/login",
+                'support_url': f"{settings.FRONTEND_URL}/contact",
+                'logo_base64': logo_base64,
+            }
+            
+            # Render HTML email template
+            html_content = render_to_string('emails/approval_email.html', context)
+            
+            # Create plain text version
+            text_content = strip_tags(html_content)
+            
+            # Determine subject and sender
+            if status == 'approved':
+                subject = f'🎉 Account Approved - Welcome to ChefSync!'
+            else:
+                subject = f'Account Application Update - ChefSync'
+            
+            # Create email
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[user.email]
+            )
+            
+            # Attach HTML version
+            email.attach_alternative(html_content, "text/html")
+            
+            # Send email
+            email.send()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Failed to send approval email: {e}")
+            return False
+    
+    @staticmethod
+    def send_welcome_email(user):
+        """
+        Send welcome email to newly registered user
+        
+        Args:
+            user: User instance
+        """
+        try:
+            context = {
+                'user_name': user.name,
+                'user_email': user.email,
+                'role_display': user.get_role_display(),
+                'login_url': f"{settings.FRONTEND_URL}/auth/login",
+                'support_url': f"{settings.FRONTEND_URL}/contact",
+            }
+            
+            html_content = render_to_string('emails/welcome_email.html', context)
+            text_content = strip_tags(html_content)
+            
+            subject = f'Welcome to ChefSync, {user.name}!'
+            
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[user.email]
+            )
+            
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Failed to send welcome email: {e}")
+            return False
+    
+    @staticmethod
+    def send_document_upload_notification(user, document_type):
+        """
+        Send notification when user uploads a document
+        
+        Args:
+            user: User instance
+            document_type: DocumentType instance
+        """
+        try:
+            context = {
+                'user_name': user.name,
+                'document_type': document_type.name,
+                'support_url': f"{settings.FRONTEND_URL}/contact",
+            }
+            
+            html_content = render_to_string('emails/document_upload_notification.html', context)
+            text_content = strip_tags(html_content)
+            
+            subject = f'Document Upload Confirmation - {document_type.name}'
+            
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[user.email]
+            )
+            
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Failed to send document upload notification: {e}")
+            return False

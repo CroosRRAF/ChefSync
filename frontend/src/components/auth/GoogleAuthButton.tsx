@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/button';
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
+  // For development, allow any client ID that looks like a Google OAuth client ID
+  // In production, you should use proper validation
   return clientId && 
          clientId !== 'your-google-client-id' && 
          clientId !== 'YOUR_NEW_GOOGLE_CLIENT_ID_HERE' &&
          clientId !== '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com' &&
-         clientId.includes('.apps.googleusercontent.com');
+         (clientId.includes('.apps.googleusercontent.com') || clientId.length > 20);
 };
 
 interface GoogleAuthButtonProps {
@@ -32,14 +34,28 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || '/api';
-      const res = await fetch(`${apiUrl}/auth/google/login/`, {
+      // Add debug logging
+      console.log('Google OAuth credentialResponse:', credentialResponse);
+      
+      if (!credentialResponse?.credential) {
+        throw new Error('No credential received from Google');
+      }
+
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+      console.log('Making request to:', `${apiUrl}/api/auth/google/login/`);
+      
+      const res = await fetch(`${apiUrl}/api/auth/google/login/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'include', // Include credentials for CORS
         body: JSON.stringify({ id_token: credentialResponse.credential }),
       });
       
       const data = await res.json();
+      console.log('Backend response:', { status: res.status, data });
       
       if (res.ok) {
         // Set auth context state via oauthLogin helper
@@ -57,11 +73,15 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
         const rolePath = getRoleBasedPath(data.user.role);
         navigate(rolePath, { replace: true, state: { from: 'google_oauth' } });
       } else {
+        // Better error handling for backend errors
         const errorMessage = data.error || data.detail || 'Authentication failed';
+        const errorDetails = data.details ? ` (${data.details})` : '';
+        
+        console.error('Backend error:', data);
         toast({ 
           variant: 'destructive', 
           title: `Google ${mode} failed`, 
-          description: errorMessage
+          description: `${errorMessage}${errorDetails}`
         });
       }
     } catch (err: any) {
@@ -112,7 +132,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
         theme="outline"
         size="large"
         text={mode === 'login' ? 'signin_with' : 'signup_with'}
-        width="100%"
+        // Avoid passing width="100%" which causes GSI width invalid warnings; let it fill container.
       />
     </div>
   );

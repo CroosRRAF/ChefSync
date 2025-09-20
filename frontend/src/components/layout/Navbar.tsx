@@ -16,6 +16,7 @@ import {
   Heart,
   Search
 } from 'lucide-react';
+import logo from '@/assets/logo.svg';
 import { cn } from '@/libs/utils';
 
 interface NavbarProps {
@@ -86,9 +87,11 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
             to="/" 
             className="flex items-center space-x-2 group"
           >
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold text-lg">
-              C
-            </div>
+            <img 
+              src={logo} 
+              alt="ChefSync Logo" 
+              className="w-8 h-8 rounded-lg"
+            />
             <span className="text-xl font-bold text-gradient-primary">
               ChefSync
             </span>
@@ -211,12 +214,16 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-80">
+                <h2 className="sr-only">Mobile menu</h2>
+                <p className="sr-only">Navigation drawer with links and actions</p>
                 <div className="flex flex-col h-full">
                   {/* Mobile Logo */}
                   <div className="flex items-center space-x-2 pb-6 border-b">
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold text-lg">
-                      C
-                    </div>
+                    <img 
+                      src={logo} 
+                      alt="ChefSync Logo" 
+                      className="w-8 h-8 rounded-lg"
+                    />
                     <span className="text-xl font-bold text-gradient-primary">
                       ChefSync
                     </span>

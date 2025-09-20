@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { useApprovalStatus } from '@/hooks/useApprovalStatus';
 
 // Layout components
 import Navbar from '@/components/layout/Navbar';
@@ -21,6 +22,7 @@ import Register from '@/pages/auth/Register';
 import ForgotPassword from '@/pages/auth/ForgotPassword';
 import VerifyEmail from '@/pages/auth/VerifyEmail';
 import ResetPassword from '@/pages/auth/ResetPassword';
+import ApprovalStatusPage from '@/pages/auth/ApprovalStatus';
 
 // Profile page - removed old generic profile, now using role-specific profiles
 
@@ -45,13 +47,16 @@ import CookSettings from '@/pages/cook/Settings';
 import CookProfile from '@/pages/cook/Profile';
 
 // Admin pages
-import AdminDashboard from '@/pages/admin/Dashboard';
+import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminManageUsers from '@/pages/admin/ManageUsers';
 import AdminOrders from '@/pages/admin/Orders';
 import AdminAnalytics from '@/pages/admin/Analytics';
 import AdminSettings from '@/pages/admin/Settings';
 import AdminProfile from '@/pages/admin/Profile';
 import AdminReports from '@/pages/admin/Reports';
+import UserApproval from '@/pages/admin/UserApproval';
+import CookApprovals from '@/pages/admin/CookApprovals';
+import DeliveryAgentApprovals from '@/pages/admin/DeliveryAgentApprovals';
 import FoodManagement from '@/pages/admin/FoodManagement';
 import AdminNotifications from '@/pages/admin/Notifications';
 import Communications from '@/pages/admin/Communications';
@@ -79,9 +84,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireAuth = true 
 }) => {
   const { isAuthenticated, user, isLoading } = useAuth();
+  const { approvalStatus, isLoading: isCheckingApproval, canAccessDashboard } = useApprovalStatus();
 
-  // Show loading while checking authentication
-  if (isLoading) {
+  // Show loading while checking authentication or approval status
+  if (isLoading || (user && (user.role === 'cook' || user.role === 'delivery_agent') && isCheckingApproval)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -91,6 +97,27 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (requireAuth && !isAuthenticated) {
     return <Navigate to="/auth/login" replace />;
+  }
+
+  // Check approval status for cooks and delivery agents
+  if (user && (user.role === 'cook' || user.role === 'delivery_agent')) {
+    // Check if user has approval status in localStorage (from login attempt)
+    const pendingUserData = localStorage.getItem('pending_user_data');
+    if (pendingUserData) {
+      try {
+        const data = JSON.parse(pendingUserData);
+        if (data.approval_status === 'pending' || data.approval_status === 'rejected') {
+          return <Navigate to="/approval-status" replace />;
+        }
+      } catch (error) {
+        console.error('Error parsing pending user data:', error);
+      }
+    }
+    
+    // Check approval status from API
+    if (approvalStatus && !canAccessDashboard) {
+      return <Navigate to="/approval-status" replace />;
+    }
   }
 
   if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
@@ -205,6 +232,11 @@ const InnerRoutes: React.FC = () => {
             <Navbar />
             <ResetPassword />
           </>
+        } />
+        <Route path="/approval-status" element={
+          <ProtectedRoute requireAuth={false}>
+            <ApprovalStatusPage />
+          </ProtectedRoute>
         } />
         
         {/* Profile Route - removed old generic profile route, now using role-specific profiles */}
@@ -404,6 +436,21 @@ const InnerRoutes: React.FC = () => {
             <AdminLayout>
               <Communications />
             </AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/approvals" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <UserApproval />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/approvals/cooks" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <CookApprovals />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/approvals/delivery-agents" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <DeliveryAgentApprovals />
           </ProtectedRoute>
         } />
 
