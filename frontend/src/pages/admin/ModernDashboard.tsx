@@ -577,19 +577,19 @@ const ModernDashboard: React.FC = () => {
                 <Activity className="h-8 w-8 text-blue-600" />
               </div>
               <div className="grid grid-cols-2 gap-2 mt-4">
-                <Button size="sm" variant="outline" className="text-xs">
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate('/admin/users')}>
                   <Users className="h-3 w-3 mr-1" />
                   Add User
                 </Button>
-                <Button size="sm" variant="outline" className="text-xs">
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate('/admin/food')}>
                   <ChefHat className="h-3 w-3 mr-1" />
-                  Add Chef
+                  Add Food
                 </Button>
-                <Button size="sm" variant="outline" className="text-xs">
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate('/admin/communications')}>
                   <Bell className="h-3 w-3 mr-1" />
                   Send Alert
                 </Button>
-                <Button size="sm" variant="outline" className="text-xs">
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate('/admin/reports')}>
                   <BarChart3 className="h-3 w-3 mr-1" />
                   Reports
                 </Button>
@@ -610,7 +610,7 @@ const ModernDashboard: React.FC = () => {
                 {performanceData.slice(0, 2).map((metric, index) => (
                   <div key={index} className="flex items-center justify-between text-xs">
                     <span className="text-green-700 dark:text-green-300">{metric.name}</span>
-                    <Badge 
+                    <Badge
                       variant={metric.status === 'good' ? 'default' : 'secondary'}
                       className="h-4 px-1.5"
                     >
@@ -622,24 +622,25 @@ const ModernDashboard: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 border-purple-200 dark:border-purple-800">
+          <Card className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-red-200 dark:border-red-800">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-purple-900 dark:text-purple-100">Recent Activity</h3>
-                  <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">Latest updates</p>
+                  <h3 className="font-medium text-red-900 dark:text-red-100">Pending Approvals</h3>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">Quick approval actions</p>
                 </div>
-                <Clock className="h-8 w-8 text-purple-600" />
+                <AlertTriangle className="h-8 w-8 text-red-600" />
               </div>
               <div className="space-y-2 mt-4">
-                {recentActivities.slice(0, 2).map((activity, index) => (
-                  <div key={index} className="text-xs text-purple-700 dark:text-purple-300">
-                    <div className="font-medium truncate">{activity.action}</div>
-                    <div className="text-purple-600 dark:text-purple-400">
-                      {new Date(activity.timestamp).toLocaleTimeString()}
-                    </div>
-                  </div>
-                ))}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs justify-start"
+                  onClick={() => navigate('/admin/approvals')}
+                >
+                  <ChefHat className="h-3 w-3 mr-2" />
+                  Unified Approvals ({stats?.pending_chef_approvals || 0})
+                </Button>
               </div>
             </CardContent>
           </Card>

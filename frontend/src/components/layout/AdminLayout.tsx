@@ -87,6 +87,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       icon: Users
     },
     {
+      label: 'Approvals',
+      href: '/admin/approvals',
+      icon: Shield,
+      badge: 0 // Will be updated with actual count
+    },
+    {
       label: 'Orders',
       href: '/admin/orders',
       icon: ShoppingCart,

@@ -17,7 +17,6 @@ import Register from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import VerifyEmail from "./pages/auth/VerifyEmail";
 import ResetPassword from "./pages/auth/ResetPassword";
-import AdminDashboard from "./pages/admin/Dashboard";
 import ModernDashboard from "./pages/admin/ModernDashboard";
 import ManageUsers from "./pages/admin/ManageUsers";
 import AdminAnalytics from "./pages/admin/Analytics";
@@ -42,7 +41,7 @@ const AppContent = () => {
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/dashboard" element={<ModernDashboard />} />
         <Route path="/admin/enhanced-dashboard" element={<ModernDashboard />} />
         <Route path="/admin/manage-users" element={<ManageUsers />} />
         <Route path="/admin/analytics" element={<AdminAnalytics />} />

@@ -21,6 +21,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { adminService, type AdminUser, type UserListResponse } from '@/services/adminService';
+import { apiClient } from '@/utils/fetcher';
 import AdvancedDataTable from '@/components/admin/AdvancedDataTable';
 import AdvancedStatsCard from '@/components/admin/AdvancedStatsCard';
 
@@ -226,6 +227,40 @@ const EnhancedUserManagement: React.FC = () => {
     }
   };
 
+  // Handle user approval/rejection
+  const handleUserApproval = async (user: AdminUser, action: 'approve' | 'reject') => {
+    try {
+      const endpoint = user.role === 'cook' ? '/api/auth/admin/approve-cook/' : '/api/auth/admin/approve-delivery-agent/';
+      const response = await apiClient.post(`${endpoint}${user.id}/`, {
+        action: action
+      });
+
+      if (response.status >= 200 && response.status < 300) {
+        // Update local state
+        setUsers(prev =>
+          prev.map(u =>
+            u.id === user.id ? {
+              ...u,
+              is_active: action === 'approve',
+              approval_status: action === 'approve' ? 'approved' : 'rejected'
+            } : u
+          )
+        );
+
+        // Show success message
+        alert(`User ${action}d successfully!`);
+
+        // Refresh the user list
+        fetchUsers(pagination.page, filters.search, filters.role, filters.status);
+      } else {
+        throw new Error(response.data?.detail || `Failed to ${action} user`);
+      }
+    } catch (error: any) {
+      console.error(`Error ${action}ing user:`, error);
+      alert(`Failed to ${action} user: ${error.response?.data?.detail || error.message}`);
+    }
+  };
+
   // Handle export
   const handleExport = async (data: AdminUser[]) => {
     try {
@@ -415,6 +450,43 @@ const EnhancedUserManagement: React.FC = () => {
       title: 'Actions',
       render: (value: any, row: AdminUser) => (
         <div className="flex items-center space-x-1">
+          {/* Approval actions for pending users */}
+          {(row.role === 'cook' || row.role === 'delivery_agent') && !row.is_active && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleUserApproval(row, 'approve');
+                }}
+                className="h-8 w-8 p-0 hover:bg-green-50 dark:hover:bg-green-900/20"
+                style={{
+                  color: theme === 'dark' ? '#22C55E' : '#16A34A'
+                }}
+                title="Approve User"
+              >
+                <UserCheck className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleUserApproval(row, 'reject');
+                }}
+                className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20"
+                style={{
+                  color: theme === 'dark' ? '#EF4444' : '#DC2626'
+                }}
+                title="Reject User"
+              >
+                <UserX className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+          
+          {/* Standard actions */}
           <Button
             variant="ghost"
             size="sm"
