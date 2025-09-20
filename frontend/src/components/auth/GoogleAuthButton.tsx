@@ -112,7 +112,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
         theme="outline"
         size="large"
         text={mode === 'login' ? 'signin_with' : 'signup_with'}
-        width="100%"
+        width="300"
       />
     </div>
   );
