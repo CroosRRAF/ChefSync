@@ -51,4 +51,9 @@ urlpatterns = [
     path('tokens/', views.user_tokens, name='user_tokens'),
     path('tokens/revoke/', views.revoke_token, name='revoke_token'),
     path('tokens/revoke-all/', views.revoke_all_tokens, name='revoke_all_tokens'),
+    
+    # Admin Approval Management
+    path('admin/pending-approvals/', views.pending_approvals, name='pending_approvals'),
+    path('admin/approve-cook/<int:user_id>/', views.approve_cook, name='approve_cook'),
+    path('admin/approve-delivery-agent/<int:user_id>/', views.approve_delivery_agent, name='approve_delivery_agent'),
 ]

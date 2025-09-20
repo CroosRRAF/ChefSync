@@ -230,7 +230,7 @@ const EnhancedUserManagement: React.FC = () => {
   // Handle user approval/rejection
   const handleUserApproval = async (user: AdminUser, action: 'approve' | 'reject') => {
     try {
-      const endpoint = user.role === 'cook' ? '/api/auth/admin/approve-cook/' : '/api/auth/admin/approve-delivery-agent/';
+      const endpoint = user.role === 'cook' ? 'auth/admin/approve-cook/' : 'auth/admin/approve-delivery-agent/';
       const response = await apiClient.post(`${endpoint}${user.id}/`, {
         action: action
       });

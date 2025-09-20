@@ -665,3 +665,163 @@ class UserViewSet(viewsets.ModelViewSet):
             )
         
         return queryset
+
+
+# Admin Approval Management Views
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def pending_approvals(request):
+    """
+    Get pending user approvals filtered by role
+    """
+    try:
+        role = request.query_params.get('role')
+        if not role:
+            return Response(
+                {'error': 'Role parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate role
+        valid_roles = ['cook', 'delivery_agent']
+        if role not in valid_roles:
+            return Response(
+                {'error': f'Invalid role. Must be one of: {valid_roles}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get pending users for the specified role
+        pending_users = User.objects.filter(
+            role=role,
+            is_active=False  # Assuming inactive users are pending approval
+        ).order_by('-date_joined')
+
+        users_data = []
+        for user in pending_users:
+            users_data.append({
+                'id': user.user_id,
+                'name': user.name or f"{user.first_name} {user.last_name}".strip(),
+                'email': user.email,
+                'role': user.role,
+                'phone_no': user.phone_no,
+                'address': user.address,
+                'created_at': user.date_joined,
+                'approval_status': 'pending'
+            })
+
+        return Response({
+            'users': users_data,
+            'count': len(users_data)
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch pending approvals: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def approve_cook(request, user_id):
+    """
+    Approve a cook application
+    """
+    try:
+        user = get_object_or_404(User, user_id=user_id, role='cook')
+
+        if user.is_active:
+            return Response(
+                {'error': 'User is already approved'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Activate the user
+        user.is_active = True
+        user.save()
+
+        # Create cook profile if it doesn't exist
+        cook_profile, created = Cook.objects.get_or_create(
+            user=user,
+            defaults={
+                'specialties': '',
+                'experience_years': 0,
+                'certifications': '',
+                'availability_status': 'available'
+            }
+        )
+
+        return Response({
+            'message': 'Cook approved successfully',
+            'user': {
+                'id': user.user_id,
+                'name': user.name,
+                'email': user.email,
+                'role': user.role,
+                'is_active': user.is_active
+            }
+        }, status=status.HTTP_200_OK)
+
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'Cook not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to approve cook: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def approve_delivery_agent(request, user_id):
+    """
+    Approve a delivery agent application
+    """
+    try:
+        user = get_object_or_404(User, user_id=user_id, role='delivery_agent')
+
+        if user.is_active:
+            return Response(
+                {'error': 'User is already approved'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Activate the user
+        user.is_active = True
+        user.save()
+
+        # Create delivery agent profile if it doesn't exist
+        delivery_profile, created = DeliveryAgent.objects.get_or_create(
+            user=user,
+            defaults={
+                'vehicle_type': 'bike',  # Default vehicle type
+                'license_number': '',
+                'availability_status': 'available',
+                'current_location': None
+            }
+        )
+
+        return Response({
+            'message': 'Delivery agent approved successfully',
+            'user': {
+                'id': user.user_id,
+                'name': user.name,
+                'email': user.email,
+                'role': user.role,
+                'is_active': user.is_active
+            }
+        }, status=status.HTTP_200_OK)
+
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'Delivery agent not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to approve delivery agent: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

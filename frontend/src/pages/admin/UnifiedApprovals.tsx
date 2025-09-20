@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Clock
 } from 'lucide-react';
+import ApiTest from '@/components/ApiTest';
 
 interface PendingUser {
   id: number;
@@ -44,8 +45,8 @@ const UnifiedApprovals: React.FC = () => {
     try {
       setLoading(true);
       const [cooksResponse, deliveryResponse] = await Promise.all([
-        apiClient.get('/api/auth/admin/pending-approvals/?role=cook'),
-        apiClient.get('/api/auth/admin/pending-approvals/?role=delivery_agent')
+        apiClient.get('auth/admin/pending-approvals/?role=cook'),
+        apiClient.get('auth/admin/pending-approvals/?role=delivery_agent')
       ]);
 
       setPendingCooks(cooksResponse.data.users || []);
@@ -60,7 +61,7 @@ const UnifiedApprovals: React.FC = () => {
   const handleApproval = async (user: PendingUser, action: 'approve' | 'reject') => {
     try {
       setActionLoading(user.id);
-      const endpoint = user.role === 'cook' ? '/api/auth/admin/approve-cook/' : '/api/auth/admin/approve-delivery-agent/';
+      const endpoint = user.role === 'cook' ? 'auth/admin/approve-cook/' : 'auth/admin/approve-delivery-agent/';
 
       const response = await apiClient.post(`${endpoint}${user.id}/`, {
         action: action
@@ -353,6 +354,14 @@ const UnifiedApprovals: React.FC = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* API Test Section - Remove this after testing */}
+      <div className="mt-8">
+        <h2 className={`text-xl font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          API Endpoint Testing
+        </h2>
+        <ApiTest />
+      </div>
     </div>
   );
 };
