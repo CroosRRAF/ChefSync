@@ -36,23 +36,92 @@ const UnifiedApprovals: React.FC = () => {
   const [pendingDeliveryAgents, setPendingDeliveryAgents] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
+    checkUserProfile();
     fetchPendingApprovals();
   }, []);
+
+  const checkUserProfile = async () => {
+    try {
+      const profile = await apiClient.get('auth/profile/');
+      setUserProfile(profile);
+      console.log('👤 User profile:', profile);
+    } catch (error) {
+      console.warn('⚠️ Could not fetch user profile:', error);
+    }
+  };
 
   const fetchPendingApprovals = async () => {
     try {
       setLoading(true);
+
+      // Check authentication status
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        console.warn('⚠️ No authentication token found. Please log in as an admin user.');
+        alert('Please log in as an admin user to view pending approvals.');
+        setPendingCooks([]);
+        setPendingDeliveryAgents([]);
+        setLoading(false);
+        return;
+      }
+
       const [cooksResponse, deliveryResponse] = await Promise.all([
         apiClient.get('auth/admin/pending-approvals/?role=cook'),
         apiClient.get('auth/admin/pending-approvals/?role=delivery_agent')
       ]);
 
-      setPendingCooks(cooksResponse.data.users || []);
-      setPendingDeliveryAgents(deliveryResponse.data.users || []);
-    } catch (error) {
-      console.error('Error fetching pending approvals:', error);
+      // Enhanced validation for API responses (apiClient.get() returns response.data directly)
+      const validateResponse = (data: any, role: string) => {
+        if (!data) {
+          console.warn(`${role} API: No data received`);
+          return [];
+        }
+
+        if (typeof data !== 'object') {
+          console.warn(`${role} API: Invalid data type received:`, typeof data, data);
+          return [];
+        }
+
+        if (!data.users) {
+          console.warn(`${role} API response missing 'users' property. Available properties:`, Object.keys(data));
+          console.warn(`${role} API response data:`, data);
+          return [];
+        }
+
+        if (!Array.isArray(data.users)) {
+          console.warn(`${role} API response data.users is not an array. Type: ${typeof data.users}, Value:`, data.users);
+          return [];
+        }
+
+        console.log(`${role} API: Successfully received ${data.users.length} pending users`);
+        return data.users;
+      };
+
+      const cooksData = validateResponse(cooksResponse, 'Cooks');
+      const deliveryData = validateResponse(deliveryResponse, 'Delivery Agents');
+
+      setPendingCooks(cooksData);
+      setPendingDeliveryAgents(deliveryData);
+    } catch (error: any) {
+      console.error('❌ Error fetching pending approvals:', error);
+
+      // Set empty arrays on error to prevent undefined state
+      setPendingCooks([]);
+      setPendingDeliveryAgents([]);
+
+      // Provide more specific error messages
+      if (error.response?.status === 401) {
+        alert('Authentication required. Please log in as an admin user.');
+      } else if (error.response?.status === 403) {
+        alert('Access denied. You do not have permission to view pending approvals.');
+      } else if (error.response?.status === 400) {
+        alert(`Invalid request: ${error.response?.data?.error || 'Bad request'}`);
+      } else {
+        alert(`Failed to load pending approvals: ${error.response?.data?.detail || error.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -80,13 +149,37 @@ const UnifiedApprovals: React.FC = () => {
       }
     } catch (error: any) {
       console.error(`Error ${action}ing user:`, error);
-      alert(`Failed to ${action} user: ${error.response?.data?.detail || error.message}`);
+
+      // Provide more specific error messages
+      if (error.response?.status === 401) {
+        alert('Authentication required. Please log in again.');
+      } else if (error.response?.status === 403) {
+        alert('Access denied. You do not have permission to approve users.');
+      } else if (error.response?.status === 404) {
+        alert(`User not found: ${error.response?.data?.error || 'User does not exist'}`);
+      } else if (error.response?.status === 400) {
+        alert(`Invalid request: ${error.response?.data?.error || 'Bad request'}`);
+      } else {
+        alert(`Failed to ${action} user: ${error.response?.data?.detail || error.response?.data?.error || error.message}`);
+      }
     } finally {
       setActionLoading(null);
     }
   };
 
-  const UserCard: React.FC<{ user: PendingUser }> = ({ user }) => (
+  const UserCard: React.FC<{ user: PendingUser }> = ({ user }) => {
+    // Enhanced safety check for user object
+    if (!user) {
+      console.warn('UserCard received undefined/null user');
+      return null;
+    }
+
+    if (!user.id) {
+      console.warn('UserCard received user without ID:', user);
+      return null;
+    }
+
+    return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
@@ -104,18 +197,18 @@ const UnifiedApprovals: React.FC = () => {
             </div>
             <div>
               <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                {user.name}
+                {user.name || 'Unknown User'}
               </h3>
               <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                {user.email}
+                {user.email || 'No email provided'}
               </p>
               <div className="flex items-center space-x-2 mt-2">
                 <Badge variant="outline" className="text-xs">
-                  {user.role === 'cook' ? 'Cook' : 'Delivery Agent'}
+                  {user.role === 'cook' ? 'Cook' : user.role === 'delivery_agent' ? 'Delivery Agent' : 'Unknown Role'}
                 </Badge>
                 <Badge variant="secondary" className="text-xs">
                   <Clock className="h-3 w-3 mr-1" />
-                  {new Date(user.created_at).toLocaleDateString()}
+                  {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Date not available'}
                 </Badge>
               </div>
             </div>
@@ -166,11 +259,19 @@ const UnifiedApprovals: React.FC = () => {
                 </span>
               </div>
             )}
+            {(!user.phone_no && !user.address) && (
+              <div className="col-span-2">
+                <span className={`text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+                  No additional contact information provided
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
     </Card>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -198,10 +299,47 @@ const UnifiedApprovals: React.FC = () => {
     );
   }
 
-  const totalPending = pendingCooks.length + pendingDeliveryAgents.length;
+  const totalPending = (Array.isArray(pendingCooks) ? pendingCooks : []).length +
+                      (Array.isArray(pendingDeliveryAgents) ? pendingDeliveryAgents : []).length;
+
+  // Check if user is authenticated
+  const isAuthenticated = !!localStorage.getItem('access_token');
 
   return (
     <div className="space-y-6">
+      {/* Authentication Status */}
+      {!isAuthenticated && (
+        <Card className="border-red-200 bg-red-50 dark:bg-red-900/20">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <p className="text-red-800 dark:text-red-200 font-medium">
+                Authentication Required
+              </p>
+            </div>
+            <p className="text-red-700 dark:text-red-300 text-sm mt-1">
+              Please log in as an admin user to view and manage pending approvals.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAuthenticated && userProfile && userProfile.role !== 'admin' && (
+        <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <p className="text-yellow-800 dark:text-yellow-200 font-medium">
+                Admin Access Required
+              </p>
+            </div>
+            <p className="text-yellow-700 dark:text-yellow-300 text-sm mt-1">
+              You need admin privileges to view pending approvals. Current role: {userProfile.role}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -233,7 +371,7 @@ const UnifiedApprovals: React.FC = () => {
                   Pending Cooks
                 </p>
                 <p className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  {pendingCooks.length}
+                  {Array.isArray(pendingCooks) ? pendingCooks.length : 0}
                 </p>
               </div>
               <ChefHat className={`h-8 w-8 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
@@ -249,7 +387,7 @@ const UnifiedApprovals: React.FC = () => {
                   Pending Delivery Agents
                 </p>
                 <p className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  {pendingDeliveryAgents.length}
+                  {Array.isArray(pendingDeliveryAgents) ? pendingDeliveryAgents.length : 0}
                 </p>
               </div>
               <Truck className={`h-8 w-8 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`} />
@@ -281,10 +419,10 @@ const UnifiedApprovals: React.FC = () => {
             All Pending ({totalPending})
           </TabsTrigger>
           <TabsTrigger value="cooks">
-            Cooks ({pendingCooks.length})
+            Cooks ({Array.isArray(pendingCooks) ? pendingCooks.length : 0})
           </TabsTrigger>
           <TabsTrigger value="delivery">
-            Delivery Agents ({pendingDeliveryAgents.length})
+            Delivery Agents ({Array.isArray(pendingDeliveryAgents) ? pendingDeliveryAgents.length : 0})
           </TabsTrigger>
         </TabsList>
 
@@ -303,15 +441,18 @@ const UnifiedApprovals: React.FC = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-1 gap-6">
-              {[...pendingCooks, ...pendingDeliveryAgents].map((user) => (
-                <UserCard key={user.id} user={user} />
+              {[
+                ...(Array.isArray(pendingCooks) ? pendingCooks : []),
+                ...(Array.isArray(pendingDeliveryAgents) ? pendingDeliveryAgents : [])
+              ].map((user) => (
+                <UserCard key={user?.id || Math.random()} user={user} />
               ))}
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="cooks" className="space-y-6">
-          {pendingCooks.length === 0 ? (
+          {Array.isArray(pendingCooks) && pendingCooks.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
                 <ChefHat className={`h-16 w-16 mx-auto mb-4 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
@@ -325,15 +466,15 @@ const UnifiedApprovals: React.FC = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-1 gap-6">
-              {pendingCooks.map((user) => (
-                <UserCard key={user.id} user={user} />
+              {(Array.isArray(pendingCooks) ? pendingCooks : []).map((user) => (
+                <UserCard key={user?.id || Math.random()} user={user} />
               ))}
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="delivery" className="space-y-6">
-          {pendingDeliveryAgents.length === 0 ? (
+          {Array.isArray(pendingDeliveryAgents) && pendingDeliveryAgents.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
                 <Truck className={`h-16 w-16 mx-auto mb-4 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`} />
@@ -347,8 +488,8 @@ const UnifiedApprovals: React.FC = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-1 gap-6">
-              {pendingDeliveryAgents.map((user) => (
-                <UserCard key={user.id} user={user} />
+              {(Array.isArray(pendingDeliveryAgents) ? pendingDeliveryAgents : []).map((user) => (
+                <UserCard key={user?.id || Math.random()} user={user} />
               ))}
             </div>
           )}
@@ -360,6 +501,23 @@ const UnifiedApprovals: React.FC = () => {
         <h2 className={`text-xl font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
           API Endpoint Testing
         </h2>
+
+        {/* Debug Information */}
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="text-sm">Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs">
+            <div className="space-y-1">
+              <p><strong>Authenticated:</strong> {isAuthenticated ? '✅ Yes' : '❌ No'}</p>
+              <p><strong>User Role:</strong> {userProfile?.role || 'Unknown'}</p>
+              <p><strong>Pending Cooks:</strong> {Array.isArray(pendingCooks) ? pendingCooks.length : 'N/A'}</p>
+              <p><strong>Pending Delivery Agents:</strong> {Array.isArray(pendingDeliveryAgents) ? pendingDeliveryAgents.length : 'N/A'}</p>
+              <p><strong>Loading:</strong> {loading ? '⏳ Yes' : '✅ No'}</p>
+            </div>
+          </CardContent>
+        </Card>
+
         <ApiTest />
       </div>
     </div>

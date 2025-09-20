@@ -20,6 +20,10 @@ from apps.admin_management.models import (
 from apps.food.models import Cuisine, FoodCategory, Food, FoodImage, FoodReview
 from apps.orders.models import Order, OrderItem, OrderStatusHistory, CartItem
 from apps.payments.models import Payment, Refund, PaymentMethod, Transaction
+from apps.communications.models import (
+    Communication, CommunicationResponse, CommunicationTemplate,
+    CommunicationCategory, CommunicationTag
+)
 
 
 class Command(BaseCommand):
@@ -55,6 +59,7 @@ class Command(BaseCommand):
                 self.generate_users()
                 self.generate_food_catalog()
                 self.generate_orders_and_payments(data_months)
+                self.generate_communications(data_months)
                 self.generate_admin_data(data_months)
 
             self.stdout.write(
@@ -87,6 +92,13 @@ class Command(BaseCommand):
         Food.objects.all().delete()
         FoodCategory.objects.all().delete()
         Cuisine.objects.all().delete()
+
+        # Clear communications
+        CommunicationTag.objects.all().delete()
+        CommunicationCategory.objects.all().delete()
+        CommunicationTemplate.objects.all().delete()
+        CommunicationResponse.objects.all().delete()
+        Communication.objects.all().delete()
 
         AdminBackupLog.objects.all().delete()
         AdminSystemSettings.objects.all().delete()
@@ -152,6 +164,9 @@ class Command(BaseCommand):
         kitchens = ['Downtown Kitchen', 'Riverside Kitchen', 'Mountain View Kitchen', 'City Center Kitchen']
 
         for i in range(8):
+            # Create some cooks as pending approval (inactive)
+            is_pending_approval = i >= 4  # Last 4 cooks are pending approval
+            
             user = User.objects.create(
                 name=f'Chef {["Mario", "Ling", "Raj", "Carlos", "Siriporn", "Hiroshi", "Pierre", "Elena"][i % 8]} {["Rossi", "Chen", "Patel", "Garcia", "Sukhumvit", "Tanaka", "Dubois", "Moreno"][i % 8]}',
                 email=f'cook{i+1}@chefsync.com',
@@ -160,6 +175,7 @@ class Command(BaseCommand):
                 password=make_password('cook123'),
                 address=f'{random.randint(200, 800)} Kitchen Ave, City {i+1}',
                 email_verified=True,
+                is_active=not is_pending_approval,  # Pending cooks are inactive
                 created_at=timezone.now() - timedelta(days=random.randint(30, 365))
             )
             Cook.objects.create(
@@ -178,6 +194,9 @@ class Command(BaseCommand):
         vehicle_numbers = [f'VEH{random.randint(1000, 9999)}' for _ in range(6)]
 
         for i in range(6):
+            # Create some delivery agents as pending approval (inactive)
+            is_pending_approval = i >= 3  # Last 3 delivery agents are pending approval
+            
             user = User.objects.create(
                 name=f'Delivery Agent {i+1}',
                 email=f'delivery{i+1}@chefsync.com',
@@ -186,6 +205,7 @@ class Command(BaseCommand):
                 password=make_password('delivery123'),
                 address=f'{random.randint(300, 900)} Delivery St, City {i+1}',
                 email_verified=True,
+                is_active=not is_pending_approval,  # Pending delivery agents are inactive
                 created_at=timezone.now() - timedelta(days=random.randint(30, 365))
             )
             DeliveryAgent.objects.create(
@@ -193,7 +213,7 @@ class Command(BaseCommand):
                 vehicle_type=random.choice(vehicles),
                 vehicle_number=random.choice(vehicle_numbers),
                 current_location=f'Location {random.randint(1, 10)}',
-                is_available=random.choice([True, True, True, False])  # 75% available
+                is_available=random.choice([True, True, True, False]) if not is_pending_approval else False  # Pending agents are not available
             )
             delivery_users.append(user)
 
@@ -541,6 +561,225 @@ class Command(BaseCommand):
         # Store for later use
         self.orders = orders
         self.payments = payments
+
+    def generate_communications(self, data_months):
+        """Generate comprehensive communication data"""
+        self.stdout.write('Generating communication data...')
+
+        start_date = timezone.now() - timedelta(days=data_months * 30)
+
+        # Create communication categories
+        categories = []
+        category_data = [
+            {'name': 'General Inquiry', 'description': 'General questions and information requests'},
+            {'name': 'Order Support', 'description': 'Questions about orders and delivery'},
+            {'name': 'Technical Support', 'description': 'Technical issues and platform problems'},
+            {'name': 'Feedback', 'description': 'Customer feedback and suggestions'},
+            {'name': 'Complaints', 'description': 'Customer complaints and issues'},
+            {'name': 'Account Issues', 'description': 'Account-related questions and problems'},
+        ]
+
+        for cat_data in category_data:
+            category = CommunicationCategory.objects.create(**cat_data)
+            categories.append(category)
+
+        # Create communication tags
+        tags = []
+        tag_data = [
+            {'name': 'urgent', 'description': 'Requires immediate attention', 'color': '#ef4444'},
+            {'name': 'high-priority', 'description': 'High priority issue', 'color': '#f97316'},
+            {'name': 'medium-priority', 'description': 'Medium priority issue', 'color': '#eab308'},
+            {'name': 'low-priority', 'description': 'Low priority issue', 'color': '#22c55e'},
+            {'name': 'follow-up', 'description': 'Requires follow-up', 'color': '#3b82f6'},
+            {'name': 'escalated', 'description': 'Escalated to higher management', 'color': '#8b5cf6'},
+        ]
+
+        for tag_data_item in tag_data:
+            tag = CommunicationTag.objects.create(**tag_data_item)
+            tags.append(tag)
+
+        # Create communication templates
+        templates = []
+        template_data = [
+            {
+                'name': 'Order Delay Response',
+                'template_type': 'complaint',
+                'subject': 'Response to your order delay concern',
+                'content': 'Dear {customer_name},\n\nWe apologize for the delay in your order #{order_id}. We understand how frustrating this can be, and we appreciate your patience.\n\n{response_details}\n\nWe have taken steps to prevent this in the future and would like to offer you a {compensation} credit for your next order.\n\nBest regards,\nCustomer Service Team',
+                'variables': {'customer_name': 'Customer Name', 'order_id': 'Order ID', 'response_details': 'Response Details', 'compensation': 'Compensation Amount'},
+            },
+            {
+                'name': 'Feedback Acknowledgment',
+                'template_type': 'feedback',
+                'subject': 'Thank you for your feedback',
+                'content': 'Dear {customer_name},\n\nThank you for taking the time to share your feedback with us. We truly appreciate your input as it helps us improve our service.\n\n{feedback_response}\n\nYour satisfaction is our top priority, and we look forward to serving you again soon.\n\nBest regards,\nChefSync Team',
+                'variables': {'customer_name': 'Customer Name', 'feedback_response': 'Feedback Response'},
+            },
+            {
+                'name': 'Technical Issue Resolution',
+                'template_type': 'inquiry',
+                'subject': 'Resolution for your technical issue',
+                'content': 'Dear {customer_name},\n\nThank you for reporting the technical issue. Our technical team has investigated and resolved the problem.\n\n{issue_details}\n\n{resolution_steps}\n\nIf you experience any further issues, please don\'t hesitate to contact us.\n\nBest regards,\nTechnical Support Team',
+                'variables': {'customer_name': 'Customer Name', 'issue_details': 'Issue Details', 'resolution_steps': 'Resolution Steps'},
+            },
+        ]
+
+        for temp_data in template_data:
+            template = CommunicationTemplate.objects.create(
+                name=temp_data['name'],
+                template_type=temp_data['template_type'],
+                subject=temp_data['subject'],
+                content=temp_data['content'],
+                variables=temp_data['variables'],
+                created_by=random.choice(self.admin_users)
+            )
+            templates.append(template)
+
+        # Generate communications
+        communications = []
+        communication_types = ['feedback', 'complaint', 'suggestion', 'inquiry', 'other']
+        priorities = ['low', 'medium', 'high', 'urgent']
+        statuses = ['pending', 'in_progress', 'resolved', 'closed']
+
+        subjects = {
+            'feedback': [
+                'Great service experience', 'Food quality feedback', 'Delivery experience',
+                'App usability feedback', 'Chef communication', 'Overall satisfaction'
+            ],
+            'complaint': [
+                'Order delay issue', 'Wrong order received', 'Food quality issue',
+                'Delivery problem', 'Payment issue', 'Customer service concern'
+            ],
+            'suggestion': [
+                'New feature suggestion', 'Menu improvement idea', 'Service enhancement',
+                'App improvement suggestion', 'Delivery improvement', 'Platform enhancement'
+            ],
+            'inquiry': [
+                'Order status question', 'Menu availability', 'Delivery time inquiry',
+                'Payment method question', 'Account information', 'Technical support'
+            ],
+            'other': [
+                'General question', 'Partnership inquiry', 'Media inquiry',
+                'Business inquiry', 'General feedback', 'Miscellaneous'
+            ]
+        }
+
+        for i in range(150):  # Generate 150 communications
+            comm_date = start_date + timedelta(
+                days=random.randint(0, data_months * 30)
+            )
+
+            comm_type = random.choice(communication_types)
+            subject = random.choice(subjects[comm_type])
+            priority = random.choices(priorities, weights=[40, 35, 20, 5])[0]  # Weighted priority distribution
+            status = random.choices(statuses, weights=[20, 30, 40, 10])[0]  # Weighted status distribution
+
+            # Create reference number
+            ref_number = f'COMM-{comm_date.strftime("%Y%m")}-{str(i+1).zfill(4)}'
+
+            communication = Communication.objects.create(
+                user=random.choice(self.customer_users),
+                communication_type=comm_type,
+                subject=subject,
+                message=self._generate_communication_message(comm_type, subject),
+                reference_number=ref_number,
+                status=status,
+                priority=priority,
+                is_read=random.choice([True, False, False]),  # 33% read
+                assigned_to=random.choice(self.admin_users) if random.choice([True, False]) else None,
+                created_at=comm_date,
+                updated_at=comm_date + timedelta(hours=random.randint(1, 72))
+            )
+
+            # Add category
+            if random.choice([True, False]):  # 50% chance of having a category
+                category = random.choice(categories)
+                # Note: In a real implementation, you'd create CommunicationCategoryRelation here
+
+            # Add tags
+            if random.choice([True, False]):  # 50% chance of having tags
+                num_tags = random.randint(1, 3)
+                selected_tags = random.sample(tags, min(num_tags, len(tags)))
+                for tag in selected_tags:
+                    # Note: In a real implementation, you'd create CommunicationTagRelation here
+                    pass
+
+            # Create responses for resolved/closed communications
+            if status in ['resolved', 'closed']:
+                num_responses = random.randint(1, 3)
+                response_time = comm_date + timedelta(hours=random.randint(2, 24))
+
+                for j in range(num_responses):
+                    CommunicationResponse.objects.create(
+                        communication=communication,
+                        responder=random.choice(self.admin_users),
+                        message=self._generate_response_message(comm_type, j == num_responses - 1),
+                        is_internal=False,
+                        created_at=response_time + timedelta(hours=j * 4)
+                    )
+
+                # Mark as resolved
+                communication.resolved_at = response_time + timedelta(hours=num_responses * 4)
+                communication.resolution_notes = 'Issue resolved through customer service response'
+                communication.save()
+
+            communications.append(communication)
+
+        self.stdout.write(self.style.SUCCESS(
+            f'Created {len(categories)} categories, {len(tags)} tags, {len(templates)} templates, {len(communications)} communications'
+        ))
+
+        # Store for later use
+        self.communications = communications
+
+    def _generate_communication_message(self, comm_type, subject):
+        """Generate realistic communication messages based on type and subject"""
+        messages = {
+            'feedback': [
+                f"I wanted to share my experience with {subject.lower()}. The service was excellent and I really enjoyed the food.",
+                f"Great job on the {subject.lower()}! Everything was perfect and I will definitely order again.",
+                f"I have some feedback about the {subject.lower()}. While it was good, there are some areas for improvement.",
+            ],
+            'complaint': [
+                f"I'm disappointed with the {subject.lower()}. The order was supposed to arrive at the expected time but was delayed significantly.",
+                f"There was an issue with my order regarding {subject.lower()}. I received the wrong items and had to wait longer than expected.",
+                f"I need to complain about the {subject.lower()}. The quality didn't meet my expectations and I was not satisfied.",
+            ],
+            'suggestion': [
+                f"I have a suggestion for improving the {subject.lower()}. It would be great if you could add more options in this area.",
+                f"I think the platform would benefit from enhancements to the {subject.lower()}. Here's my idea...",
+                f"Based on my experience, I suggest improving the {subject.lower()} to make it more user-friendly.",
+            ],
+            'inquiry': [
+                f"I have a question about the {subject.lower()}. Could you please provide more information?",
+                f"I'm trying to understand more about the {subject.lower()}. Can you help me with this?",
+                f"I need clarification on the {subject.lower()}. Could you explain how this works?",
+            ],
+            'other': [
+                f"I have a general question about {subject.lower()}. Could you please assist me?",
+                f"I'm reaching out regarding {subject.lower()}. I would appreciate your help with this matter.",
+                f"I need information about {subject.lower()}. Could you provide some details?",
+            ]
+        }
+
+        return random.choice(messages.get(comm_type, messages['other']))
+
+    def _generate_response_message(self, comm_type, is_final):
+        """Generate realistic response messages"""
+        if is_final:
+            final_responses = [
+                "Thank you for bringing this to our attention. We have resolved the issue and apologize for any inconvenience caused.",
+                "We appreciate your feedback and have taken the necessary steps to address your concern. The issue has been resolved.",
+                "Your satisfaction is important to us. We have investigated the matter and implemented a solution.",
+            ]
+            return random.choice(final_responses)
+        else:
+            responses = [
+                "Thank you for your message. We're currently looking into this matter and will get back to you shortly.",
+                "We appreciate you bringing this to our attention. Our team is working on resolving this issue.",
+                "We're sorry to hear about your experience. We're investigating this and will update you soon.",
+            ]
+            return random.choice(responses)
 
     def generate_admin_data(self, data_months):
         """Generate comprehensive admin management data"""

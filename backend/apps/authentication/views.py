@@ -1,6 +1,6 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import login, logout
@@ -18,6 +18,7 @@ from .serializers import (
     SendOTPSerializer, VerifyOTPSerializer, CompleteRegistrationSerializer
 )
 from .models import User, Customer, Cook, DeliveryAgent
+from .permissions import IsAdminUser
 import json
 
 # Health Check Endpoint
@@ -690,11 +691,16 @@ def pending_approvals(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get pending users for the specified role
-        pending_users = User.objects.filter(
-            role=role,
-            is_active=False  # Assuming inactive users are pending approval
-        ).order_by('-date_joined')
+        if role == 'cook':
+            # For cooks, check ChefProfile.approval_status
+            from apps.users.models import ChefProfile
+            pending_profiles = ChefProfile.objects.filter(approval_status='pending')
+            pending_users = [profile.user for profile in pending_profiles]
+        elif role == 'delivery_agent':
+            # For delivery agents, check DeliveryProfile.approval_status
+            from apps.users.models import DeliveryProfile
+            pending_profiles = DeliveryProfile.objects.filter(approval_status='pending')
+            pending_users = [profile.user for profile in pending_profiles]
 
         users_data = []
         for user in pending_users:
@@ -730,26 +736,36 @@ def approve_cook(request, user_id):
     try:
         user = get_object_or_404(User, user_id=user_id, role='cook')
 
-        if user.is_active:
+        # Get or create ChefProfile
+        from apps.users.models import ChefProfile
+        chef_profile, created = ChefProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'specialty_cuisines': [],
+                'experience_years': 0,
+                'bio': '',
+                'approval_status': 'pending',
+                'rating_average': 0.0,
+                'total_orders': 0,
+                'total_reviews': 0,
+                'is_featured': False
+            }
+        )
+
+        if chef_profile.approval_status == 'approved':
             return Response(
-                {'error': 'User is already approved'},
+                {'error': 'Cook is already approved'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Activate the user
-        user.is_active = True
-        user.save()
+        # Update approval status
+        chef_profile.approval_status = 'approved'
+        chef_profile.save()
 
-        # Create cook profile if it doesn't exist
-        cook_profile, created = Cook.objects.get_or_create(
-            user=user,
-            defaults={
-                'specialties': '',
-                'experience_years': 0,
-                'certifications': '',
-                'availability_status': 'available'
-            }
-        )
+        # Also activate the user if not already active
+        if not user.is_active:
+            user.is_active = True
+            user.save()
 
         return Response({
             'message': 'Cook approved successfully',
@@ -783,26 +799,36 @@ def approve_delivery_agent(request, user_id):
     try:
         user = get_object_or_404(User, user_id=user_id, role='delivery_agent')
 
-        if user.is_active:
+        # Get or create DeliveryProfile
+        from apps.users.models import DeliveryProfile
+        delivery_profile, created = DeliveryProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'vehicle_type': 'bike',
+                'vehicle_number': '',
+                'license_number': '',
+                'is_available': True,
+                'rating_average': 0.0,
+                'total_deliveries': 0,
+                'total_earnings': 0.0,
+                'approval_status': 'pending'
+            }
+        )
+
+        if delivery_profile.approval_status == 'approved':
             return Response(
-                {'error': 'User is already approved'},
+                {'error': 'Delivery agent is already approved'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Activate the user
-        user.is_active = True
-        user.save()
+        # Update approval status
+        delivery_profile.approval_status = 'approved'
+        delivery_profile.save()
 
-        # Create delivery agent profile if it doesn't exist
-        delivery_profile, created = DeliveryAgent.objects.get_or_create(
-            user=user,
-            defaults={
-                'vehicle_type': 'bike',  # Default vehicle type
-                'license_number': '',
-                'availability_status': 'available',
-                'current_location': None
-            }
-        )
+        # Also activate the user if not already active
+        if not user.is_active:
+            user.is_active = True
+            user.save()
 
         return Response({
             'message': 'Delivery agent approved successfully',

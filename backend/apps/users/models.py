@@ -70,6 +70,13 @@ class DeliveryProfile(models.Model):
         ('foot', 'On Foot'),
     ]
     
+    APPROVAL_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('suspended', 'Suspended'),
+    ]
+    
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='delivery_profile')
     vehicle_type = models.CharField(max_length=20, choices=VEHICLE_TYPE_CHOICES)
     vehicle_number = models.CharField(max_length=20, blank=True)
@@ -79,6 +86,11 @@ class DeliveryProfile(models.Model):
     rating_average = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
     total_deliveries = models.PositiveIntegerField(default=0)
     total_earnings = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    approval_status = models.CharField(
+        max_length=20,
+        choices=APPROVAL_STATUS_CHOICES,
+        default='pending'
+    )
     
     def __str__(self):
         return f"Delivery Partner {self.user.username}"
