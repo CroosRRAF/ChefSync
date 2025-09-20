@@ -28,7 +28,7 @@ export interface UserResponse {
 }
 
 class UserService {
-  private baseUrl = '/api/users';
+  private baseUrl = 'users';
 
   async getUsers(filters: UserFilters = {}): Promise<UserResponse> {
     try {
