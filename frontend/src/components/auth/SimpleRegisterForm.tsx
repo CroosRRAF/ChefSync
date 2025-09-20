@@ -126,8 +126,8 @@ const SimpleRegisterForm: React.FC = () => {
 
   const apiCall = async (endpoint: string, data: any) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const response = await fetch(`${apiUrl}/api/auth/${endpoint}`, {
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+      const response = await fetch(`${apiUrl}/auth/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

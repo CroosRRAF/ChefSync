@@ -22,7 +22,8 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ onRetry }) => {
   const checkServerStatus = async () => {
     setIsChecking(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/auth/health/', {
+      const base = import.meta.env.VITE_API_BASE_URL || '/api';
+      const response = await fetch(`${base}/auth/health/`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000)
       });
@@ -89,7 +90,7 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ onRetry }) => {
         <AlertDescription className="mt-2">
           {serverStatus.isOnline ? (
             <div className="text-green-700">
-              ✅ Backend server is running at http://127.0.0.1:8000
+              ✅ Backend server is reachable
               <br />
               Last checked: {serverStatus.lastChecked?.toLocaleTimeString()}
             </div>

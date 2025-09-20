@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+// Use Vite dev proxy by default to avoid protocol mismatches in development.
+// Set VITE_API_BASE_URL in production builds.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -180,7 +182,7 @@ class AuthService {
   // Check if backend server is running
   async checkServerStatus(): Promise<boolean> {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/auth/health/`, {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/auth/health/`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000) // 5 second timeout
       });
