@@ -5,9 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
 import { Bell, Send, Users, Package, AlertTriangle, CheckCircle, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { adminService, type AdminNotification } from '@/services/adminService';
+import SystemAlerts from '@/components/admin/SystemAlerts';
 import { toast } from 'sonner';
 
 const AdminNotifications: React.FC = memo(() => {
@@ -17,6 +19,7 @@ const AdminNotifications: React.FC = memo(() => {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [activeTab, setActiveTab] = useState<string>("notifications");
 
   console.log('AdminNotifications component rendered', { user, loading, error });
 
@@ -234,236 +237,245 @@ const AdminNotifications: React.FC = memo(() => {
           <p className="text-gray-600 dark:text-gray-400 mt-2">Send and manage platform notifications</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Send Notifications */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Send className="h-5 w-5" />
-                <span>Compose Notification</span>
-              </CardTitle>
-              <CardDescription>Send notifications to users or groups</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="notification-type">Notification Type</Label>
-                <select
-                  id="notification-type"
-                  className="w-full mt-2 p-2 border rounded-md"
-                  value={formData.notification_type}
-                  onChange={(e) => handleFormChange('notification_type', e.target.value)}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="alerts">System Alerts</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="notifications" className="space-y-6">
+            {/* Send Notifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Send className="h-5 w-5" />
+                  <span>Compose Notification</span>
+                </CardTitle>
+                <CardDescription>Send notifications to users or groups</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="notification-type">Notification Type</Label>
+                  <select
+                    id="notification-type"
+                    className="w-full mt-2 p-2 border rounded-md"
+                    value={formData.notification_type}
+                    onChange={(e) => handleFormChange('notification_type', e.target.value)}
+                  >
+                    <option value="system_alert">System Alert</option>
+                    <option value="user_activity">User Activity</option>
+                    <option value="order_update">Order Update</option>
+                    <option value="payment_issue">Payment Issue</option>
+                    <option value="security_event">Security Event</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="backup">Backup</option>
+                    <option value="performance">Performance</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="priority">Priority</Label>
+                  <select
+                    id="priority"
+                    className="w-full mt-2 p-2 border rounded-md"
+                    value={formData.priority}
+                    onChange={(e) => handleFormChange('priority', e.target.value)}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="target-audience">Target Audience</Label>
+                  <select
+                    id="target-audience"
+                    className="w-full mt-2 p-2 border rounded-md"
+                    value={formData.target_audience}
+                    onChange={(e) => handleFormChange('target_audience', e.target.value)}
+                  >
+                    <option value="all">All Users</option>
+                    <option value="customers">Customers Only</option>
+                    <option value="cooks">Cooks Only</option>
+                    <option value="delivery_agents">Delivery Agents Only</option>
+                    <option value="admins">Admins Only</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="notification-title">Title</Label>
+                  <Input
+                    id="notification-title"
+                    placeholder="Enter notification title"
+                    className="mt-2"
+                    value={formData.title}
+                    onChange={(e) => handleFormChange('title', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="notification-message">Message</Label>
+                  <Textarea
+                    id="notification-message"
+                    placeholder="Enter notification message"
+                    className="mt-2"
+                    rows={4}
+                    value={formData.message}
+                    onChange={(e) => handleFormChange('message', e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="urgent"
+                    className="rounded"
+                    checked={formData.is_urgent}
+                    onChange={(e) => handleFormChange('is_urgent', e.target.checked)}
+                  />
+                  <Label htmlFor="urgent">Mark as urgent</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="email"
+                    className="rounded"
+                    checked={formData.send_email}
+                    onChange={(e) => handleFormChange('send_email', e.target.checked)}
+                  />
+                  <Label htmlFor="email">Send via email</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="sms"
+                    className="rounded"
+                    checked={formData.send_sms}
+                    onChange={(e) => handleFormChange('send_sms', e.target.checked)}
+                  />
+                  <Label htmlFor="sms">Send via SMS</Label>
+                </div>
+
+                <Button
+                  className="w-full"
+                  onClick={handleSendNotification}
+                  disabled={sending}
                 >
-                  <option value="system_alert">System Alert</option>
-                  <option value="user_activity">User Activity</option>
-                  <option value="order_update">Order Update</option>
-                  <option value="payment_issue">Payment Issue</option>
-                  <option value="security_event">Security Event</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="backup">Backup</option>
-                  <option value="performance">Performance</option>
-                </select>
-              </div>
+                  {sending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send Notification
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
 
-              <div>
-                <Label htmlFor="priority">Priority</Label>
-                <select
-                  id="priority"
-                  className="w-full mt-2 p-2 border rounded-md"
-                  value={formData.priority}
-                  onChange={(e) => handleFormChange('priority', e.target.value)}
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
-              </div>
+            {/* Notification Templates */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Bell className="h-5 w-5" />
+                  <span>Quick Templates</span>
+                </CardTitle>
+                <CardDescription>Pre-defined notification templates</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button variant="outline" className="w-full justify-start">
+                  <Package className="h-4 w-4 mr-2" />
+                  New Order Alert
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  System Maintenance
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Order Delivered
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Users className="h-4 w-4 mr-2" />
+                  Welcome Message
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Bell className="h-4 w-4 mr-2" />
+                  Promotional Offer
+                </Button>
+              </CardContent>
+            </Card>
 
-              <div>
-                <Label htmlFor="target-audience">Target Audience</Label>
-                <select
-                  id="target-audience"
-                  className="w-full mt-2 p-2 border rounded-md"
-                  value={formData.target_audience}
-                  onChange={(e) => handleFormChange('target_audience', e.target.value)}
-                >
-                  <option value="all">All Users</option>
-                  <option value="customers">Customers Only</option>
-                  <option value="cooks">Cooks Only</option>
-                  <option value="delivery_agents">Delivery Agents Only</option>
-                  <option value="admins">Admins Only</option>
-                </select>
-              </div>
-
-              <div>
-                <Label htmlFor="notification-title">Title</Label>
-                <Input
-                  id="notification-title"
-                  placeholder="Enter notification title"
-                  className="mt-2"
-                  value={formData.title}
-                  onChange={(e) => handleFormChange('title', e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="notification-message">Message</Label>
-                <Textarea
-                  id="notification-message"
-                  placeholder="Enter notification message"
-                  className="mt-2"
-                  rows={4}
-                  value={formData.message}
-                  onChange={(e) => handleFormChange('message', e.target.value)}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="urgent"
-                  className="rounded"
-                  checked={formData.is_urgent}
-                  onChange={(e) => handleFormChange('is_urgent', e.target.checked)}
-                />
-                <Label htmlFor="urgent">Mark as urgent</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="email"
-                  className="rounded"
-                  checked={formData.send_email}
-                  onChange={(e) => handleFormChange('send_email', e.target.checked)}
-                />
-                <Label htmlFor="email">Send via email</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="sms"
-                  className="rounded"
-                  checked={formData.send_sms}
-                  onChange={(e) => handleFormChange('send_sms', e.target.checked)}
-                />
-                <Label htmlFor="sms">Send via SMS</Label>
-              </div>
-
-              <Button
-                className="w-full"
-                onClick={handleSendNotification}
-                disabled={sending}
-              >
-                {sending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    Send Notification
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Notification Templates */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Bell className="h-5 w-5" />
-                <span>Quick Templates</span>
-              </CardTitle>
-              <CardDescription>Pre-defined notification templates</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full justify-start">
-                <Package className="h-4 w-4 mr-2" />
-                New Order Alert
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                System Maintenance
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Order Delivered
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <Users className="h-4 w-4 mr-2" />
-                Welcome Message
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <Bell className="h-4 w-4 mr-2" />
-                Promotional Offer
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Notifications */}
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Notifications</CardTitle>
-              <CardDescription>Notifications sent in the last 24 hours</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {notifications.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Bell className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">No notifications sent yet</p>
-                  </div>
-                ) : (
-                  notifications.map((notification) => (
-                    <div 
-                      key={notification.id} 
-                      className={`p-4 border rounded-lg ${getNotificationColor(notification.notification_type)} ${
-                        !notification.is_read ? 'ring-2 ring-blue-500' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-3">
-                          {getNotificationIcon(notification.notification_type)}
-                          <div>
-                            <h4 className="font-medium">{notification.title}</h4>
-                            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
-                            <p className="text-xs text-gray-500 mt-2">
-                              {new Date(notification.created_at).toLocaleString()}
-                            </p>
+            {/* Recent Notifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Notifications</CardTitle>
+                <CardDescription>Notifications sent in the last 24 hours</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Bell className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No notifications sent yet</p>
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`p-4 border rounded-lg ${getNotificationColor(notification.notification_type)} ${
+                          !notification.is_read ? 'ring-2 ring-blue-500' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start space-x-3">
+                            {getNotificationIcon(notification.notification_type)}
+                            <div>
+                              <h4 className="font-medium">{notification.title}</h4>
+                              <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                              <p className="text-xs text-gray-500 mt-2">
+                                {new Date(notification.created_at).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {!notification.is_read && (
+                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleMarkAsRead(notification.id)}
+                            >
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Mark Read
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          {!notification.is_read && (
-                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleMarkAsRead(notification.id)}
-                          >
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Mark Read
-                          </Button>
-                        </div>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-  );
-});
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-export default AdminNotifications;
+          <TabsContent value="alerts" className="space-y-6">
+            <SystemAlerts />
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  });
+
+  export default AdminNotifications;
 
 
 

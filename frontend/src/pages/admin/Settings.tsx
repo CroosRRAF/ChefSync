@@ -4,8 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
-import { Settings, Save, RefreshCw, Shield, Bell, Globe, AlertCircle, CheckCircle } from 'lucide-react';
+import { Settings, Save, RefreshCw, Shield, Bell, Globe, AlertCircle, CheckCircle, User, Mail, Phone, MapPin } from 'lucide-react';
 import { adminService, type SystemSetting } from '@/services/adminService';
 import { toast } from 'sonner';
 
@@ -16,6 +18,16 @@ const AdminSettings: React.FC = memo(() => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Profile state
+  const [activeTab, setActiveTab] = useState('settings');
+  const [profileData, setProfileData] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    phone_no: (user as any)?.phone_no || user?.phone || '',
+    address: user?.address || ''
+  });
+  const [profileLoading, setProfileLoading] = useState(false);
 
   // Local state for form values
   const [formValues, setFormValues] = useState<Record<string, string | boolean | number>>({});
@@ -102,6 +114,33 @@ const AdminSettings: React.FC = memo(() => {
     setError(null);
   };
 
+  // Profile update handler
+  const handleProfileUpdate = async () => {
+    try {
+      setProfileLoading(true);
+      // Use the auth service to update profile
+      const response = await fetch('/api/auth/profile/update/', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('chefsync_token')}`
+        },
+        body: JSON.stringify(profileData)
+      });
+
+      if (response.ok) {
+        toast.success('Profile updated successfully');
+      } else {
+        throw new Error('Failed to update profile');
+      }
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      toast.error('Failed to update profile');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   // Helper function to get setting value with proper typing
   const getSettingValue = <T extends string | boolean | number>(key: string, defaultValue: T): T => {
     const value = formValues[key];
@@ -154,19 +193,20 @@ const AdminSettings: React.FC = memo(() => {
 
   return (
     <div className="space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Settings</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">Configure platform settings and preferences</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            {error && (
-              <div className="flex items-center text-red-600 text-sm">
-                <AlertCircle className="h-4 w-4 mr-1" />
-                {error}
-              </div>
-            )}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Configure platform settings and manage your profile</p>
+        </div>
+        <div className="flex items-center space-x-3">
+          {error && (
+            <div className="flex items-center text-red-600 text-sm">
+              <AlertCircle className="h-4 w-4 mr-1" />
+              {error}
+            </div>
+          )}
+          {activeTab === 'settings' && (
             <Button
               onClick={loadSettings}
               variant="outline"
@@ -176,10 +216,18 @@ const AdminSettings: React.FC = memo(() => {
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-          </div>
+          )}
         </div>
+      </div>
 
-        {/* Settings Sections */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="settings">System Settings</TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="settings" className="space-y-6">
+          {/* Settings Sections */}        {/* Settings Sections */}
         <div className="space-y-6">
           {/* Platform Settings */}
           <Card>
@@ -434,7 +482,137 @@ const AdminSettings: React.FC = memo(() => {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </TabsContent>
+
+        <TabsContent value="profile" className="space-y-6">
+          {/* Profile Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <User className="h-5 w-5" />
+                <span>Profile Management</span>
+              </CardTitle>
+              <CardDescription>Update your personal information and account details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="profile-name">Full Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="profile-name"
+                      value={profileData.name}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
+                      className="pl-10"
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="profile-email">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="profile-email"
+                      type="email"
+                      value={profileData.email}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
+                      className="pl-10"
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="profile-phone">Phone Number</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="profile-phone"
+                      value={profileData.phone_no}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, phone_no: e.target.value }))}
+                      className="pl-10"
+                      placeholder="Enter your phone number"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="profile-address">Address</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="profile-address"
+                      value={profileData.address}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, address: e.target.value }))}
+                      className="pl-10"
+                      placeholder="Enter your address"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-4 pt-4">
+                <Button
+                  onClick={handleProfileUpdate}
+                  disabled={profileLoading}
+                >
+                  {profileLoading ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  {profileLoading ? 'Saving...' : 'Save Profile'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Account Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Account Information</CardTitle>
+              <CardDescription>Your account details and role information</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label>Account Type</Label>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Badge variant="secondary" className="capitalize">
+                      {user?.role || 'Admin'}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label>Account Status</Label>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-muted-foreground">Active</span>
+                  </div>
+                </div>
+                <div>
+                  <Label>Member Since</Label>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <Label>Last Updated</Label>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {user?.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 });
 

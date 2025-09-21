@@ -721,6 +721,98 @@ class AdminService {
     }
   }
 
+  // Approval Management
+  async getPendingApprovals(params: {
+    role?: string;
+  } = {}): Promise<{
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    phone_no?: string;
+    address?: string;
+    created_at: string;
+    approval_status: string;
+    documents: Array<{
+      id: number;
+      file_name: string;
+      file: string;
+      document_type: {
+        id: number;
+        name: string;
+        description: string;
+      };
+      uploaded_at: string;
+      is_visible_to_admin: boolean;
+    }>;
+  }[]> {
+    try {
+      // If no role is specified, don't send any params to get all pending approvals
+      const config = params.role && params.role.trim() !== ''
+        ? { params: { role: params.role } }
+        : {};
+
+      const response = await apiClient.get('/auth/admin/get-pending-approvals/', config);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching pending approvals:', error);
+      throw new Error('Failed to fetch pending approvals');
+    }
+  }
+
+  async getUserForApproval(userId: number): Promise<{
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    phone_no?: string;
+    address?: string;
+    created_at: string;
+    approval_status: string;
+    documents: Array<{
+      id: number;
+      file_name: string;
+      file: string;
+      document_type: {
+        id: number;
+        name: string;
+        description: string;
+      };
+      uploaded_at: string;
+      is_visible_to_admin: boolean;
+    }>;
+  }> {
+    try {
+      const response = await apiClient.get(`/auth/admin/user/${userId}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user for approval:', error);
+      throw new Error('Failed to fetch user details');
+    }
+  }
+
+  async approveUser(userId: number, action: 'approve' | 'reject', notes?: string): Promise<{
+    message: string;
+    user: {
+      id: number;
+      name: string;
+      email: string;
+      role: string;
+      approval_status: string;
+    };
+  }> {
+    try {
+      const response = await apiClient.post(`/auth/admin/user/${userId}/approve/`, {
+        action,
+        notes: notes || ''
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error approving/rejecting user:', error);
+      throw new Error(`Failed to ${action} user`);
+    }
+  }
+
   // Utility methods
   async refreshDashboardData(): Promise<DashboardStats> {
     try {

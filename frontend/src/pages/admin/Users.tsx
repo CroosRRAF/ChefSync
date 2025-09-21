@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Users,
   Download,
@@ -16,7 +17,12 @@ import {
   UserX,
   Mail,
   Calendar,
-  DollarSign
+  DollarSign,
+  CheckCircle,
+  XCircle,
+  Clock,
+  FileText,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -49,6 +55,13 @@ const EnhancedUserManagement: React.FC = () => {
     role: '',
     status: ''
   });
+
+  // Approval state
+  const [activeTab, setActiveTab] = useState('users');
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [approvalLoading, setApprovalLoading] = useState(false);
+  const [selectedApprovalUser, setSelectedApprovalUser] = useState<any>(null);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
 
   // Fetch users
   const fetchUsers = useCallback(async (page = 1, search = '', role = '', status = '') => {
@@ -284,6 +297,58 @@ const EnhancedUserManagement: React.FC = () => {
     }
   };
 
+  // Fetch pending approvals
+  const fetchPendingApprovals = useCallback(async () => {
+    try {
+      setApprovalLoading(true);
+      const approvals = await adminService.getPendingApprovals();
+      setPendingApprovals(approvals);
+    } catch (err) {
+      console.error('Failed to fetch pending approvals:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch pending approvals');
+    } finally {
+      setApprovalLoading(false);
+    }
+  }, []);
+
+  // Handle approval action
+  const handleApprovalAction = async (userId: number, action: 'approve' | 'reject', notes?: string) => {
+    try {
+      await adminService.approveUser(userId, action, notes);
+      
+      // Update local state
+      setPendingApprovals(prev => prev.filter(user => user.id !== userId));
+      
+      // Refresh approvals
+      fetchPendingApprovals();
+      
+      // Show success message
+      alert(`User ${action}d successfully!`);
+    } catch (err) {
+      console.error(`Failed to ${action} user:`, err);
+      alert(`Failed to ${action} user: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  // Handle approval user detail view
+  const handleApprovalUserDetail = async (user: any) => {
+    try {
+      const userDetails = await adminService.getUserForApproval(user.id);
+      setSelectedApprovalUser(userDetails);
+      setShowApprovalModal(true);
+    } catch (err) {
+      console.error('Failed to fetch user details for approval:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch user details');
+    }
+  };
+
+  // Fetch approvals when tab changes
+  useEffect(() => {
+    if (activeTab === 'approvals') {
+      fetchPendingApprovals();
+    }
+  }, [activeTab, fetchPendingApprovals]);
+
   // Get user stats
   const userStats = {
     total: pagination.total,
@@ -315,12 +380,7 @@ const EnhancedUserManagement: React.FC = () => {
           onClick={() => handleUserDetail(row)}
         >
           <div 
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm"
-            style={{
-              background: theme === 'dark' 
-                ? 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)'
-                : 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)'
-            }}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700"
           >
             {value.charAt(0).toUpperCase()}
           </div>
@@ -352,18 +412,15 @@ const EnhancedUserManagement: React.FC = () => {
       render: (value: string) => (
         <Badge 
           variant="secondary"
-          style={{
-            backgroundColor: 
-              value === 'admin' ? (theme === 'dark' ? '#7F1D1D' : '#FEF2F2') :
-              value === 'cook' ? (theme === 'dark' ? '#92400E' : '#FFFBEB') :
-              value === 'delivery_agent' ? (theme === 'dark' ? '#1E3A8A' : '#EFF6FF') :
-              (theme === 'dark' ? '#14532D' : '#F0FDF4'),
-            color:
-              value === 'admin' ? (theme === 'dark' ? '#FCA5A5' : '#DC2626') :
-              value === 'cook' ? (theme === 'dark' ? '#FBBF24' : '#D97706') :
-              value === 'delivery_agent' ? (theme === 'dark' ? '#3B82F6' : '#2563EB') :
-              (theme === 'dark' ? '#22C55E' : '#16A34A')
-          }}
+          className={`text-xs ${
+            value === 'admin' 
+              ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800'
+              : value === 'cook'
+              ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800'
+              : value === 'delivery_agent'
+              ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800'
+              : 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800'
+          }`}
         >
           {value === 'delivery_agent' ? 'Delivery' : value.charAt(0).toUpperCase() + value.slice(1)}
         </Badge>
@@ -376,22 +433,15 @@ const EnhancedUserManagement: React.FC = () => {
       render: (value: boolean) => (
         <div className="flex items-center space-x-2">
           <div 
-            className="w-2 h-2 rounded-full"
-            style={{
-              backgroundColor: value ? '#22C55E' : '#EF4444'
-            }}
+            className={`w-2 h-2 rounded-full ${value ? 'bg-green-500' : 'bg-red-500'}`}
           ></div>
           <Badge 
             variant="secondary"
-            style={{
-              backgroundColor: value 
-                ? (theme === 'dark' ? '#14532D' : '#F0FDF4')
-                : (theme === 'dark' ? '#7F1D1D' : '#FEF2F2'),
-              color: value 
-                ? (theme === 'dark' ? '#22C55E' : '#16A34A')
-                : (theme === 'dark' ? '#FCA5A5' : '#DC2626')
-            }}
-            className="text-xs"
+            className={`text-xs ${
+              value 
+                ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800'
+                : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800'
+            }`}
           >
             {value ? 'Active' : 'Inactive'}
           </Badge>
@@ -405,10 +455,7 @@ const EnhancedUserManagement: React.FC = () => {
       align: 'center' as const,
       render: (value: number) => (
         <span 
-          className="font-medium"
-          style={{
-            color: theme === 'dark' ? '#F9FAFB' : '#111827'
-          }}
+          className="font-medium text-gray-900 dark:text-gray-100"
         >
           {value}
         </span>
@@ -421,10 +468,7 @@ const EnhancedUserManagement: React.FC = () => {
       align: 'right' as const,
       render: (value: number) => (
         <span 
-          className="font-medium"
-          style={{
-            color: theme === 'dark' ? '#F9FAFB' : '#111827'
-          }}
+          className="font-medium text-gray-900 dark:text-gray-100"
         >
           ${value.toFixed(2)}
         </span>
@@ -436,10 +480,7 @@ const EnhancedUserManagement: React.FC = () => {
       sortable: true,
       render: (value: string | null) => (
         <span 
-          className="text-sm"
-          style={{
-            color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
-          }}
+          className="text-sm text-gray-500 dark:text-gray-400"
         >
           {value ? new Date(value).toLocaleDateString() : 'Never'}
         </span>
@@ -460,10 +501,7 @@ const EnhancedUserManagement: React.FC = () => {
                   e.stopPropagation();
                   handleUserApproval(row, 'approve');
                 }}
-                className="h-8 w-8 p-0 hover:bg-green-50 dark:hover:bg-green-900/20"
-                style={{
-                  color: theme === 'dark' ? '#22C55E' : '#16A34A'
-                }}
+                className="h-8 w-8 p-0 hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400"
                 title="Approve User"
               >
                 <UserCheck className="h-4 w-4" />
@@ -475,10 +513,7 @@ const EnhancedUserManagement: React.FC = () => {
                   e.stopPropagation();
                   handleUserApproval(row, 'reject');
                 }}
-                className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20"
-                style={{
-                  color: theme === 'dark' ? '#EF4444' : '#DC2626'
-                }}
+                className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
                 title="Reject User"
               >
                 <UserX className="h-4 w-4" />
@@ -607,18 +642,40 @@ const EnhancedUserManagement: React.FC = () => {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          {activeFilterCount > 0 && (
-            <Button variant="outline" onClick={handleClearFilters}>
-              <Filter className="h-4 w-4 mr-2" />
-              Clear Filters ({activeFilterCount})
-            </Button>
+          {activeTab === 'users' && (
+            <>
+              {activeFilterCount > 0 && (
+                <Button variant="outline" onClick={handleClearFilters}>
+                  <Filter className="h-4 w-4 mr-2" />
+                  Clear Filters ({activeFilterCount})
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => handleExport(users)}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </>
           )}
-          <Button variant="outline" onClick={() => handleExport(users)}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
         </div>
       </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="approvals" className="relative">
+            Approvals
+            {pendingApprovals.length > 0 && (
+              <Badge 
+                variant="destructive" 
+                className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+              >
+                {pendingApprovals.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="users" className="space-y-6">
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1387,6 +1444,377 @@ const EnhancedUserManagement: React.FC = () => {
                   Failed to load user details
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+        </TabsContent>
+
+        <TabsContent value="approvals" className="space-y-6">
+          {/* Approvals Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 
+                className="text-xl font-semibold"
+                style={{
+                  color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                }}
+              >
+                Pending Approvals
+              </h2>
+              <p 
+                className="mt-1"
+                style={{
+                  color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                }}
+              >
+                Review and approve new cooks and delivery agents.
+              </p>
+            </div>
+            <Button variant="outline" onClick={fetchPendingApprovals} disabled={approvalLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${approvalLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+
+          {/* Approvals Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <AdvancedStatsCard
+              title="Pending Cooks"
+              value={pendingApprovals.filter(user => user.role === 'cook').length}
+              subtitle="Awaiting approval"
+              icon={<Users className="h-6 w-6" />}
+              color="yellow"
+              onRefresh={fetchPendingApprovals}
+            />
+            
+            <AdvancedStatsCard
+              title="Pending Delivery Agents"
+              value={pendingApprovals.filter(user => user.role === 'delivery_agent').length}
+              subtitle="Awaiting approval"
+              icon={<Users className="h-6 w-6" />}
+              color="blue"
+              onRefresh={fetchPendingApprovals}
+            />
+            
+            <AdvancedStatsCard
+              title="Total Pending"
+              value={pendingApprovals.length}
+              subtitle="All roles"
+              icon={<Clock className="h-6 w-6" />}
+              color="purple"
+              onRefresh={fetchPendingApprovals}
+            />
+          </div>
+
+          {/* Approvals List */}
+          <Card 
+            className="shadow-sm border-0"
+            style={{
+              background: theme === 'dark' 
+                ? 'linear-gradient(135deg, #1F2937 0%, #111827 100%)'
+                : 'linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 100%)',
+              borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+            }}
+          >
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle 
+                    className="text-xl font-semibold flex items-center"
+                    style={{
+                      color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                    }}
+                  >
+                    <Clock 
+                      className="h-5 w-5 mr-2"
+                      style={{
+                        color: theme === 'dark' ? '#F59E0B' : '#D97706'
+                      }}
+                    />
+                    Pending Approvals
+                  </CardTitle>
+                  <p 
+                    className="text-sm mt-1"
+                    style={{
+                      color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                    }}
+                  >
+                    {pendingApprovals.length} users waiting for approval
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {approvalLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin mr-2" />
+                  <span>Loading pending approvals...</span>
+                </div>
+              ) : pendingApprovals.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                  <h3 className="text-lg font-medium mb-2">No pending approvals</h3>
+                  <p className="text-muted-foreground">All user applications have been reviewed.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingApprovals.map((user) => (
+                    <Card key={user.id} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div 
+                            className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold"
+                            style={{
+                              background: user.role === 'cook' 
+                                ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                                : 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)'
+                            }}
+                          >
+                            {user.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h3 className="font-semibold">{user.name}</h3>
+                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <Badge variant="secondary">
+                                {user.role === 'delivery_agent' ? 'Delivery Agent' : user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                Applied {new Date(user.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleApprovalUserDetail(user)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View Details
+                          </Button>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleApprovalAction(user.id, 'approve')}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleApprovalAction(user.id, 'reject')}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {/* Documents Preview */}
+                      {user.documents && user.documents.length > 0 && (
+                        <div className="mt-4 pt-4 border-t">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <FileText className="h-4 w-4" />
+                            <span className="text-sm font-medium">Submitted Documents ({user.documents.length})</span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {user.documents.slice(0, 4).map((doc: any, index: number) => (
+                              <div key={index} className="flex items-center space-x-2 p-2 bg-muted rounded">
+                                <FileText className="h-4 w-4" />
+                                <span className="text-sm truncate">{doc.document_type.name}</span>
+                              </div>
+                            ))}
+                            {user.documents.length > 4 && (
+                              <div className="flex items-center space-x-2 p-2 bg-muted rounded">
+                                <span className="text-sm text-muted-foreground">
+                                  +{user.documents.length - 4} more documents
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Approval User Detail Modal */}
+      {showApprovalModal && selectedApprovalUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div 
+            className="rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+            style={{
+              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF'
+            }}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 
+                  className="text-2xl font-bold"
+                  style={{
+                    color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                  }}
+                >
+                  Review Application
+                </h2>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="default"
+                    onClick={() => handleApprovalAction(selectedApprovalUser.id, 'approve')}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Approve
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleApprovalAction(selectedApprovalUser.id, 'reject')}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowApprovalModal(false);
+                      setSelectedApprovalUser(null);
+                    }}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {/* User Info */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Users className="h-5 w-5 mr-2" />
+                      Applicant Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <div 
+                        className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl"
+                        style={{
+                          background: selectedApprovalUser.role === 'cook' 
+                            ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                            : 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)'
+                        }}
+                      >
+                        {selectedApprovalUser.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold">{selectedApprovalUser.name}</h3>
+                        <p className="text-muted-foreground">{selectedApprovalUser.email}</p>
+                        <div className="flex items-center space-x-2 mt-2">
+                          <Badge variant="secondary">
+                            {selectedApprovalUser.role === 'delivery_agent' ? 'Delivery Agent' : selectedApprovalUser.role.charAt(0).toUpperCase() + selectedApprovalUser.role.slice(1)}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            Applied {new Date(selectedApprovalUser.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Phone:</span>
+                        <span className="ml-2">{selectedApprovalUser.phone_no || 'Not provided'}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Address:</span>
+                        <span className="ml-2">{selectedApprovalUser.address || 'Not provided'}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Documents */}
+                {selectedApprovalUser.documents && selectedApprovalUser.documents.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <FileText className="h-5 w-5 mr-2" />
+                        Submitted Documents ({selectedApprovalUser.documents.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedApprovalUser.documents.map((doc: any, index: number) => (
+                          <Card key={index} className="p-4">
+                            <div className="flex items-center space-x-3">
+                              <FileText className="h-8 w-8 text-muted-foreground" />
+                              <div className="flex-1">
+                                <h4 className="font-medium">{doc.document_type.name}</h4>
+                                <p className="text-sm text-muted-foreground">{doc.document_type.description}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Uploaded {new Date(doc.uploaded_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(doc.file, '_blank')}
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Approval Actions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <AlertTriangle className="h-5 w-5 mr-2" />
+                      Review Decision
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center space-x-4">
+                      <Button
+                        variant="default"
+                        onClick={() => handleApprovalAction(selectedApprovalUser.id, 'approve')}
+                        className="bg-green-600 hover:bg-green-700 flex-1"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve Application
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleApprovalAction(selectedApprovalUser.id, 'reject')}
+                        className="flex-1"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject Application
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-4">
+                      Approving this application will activate the user's account and allow them to access the platform.
+                      Rejecting will prevent them from logging in.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>

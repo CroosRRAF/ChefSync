@@ -1,0 +1,555 @@
+{
+  "pages": [
+    {
+      "path": "frontend\\src\\pages\\admin\\Analytics.tsx",
+      "componentName": "AdminAnalytics",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "b091cf4",
+        "message": "refactor(admin): analytics and notifications page"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\Communications.tsx",
+      "componentName": "Communications",
+      "exportNames": [
+        "default"
+      ],
+      "props": {
+        "interface": "ErrorBoundaryProps"
+      },
+      "lastCommit": {
+        "commit": "8000ad9",
+        "message": "fix(admin): finalize redesign with minor bug fixes"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\Complaints.tsx",
+      "componentName": "AdminComplaints",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "b091cf4",
+        "message": "refactor(admin): analytics and notifications page"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\CookApprovals.tsx",
+      "componentName": "CookApprovals",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "8000ad9",
+        "message": "fix(admin): finalize redesign with minor bug fixes"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\Dashboard.tsx",
+      "componentName": "Dashboard",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "add836b",
+        "message": "style(admin): theme and uiux update"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\DeliveryAgentApprovals.tsx",
+      "componentName": "DeliveryAgentApprovals",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "8000ad9",
+        "message": "fix(admin): finalize redesign with minor bug fixes"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\Foods.tsx",
+      "componentName": "FoodManagement",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "557618b",
+        "message": "feat(uiux): full admin management restructure phase 1"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\Notifications.tsx",
+      "componentName": "AdminNotifications",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "cc26e57",
+        "message": "refactor(admin): successfully redesigned admin management"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\Orders.tsx",
+      "componentName": "OrderManagement",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "cc26e57",
+        "message": "refactor(admin): successfully redesigned admin management"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\Profile.tsx",
+      "componentName": "AdminProfile",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "add836b",
+        "message": "style(admin): theme and uiux update"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\Reports.tsx",
+      "componentName": "AdminReports",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "cc26e57",
+        "message": "refactor(admin): successfully redesigned admin management"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\Settings.tsx",
+      "componentName": "AdminSettings",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "cc26e57",
+        "message": "refactor(admin): successfully redesigned admin management"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\UnifiedApprovals.tsx",
+      "componentName": "UnifiedApprovals",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "8000ad9",
+        "message": "fix(admin): finalize redesign with minor bug fixes"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\UserApproval.tsx",
+      "componentName": "UserApproval",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "8000ad9",
+        "message": "fix(admin): finalize redesign with minor bug fixes"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\Users.tsx",
+      "componentName": "EnhancedUserManagement",
+      "exportNames": [
+        "handleExport",
+        "users",
+        "users",
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "557618b",
+        "message": "feat(uiux): full admin management restructure phase 1"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\communications\\ComplaintManagement.tsx",
+      "componentName": "ComplaintManagement",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "8000ad9",
+        "message": "fix(admin): finalize redesign with minor bug fixes"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\communications\\EmailTemplates.tsx",
+      "componentName": "EmailTemplates",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "8000ad9",
+        "message": "fix(admin): finalize redesign with minor bug fixes"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\communications\\FeedbackManagement.tsx",
+      "componentName": "FeedbackManagement",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "8000ad9",
+        "message": "fix(admin): finalize redesign with minor bug fixes"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\communications\\SystemAlerts.tsx",
+      "componentName": "SystemAlerts",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "8000ad9",
+        "message": "fix(admin): finalize redesign with minor bug fixes"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\__tests__\\Notifications.test.tsx",
+      "componentName": "",
+      "exportNames": [],
+      "props": {},
+      "lastCommit": {
+        "commit": "ce9ea11",
+        "message": "fix(admin): new bug fix"
+      }
+    },
+    {
+      "path": "frontend\\src\\pages\\admin\\__tests__\\Settings.test.tsx",
+      "componentName": "",
+      "exportNames": [],
+      "props": {},
+      "lastCommit": {
+        "commit": "9c31603",
+        "message": "feat(admin): updating system"
+      }
+    }
+  ],
+  "components": [
+    {
+      "path": "frontend\\src\\components\\admin\\AdvancedDataTable.tsx",
+      "componentName": "AdvancedDataTable",
+      "exportNames": [
+        "interface",
+        "interface",
+        "interface",
+        "default"
+      ],
+      "props": {
+        "interface": "AdvancedDataTableProps"
+      },
+      "lastCommit": {
+        "commit": "342715d",
+        "message": "feat(ui): redesign frontend layout for better UX"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\AdvancedStatsCard.tsx",
+      "componentName": "AdvancedStatsCard",
+      "exportNames": [
+        "default"
+      ],
+      "props": {
+        "interface": "AdvancedStatsCardProps"
+      },
+      "lastCommit": {
+        "commit": "342715d",
+        "message": "feat(ui): redesign frontend layout for better UX"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\Communications.tsx",
+      "componentName": "Communications",
+      "exportNames": [
+        "default"
+      ],
+      "props": {
+        "interface": "ErrorBoundaryProps"
+      },
+      "lastCommit": {
+        "commit": "ce9ea11",
+        "message": "fix(admin): new bug fix"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\CookApprovals.tsx",
+      "componentName": "CookApprovals",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "ce9ea11",
+        "message": "fix(admin): new bug fix"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\DeliveryAgentApprovals.tsx",
+      "componentName": "DeliveryAgentApprovals",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "4d1b1c4",
+        "message": "feat(uiux): admin redesign phase 02"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\index.ts",
+      "componentName": "type",
+      "exportNames": [
+        "type",
+        "type"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "1de3a55",
+        "message": "refactor(admin): complete restructure of admin components and pages"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\InteractiveChart.tsx",
+      "componentName": "InteractiveChart",
+      "exportNames": [
+        "type",
+        "type",
+        "default"
+      ],
+      "props": {
+        "interface": "InteractiveChartProps"
+      },
+      "lastCommit": {
+        "commit": "342715d",
+        "message": "feat(ui): redesign frontend layout for better UX"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\NotificationCenter.tsx",
+      "componentName": "NotificationCenter",
+      "exportNames": [
+        "default"
+      ],
+      "props": {
+        "interface": "NotificationCenterProps"
+      },
+      "lastCommit": {
+        "commit": "8000ad9",
+        "message": "fix(admin): finalize redesign with minor bug fixes"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\Profile.tsx",
+      "componentName": "AdminProfile",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "557618b",
+        "message": "feat(uiux): full admin management restructure phase 1"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\Reports.tsx",
+      "componentName": "AdminReports",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "557618b",
+        "message": "feat(uiux): full admin management restructure phase 1"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\SearchResults.tsx",
+      "componentName": "SearchResults",
+      "exportNames": [
+        "SearchResults"
+      ],
+      "props": {
+        "interface": "SearchResultsProps"
+      },
+      "lastCommit": {
+        "commit": "1b213ab",
+        "message": "feat(ui): color theme updated for admin management"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\SystemHealthMonitor.tsx",
+      "componentName": "SystemHealthMonitor",
+      "exportNames": [
+        "default"
+      ],
+      "props": {
+        "interface": "SystemHealthMonitorProps"
+      },
+      "lastCommit": {
+        "commit": "1b213ab",
+        "message": "feat(ui): color theme updated for admin management"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\UnifiedApprovals.tsx",
+      "componentName": "UnifiedApprovals",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "557618b",
+        "message": "feat(uiux): full admin management restructure phase 1"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\UnifiedStatsCard.tsx",
+      "componentName": "UnifiedStatsCard",
+      "exportNames": [
+        "interface",
+        "UnifiedStatsCard",
+        "StatsCard",
+        "AdvancedStatsCard",
+        "default"
+      ],
+      "props": {
+        "interface": "UnifiedStatsCardProps"
+      },
+      "lastCommit": {
+        "commit": "add836b",
+        "message": "style(admin): theme and uiux update"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\UserApproval.tsx",
+      "componentName": "UserApproval",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "4d1b1c4",
+        "message": "feat(uiux): admin redesign phase 02"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\communications\\ComplaintManagement.tsx",
+      "componentName": "ComplaintManagement",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "557618b",
+        "message": "feat(uiux): full admin management restructure phase 1"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\communications\\EmailTemplates.tsx",
+      "componentName": "EmailTemplates",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "557618b",
+        "message": "feat(uiux): full admin management restructure phase 1"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\communications\\FeedbackManagement.tsx",
+      "componentName": "FeedbackManagement",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "557618b",
+        "message": "feat(uiux): full admin management restructure phase 1"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\communications\\SystemAlerts.tsx",
+      "componentName": "SystemAlerts",
+      "exportNames": [
+        "default"
+      ],
+      "props": {},
+      "lastCommit": {
+        "commit": "557618b",
+        "message": "feat(uiux): full admin management restructure phase 1"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\food\\CategoryForm.tsx",
+      "componentName": "CategoryForm",
+      "exportNames": [
+        "default"
+      ],
+      "props": {
+        "interface": "CategoryFormProps"
+      },
+      "lastCommit": {
+        "commit": "e7a2e35",
+        "message": "feat(ui): food management redesign"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\food\\CuisineForm.tsx",
+      "componentName": "CuisineForm",
+      "exportNames": [
+        "default"
+      ],
+      "props": {
+        "interface": "CuisineFormProps"
+      },
+      "lastCommit": {
+        "commit": "e7a2e35",
+        "message": "feat(ui): food management redesign"
+      }
+    },
+    {
+      "path": "frontend\\src\\components\\admin\\food\\FoodForm.tsx",
+      "componentName": "FoodForm",
+      "exportNames": [
+        "default"
+      ],
+      "props": {
+        "interface": "FoodFormProps"
+      },
+      "lastCommit": {
+        "commit": "e7a2e35",
+        "message": "feat(ui): food management redesign"
+      }
+    }
+  ]
+}

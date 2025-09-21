@@ -1,0 +1,1147 @@
+{
+  "frontend\\src\\pages\\admin\\Analytics.tsx": [
+    {
+      "from": "@/components/layout/AdminLayout",
+      "resolvedPath": "frontend/src/components/layout/AdminLayout",
+      "isAdminComponent": false,
+      "namedImports": [],
+      "defaultImport": "AdminLayout"
+    },
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/select",
+      "resolvedPath": "frontend/src/components/ui/select",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Select",
+        "SelectContent",
+        "SelectItem",
+        "SelectTrigger",
+        "SelectValue",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/admin/InteractiveChart",
+      "resolvedPath": "frontend/src/components/admin/InteractiveChart",
+      "isAdminComponent": true,
+      "namedImports": [],
+      "defaultImport": "InteractiveChart"
+    }
+  ],
+  "frontend\\src\\pages\\admin\\Communications.tsx": [
+    {
+      "from": "@/components/ui/tabs",
+      "resolvedPath": "frontend/src/components/ui/tabs",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Tabs",
+        "TabsContent",
+        "TabsList",
+        "TabsTrigger"
+      ]
+    },
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\Complaints.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/tabs",
+      "resolvedPath": "frontend/src/components/ui/tabs",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Tabs",
+        "TabsContent",
+        "TabsList",
+        "TabsTrigger"
+      ]
+    },
+    {
+      "from": "@/components/admin/communications/ComplaintManagement",
+      "resolvedPath": "frontend/src/components/admin/communications/ComplaintManagement",
+      "isAdminComponent": true,
+      "namedImports": [],
+      "defaultImport": "ComplaintManagement"
+    },
+    {
+      "from": "@/components/admin/communications/FeedbackManagement",
+      "resolvedPath": "frontend/src/components/admin/communications/FeedbackManagement",
+      "isAdminComponent": true,
+      "namedImports": [],
+      "defaultImport": "FeedbackManagement"
+    }
+  ],
+  "frontend\\src\\pages\\admin\\CookApprovals.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/textarea",
+      "resolvedPath": "frontend/src/components/ui/textarea",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Textarea"
+      ]
+    },
+    {
+      "from": "@/components/ui/alert",
+      "resolvedPath": "frontend/src/components/ui/alert",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Alert",
+        "AlertDescription"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\Dashboard.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/admin/UnifiedStatsCard",
+      "resolvedPath": "frontend/src/components/admin/UnifiedStatsCard",
+      "isAdminComponent": true,
+      "namedImports": [
+        "UnifiedStatsCard"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\DeliveryAgentApprovals.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/textarea",
+      "resolvedPath": "frontend/src/components/ui/textarea",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Textarea"
+      ]
+    },
+    {
+      "from": "@/components/ui/alert",
+      "resolvedPath": "frontend/src/components/ui/alert",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Alert",
+        "AlertDescription"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\Foods.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardFooter",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/input",
+      "resolvedPath": "frontend/src/components/ui/input",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Input"
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/dropdown-menu",
+      "resolvedPath": "frontend/src/components/ui/dropdown-menu",
+      "isAdminComponent": false,
+      "namedImports": [
+        "DropdownMenu",
+        "DropdownMenuContent",
+        "DropdownMenuItem",
+        "DropdownMenuLabel",
+        "DropdownMenuSeparator",
+        "DropdownMenuTrigger",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/table",
+      "resolvedPath": "frontend/src/components/ui/table",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Table",
+        "TableBody",
+        "TableCell",
+        "TableHead",
+        "TableHeader",
+        "TableRow",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/use-toast",
+      "resolvedPath": "frontend/src/components/ui/use-toast",
+      "isAdminComponent": false,
+      "namedImports": [
+        "toast"
+      ]
+    },
+    {
+      "from": "@/components/ui/tabs",
+      "resolvedPath": "frontend/src/components/ui/tabs",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Tabs",
+        "TabsContent",
+        "TabsList",
+        "TabsTrigger"
+      ]
+    },
+    {
+      "from": "@/components/ui/pagination-wrapper",
+      "resolvedPath": "frontend/src/components/ui/pagination-wrapper",
+      "isAdminComponent": false,
+      "namedImports": [
+        "PaginationWrapper"
+      ]
+    },
+    {
+      "from": "@/components/ui/checkbox",
+      "resolvedPath": "frontend/src/components/ui/checkbox",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Checkbox"
+      ]
+    },
+    {
+      "from": "@/components/admin/food/FoodForm",
+      "resolvedPath": "frontend/src/components/admin/food/FoodForm",
+      "isAdminComponent": true,
+      "namedImports": [],
+      "defaultImport": "FoodForm"
+    },
+    {
+      "from": "@/components/admin/food/CuisineForm",
+      "resolvedPath": "frontend/src/components/admin/food/CuisineForm",
+      "isAdminComponent": true,
+      "namedImports": [],
+      "defaultImport": "CuisineForm"
+    },
+    {
+      "from": "@/components/admin/food/CategoryForm",
+      "resolvedPath": "frontend/src/components/admin/food/CategoryForm",
+      "isAdminComponent": true,
+      "namedImports": [],
+      "defaultImport": "CategoryForm"
+    },
+    {
+      "from": "@/components/ui/dialog",
+      "resolvedPath": "frontend/src/components/ui/dialog",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Dialog",
+        "DialogContent",
+        "DialogTitle",
+        "DialogDescription",
+        "DialogHeader",
+        "DialogFooter"
+      ]
+    },
+    {
+      "from": "@/components/ui/pagination",
+      "resolvedPath": "frontend/src/components/ui/pagination",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Pagination"
+      ]
+    },
+    {
+      "from": "@/components/ui/hover-card",
+      "resolvedPath": "frontend/src/components/ui/hover-card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "HoverCard",
+        "HoverCardContent",
+        "HoverCardTrigger"
+      ]
+    },
+    {
+      "from": "@/components/ui/separator",
+      "resolvedPath": "frontend/src/components/ui/separator",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Separator"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\Notifications.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/input",
+      "resolvedPath": "frontend/src/components/ui/input",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Input"
+      ]
+    },
+    {
+      "from": "@/components/ui/label",
+      "resolvedPath": "frontend/src/components/ui/label",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Label"
+      ]
+    },
+    {
+      "from": "@/components/ui/textarea",
+      "resolvedPath": "frontend/src/components/ui/textarea",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Textarea"
+      ]
+    },
+    {
+      "from": "@/components/ui/switch",
+      "resolvedPath": "frontend/src/components/ui/switch",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Switch"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\Orders.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/input",
+      "resolvedPath": "frontend/src/components/ui/input",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Input"
+      ]
+    },
+    {
+      "from": "@/components/ui/select",
+      "resolvedPath": "frontend/src/components/ui/select",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Select",
+        "SelectContent",
+        "SelectItem",
+        "SelectTrigger",
+        "SelectValue"
+      ]
+    },
+    {
+      "from": "@/components/ui/table",
+      "resolvedPath": "frontend/src/components/ui/table",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Table",
+        "TableBody",
+        "TableCell",
+        "TableHead",
+        "TableHeader",
+        "TableRow"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\Profile.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/input",
+      "resolvedPath": "frontend/src/components/ui/input",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Input"
+      ]
+    },
+    {
+      "from": "@/components/ui/label",
+      "resolvedPath": "frontend/src/components/ui/label",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Label"
+      ]
+    },
+    {
+      "from": "@/components/ui/textarea",
+      "resolvedPath": "frontend/src/components/ui/textarea",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Textarea"
+      ]
+    },
+    {
+      "from": "@/components/ui/avatar",
+      "resolvedPath": "frontend/src/components/ui/avatar",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Avatar",
+        "AvatarFallback",
+        "AvatarImage"
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\Reports.tsx": [
+    {
+      "from": "@/components/layout/AdminLayout",
+      "resolvedPath": "frontend/src/components/layout/AdminLayout",
+      "isAdminComponent": false,
+      "namedImports": [],
+      "defaultImport": "AdminLayout"
+    },
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/input",
+      "resolvedPath": "frontend/src/components/ui/input",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Input"
+      ]
+    },
+    {
+      "from": "@/components/ui/label",
+      "resolvedPath": "frontend/src/components/ui/label",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Label"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\Settings.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/input",
+      "resolvedPath": "frontend/src/components/ui/input",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Input"
+      ]
+    },
+    {
+      "from": "@/components/ui/label",
+      "resolvedPath": "frontend/src/components/ui/label",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Label"
+      ]
+    },
+    {
+      "from": "@/components/ui/switch",
+      "resolvedPath": "frontend/src/components/ui/switch",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Switch"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\UnifiedApprovals.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/tabs",
+      "resolvedPath": "frontend/src/components/ui/tabs",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Tabs",
+        "TabsContent",
+        "TabsList",
+        "TabsTrigger"
+      ]
+    },
+    {
+      "from": "@/components/ApiTest",
+      "resolvedPath": "frontend/src/components/ApiTest",
+      "isAdminComponent": false,
+      "namedImports": [],
+      "defaultImport": "ApiTest"
+    }
+  ],
+  "frontend\\src\\pages\\admin\\UserApproval.tsx": [
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/textarea",
+      "resolvedPath": "frontend/src/components/ui/textarea",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Textarea"
+      ]
+    },
+    {
+      "from": "@/components/ui/alert",
+      "resolvedPath": "frontend/src/components/ui/alert",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Alert",
+        "AlertDescription"
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\Users.tsx": [
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/card",
+      "resolvedPath": "frontend/src/components/ui/card",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Card",
+        "CardContent",
+        "CardHeader",
+        "CardTitle"
+      ]
+    },
+    {
+      "from": "@/components/admin/AdvancedDataTable",
+      "resolvedPath": "frontend/src/components/admin/AdvancedDataTable",
+      "isAdminComponent": true,
+      "namedImports": [],
+      "defaultImport": "AdvancedDataTable"
+    },
+    {
+      "from": "@/components/admin/AdvancedStatsCard",
+      "resolvedPath": "frontend/src/components/admin/AdvancedStatsCard",
+      "isAdminComponent": true,
+      "namedImports": [],
+      "defaultImport": "AdvancedStatsCard"
+    }
+  ],
+  "frontend\\src\\pages\\admin\\communications\\ComplaintManagement.tsx": [
+    {
+      "from": "@/components/ui/table",
+      "resolvedPath": "frontend/src/components/ui/table",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Table",
+        "TableBody",
+        "TableCell",
+        "TableHead",
+        "TableHeader",
+        "TableRow",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/dialog",
+      "resolvedPath": "frontend/src/components/ui/dialog",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Dialog",
+        "DialogContent",
+        "DialogDescription",
+        "DialogFooter",
+        "DialogHeader",
+        "DialogTitle",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/textarea",
+      "resolvedPath": "frontend/src/components/ui/textarea",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Textarea"
+      ]
+    },
+    {
+      "from": "@/components/ui/select",
+      "resolvedPath": "frontend/src/components/ui/select",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Select",
+        "SelectContent",
+        "SelectItem",
+        "SelectTrigger",
+        "SelectValue",
+        ""
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\communications\\EmailTemplates.tsx": [
+    {
+      "from": "@/components/ui/table",
+      "resolvedPath": "frontend/src/components/ui/table",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Table",
+        "TableBody",
+        "TableCell",
+        "TableHead",
+        "TableHeader",
+        "TableRow",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/dialog",
+      "resolvedPath": "frontend/src/components/ui/dialog",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Dialog",
+        "DialogContent",
+        "DialogDescription",
+        "DialogFooter",
+        "DialogHeader",
+        "DialogTitle",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/input",
+      "resolvedPath": "frontend/src/components/ui/input",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Input"
+      ]
+    },
+    {
+      "from": "@/components/ui/textarea",
+      "resolvedPath": "frontend/src/components/ui/textarea",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Textarea"
+      ]
+    },
+    {
+      "from": "@/components/ui/select",
+      "resolvedPath": "frontend/src/components/ui/select",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Select",
+        "SelectContent",
+        "SelectItem",
+        "SelectTrigger",
+        "SelectValue",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/form",
+      "resolvedPath": "frontend/src/components/ui/form",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Form",
+        "FormControl",
+        "FormField",
+        "FormItem",
+        "FormLabel",
+        "FormMessage",
+        ""
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\communications\\FeedbackManagement.tsx": [
+    {
+      "from": "@/components/ui/table",
+      "resolvedPath": "frontend/src/components/ui/table",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Table",
+        "TableBody",
+        "TableCell",
+        "TableHead",
+        "TableHeader",
+        "TableRow",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/dialog",
+      "resolvedPath": "frontend/src/components/ui/dialog",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Dialog",
+        "DialogContent",
+        "DialogDescription",
+        "DialogFooter",
+        "DialogHeader",
+        "DialogTitle",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/input",
+      "resolvedPath": "frontend/src/components/ui/input",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Input"
+      ]
+    },
+    {
+      "from": "@/components/ui/textarea",
+      "resolvedPath": "frontend/src/components/ui/textarea",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Textarea"
+      ]
+    },
+    {
+      "from": "@/components/ui/select",
+      "resolvedPath": "frontend/src/components/ui/select",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Select",
+        "SelectContent",
+        "SelectItem",
+        "SelectTrigger",
+        "SelectValue",
+        ""
+      ]
+    }
+  ],
+  "frontend\\src\\pages\\admin\\communications\\SystemAlerts.tsx": [
+    {
+      "from": "@/components/ui/table",
+      "resolvedPath": "frontend/src/components/ui/table",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Table",
+        "TableBody",
+        "TableCell",
+        "TableHead",
+        "TableHeader",
+        "TableRow",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/badge",
+      "resolvedPath": "frontend/src/components/ui/badge",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Badge"
+      ]
+    },
+    {
+      "from": "@/components/ui/button",
+      "resolvedPath": "frontend/src/components/ui/button",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Button"
+      ]
+    },
+    {
+      "from": "@/components/ui/dialog",
+      "resolvedPath": "frontend/src/components/ui/dialog",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Dialog",
+        "DialogContent",
+        "DialogDescription",
+        "DialogFooter",
+        "DialogHeader",
+        "DialogTitle",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/input",
+      "resolvedPath": "frontend/src/components/ui/input",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Input"
+      ]
+    },
+    {
+      "from": "@/components/ui/textarea",
+      "resolvedPath": "frontend/src/components/ui/textarea",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Textarea"
+      ]
+    },
+    {
+      "from": "@/components/ui/select",
+      "resolvedPath": "frontend/src/components/ui/select",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Select",
+        "SelectContent",
+        "SelectItem",
+        "SelectTrigger",
+        "SelectValue",
+        ""
+      ]
+    },
+    {
+      "from": "@/components/ui/form",
+      "resolvedPath": "frontend/src/components/ui/form",
+      "isAdminComponent": false,
+      "namedImports": [
+        "Form",
+        "FormControl",
+        "FormField",
+        "FormItem",
+        "FormLabel",
+        "FormMessage",
+        ""
+      ]
+    }
+  ]
+}

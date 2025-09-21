@@ -16,10 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { apiClient } from "@/utils/fetcher";
 import InteractiveChart from "@/components/admin/InteractiveChart";
+import Reports from "@/components/admin/Reports";
 import {
   BarChart3,
   TrendingUp,
@@ -34,6 +36,7 @@ import {
   User,
   Activity,
   RefreshCw,
+  FileText,
 } from "lucide-react";
 
 interface AnalyticsData {
@@ -72,6 +75,7 @@ const AdminAnalytics: React.FC = () => {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<string>("30d");
+  const [activeTab, setActiveTab] = useState<string>("analytics");
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -305,7 +309,13 @@ const AdminAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Key Metrics */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="analytics" className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card
           style={{
@@ -1012,6 +1022,12 @@ const AdminAnalytics: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-6">
+          <Reports />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
