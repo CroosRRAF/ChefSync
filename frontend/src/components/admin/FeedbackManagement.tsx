@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -28,7 +29,7 @@ import {
 } from '@/components/ui/select';
 import { useTheme } from '@/context/ThemeContext';
 import { communicationService, type Communication } from '@/services/communicationService';
-import { Star, MessageCircle } from 'lucide-react';
+import { Star, MessageCircle, Mail, Send } from 'lucide-react';
 
 const FeedbackManagement: React.FC = () => {
   const { theme } = useTheme();

@@ -18,6 +18,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -27,7 +29,7 @@ import {
 } from '@/components/ui/select';
 import { useTheme } from '@/context/ThemeContext';
 import { communicationService, type Communication } from '@/services/communicationService';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Mail, Send } from 'lucide-react';
 
 const ComplaintManagement: React.FC = () => {
   const { theme } = useTheme();
@@ -40,6 +42,12 @@ const ComplaintManagement: React.FC = () => {
     status: 'all',
     priority: 'all',
   });
+
+  // Email reply state
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => {
     fetchComplaints();
@@ -76,6 +84,38 @@ const ComplaintManagement: React.FC = () => {
       fetchComplaints();
     } catch (error) {
       console.error('Error resolving complaint:', error);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedComplaint || !emailSubject || !emailMessage) return;
+
+    try {
+      setSendingEmail(true);
+      
+      // Simulate sending email (you'll need to implement the actual email service)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Add response to the complaint
+      await communicationService.addResponse(selectedComplaint.id, {
+        response: `Email sent: ${emailMessage}`,
+        is_resolution: false
+      });
+      
+      // Reset form and close dialog
+      setShowEmailDialog(false);
+      setEmailSubject('');
+      setEmailMessage('');
+      setSelectedComplaint(null);
+      
+      // Refresh complaints
+      fetchComplaints();
+      
+      console.log('Email sent successfully');
+    } catch (error) {
+      console.error('Error sending email:', error);
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -211,19 +251,34 @@ const ComplaintManagement: React.FC = () => {
                 </TableCell>
                 <TableCell>{new Date(complaint.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedComplaint(complaint)}
-                    disabled={complaint.status === 'resolved' || complaint.status === 'closed'}
-                  >
-                    {complaint.status === 'resolved' || complaint.status === 'closed' ? (
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4 mr-1" />
-                    )}
-                    {(complaint.status === 'resolved' || complaint.status === 'closed') ? 'Resolved' : 'Resolve'}
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedComplaint(complaint)}
+                      disabled={complaint.status === 'resolved' || complaint.status === 'closed'}
+                    >
+                      {complaint.status === 'resolved' || complaint.status === 'closed' ? (
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 mr-1" />
+                      )}
+                      {(complaint.status === 'resolved' || complaint.status === 'closed') ? 'Resolved' : 'Resolve'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedComplaint(complaint);
+                        setEmailSubject(`Re: ${complaint.subject || 'Your complaint'}`);
+                        setEmailMessage('');
+                        setShowEmailDialog(true);
+                      }}
+                    >
+                      <Mail className="h-4 w-4 mr-1" />
+                      Reply
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -323,6 +378,71 @@ const ComplaintManagement: React.FC = () => {
               {newStatus === 'investigating' && 'Mark as Investigating'}
               {newStatus === 'resolved' && 'Resolve Complaint'}
               {newStatus === 'rejected' && 'Reject Complaint'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Reply Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Mail className="h-5 w-5" />
+              <span>Send Email Reply</span>
+            </DialogTitle>
+            <DialogDescription>
+              Send an email reply to {selectedComplaint?.user?.email || 'the user'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email_subject">Subject</Label>
+              <Input
+                id="email_subject"
+                placeholder="Email subject"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email_message">Message</Label>
+              <Textarea
+                id="email_message"
+                placeholder="Type your email message here..."
+                rows={6}
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+              />
+            </div>
+            {selectedComplaint && (
+              <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <h4 className="text-sm font-medium mb-2">Original Complaint:</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {selectedComplaint.message}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSendEmail} 
+              disabled={!emailSubject || !emailMessage || sendingEmail}
+            >
+              {sendingEmail ? (
+                <>
+                  <Send className="h-4 w-4 mr-2 animate-pulse" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Email
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

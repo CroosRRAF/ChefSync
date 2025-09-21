@@ -300,11 +300,14 @@ const EnhancedUserManagement: React.FC = () => {
   // Fetch pending approvals
   const fetchPendingApprovals = useCallback(async () => {
     try {
+      console.log('🔄 Fetching pending approvals...');
       setApprovalLoading(true);
       const approvals = await adminService.getPendingApprovals();
+      console.log('✅ Received approvals data:', approvals);
+      console.log('📊 Number of pending approvals:', Array.isArray(approvals) ? approvals.length : 'Not an array');
       setPendingApprovals(approvals);
     } catch (err) {
-      console.error('Failed to fetch pending approvals:', err);
+      console.error('❌ Failed to fetch pending approvals:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch pending approvals');
     } finally {
       setApprovalLoading(false);
@@ -317,7 +320,7 @@ const EnhancedUserManagement: React.FC = () => {
       await adminService.approveUser(userId, action, notes);
       
       // Update local state
-      setPendingApprovals(prev => prev.filter(user => user.id !== userId));
+      setPendingApprovals(prev => prev.filter(user => user.user_id !== userId));
       
       // Refresh approvals
       fetchPendingApprovals();
@@ -529,12 +532,7 @@ const EnhancedUserManagement: React.FC = () => {
               e.stopPropagation();
               handleUserUpdate(row.id, { is_active: !row.is_active });
             }}
-            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-            style={{
-              color: row.is_active 
-                ? (theme === 'dark' ? '#FCA5A5' : '#DC2626')
-                : (theme === 'dark' ? '#22C55E' : '#16A34A')
-            }}
+            className={`h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 ${row.is_active ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}
             title={row.is_active ? 'Deactivate User' : 'Activate User'}
           >
             {row.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
@@ -546,10 +544,7 @@ const EnhancedUserManagement: React.FC = () => {
               e.stopPropagation();
               handleUserDetail(row);
             }}
-            className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-            style={{
-              color: theme === 'dark' ? '#3B82F6' : '#2563EB'
-            }}
+            className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400"
             title="View Details"
           >
             <Eye className="h-4 w-4" />
@@ -621,18 +616,12 @@ const EnhancedUserManagement: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 
-            className="text-2xl font-bold"
-            style={{
-              color: theme === 'dark' ? '#F9FAFB' : '#111827'
-            }}
+            className="text-2xl font-bold text-gray-900 dark:text-gray-100"
           >
             User Management
           </h1>
           <p 
-            className="mt-1"
-            style={{
-              color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
-            }}
+            className="mt-1 text-gray-600 dark:text-gray-400"
           >
             Manage users, roles, and permissions across your platform.
           </p>
@@ -714,30 +703,18 @@ const EnhancedUserManagement: React.FC = () => {
             <div className="flex items-center space-x-4">
               <div className="relative">
                 <Search 
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
-                  style={{
-                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
-                  }}
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500"
                 />
                 <input
                   type="text"
                   placeholder="Search by name, email, or phone..."
-                  className="pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:border-transparent w-80"
-                  style={{
-                    backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-                    borderColor: theme === 'dark' ? '#374151' : '#D1D5DB',
-                    color: theme === 'dark' ? '#F9FAFB' : '#111827',
-                    '--tw-ring-color': theme === 'dark' ? '#3B82F6' : '#2563EB'
-                  } as React.CSSProperties}
+                  className="pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:border-transparent w-80 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-blue-500 dark:focus:ring-blue-400"
                   value={filters.search}
                   onChange={(e) => handleSearch(e.target.value)}
                 />
               </div>
               <span 
-                className="text-sm"
-                style={{
-                  color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
-                }}
+                className="text-sm text-gray-600 dark:text-gray-400"
               >
                 {pagination.total} users found
                 {filters.search && ` for "${filters.search}"`}
@@ -755,10 +732,7 @@ const EnhancedUserManagement: React.FC = () => {
           {/* Quick Filter Buttons */}
           <div className="flex items-center space-x-2 flex-wrap gap-2">
             <span 
-              className="text-sm font-medium"
-              style={{
-                color: theme === 'dark' ? '#D1D5DB' : '#374151'
-              }}
+              className="text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Quick Filters:
             </span>
@@ -803,13 +777,7 @@ const EnhancedUserManagement: React.FC = () => {
 
       {/* Main Content */}
       <Card 
-        className="shadow-sm border-0"
-        style={{
-          background: theme === 'dark' 
-            ? 'linear-gradient(135deg, #1F2937 0%, #111827 100%)'
-            : 'linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 100%)',
-          borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
-        }}
+        className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border-gray-200 dark:border-gray-700"
       >
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
@@ -821,10 +789,7 @@ const EnhancedUserManagement: React.FC = () => {
                 }}
               >
                 <Users 
-                  className="h-5 w-5 mr-2"
-                  style={{
-                    color: theme === 'dark' ? '#3B82F6' : '#2563EB'
-                  }}
+                  className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400"
                 />
                 All Users
               </CardTitle>
@@ -880,20 +845,11 @@ const EnhancedUserManagement: React.FC = () => {
           }}
         >
           <div 
-            className="border rounded-xl shadow-xl p-4 w-80 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95"
-            style={{
-              backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-              borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
-            }}
+            className="border rounded-xl shadow-xl p-4 w-80 backdrop-blur-sm bg-white/95 dark:bg-gray-800/95 border-gray-200 dark:border-gray-700"
           >
             <div className="flex items-center space-x-3 mb-4">
               <div 
-                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg"
-                style={{
-                  background: theme === 'dark' 
-                    ? 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)'
-                    : 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)'
-                }}
+                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700"
               >
                 {previewUser.name.charAt(0).toUpperCase()}
               </div>
@@ -1521,10 +1477,7 @@ const EnhancedUserManagement: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle 
-                    className="text-xl font-semibold flex items-center"
-                    style={{
-                      color: theme === 'dark' ? '#F9FAFB' : '#111827'
-                    }}
+                    className="text-xl font-semibold flex items-center text-gray-900 dark:text-gray-100"
                   >
                     <Clock 
                       className="h-5 w-5 mr-2"
@@ -1535,10 +1488,7 @@ const EnhancedUserManagement: React.FC = () => {
                     Pending Approvals
                   </CardTitle>
                   <p 
-                    className="text-sm mt-1"
-                    style={{
-                      color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
-                    }}
+                    className="text-sm mt-1 text-gray-600 dark:text-gray-400"
                   >
                     {pendingApprovals.length} users waiting for approval
                   </p>
@@ -1560,7 +1510,7 @@ const EnhancedUserManagement: React.FC = () => {
               ) : (
                 <div className="space-y-4">
                   {pendingApprovals.map((user) => (
-                    <Card key={user.id} className="p-4">
+                    <Card key={user.user_id} className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                           <div 
@@ -1598,7 +1548,7 @@ const EnhancedUserManagement: React.FC = () => {
                           <Button
                             variant="default"
                             size="sm"
-                            onClick={() => handleApprovalAction(user.id, 'approve')}
+                            onClick={() => handleApprovalAction(user.user_id, 'approve')}
                             className="bg-green-600 hover:bg-green-700"
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
@@ -1607,7 +1557,7 @@ const EnhancedUserManagement: React.FC = () => {
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => handleApprovalAction(user.id, 'reject')}
+                            onClick={() => handleApprovalAction(user.user_id, 'reject')}
                           >
                             <XCircle className="h-4 w-4 mr-1" />
                             Reject
@@ -1670,7 +1620,7 @@ const EnhancedUserManagement: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <Button
                     variant="default"
-                    onClick={() => handleApprovalAction(selectedApprovalUser.id, 'approve')}
+                    onClick={() => handleApprovalAction(selectedApprovalUser.user_id, 'approve')}
                     className="bg-green-600 hover:bg-green-700"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
@@ -1678,7 +1628,7 @@ const EnhancedUserManagement: React.FC = () => {
                   </Button>
                   <Button
                     variant="destructive"
-                    onClick={() => handleApprovalAction(selectedApprovalUser.id, 'reject')}
+                    onClick={() => handleApprovalAction(selectedApprovalUser.user_id, 'reject')}
                   >
                     <XCircle className="h-4 w-4 mr-2" />
                     Reject
@@ -1793,7 +1743,7 @@ const EnhancedUserManagement: React.FC = () => {
                     <div className="flex items-center space-x-4">
                       <Button
                         variant="default"
-                        onClick={() => handleApprovalAction(selectedApprovalUser.id, 'approve')}
+                        onClick={() => handleApprovalAction(selectedApprovalUser.user_id, 'approve')}
                         className="bg-green-600 hover:bg-green-700 flex-1"
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
@@ -1801,7 +1751,7 @@ const EnhancedUserManagement: React.FC = () => {
                       </Button>
                       <Button
                         variant="destructive"
-                        onClick={() => handleApprovalAction(selectedApprovalUser.id, 'reject')}
+                        onClick={() => handleApprovalAction(selectedApprovalUser.user_id, 'reject')}
                         className="flex-1"
                       >
                         <XCircle className="h-4 w-4 mr-2" />

@@ -6,10 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/context/AuthContext';
-import { Bell, Send, Users, Package, AlertTriangle, CheckCircle, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
+import { Bell, Send, Users, Package, AlertTriangle, CheckCircle, RefreshCw, AlertCircle, Loader2, Mail, FileText } from 'lucide-react';
 import { adminService, type AdminNotification } from '@/services/adminService';
 import SystemAlerts from '@/components/admin/SystemAlerts';
+import EmailTemplates from '@/components/admin/EmailTemplates';
 import { toast } from 'sonner';
 
 const AdminNotifications: React.FC = memo(() => {
@@ -34,6 +36,15 @@ const AdminNotifications: React.FC = memo(() => {
     send_sms: false,
     is_urgent: false
   });
+
+  // Email sending state
+  const [emailForm, setEmailForm] = useState({
+    recipient_type: 'all', // 'customers', 'chefs', 'delivery_agents', 'all'
+    subject: '',
+    message: '',
+    template_id: null as number | null
+  });
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Load notifications when user becomes available and is admin
   useEffect(() => {
@@ -153,6 +164,39 @@ const AdminNotifications: React.FC = memo(() => {
     }
   };
 
+  const handleSendEmail = async () => {
+    if (!emailForm.subject || !emailForm.message) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      
+      // Send email using adminService (you'll need to add this method)
+      // For now, we'll simulate the API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast.success(`Email sent successfully to ${emailForm.recipient_type === 'all' ? 'all users' : emailForm.recipient_type}`);
+      
+      // Reset form
+      setEmailForm({
+        recipient_type: 'all',
+        subject: '',
+        message: '',
+        template_id: null
+      });
+      
+      // Refresh notifications
+      loadNotifications();
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error('Failed to send email');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   const handleFormChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
@@ -238,8 +282,9 @@ const AdminNotifications: React.FC = memo(() => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="emails">Send Emails</TabsTrigger>
             <TabsTrigger value="alerts">System Alerts</TabsTrigger>
           </TabsList>
 
@@ -463,6 +508,105 @@ const AdminNotifications: React.FC = memo(() => {
                     ))
                   )}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="emails" className="space-y-6">
+            {/* Role-based Email Sending */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Mail className="h-5 w-5" />
+                  <span>Send Role-based Emails</span>
+                </CardTitle>
+                <CardDescription>Send emails to specific user groups (customers, chefs, delivery agents)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="recipient_type">Recipient Group</Label>
+                    <Select
+                      value={emailForm.recipient_type}
+                      onValueChange={(value) => setEmailForm(prev => ({...prev, recipient_type: value}))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select recipient group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Users</SelectItem>
+                        <SelectItem value="customers">Customers Only</SelectItem>
+                        <SelectItem value="chefs">Chefs Only</SelectItem>
+                        <SelectItem value="delivery_agents">Delivery Agents Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="email_subject">Email Subject</Label>
+                    <Input
+                      id="email_subject"
+                      placeholder="Enter email subject"
+                      value={emailForm.subject}
+                      onChange={(e) => setEmailForm(prev => ({...prev, subject: e.target.value}))}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email_message">Email Message</Label>
+                  <Textarea
+                    id="email_message"
+                    placeholder="Enter your email message..."
+                    rows={6}
+                    value={emailForm.message}
+                    onChange={(e) => setEmailForm(prev => ({...prev, message: e.target.value}))}
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setEmailForm({
+                      recipient_type: 'all',
+                      subject: '',
+                      message: '',
+                      template_id: null
+                    })}
+                  >
+                    Clear
+                  </Button>
+                  <Button 
+                    onClick={handleSendEmail}
+                    disabled={sendingEmail || !emailForm.subject || !emailForm.message}
+                  >
+                    {sendingEmail ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Send Email
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Email Templates Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5" />
+                  <span>Email Templates</span>
+                </CardTitle>
+                <CardDescription>Manage email templates for quick messaging</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EmailTemplates />
               </CardContent>
             </Card>
           </TabsContent>

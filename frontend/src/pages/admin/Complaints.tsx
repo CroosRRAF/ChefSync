@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import { MessageSquare, AlertCircle, CheckCircle, Clock, Loader2, Mail, Send } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCommunicationStats } from '@/hooks/useCommunicationStats';
 import ComplaintManagement from '@/components/admin/ComplaintManagement';
 import FeedbackManagement from '@/components/admin/FeedbackManagement';
+import EmailTemplates from '@/components/admin/EmailTemplates';
 
 const AdminComplaints: React.FC = () => {
   const { stats, loading, error } = useCommunicationStats();
@@ -115,15 +116,32 @@ const AdminComplaints: React.FC = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="complaints" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="complaints">Complaints</TabsTrigger>
               <TabsTrigger value="feedback">Feedback</TabsTrigger>
+              <TabsTrigger value="email-replies">Email Replies</TabsTrigger>
             </TabsList>
             <TabsContent value="complaints" className="mt-6">
               <ComplaintManagement />
             </TabsContent>
             <TabsContent value="feedback" className="mt-6">
               <FeedbackManagement />
+            </TabsContent>
+            <TabsContent value="email-replies" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Mail className="h-5 w-5" />
+                    <span>Email Reply Templates</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Manage email templates for replying to complaints and feedback
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <EmailTemplates />
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </CardContent>

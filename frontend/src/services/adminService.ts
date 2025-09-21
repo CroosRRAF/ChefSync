@@ -725,7 +725,7 @@ class AdminService {
   async getPendingApprovals(params: {
     role?: string;
   } = {}): Promise<{
-    id: number;
+    user_id: number;
     name: string;
     email: string;
     role: string;
@@ -747,21 +747,25 @@ class AdminService {
     }>;
   }[]> {
     try {
+      console.log('🔄 AdminService: Fetching pending approvals with params:', params);
+      
       // If no role is specified, don't send any params to get all pending approvals
       const config = params.role && params.role.trim() !== ''
         ? { params: { role: params.role } }
         : {};
-
-      const response = await apiClient.get('/auth/admin/get-pending-approvals/', config);
+      
+      console.log('🌐 Making request to: /auth/admin/pending-approvals/ with config:', config);
+      const response = await apiClient.get('/auth/admin/pending-approvals/', config);
+      console.log('✅ API Response received:', response.status, response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching pending approvals:', error);
+      console.error('❌ Error fetching pending approvals:', error);
       throw new Error('Failed to fetch pending approvals');
     }
   }
 
   async getUserForApproval(userId: number): Promise<{
-    id: number;
+    user_id: number;
     name: string;
     email: string;
     role: string;
