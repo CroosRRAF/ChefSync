@@ -20,6 +20,9 @@ class DashboardViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Get dashboard statistics"""
+        # Accept range parameter but ignore it for now
+        range_param = request.query_params.get('range', '30d')
+        
         from django.contrib.auth import get_user_model
         from apps.orders.models import Order
         from apps.food.models import Food
@@ -35,6 +38,7 @@ class DashboardViewSet(viewsets.ViewSet):
         # User statistics
         total_users = User.objects.count()
         active_users = User.objects.filter(is_active=True).count()
+        new_users_today = User.objects.filter(date_joined__date=today).count()
         new_users_this_week = User.objects.filter(date_joined__gte=week_ago).count()
         new_users_this_month = User.objects.filter(date_joined__gte=month_ago).count()
         
@@ -87,6 +91,10 @@ class DashboardViewSet(viewsets.ViewSet):
             
             'total_chefs': total_chefs,
             'active_chefs': active_chefs,
+            'pending_chef_approvals': User.objects.filter(
+                role='cook',
+                approval_status='pending'
+            ).count(),
             'chef_growth': 0,  # Calculate based on chef registrations
             
             'total_orders': total_orders,

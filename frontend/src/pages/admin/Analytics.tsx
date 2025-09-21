@@ -67,7 +67,7 @@ const AdminAnalytics: React.FC = () => {
       console.log('Fetching analytics with timeRange:', timeRange);
       const response = await apiClient.get(`/analytics/dashboard/stats/?range=${timeRange}`);
       console.log('Analytics response:', response);
-      setAnalytics(response.data || response);
+      setAnalytics(response);
     } catch (error) {
       console.error('Error fetching analytics:', error);
       // Show error state instead of fallback to dummy data

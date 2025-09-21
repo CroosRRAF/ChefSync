@@ -781,13 +781,34 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
             from apps.orders.models import Order
             
             # Get query parameters
-            page = int(request.query_params.get('page', 1))
-            limit = int(request.query_params.get('limit', 25))
+            try:
+                page = int(request.query_params.get('page', 1))
+                limit = int(request.query_params.get('limit', 25))
+                if page < 1 or limit < 1 or limit > 100:
+                    return Response(
+                        {'error': 'Invalid pagination parameters'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except (ValueError, TypeError):
+                return Response(
+                    {'error': 'Invalid page or limit parameter'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             search = request.query_params.get('search', '')
             status = request.query_params.get('status', '')
             payment_status = request.query_params.get('payment_status', '')
             sort_by = request.query_params.get('sort_by', 'created_at')
             sort_order = request.query_params.get('sort_order', 'desc')
+            
+            # Validate sort_by field
+            allowed_sort_fields = ['created_at', 'updated_at', 'total_amount', 'order_number']
+            if sort_by not in allowed_sort_fields:
+                sort_by = 'created_at'
+            
+            # Validate sort_order
+            if sort_order not in ['asc', 'desc']:
+                sort_order = 'desc'
             
             # Build query
             queryset = Order.objects.select_related('customer').all()
@@ -932,18 +953,18 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                 'id': order.id,
                 'order_number': order.order_number,
                 'customer': {
-                    'id': order.customer.id,
+                    'id': order.customer.user_id,
                     'name': order.customer.name,
                     'email': order.customer.email,
                     'phone': order.customer.phone_no,
                 } if order.customer else None,
                 'chef': {
-                    'id': order.chef.id,
+                    'id': order.chef.user_id,
                     'name': order.chef.name,
                     'email': order.chef.email,
                 } if order.chef else None,
                 'delivery_partner': {
-                    'id': order.delivery_partner.id,
+                    'id': order.delivery_partner.user_id,
                     'name': order.delivery_partner.name,
                     'email': order.delivery_partner.email,
                 } if order.delivery_partner else None,
@@ -1019,7 +1040,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                     'id': order.id,
                     'order_number': order.order_number,
                     'chef': {
-                        'id': chef.id,
+                        'id': chef.user_id,
                         'name': chef.name,
                         'email': chef.email,
                     }
@@ -1081,7 +1102,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                     'id': order.id,
                     'order_number': order.order_number,
                     'delivery_partner': {
-                        'id': partner.id,
+                        'id': partner.user_id,
                         'name': partner.name,
                         'email': partner.email,
                     }
@@ -1111,10 +1132,10 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
             chefs = User.objects.filter(
                 role='cook',
                 is_active=True
-            ).values('id', 'name', 'email')
+            ).values('user_id', 'name', 'email')
             
             return Response({
-                'chefs': list(chefs)
+                'chefs': [{'id': chef['user_id'], 'name': chef['name'], 'email': chef['email']} for chef in chefs]
             })
             
         except Exception as e:
@@ -1130,10 +1151,10 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
             partners = User.objects.filter(
                 role='delivery_agent',
                 is_active=True
-            ).values('id', 'name', 'email')
+            ).values('user_id', 'name', 'email')
             
             return Response({
-                'partners': list(partners)
+                'partners': [{'id': partner['user_id'], 'name': partner['name'], 'email': partner['email']} for partner in partners]
             })
             
         except Exception as e:

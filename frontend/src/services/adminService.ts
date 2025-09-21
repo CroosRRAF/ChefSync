@@ -489,6 +489,100 @@ class AdminService {
     }
   }
 
+  async updateOrderStatus(orderId: number, status: string): Promise<{
+    message: string;
+    order: {
+      id: number;
+      order_number: string;
+      status: string;
+      updated_at: string;
+    };
+  }> {
+    try {
+      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/update_status/`, {
+        status
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      throw new Error('Failed to update order status');
+    }
+  }
+
+  async assignChef(orderId: number, chefId: number): Promise<{
+    message: string;
+    order: {
+      id: number;
+      order_number: string;
+      chef: {
+        id: number;
+        name: string;
+        email: string;
+      };
+    };
+  }> {
+    try {
+      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/assign_chef/`, {
+        chef_id: chefId
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error assigning chef:', error);
+      throw new Error('Failed to assign chef');
+    }
+  }
+
+  async assignDeliveryPartner(orderId: number, partnerId: number): Promise<{
+    message: string;
+    order: {
+      id: number;
+      order_number: string;
+      delivery_partner: {
+        id: number;
+        name: string;
+        email: string;
+      };
+    };
+  }> {
+    try {
+      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/assign_delivery_partner/`, {
+        partner_id: partnerId
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error assigning delivery partner:', error);
+      throw new Error('Failed to assign delivery partner');
+    }
+  }
+
+  async getAvailableChefs(): Promise<Array<{
+    id: number;
+    name: string;
+    email: string;
+  }>> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/orders/available_chefs/`);
+      return response.data.chefs || [];
+    } catch (error) {
+      console.error('Error fetching available chefs:', error);
+      throw new Error('Failed to fetch available chefs');
+    }
+  }
+
+  async getAvailableDeliveryPartners(): Promise<Array<{
+    id: number;
+    name: string;
+    email: string;
+  }>> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/orders/available_delivery_partners/`);
+      return response.data.partners || [];
+    } catch (error) {
+      console.error('Error fetching available delivery partners:', error);
+      throw new Error('Failed to fetch available delivery partners');
+    }
+  }
+
   // Notifications
   async getNotifications(params: {
     is_read?: boolean;

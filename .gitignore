@@ -257,3 +257,4 @@ psd/
 sketch/
 
 .env 
+.bash_history

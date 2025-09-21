@@ -39,6 +39,7 @@ class DashboardStatsSerializer(serializers.Serializer):
     # User stats
     total_users = serializers.IntegerField()
     active_users = serializers.IntegerField()
+    new_users_today = serializers.IntegerField()
     new_users_this_week = serializers.IntegerField()
     new_users_this_month = serializers.IntegerField()
     user_growth = serializers.FloatField()
@@ -46,6 +47,7 @@ class DashboardStatsSerializer(serializers.Serializer):
     # Chef stats
     total_chefs = serializers.IntegerField()
     active_chefs = serializers.IntegerField()
+    pending_chef_approvals = serializers.IntegerField()
     chef_growth = serializers.FloatField()
     
     # Order stats

@@ -266,7 +266,7 @@ class AdminUserSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'email', 'name', 'role', 'is_active', 'last_login',
+            'user_id', 'email', 'name', 'role', 'is_active', 'last_login',
             'date_joined', 'total_orders', 'total_spent'
         ]
     
