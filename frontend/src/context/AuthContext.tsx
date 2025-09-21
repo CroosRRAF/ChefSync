@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, AuthState, LoginCredentials, RegisterData } from '@/types/auth';
 import authService, { AuthResponse } from '@/services/authService';
 
@@ -114,6 +115,7 @@ export function getRoleBasedPath(role: string): string {
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const token = getSecureToken();
@@ -147,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     }
   };
 
-  const login = async (credentials: LoginCredentials) => {
+  const login = useCallback(async (credentials: LoginCredentials) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const response: AuthResponse = await authService.login(credentials);
@@ -192,9 +194,9 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       
       throw error;
     }
-  };
+  }, []);
 
-  const register = async (data: RegisterData) => {
+  const register = useCallback(async (data: RegisterData) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const backendData = {
@@ -213,9 +215,9 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;
     }
-  };
+  }, [login]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await authService.logout();
     } catch (error) {
@@ -223,9 +225,9 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     } finally {
       dispatch({ type: 'CLEAR_USER' });
     }
-  };
+  }, []);
 
-  const refreshToken = async () => {
+  const refreshToken = useCallback(async () => {
     try {
       const response = await authService.refreshToken();
       dispatch({ type: 'SET_TOKEN', payload: response.access });
@@ -233,10 +235,10 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       console.error('Token refresh failed:', error);
       dispatch({ type: 'CLEAR_USER' });
     }
-  };
+  }, []);
 
   // Direct state setter for OAuth flows (Google, etc.)
-  const oauthLogin = (data: any) => {
+  const oauthLogin = useCallback((data: any) => {
     if (!data?.access || !data?.user) return;
 
     // Persist tokens
@@ -256,9 +258,9 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     };
 
     dispatch({ type: 'SET_USER', payload: { user: frontendUser, token: data.access } });
-  };
+  }, []);
 
-  const updateProfile = async (data: { name?: string; phone?: string; address?: string }) => {
+  const updateProfile = useCallback(async (data: { name?: string; phone?: string; address?: string }) => {
     if (!state.user) throw new Error('No user logged in');
     
     try {
@@ -281,9 +283,9 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       console.error('Profile update failed:', error);
       throw error;
     }
-  };
+  }, [state.user, state.token]);
 
-  const value: AuthContextType = {
+  const value: AuthContextType = useMemo(() => ({
     ...state,
     login,
     register,
@@ -291,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     refreshToken,
     oauthLogin,
     updateProfile,
-  };
+  }), [state, login, register, logout, refreshToken, oauthLogin, updateProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

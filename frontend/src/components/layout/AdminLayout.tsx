@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { performAdminSearch } from '@/utils/adminSearch';
@@ -75,7 +75,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
 
   // Navigation items
-  const navItems: NavItem[] = [
+  const navItems: NavItem[] = useMemo(() => [
     {
       label: 'Dashboard',
       href: '/admin/dashboard',
@@ -119,15 +119,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       href: '/admin/settings',
       icon: Settings
     }
-  ];
+  ], []);
 
   // Check if current path matches nav item
-  const isActiveRoute = (href: string) => {
+  const isActiveRoute = useCallback((href: string) => {
     if (href === '/admin/dashboard') {
       return location.pathname === href;
     }
     return location.pathname.startsWith(href);
-  };
+  }, [location.pathname]);
 
   // Get current page info
   const getCurrentPageInfo = () => {

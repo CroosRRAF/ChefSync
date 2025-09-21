@@ -1,3 +1,5 @@
+export { default } from '@/components/admin/communications/FeedbackManagement';
+
 import React, { useState, useEffect } from 'react';
 import {
   Table,

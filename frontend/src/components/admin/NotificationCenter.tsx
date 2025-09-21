@@ -93,7 +93,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [maxNotifications]);
+  }, [maxNotifications, user]);
 
   // Mark notification as read
   const markAsRead = useCallback(async (notificationId: number) => {
