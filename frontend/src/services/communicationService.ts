@@ -161,7 +161,7 @@ class CommunicationService {
 
   async getCommunicationById(id: number): Promise<Communication> {
     try {
-      const response = await apiClient.get(`/communications/communications/${id}/`);
+      const response = await apiClient.get(`/communications/${id}/`);
       return response.data;
     } catch (error) {
       return this.handleError(error, 'getCommunicationById');
@@ -200,7 +200,7 @@ class CommunicationService {
 
   async updateStatus(communicationId: number, status: string): Promise<Communication> {
     try {
-      const response = await apiClient.patch(`/communications/communications/${communicationId}/`, { status });
+      const response = await apiClient.patch(`/communications/${communicationId}/`, { status });
       toast({
         title: 'Success',
         description: 'Status updated successfully',
@@ -242,7 +242,7 @@ class CommunicationService {
     by_status: Array<{ status: string; count: number }>;
   }> {
     try {
-      const response = await apiClient.get('/communications/communications/stats/');
+      const response = await apiClient.get('/communications/stats/');
       return response.data;
     } catch (error) {
       return this.handleError(error, 'getStats');
@@ -359,7 +359,7 @@ class CommunicationService {
     search?: string;
   } = {}): Promise<PaginatedResponse<SystemAlert>> {
     try {
-      const response = await apiClient.get('/communications/', { params: { ...params, type: 'system_alert' } });
+      const response = await apiClient.get('/communications/communications/', { params: { ...params, type: 'system_alert' } });
       return response.data;
     } catch (error) {
       return this.handleError(error, 'getSystemAlerts');

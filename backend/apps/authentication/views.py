@@ -38,6 +38,17 @@ def health_check(request):
         'timestamp': timezone.now(),
         'message': 'ChefSync API is running'
     }, status=status.HTTP_200_OK)
+
+# CSRF Token Endpoint
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def csrf_token(request):
+    """Get CSRF token for frontend"""
+    from django.middleware.csrf import get_token
+    token = get_token(request)
+    return Response({
+        'csrf_token': token
+    }, status=status.HTTP_200_OK)
 import requests
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token

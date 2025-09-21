@@ -66,46 +66,46 @@ export interface UnifiedStatsCardProps {
 // Color variants for consistent theming
 const colorVariants = {
   blue: {
-    bg: 'bg-blue-50 dark:bg-blue-900/20',
-    icon: 'text-blue-600 dark:text-blue-400',
-    border: 'border-blue-200 dark:border-blue-800',
-    accent: 'bg-blue-500',
-    trend: 'text-blue-600 dark:text-blue-400'
+    bg: 'bg-primary/10 dark:bg-primary/20',
+    icon: 'text-primary dark:text-primary-light',
+    border: 'border-primary/20 dark:border-primary/30',
+    accent: 'bg-primary',
+    trend: 'text-primary dark:text-primary-light'
   },
   green: {
-    bg: 'bg-green-50 dark:bg-green-900/20',
-    icon: 'text-green-600 dark:text-green-400',
-    border: 'border-green-200 dark:border-green-800',
-    accent: 'bg-green-500',
-    trend: 'text-green-600 dark:text-green-400'
+    bg: 'bg-success/10 dark:bg-success/20',
+    icon: 'text-success dark:text-success-light',
+    border: 'border-success/20 dark:border-success/30',
+    accent: 'bg-success',
+    trend: 'text-success dark:text-success-light'
   },
   yellow: {
-    bg: 'bg-yellow-50 dark:bg-yellow-900/20',
-    icon: 'text-yellow-600 dark:text-yellow-400',
-    border: 'border-yellow-200 dark:border-yellow-800',
-    accent: 'bg-yellow-500',
-    trend: 'text-yellow-600 dark:text-yellow-400'
+    bg: 'bg-warning/10 dark:bg-warning/20',
+    icon: 'text-warning dark:text-warning-light',
+    border: 'border-warning/20 dark:border-warning/30',
+    accent: 'bg-warning',
+    trend: 'text-warning dark:text-warning-light'
   },
   red: {
-    bg: 'bg-red-50 dark:bg-red-900/20',
-    icon: 'text-red-600 dark:text-red-400',
-    border: 'border-red-200 dark:border-red-800',
-    accent: 'bg-red-500',
-    trend: 'text-red-600 dark:text-red-400'
+    bg: 'bg-error/10 dark:bg-error/20',
+    icon: 'text-error dark:text-error-light',
+    border: 'border-error/20 dark:border-error/30',
+    accent: 'bg-error',
+    trend: 'text-error dark:text-error-light'
   },
   purple: {
-    bg: 'bg-purple-50 dark:bg-purple-900/20',
-    icon: 'text-purple-600 dark:text-purple-400',
-    border: 'border-purple-200 dark:border-purple-800',
-    accent: 'bg-purple-500',
-    trend: 'text-purple-600 dark:text-purple-400'
+    bg: 'bg-accent/10 dark:bg-accent/20',
+    icon: 'text-accent dark:text-accent-light',
+    border: 'border-accent/20 dark:border-accent/30',
+    accent: 'bg-accent',
+    trend: 'text-accent dark:text-accent-light'
   },
   indigo: {
-    bg: 'bg-indigo-50 dark:bg-indigo-900/20',
-    icon: 'text-indigo-600 dark:text-indigo-400',
-    border: 'border-indigo-200 dark:border-indigo-800',
-    accent: 'bg-indigo-500',
-    trend: 'text-indigo-600 dark:text-indigo-400'
+    bg: 'bg-info/10 dark:bg-info/20',
+    icon: 'text-info dark:text-info-light',
+    border: 'border-info/20 dark:border-info/30',
+    accent: 'bg-info',
+    trend: 'text-info dark:text-info-light'
   }
 };
 

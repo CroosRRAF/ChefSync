@@ -14,6 +14,9 @@ urlpatterns = [
     # Health Check
     path('health/', views.health_check, name='health_check'),
     
+    # CSRF Token
+    path('csrf-token/', views.csrf_token, name='csrf_token'),
+    
     # Basic Authentication
     path('register/', views.user_registration, name='register'),
     path('login/', views.user_login, name='login'),

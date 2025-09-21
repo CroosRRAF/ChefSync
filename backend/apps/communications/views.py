@@ -37,7 +37,10 @@ class CommunicationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter communications based on query parameters"""
-        queryset = self.queryset.select_related('user', 'assigned_to')
+        queryset = self.queryset.select_related('user', 'assigned_to').prefetch_related(
+            'tag_relations__tag',
+            'responses'
+        )
         
         # Get query parameters
         status = self.request.query_params.get('status')

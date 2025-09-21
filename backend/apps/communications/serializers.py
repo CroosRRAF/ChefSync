@@ -45,23 +45,28 @@ class CommunicationAttachmentSerializer(serializers.ModelSerializer):
 
 
 class CommunicationResponseSerializer(serializers.ModelSerializer):
-    responder_name = serializers.SerializerMethodField()
+    responder = serializers.SerializerMethodField()
+    communication_id = serializers.ReadOnlyField(source='communication.id')
+    response = serializers.CharField(source='message', read_only=True)
     
     class Meta:
         model = CommunicationResponse
-        fields = '__all__'
+        fields = ('id', 'communication_id', 'responder', 'response', 'created_at', 'updated_at', 'is_resolution', 'metadata')
         read_only_fields = ('created_at', 'updated_at', 'responder')
     
-    def get_responder_name(self, obj):
-        return obj.responder.name if obj.responder else None
+    def get_responder(self, obj):
+        return {
+            'id': obj.responder.id,
+            'name': obj.responder.name
+        } if obj.responder else None
 
 
 class CommunicationSerializer(serializers.ModelSerializer):
     responses = CommunicationResponseSerializer(many=True, read_only=True)
-    attachments = CommunicationAttachmentSerializer(many=True, read_only=True)
+    attachments = serializers.SerializerMethodField()
     tags = CommunicationTagSerializer(many=True, read_only=True, source='tag_relations')
     categories = CommunicationCategorySerializer(many=True, read_only=True, source='category_relations')
-    user_name = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
     assigned_to_name = serializers.SerializerMethodField()
     
     class Meta:
@@ -72,16 +77,23 @@ class CommunicationSerializer(serializers.ModelSerializer):
             'resolved_at', 'read_at', 'is_read'
         )
     
-    def get_user_name(self, obj):
-        return obj.user.name if obj.user else None
+    def get_user(self, obj):
+        return {
+            'id': obj.user.id,
+            'name': obj.user.name,
+            'email': obj.user.email
+        } if obj.user else None
     
     def get_assigned_to_name(self, obj):
         return obj.assigned_to.name if obj.assigned_to else None
+    
+    def get_attachments(self, obj):
+        return [attachment.file.url for attachment in obj.attachments.all()]
 
 
 class CommunicationListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for list views"""
-    user_name = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
     assigned_to_name = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
     response_count = serializers.SerializerMethodField()
@@ -90,13 +102,17 @@ class CommunicationListSerializer(serializers.ModelSerializer):
         model = Communication
         fields = (
             'id', 'reference_number', 'subject', 'communication_type',
-            'status', 'priority', 'is_read', 'user_name',
+            'status', 'priority', 'is_read', 'user',
             'assigned_to_name', 'created_at', 'updated_at',
             'tags', 'response_count'
         )
     
-    def get_user_name(self, obj):
-        return obj.user.name if obj.user else None
+    def get_user(self, obj):
+        return {
+            'id': obj.user.id,
+            'name': obj.user.name,
+            'email': obj.user.email
+        } if obj.user else None
     
     def get_assigned_to_name(self, obj):
         return obj.assigned_to.name if obj.assigned_to else None

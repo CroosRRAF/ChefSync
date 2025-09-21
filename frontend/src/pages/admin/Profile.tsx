@@ -98,7 +98,7 @@ const AdminProfile: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your profile...</p>
@@ -108,7 +108,7 @@ const AdminProfile: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-card to-muted">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -120,7 +120,7 @@ const AdminProfile: React.FC = () => {
             <Button
               onClick={() => setIsEditing(!isEditing)}
               variant={isEditing ? "outline" : "default"}
-              className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+              className="bg-gradient-to-r from-primary to-primary-light hover:from-primary-light hover:to-primary"
             >
               <Edit className="h-4 w-4 mr-2" />
               {isEditing ? 'Cancel' : 'Edit Profile'}
@@ -135,23 +135,23 @@ const AdminProfile: React.FC = () => {
             <Card className="border-none shadow-md">
               <CardHeader className="text-center">
                 <div className="relative inline-block">
-                  <Avatar className="h-32 w-32 mx-auto ring-4 ring-purple-500/20">
+                  <Avatar className="h-32 w-32 mx-auto ring-4 ring-primary/20">
                     <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className="bg-purple-500 text-white font-bold text-3xl">
+                    <AvatarFallback className="bg-primary text-primary-foreground font-bold text-3xl">
                       {user.name.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   {isEditing && (
                     <Button
                       size="sm"
-                      className="absolute bottom-0 right-0 rounded-full h-8 w-8 p-0 bg-purple-500 hover:bg-purple-600"
+                      className="absolute bottom-0 right-0 rounded-full h-8 w-8 p-0 bg-primary hover:bg-primary-light"
                     >
                       <Camera className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
                 <CardTitle className="text-xl mt-4">{user.name}</CardTitle>
-                <CardDescription className="text-purple-600 font-medium">System Administrator</CardDescription>
+                <CardDescription className="text-primary font-medium">System Administrator</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-center space-x-2">
@@ -161,13 +161,13 @@ const AdminProfile: React.FC = () => {
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4 text-center">
-                  <div className="p-3 bg-purple-50 rounded-lg">
-                    <p className="text-2xl font-bold text-purple-600">{formData.totalActions}</p>
-                    <p className="text-sm text-gray-600">Actions</p>
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <p className="text-2xl font-bold text-primary">{formData.totalActions}</p>
+                    <p className="text-sm text-muted-foreground">Actions</p>
                   </div>
-                  <div className="p-3 bg-purple-50 rounded-lg">
-                    <p className="text-2xl font-bold text-purple-600">{formData.experience}</p>
-                    <p className="text-sm text-gray-600">Experience</p>
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <p className="text-2xl font-bold text-primary">{formData.experience}</p>
+                    <p className="text-sm text-muted-foreground">Experience</p>
                   </div>
                 </div>
 
@@ -205,7 +205,7 @@ const AdminProfile: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Role Level</span>
-                    <Badge className="bg-purple-100 text-purple-800">{formData.role}</Badge>
+                    <Badge className="bg-primary/10 text-primary border-primary/20">{formData.role}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Department</span>
@@ -243,7 +243,7 @@ const AdminProfile: React.FC = () => {
                     <span className="text-sm font-bold text-purple-600">99.9%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-purple-500 h-2 rounded-full" style={{ width: '99.9%' }}></div>
+                    <div className="bg-primary h-2 rounded-full" style={{ width: '99.9%' }}></div>
                   </div>
                 </div>
               </CardContent>
@@ -343,8 +343,8 @@ const AdminProfile: React.FC = () => {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {formData.permissions.map((permission, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-3 bg-purple-50 rounded-lg">
-                      <CheckCircle className="h-4 w-4 text-purple-500" />
+                    <div key={index} className="flex items-center space-x-2 p-3 bg-primary/10 rounded-lg">
+                      <CheckCircle className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium">{permission}</span>
                     </div>
                   ))}
@@ -492,7 +492,7 @@ const AdminProfile: React.FC = () => {
 
             {/* Save Button */}
             {isEditing && (
-              <Card className="border-none shadow-md bg-gradient-to-r from-purple-50 to-blue-50">
+              <Card className="border-none shadow-md bg-gradient-to-r from-primary/5 to-accent/5">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -501,7 +501,7 @@ const AdminProfile: React.FC = () => {
                     </div>
                     <Button
                       onClick={handleSave}
-                      className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                      className="bg-gradient-to-r from-primary to-primary-light hover:from-primary-light hover:to-primary"
                     >
                       <Save className="h-4 w-4 mr-2" />
                       Save Profile

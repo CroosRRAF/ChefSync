@@ -231,6 +231,13 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
+# CSRF settings - Allow cross-origin requests from frontend
+CSRF_TRUSTED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:8080,http://127.0.0.1:8080,http://localhost:8081,http://127.0.0.1:8081,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:8080,http://0.0.0.0:8081').split(',')
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF cookie
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_SAMESITE = 'Lax' if DEBUG else 'Strict'  # Allow cross-origin in development
+
 # Additional CORS settings for development
 CORS_EXPOSE_HEADERS = ['*']
 CORS_PREFLIGHT_MAX_AGE = 86400

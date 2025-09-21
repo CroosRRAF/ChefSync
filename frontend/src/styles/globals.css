@@ -2,40 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ChefSync Design System - Food-inspired color palette and animations */
+/* ChefSync Admin Design System - Modern Professional Theme */
 
 @layer base {
   :root {
-    /* Core Colors - Food-inspired warm palette */
-    --background: 0 0% 100%;
-    --foreground: 20 14.3% 4.1%;
+    /* Core Colors - Professional Corporate Theme */
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
     
     --card: 0 0% 100%;
-    --card-foreground: 20 14.3% 4.1%;
+    --card-foreground: 222.2 84% 4.9%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 20 14.3% 4.1%;
+    --popover-foreground: 222.2 84% 4.9%;
     
-    /* Primary - Appetite Orange */
-    --primary: 24 100% 50%;
-    --primary-foreground: 0 0% 98%;
-    --primary-light: 24 100% 60%;
-    --primary-dark: 24 100% 40%;
+    /* Primary - Deep Corporate Blue */
+    --primary: 217 91% 60%;
+    --primary-foreground: 210 40% 98%;
+    --primary-light: 217 91% 65%;
+    --primary-dark: 217 91% 55%;
     
-    /* Secondary - Fresh Green */
-    --secondary: 142 69% 45%;
-    --secondary-foreground: 0 0% 98%;
-    --secondary-light: 142 69% 55%;
-    --secondary-dark: 142 69% 35%;
+    /* Secondary - Neutral Gray */
+    --secondary: 215 16% 47%;
+    --secondary-foreground: 210 40% 98%;
+    --secondary-light: 215 20% 65%;
+    --secondary-dark: 215 25% 27%;
     
-    /* Accent - Golden Yellow */
-    --accent: 45 100% 65%;
-    --accent-foreground: 20 14.3% 4.1%;
-    --accent-light: 45 100% 75%;
-    --accent-dark: 45 100% 55%;
+    /* Accent - Electric Blue */
+    --accent: 217 91% 70%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --accent-light: 217 91% 80%;
+    --accent-dark: 217 91% 60%;
     
     /* Neutral Palette */
-    --muted: 210 40% 96.1%;
+    --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
     
     --destructive: 0 84.2% 60.2%;
@@ -43,19 +43,31 @@
     
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 24 100% 50%;
+    --ring: 217 91% 60%;
     
-    /* Success - Fresh Green variation */
-    --success: 142 69% 45%;
-    --success-foreground: 0 0% 98%;
+    /* Success - Emerald Green */
+    --success: 160 84% 39%;
+    --success-foreground: 210 40% 98%;
+    --success-light: 160 84% 49%;
+    --success-dark: 160 84% 29%;
     
-    /* Warning - Warm Orange variation */
-    --warning: 38 100% 55%;
-    --warning-foreground: 20 14.3% 4.1%;
+    /* Warning - Amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 222.2 84% 4.9%;
+    --warning-light: 38 92% 60%;
+    --warning-dark: 38 92% 40%;
     
-    /* Info - Cool Blue */
-    --info: 217 91% 60%;
-    --info-foreground: 0 0% 98%;
+    /* Info - Sky Blue */
+    --info: 199 89% 48%;
+    --info-foreground: 210 40% 98%;
+    --info-light: 199 89% 58%;
+    --info-dark: 199 89% 38%;
+    
+    /* Error - Red */
+    --error: 0 84% 60%;
+    --error-foreground: 210 40% 98%;
+    --error-light: 0 84% 70%;
+    --error-dark: 0 84% 50%;
     
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
@@ -64,7 +76,7 @@
     --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.9), hsl(var(--secondary) / 0.8));
     --gradient-card: linear-gradient(145deg, hsl(var(--background)), hsl(var(--muted) / 0.3));
     
-    /* Shadows - Food-themed with warm tones */
+    /* Shadows - Professional with blue tones */
     --shadow-sm: 0 1px 2px 0 hsl(var(--primary) / 0.05);
     --shadow-md: 0 4px 6px -1px hsl(var(--primary) / 0.1), 0 2px 4px -1px hsl(var(--primary) / 0.06);
     --shadow-lg: 0 10px 15px -3px hsl(var(--primary) / 0.1), 0 4px 6px -2px hsl(var(--primary) / 0.05);
@@ -77,72 +89,83 @@
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-spring: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-foreground: 222.2 84% 4.9%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary: 222.2 47.4% 11.2%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-primary-foreground: 210 40% 98%;
 
-    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent: 210 40% 96%;
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
 
-    --sidebar-border: 220 13% 91%;
+    --sidebar-border: 214.3 31.8% 91.4%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    /* Dark Mode - Professional dark theme with food accent colors */
-    --background: 20 14.3% 4.1%;
-    --foreground: 0 0% 95%;
+    /* Dark Mode - Professional dark theme with corporate blue accent colors */
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
     
-    --card: 20 14.3% 7%;
-    --card-foreground: 0 0% 95%;
+    --card: 222.2 84% 7%;
+    --card-foreground: 210 40% 98%;
     
-    --popover: 20 14.3% 4.1%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
     
-    /* Dark Mode Primary - Softer Orange */
-    --primary: 24 100% 55%;
-    --primary-foreground: 20 14.3% 4.1%;
-    --primary-light: 24 100% 65%;
-    --primary-dark: 24 100% 45%;
+    /* Dark Mode Primary - Corporate Blue */
+    --primary: 217 91% 55%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --primary-light: 217 91% 65%;
+    --primary-dark: 217 91% 45%;
     
-    /* Dark Mode Secondary - Muted Green */
-    --secondary: 142 69% 50%;
-    --secondary-foreground: 20 14.3% 4.1%;
-    --secondary-light: 142 69% 60%;
-    --secondary-dark: 142 69% 40%;
+    /* Dark Mode Secondary - Muted Gray */
+    --secondary: 215 25% 27%;
+    --secondary-foreground: 210 40% 98%;
+    --secondary-light: 215 16% 47%;
+    --secondary-dark: 215 25% 17%;
     
-    /* Dark Mode Accent - Softer Golden */
-    --accent: 45 100% 70%;
-    --accent-foreground: 20 14.3% 4.1%;
-    --accent-light: 45 100% 80%;
-    --accent-dark: 45 100% 60%;
+    /* Dark Mode Accent - Electric Blue */
+    --accent: 217 91% 60%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --accent-light: 217 91% 70%;
+    --accent-dark: 217 91% 50%;
     
-    --muted: 20 14.3% 10%;
+    --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
     
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 95%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
     
-    --border: 20 14.3% 15%;
-    --input: 20 14.3% 15%;
-    --ring: 24 100% 55%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 217 91% 55%;
     
-    --success: 142 69% 50%;
-    --success-foreground: 20 14.3% 4.1%;
+    --success: 160 84% 29%;
+    --success-foreground: 210 40% 98%;
+    --success-light: 160 84% 39%;
+    --success-dark: 160 84% 19%;
     
-    --warning: 38 100% 60%;
-    --warning-foreground: 20 14.3% 4.1%;
+    --warning: 38 92% 40%;
+    --warning-foreground: 210 40% 98%;
+    --warning-light: 38 92% 50%;
+    --warning-dark: 38 92% 30%;
     
-    --info: 217 91% 65%;
-    --info-foreground: 20 14.3% 4.1%;
+    --info: 199 89% 38%;
+    --info-foreground: 210 40% 98%;
+    --info-light: 199 89% 48%;
+    --info-dark: 199 89% 28%;
+    
+    --error: 0 84% 50%;
+    --error-foreground: 210 40% 98%;
+    --error-light: 0 84% 60%;
+    --error-dark: 0 84% 40%;
     
     /* Dark Mode Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));

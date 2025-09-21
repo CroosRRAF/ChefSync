@@ -52,6 +52,8 @@ class Communication(models.Model):
         choices=PRIORITY_CHOICES,
         default='medium'
     )
+    rating = models.IntegerField(null=True, blank=True)  # For feedback communications
+    order_id = models.IntegerField(null=True, blank=True)  # For complaint communications
     is_read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
     is_archived = models.BooleanField(default=False)
@@ -63,6 +65,7 @@ class Communication(models.Model):
         related_name='assigned_communications'
     )
     resolution_notes = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)  # Additional metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
@@ -113,6 +116,8 @@ class CommunicationResponse(models.Model):
     )
     message = models.TextField()
     is_internal = models.BooleanField(default=False)  # For internal notes
+    is_resolution = models.BooleanField(default=False)  # Whether this response resolves the communication
+    metadata = models.JSONField(default=dict, blank=True)  # Additional metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

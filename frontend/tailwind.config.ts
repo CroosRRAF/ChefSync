@@ -60,15 +60,27 @@ export default {
 				},
 				success: {
 					DEFAULT: 'hsl(var(--success))',
-					foreground: 'hsl(var(--success-foreground))'
+					foreground: 'hsl(var(--success-foreground))',
+					light: 'hsl(var(--success-light))',
+					dark: 'hsl(var(--success-dark))'
 				},
 				warning: {
 					DEFAULT: 'hsl(var(--warning))',
-					foreground: 'hsl(var(--warning-foreground))'
+					foreground: 'hsl(var(--warning-foreground))',
+					light: 'hsl(var(--warning-light))',
+					dark: 'hsl(var(--warning-dark))'
 				},
 				info: {
 					DEFAULT: 'hsl(var(--info))',
-					foreground: 'hsl(var(--info-foreground))'
+					foreground: 'hsl(var(--info-foreground))',
+					light: 'hsl(var(--info-light))',
+					dark: 'hsl(var(--info-dark))'
+				},
+				error: {
+					DEFAULT: 'hsl(var(--error))',
+					foreground: 'hsl(var(--error-foreground))',
+					light: 'hsl(var(--error-light))',
+					dark: 'hsl(var(--error-dark))'
 				}
 			},
 			borderRadius: {
