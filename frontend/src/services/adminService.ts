@@ -491,6 +491,24 @@ class AdminService {
     }
   }
 
+  async createNotification(data: {
+    title: string;
+    message: string;
+    notification_type: string;
+    priority?: string;
+    target_audience?: string;
+    send_email?: boolean;
+    send_sms?: boolean;
+  }): Promise<AdminNotification> {
+    try {
+      const response = await apiClient.post(`${this.baseUrl}/notifications/`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      throw new Error('Failed to create notification');
+    }
+  }
+
   async getUnreadNotificationCount(): Promise<{ unread_count: number }> {
     try {
       const response = await apiClient.get(`${this.baseUrl}/notifications/unread_count/`);

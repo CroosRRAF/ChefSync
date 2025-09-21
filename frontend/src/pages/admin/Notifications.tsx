@@ -1,14 +1,154 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { useUserStore } from '@/store/userStore';
-import { Bell, Send, Users, Package, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Bell, Send, Users, Package, AlertTriangle, CheckCircle, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
+import { adminService, type AdminNotification } from '@/services/adminService';
+import { toast } from 'sonner';
 
 const AdminNotifications: React.FC = () => {
   const { user } = useUserStore();
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    title: '',
+    message: '',
+    notification_type: 'info',
+    priority: 'normal',
+    target_audience: 'all',
+    send_email: true,
+    send_sms: false,
+    is_urgent: false
+  });
+
+  // Load notifications on component mount
+  useEffect(() => {
+    loadNotifications();
+    loadUnreadCount();
+  }, []);
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await adminService.getNotifications();
+      setNotifications(response.results);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load notifications');
+      toast.error('Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadUnreadCount = async () => {
+    try {
+      const response = await adminService.getUnreadNotificationCount();
+      setUnreadCount(response.unread_count);
+    } catch (err) {
+      console.error('Failed to load unread count:', err);
+    }
+  };
+
+  const handleSendNotification = async () => {
+    if (!formData.title.trim() || !formData.message.trim()) {
+      toast.error('Please fill in both title and message');
+      return;
+    }
+
+    try {
+      setSending(true);
+      await adminService.createNotification({
+        title: formData.title,
+        message: formData.message,
+        notification_type: formData.notification_type,
+        priority: formData.priority,
+        target_audience: formData.target_audience,
+        send_email: formData.send_email,
+        send_sms: formData.send_sms
+      });
+
+      toast.success('Notification sent successfully');
+
+      // Reset form
+      setFormData({
+        title: '',
+        message: '',
+        notification_type: 'info',
+        priority: 'normal',
+        target_audience: 'all',
+        send_email: true,
+        send_sms: false,
+        is_urgent: false
+      });
+
+      // Reload notifications
+      await loadNotifications();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send notification';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId: number) => {
+    try {
+      await adminService.markNotificationRead(notificationId);
+      toast.success('Notification marked as read');
+
+      // Update local state
+      setNotifications(prev =>
+        prev.map(notification =>
+          notification.id === notificationId
+            ? { ...notification, is_read: true, read_at: new Date().toISOString() }
+            : notification
+        )
+      );
+
+      // Update unread count
+      await loadUnreadCount();
+    } catch (err) {
+      toast.error('Failed to mark notification as read');
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await adminService.markAllNotificationsRead();
+      toast.success('All notifications marked as read');
+
+      // Update local state
+      setNotifications(prev =>
+        prev.map(notification => ({
+          ...notification,
+          is_read: true,
+          read_at: new Date().toISOString()
+        }))
+      );
+
+      setUnreadCount(0);
+    } catch (err) {
+      toast.error('Failed to mark all notifications as read');
+    }
+  };
+
+  const handleFormChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   if (!user) {
     return (
@@ -17,34 +157,6 @@ const AdminNotifications: React.FC = () => {
       </div>
     );
   }
-
-  // Mock notification data
-  const notifications = [
-    {
-      id: 1,
-      type: 'order',
-      title: 'New Order Received',
-      message: 'Order #123456 has been placed by John Customer',
-      timestamp: '2024-01-20T10:30:00Z',
-      read: false
-    },
-    {
-      id: 2,
-      type: 'system',
-      title: 'System Maintenance',
-      message: 'Scheduled maintenance will occur tonight at 2 AM',
-      timestamp: '2024-01-20T09:00:00Z',
-      read: true
-    },
-    {
-      id: 3,
-      type: 'user',
-      title: 'New User Registration',
-      message: 'Chef Maria has registered as a cook',
-      timestamp: '2024-01-20T08:45:00Z',
-      read: false
-    }
-  ];
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -199,23 +311,23 @@ const AdminNotifications: React.FC = () => {
                   notifications.map((notification) => (
                     <div 
                       key={notification.id} 
-                      className={`p-4 border rounded-lg ${getNotificationColor(notification.type)} ${
-                        !notification.read ? 'ring-2 ring-blue-500' : ''
+                      className={`p-4 border rounded-lg ${getNotificationColor(notification.notification_type)} ${
+                        !notification.is_read ? 'ring-2 ring-blue-500' : ''
                       }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-3">
-                          {getNotificationIcon(notification.type)}
+                          {getNotificationIcon(notification.notification_type)}
                           <div>
                             <h4 className="font-medium">{notification.title}</h4>
                             <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
                             <p className="text-xs text-gray-500 mt-2">
-                              {new Date(notification.timestamp).toLocaleString()}
+                              {new Date(notification.created_at).toLocaleString()}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
-                          {!notification.read && (
+                          {!notification.is_read && (
                             <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                           )}
                           <Button size="sm" variant="outline">
