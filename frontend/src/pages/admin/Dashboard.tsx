@@ -18,7 +18,8 @@ import {
   Package,
   UserPlus,
   ShoppingBag,
-  CheckCircle2
+  CheckCircle2,
+  Bell
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -161,30 +162,7 @@ const Dashboard: React.FC = () => {
       color: 'purple' as const,
       onClick: () => handleCardClick('/admin/orders')
     },
-    {
-      title: 'Pending Approvals',
-      value: stats?.pending_chef_approvals || 0,
-      subtitle: 'Chef applications',
-      icon: <AlertCircle />,
-      color: 'yellow' as const,
-      onClick: () => handleCardClick('/admin/approvals')
-    },
-    {
-      title: 'Total Chefs',
-      value: stats?.total_chefs || 0,
-      subtitle: `${stats?.active_chefs || 0} active`,
-      icon: <ChefHat />,
-      color: 'red' as const,
-      onClick: () => handleCardClick('/admin/chefs')
-    },
-    {
-      title: 'Delivery Agents',
-      value: 0, // Will be updated when backend supports this
-      subtitle: 'Active agents',
-      icon: <Truck />,
-      color: 'green' as const,
-      onClick: () => handleCardClick('/admin/delivery-agents')
-    }
+    // Removed cards that link to non-existent pages (approvals, chefs, delivery agents)
   ];
 
   // Quick actions data with modern color theme
@@ -217,31 +195,22 @@ const Dashboard: React.FC = () => {
       badge: 'View insights'
     },
     {
-      title: 'Reports',
-      description: 'Generate and download reports',
-      icon: FileText,
-      iconColor: 'text-indigo-700 dark:text-indigo-300',
-      bgColor: 'bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/30 border-indigo-200 dark:border-indigo-700',
-      path: '/admin/reports',
-      badge: 'Generate reports'
-    },
-    {
-      title: 'User Approvals',
-      description: 'Review and approve user applications',
-      icon: UserCheck,
-      iconColor: 'text-amber-700 dark:text-amber-300',
-      bgColor: 'bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/30 border-amber-200 dark:border-amber-700',
-      path: '/admin/approvals',
-      badge: stats?.pending_chef_approvals ? `${stats.pending_chef_approvals} pending` : null
-    },
-    {
-      title: 'Complaints & Feedback',
-      description: 'Manage user complaints and feedback',
+      title: 'Complaints',
+      description: 'Manage complaints and feedback',
       icon: MessageSquare,
       iconColor: 'text-rose-700 dark:text-rose-300',
       bgColor: 'bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/30 dark:to-rose-800/30 border-rose-200 dark:border-rose-700',
-      path: '/admin/communications',
+      path: '/admin/complaints',
       badge: stats?.unread_notifications ? `${stats.unread_notifications} unread` : null
+    },
+    {
+      title: 'Notifications',
+      description: 'Send and manage notifications',
+      icon: Bell,
+      iconColor: 'text-blue-700 dark:text-blue-300',
+      bgColor: 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 border-blue-200 dark:border-blue-700',
+      path: '/admin/notifications',
+      badge: undefined
     }
   ];
 

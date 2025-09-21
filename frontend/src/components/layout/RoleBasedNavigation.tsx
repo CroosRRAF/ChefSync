@@ -16,7 +16,8 @@ import {
   Bell,
   MapPin,
   Calendar,
-  Package
+  Package,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/libs/utils';
 
@@ -59,12 +60,12 @@ const RoleBasedNavigation: React.FC = () => {
       case 'admin':
         return [
           { label: 'Dashboard', href: '/admin/dashboard', icon: Home },
-          { label: 'Users', href: '/admin/manage-users', icon: User },
+          { label: 'Users', href: '/admin/users', icon: User },
           { label: 'Orders', href: '/admin/orders', icon: Package },
+          { label: 'Foods', href: '/admin/foods', icon: ChefHat },
           { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
-          { label: 'Reports', href: '/admin/reports', icon: FileText },
+          { label: 'Complaints', href: '/admin/complaints', icon: MessageSquare },
           { label: 'Notifications', href: '/admin/notifications', icon: Bell },
-          { label: 'Profile', href: '/admin/profile', icon: User },
           { label: 'Settings', href: '/admin/settings', icon: Settings },
         ];
       

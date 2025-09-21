@@ -46,19 +46,15 @@ import CookSchedule from '@/pages/cook/Schedule';
 import CookSettings from '@/pages/cook/Settings';
 import CookProfile from '@/pages/cook/Profile';
 
-// Admin pages
+// Admin pages (restricted to eight)
 import Dashboard from '@/pages/admin/Dashboard';
-import EnhancedUserManagement from '@/pages/admin/EnhancedUserManagement';
-import AdminOrders from '@/pages/admin/Orders';
-import AdminAnalytics from '@/pages/admin/Analytics';
-import AdminSettings from '@/pages/admin/Settings';
-import AdminProfile from '@/pages/admin/Profile';
-import AdminReports from '@/pages/admin/Reports';
-import UnifiedApprovals from '@/pages/admin/UnifiedApprovals';
-import FoodManagement from '@/pages/admin/FoodManagement';
-import AdminNotifications from '@/pages/admin/Notifications';
-import Communications from '@/pages/admin/Communications';
-import AdminComplaints from '@/pages/admin/AdminComplaints';
+import Users from '@/pages/admin/Users';
+import Orders from '@/pages/admin/Orders';
+import Foods from '@/pages/admin/Foods';
+import Analytics from '@/pages/admin/Analytics';
+import Complaints from '@/pages/admin/Complaints';
+import Notifications from '@/pages/admin/Notifications';
+import Settings from '@/pages/admin/Settings';
 
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
@@ -384,91 +380,49 @@ const InnerRoutes: React.FC = () => {
         <Route path="/admin/users" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <EnhancedUserManagement />
+              <Users />
             </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/orders" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <AdminOrders />
+              <Orders />
             </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/analytics" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <AdminAnalytics />
+              <Analytics />
             </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/settings" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <AdminSettings />
-            </AdminLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/profile" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminLayout>
-              <AdminProfile />
-            </AdminLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/reports" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminLayout>
-              <AdminReports />
+              <Settings />
             </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/foods" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <FoodManagement />
-            </AdminLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/communications" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminLayout>
-              <Communications />
+              <Foods />
             </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/notifications" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <AdminNotifications />
+              <Notifications />
             </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/complaints" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <AdminComplaints />
-            </AdminLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/approvals" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminLayout>
-              <UnifiedApprovals />
-            </AdminLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/chefs" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminLayout>
-              <UnifiedApprovals />
-            </AdminLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/delivery-agents" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminLayout>
-              <UnifiedApprovals />
+              <Complaints />
             </AdminLayout>
           </ProtectedRoute>
         } />

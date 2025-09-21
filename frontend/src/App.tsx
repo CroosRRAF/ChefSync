@@ -17,9 +17,7 @@ import Register from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import VerifyEmail from "./pages/auth/VerifyEmail";
 import ResetPassword from "./pages/auth/ResetPassword";
-import Dashboard from "./pages/admin/Dashboard";
-import EnhancedUserManagement from "./pages/admin/EnhancedUserManagement";
-import AdminAnalytics from "./pages/admin/Analytics";
+// Admin routes are handled in routes/AppRoutes.tsx via AdminLayout and ProtectedRoute
 
 const queryClient = new QueryClient();
 
@@ -41,10 +39,7 @@ const AppContent = () => {
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/admin/dashboard" element={<Dashboard />} />
-        <Route path="/admin/enhanced-dashboard" element={<Dashboard />} />
-        <Route path="/admin/manage-users" element={<EnhancedUserManagement />} />
-        <Route path="/admin/analytics" element={<AdminAnalytics />} />
+  {/* Admin routes are defined in AppRoutes and use AdminLayout */}
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -93,7 +93,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [user, maxNotifications]);
+  }, [maxNotifications]);
 
   // Mark notification as read
   const markAsRead = useCallback(async (notificationId: number) => {
@@ -128,7 +128,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   }, []);
 
   // Get notification icon
-  const getNotificationIcon = (type: string, priority: string, theme: 'light' | 'dark') => {
+  const getNotificationIcon = useCallback((type: string, priority: string, theme: 'light' | 'dark') => {
     const iconClass = "h-4 w-4";
     
     if (priority === 'high') {
@@ -159,10 +159,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
           color: theme === 'light' ? '#6B7280' : '#9CA3AF'
         }} />;
     }
-  };
+  }, []);
 
   // Get priority color
-  const getPriorityColor = (priority: string, theme: 'light' | 'dark') => {
+  const getPriorityColor = useCallback((priority: string, theme: 'light' | 'dark') => {
     switch (priority) {
       case 'high':
         return {
@@ -185,26 +185,30 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
           color: theme === 'light' ? '#6B7280' : '#9CA3AF'
         };
     }
-  };
+  }, []);
 
   // Filter notifications
-  const filteredNotifications = notifications.filter(notification => {
-    switch (filter) {
-      case 'unread':
-        return !notification.is_read;
-      case 'high':
-        return notification.priority === 'high';
-      case 'medium':
-        return notification.priority === 'medium';
-      case 'low':
-        return notification.priority === 'low';
-      default:
-        return true;
-    }
-  });
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter(notification => {
+      switch (filter) {
+        case 'unread':
+          return !notification.is_read;
+        case 'high':
+          return notification.priority === 'high';
+        case 'medium':
+          return notification.priority === 'medium';
+        case 'low':
+          return notification.priority === 'low';
+        default:
+          return true;
+      }
+    });
+  }, [notifications, filter]);
 
   // Get unread count
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = useMemo(() => {
+    return notifications.filter(n => !n.is_read).length;
+  }, [notifications]);
 
   // Auto refresh effect
   useEffect(() => {
@@ -213,9 +217,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
       const interval = setInterval(fetchNotifications, refreshInterval);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, refreshInterval, fetchNotifications, user]);
-
-  // Manual refresh
+  }, [autoRefresh, refreshInterval, fetchNotifications, user?.id]);  // Manual refresh
   const handleRefresh = () => {
     fetchNotifications();
   };
