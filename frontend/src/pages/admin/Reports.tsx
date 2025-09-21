@@ -6,12 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useUserStore } from '@/store/userStore';
+import { useAuth } from '@/context/AuthContext';
 import { useOrderStore } from '@/store/orderStore';
 import { FileText, Download, Calendar, TrendingUp, Users, Package, RefreshCw } from 'lucide-react';
 
 const AdminReports: React.FC = () => {
-  const { user } = useUserStore();
+  const { user } = useAuth();
   const { orders } = useOrderStore();
 
   if (!user) {

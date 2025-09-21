@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useUserStore } from '@/store/userStore';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { apiClient } from '@/utils/fetcher';
@@ -46,7 +45,7 @@ interface AdminOrder {
 }
 
 const OrderManagement: React.FC = () => {
-  const { user } = useUserStore();
+  const { user } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 

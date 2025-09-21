@@ -5,13 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { useUserStore } from '@/store/userStore';
+import { useAuth } from '@/context/AuthContext';
 import { Bell, Send, Users, Package, AlertTriangle, CheckCircle, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { adminService, type AdminNotification } from '@/services/adminService';
 import { toast } from 'sonner';
 
 const AdminNotifications: React.FC = memo(() => {
-  const { user } = useUserStore();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -24,8 +24,8 @@ const AdminNotifications: React.FC = memo(() => {
   const [formData, setFormData] = useState({
     title: '',
     message: '',
-    notification_type: 'info',
-    priority: 'normal',
+    notification_type: 'system_alert',
+    priority: 'medium',
     target_audience: 'all',
     send_email: true,
     send_sms: false,
@@ -90,8 +90,8 @@ const AdminNotifications: React.FC = memo(() => {
       setFormData({
         title: '',
         message: '',
-        notification_type: 'info',
-        priority: 'normal',
+        notification_type: 'system_alert',
+        priority: 'medium',
         target_audience: 'all',
         send_email: true,
         send_sms: false,
@@ -249,6 +249,40 @@ const AdminNotifications: React.FC = memo(() => {
                 <Label htmlFor="notification-type">Notification Type</Label>
                 <select
                   id="notification-type"
+                  className="w-full mt-2 p-2 border rounded-md"
+                  value={formData.notification_type}
+                  onChange={(e) => handleFormChange('notification_type', e.target.value)}
+                >
+                  <option value="system_alert">System Alert</option>
+                  <option value="user_activity">User Activity</option>
+                  <option value="order_update">Order Update</option>
+                  <option value="payment_issue">Payment Issue</option>
+                  <option value="security_event">Security Event</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="backup">Backup</option>
+                  <option value="performance">Performance</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="priority">Priority</Label>
+                <select
+                  id="priority"
+                  className="w-full mt-2 p-2 border rounded-md"
+                  value={formData.priority}
+                  onChange={(e) => handleFormChange('priority', e.target.value)}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="target-audience">Target Audience</Label>
+                <select
+                  id="target-audience"
                   className="w-full mt-2 p-2 border rounded-md"
                   value={formData.target_audience}
                   onChange={(e) => handleFormChange('target_audience', e.target.value)}

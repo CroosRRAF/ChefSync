@@ -1198,6 +1198,31 @@ class AdminNotificationViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('-created_at')
     
+    def create(self, request, *args, **kwargs):
+        """Create a notification with additional metadata"""
+        data = request.data.copy()
+        
+        # Extract additional fields for metadata
+        metadata = {}
+        if 'target_audience' in data:
+            metadata['target_audience'] = data.pop('target_audience')
+        if 'send_email' in data:
+            metadata['send_email'] = data.pop('send_email')
+        if 'send_sms' in data:
+            metadata['send_sms'] = data.pop('send_sms')
+        if 'is_urgent' in data:
+            metadata['is_urgent'] = data.pop('is_urgent')
+        
+        # Add metadata to the data
+        if metadata:
+            data['metadata'] = metadata
+        
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
     @action(detail=True, methods=['patch'])
     def mark_read(self, request, pk=None):
         """Mark notification as read"""

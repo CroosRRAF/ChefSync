@@ -9,7 +9,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
-import { useUserStore } from '@/store/userStore';
 import { 
   Shield, 
   Save, 

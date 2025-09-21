@@ -4,13 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useUserStore } from '@/store/userStore';
+import { useAuth } from '@/context/AuthContext';
 import { Settings, Save, RefreshCw, Shield, Bell, Globe, AlertCircle, CheckCircle } from 'lucide-react';
 import { adminService, type SystemSetting } from '@/services/adminService';
 import { toast } from 'sonner';
 
 const AdminSettings: React.FC = memo(() => {
-  const { user } = useUserStore();
+  const { user } = useAuth();
   const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,6 +30,12 @@ const AdminSettings: React.FC = memo(() => {
       setLoading(true);
       setError(null);
       const settingsData = await adminService.getSystemSettings();
+      
+      // Ensure settingsData is an array
+      if (!Array.isArray(settingsData)) {
+        throw new Error('Invalid settings data received from server');
+      }
+      
       setSettings(settingsData);
 
       // Initialize form values
