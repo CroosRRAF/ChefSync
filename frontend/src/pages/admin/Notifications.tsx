@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Bell, Send, Users, Package, AlertTriangle, CheckCircle, RefreshCw, Aler
 import { adminService, type AdminNotification } from '@/services/adminService';
 import { toast } from 'sonner';
 
-const AdminNotifications: React.FC = () => {
+const AdminNotifications: React.FC = memo(() => {
   const { user } = useUserStore();
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,7 +143,7 @@ const AdminNotifications: React.FC = () => {
     }
   };
 
-  const handleFormChange = (field: string, value: any) => {
+  const handleFormChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -205,10 +205,11 @@ const AdminNotifications: React.FC = () => {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="notification-type">Notification Type</Label>
-                <select 
-                  id="notification-type" 
+                <select
+                  id="notification-type"
                   className="w-full mt-2 p-2 border rounded-md"
-                  defaultValue="all"
+                  value={formData.target_audience}
+                  onChange={(e) => handleFormChange('target_audience', e.target.value)}
                 >
                   <option value="all">All Users</option>
                   <option value="customers">Customers Only</option>
@@ -220,41 +221,76 @@ const AdminNotifications: React.FC = () => {
 
               <div>
                 <Label htmlFor="notification-title">Title</Label>
-                <Input 
-                  id="notification-title" 
+                <Input
+                  id="notification-title"
                   placeholder="Enter notification title"
                   className="mt-2"
+                  value={formData.title}
+                  onChange={(e) => handleFormChange('title', e.target.value)}
                 />
               </div>
 
               <div>
                 <Label htmlFor="notification-message">Message</Label>
-                <Textarea 
-                  id="notification-message" 
+                <Textarea
+                  id="notification-message"
                   placeholder="Enter notification message"
                   className="mt-2"
                   rows={4}
+                  value={formData.message}
+                  onChange={(e) => handleFormChange('message', e.target.value)}
                 />
               </div>
 
               <div className="flex items-center space-x-2">
-                <input type="checkbox" id="urgent" className="rounded" />
+                <input
+                  type="checkbox"
+                  id="urgent"
+                  className="rounded"
+                  checked={formData.is_urgent}
+                  onChange={(e) => handleFormChange('is_urgent', e.target.checked)}
+                />
                 <Label htmlFor="urgent">Mark as urgent</Label>
               </div>
 
               <div className="flex items-center space-x-2">
-                <input type="checkbox" id="email" className="rounded" defaultChecked />
+                <input
+                  type="checkbox"
+                  id="email"
+                  className="rounded"
+                  checked={formData.send_email}
+                  onChange={(e) => handleFormChange('send_email', e.target.checked)}
+                />
                 <Label htmlFor="email">Send via email</Label>
               </div>
 
               <div className="flex items-center space-x-2">
-                <input type="checkbox" id="sms" className="rounded" />
+                <input
+                  type="checkbox"
+                  id="sms"
+                  className="rounded"
+                  checked={formData.send_sms}
+                  onChange={(e) => handleFormChange('send_sms', e.target.checked)}
+                />
                 <Label htmlFor="sms">Send via SMS</Label>
               </div>
 
-              <Button className="w-full">
-                <Send className="h-4 w-4 mr-2" />
-                Send Notification
+              <Button
+                className="w-full"
+                onClick={handleSendNotification}
+                disabled={sending}
+              >
+                {sending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Send Notification
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -330,7 +366,11 @@ const AdminNotifications: React.FC = () => {
                           {!notification.is_read && (
                             <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                           )}
-                          <Button size="sm" variant="outline">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleMarkAsRead(notification.id)}
+                          >
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Mark Read
                           </Button>
@@ -345,7 +385,7 @@ const AdminNotifications: React.FC = () => {
         </div>
       </div>
   );
-};
+});
 
 export default AdminNotifications;
 

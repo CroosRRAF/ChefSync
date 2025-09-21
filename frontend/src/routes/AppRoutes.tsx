@@ -58,6 +58,7 @@ import UnifiedApprovals from '@/pages/admin/UnifiedApprovals';
 import FoodManagement from '@/pages/admin/FoodManagement';
 import AdminNotifications from '@/pages/admin/Notifications';
 import Communications from '@/pages/admin/Communications';
+import AdminComplaints from '@/pages/admin/AdminComplaints';
 
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
@@ -422,7 +423,7 @@ const InnerRoutes: React.FC = () => {
             </AdminLayout>
           </ProtectedRoute>
         } />
-        <Route path="/admin/food" element={
+        <Route path="/admin/foods" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
               <FoodManagement />
@@ -433,6 +434,20 @@ const InnerRoutes: React.FC = () => {
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
               <Communications />
+            </AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/notifications" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout>
+              <AdminNotifications />
+            </AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/complaints" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout>
+              <AdminComplaints />
             </AdminLayout>
           </ProtectedRoute>
         } />

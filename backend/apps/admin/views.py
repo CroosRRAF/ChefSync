@@ -2,6 +2,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from django.db import models
 from django.db.models import Count, Sum, Avg, Q, F
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -190,3 +191,641 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             ).count()
         except:
             return 0
+
+
+class AdminNotificationViewSet(viewsets.ModelViewSet):
+    """Admin notification management"""
+    queryset = AdminNotification.objects.all()
+    serializer_class = AdminNotificationSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get_queryset(self):
+        """Filter notifications based on query parameters"""
+        queryset = AdminNotification.objects.all()
+        is_read = self.request.query_params.get('is_read')
+        notification_type = self.request.query_params.get('type')
+        priority = self.request.query_params.get('priority')
+        is_active = self.request.query_params.get('is_active', 'true')
+
+        if is_read is not None:
+            queryset = queryset.filter(is_read=is_read.lower() == 'true')
+        if notification_type:
+            queryset = queryset.filter(notification_type=notification_type)
+        if priority:
+            queryset = queryset.filter(priority=priority)
+        if is_active.lower() == 'false':
+            queryset = queryset.filter(is_active=False)
+        else:
+            queryset = queryset.filter(is_active=True)
+
+        return queryset.order_by('-created_at')
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        """Mark all notifications as read"""
+        AdminNotification.objects.filter(
+            is_read=False,
+            is_active=True
+        ).update(is_read=True, read_at=timezone.now())
+
+        return Response({'message': 'All notifications marked as read'})
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark a specific notification as read"""
+        notification = self.get_object()
+        notification.is_read = True
+        notification.read_at = timezone.now()
+        notification.save()
+
+        serializer = self.get_serializer(notification)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def mark_unread(self, request, pk=None):
+        """Mark a specific notification as unread"""
+        notification = self.get_object()
+        notification.is_read = False
+        notification.read_at = None
+        notification.save()
+
+        serializer = self.get_serializer(notification)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['delete'])
+    def clear_read(self, request):
+        """Delete all read notifications"""
+        count = AdminNotification.objects.filter(is_read=True).delete()[0]
+        return Response({'message': f'Deleted {count} read notifications'})
+
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        """Get count of unread notifications"""
+        count = AdminNotification.objects.filter(
+            is_read=False,
+            is_active=True
+        ).count()
+        return Response({'unread_count': count})
+
+
+class AdminSystemSettingsViewSet(viewsets.ModelViewSet):
+    """Admin system settings management"""
+    queryset = AdminSystemSettings.objects.all()
+    serializer_class = AdminSystemSettingsSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get_queryset(self):
+        """Filter settings based on query parameters"""
+        queryset = AdminSystemSettings.objects.all()
+        category = self.request.query_params.get('category')
+        is_public = self.request.query_params.get('is_public')
+
+        if category:
+            queryset = queryset.filter(category=category)
+        if is_public is not None:
+            queryset = queryset.filter(is_public=is_public.lower() == 'true')
+
+        return queryset.order_by('category', 'key')
+
+    @action(detail=False, methods=['get'])
+    def categories(self, request):
+        """Get available setting categories"""
+        categories = AdminSystemSettings.SETTING_CATEGORIES
+        return Response({'categories': categories})
+
+    @action(detail=False, methods=['get'])
+    def by_category(self, request, category=None):
+        """Get settings grouped by category"""
+        settings = AdminSystemSettings.objects.filter(category=category)
+        serializer = self.get_serializer(settings, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'])
+    def bulk_update(self, request):
+        """Bulk update multiple settings"""
+        settings_data = request.data.get('settings', [])
+        updated_settings = []
+        errors = []
+
+        for setting_data in settings_data:
+            setting_id = setting_data.get('id')
+            value = setting_data.get('value')
+
+            try:
+                setting = AdminSystemSettings.objects.get(id=setting_id)
+                setting.value = str(value)
+                setting.updated_by = request.user
+                setting.save()
+                updated_settings.append(setting)
+            except AdminSystemSettings.DoesNotExist:
+                errors.append(f'Setting with id {setting_id} not found')
+            except Exception as e:
+                errors.append(f'Error updating setting {setting_id}: {str(e)}')
+
+        serializer = self.get_serializer(updated_settings, many=True)
+        return Response({
+            'updated': serializer.data,
+            'errors': errors
+        })
+
+    @action(detail=False, methods=['post'])
+    def reset_to_default(self, request):
+        """Reset settings to their default values"""
+        setting_ids = request.data.get('setting_ids', [])
+        reset_settings = []
+
+        for setting_id in setting_ids:
+            try:
+                setting = AdminSystemSettings.objects.get(id=setting_id)
+                if setting.default_value:
+                    setting.value = setting.default_value
+                    setting.updated_by = request.user
+                    setting.save()
+                    reset_settings.append(setting)
+            except AdminSystemSettings.DoesNotExist:
+                pass
+
+        serializer = self.get_serializer(reset_settings, many=True)
+        return Response({
+            'reset': serializer.data,
+            'message': f'Reset {len(reset_settings)} settings to default values'
+        })
+
+    @action(detail=False, methods=['get'])
+    def public_settings(self, request):
+        """Get public settings that can be accessed by non-admin users"""
+        settings = AdminSystemSettings.objects.filter(is_public=True)
+        serializer = self.get_serializer(settings, many=True)
+        return Response(serializer.data)
+
+
+class AdminUserManagementViewSet(viewsets.ModelViewSet):
+    """Admin user management"""
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    serializer_class = AdminUserSummarySerializer  # We'll use a custom serializer for listing
+
+    def get_queryset(self):
+        """Filter users based on query parameters"""
+        queryset = User.objects.all()
+        role = self.request.query_params.get('role')
+        is_active = self.request.query_params.get('is_active')
+        search = self.request.query_params.get('search')
+
+        if role:
+            queryset = queryset.filter(role=role)
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        if search:
+            queryset = queryset.filter(
+                models.Q(email__icontains=search) |
+                models.Q(first_name__icontains=search) |
+                models.Q(last_name__icontains=search)
+            )
+
+        return queryset.order_by('-date_joined')
+
+    def get_serializer_class(self):
+        """Use different serializers for different actions"""
+        if self.action == 'retrieve':
+            # For detail view, we might want a more detailed serializer
+            return AdminUserSummarySerializer
+        return AdminUserSummarySerializer
+
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """Activate a user account"""
+        user = self.get_object()
+        user.is_active = True
+        user.save()
+
+        # Log the activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action='activate',
+            resource_type='user',
+            resource_id=str(user.id),
+            description=f'Activated user account: {user.email}',
+            metadata={'user_email': user.email}
+        )
+
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None):
+        """Deactivate a user account"""
+        user = self.get_object()
+        user.is_active = False
+        user.save()
+
+        # Log the activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action='suspend',
+            resource_type='user',
+            resource_id=str(user.id),
+            description=f'Deactivated user account: {user.email}',
+            metadata={'user_email': user.email}
+        )
+
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def change_role(self, request, pk=None):
+        """Change user role"""
+        user = self.get_object()
+        new_role = request.data.get('role')
+
+        if not new_role:
+            return Response(
+                {'error': 'Role is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        old_role = user.role
+        user.role = new_role
+        user.save()
+
+        # Log the activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action='update',
+            resource_type='user',
+            resource_id=str(user.id),
+            description=f'Changed user role from {old_role} to {new_role}: {user.email}',
+            metadata={'user_email': user.email, 'old_role': old_role, 'new_role': new_role}
+        )
+
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get user statistics"""
+        total_users = User.objects.count()
+        active_users = User.objects.filter(is_active=True).count()
+        inactive_users = User.objects.filter(is_active=False).count()
+
+        # Role distribution
+        role_stats = User.objects.values('role').annotate(
+            count=models.Count('id')
+        ).order_by('role')
+
+        # Recent registrations
+        recent_registrations = User.objects.filter(
+            date_joined__gte=timezone.now() - timedelta(days=30)
+        ).count()
+
+        return Response({
+            'total_users': total_users,
+            'active_users': active_users,
+            'inactive_users': inactive_users,
+            'role_distribution': list(role_stats),
+            'recent_registrations': recent_registrations
+        })
+
+    @action(detail=False, methods=['post'])
+    def bulk_activate(self, request):
+        """Bulk activate users"""
+        user_ids = request.data.get('user_ids', [])
+        if not user_ids:
+            return Response(
+                {'error': 'user_ids is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        users = User.objects.filter(id__in=user_ids, is_active=False)
+        count = users.update(is_active=True)
+
+        # Log the activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action='activate',
+            resource_type='user',
+            description=f'Bulk activated {count} user accounts',
+            metadata={'user_ids': user_ids, 'count': count}
+        )
+
+        return Response({'message': f'Activated {count} users'})
+
+    @action(detail=False, methods=['post'])
+    def bulk_deactivate(self, request):
+        """Bulk deactivate users"""
+        user_ids = request.data.get('user_ids', [])
+        if not user_ids:
+            return Response(
+                {'error': 'user_ids is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        users = User.objects.filter(id__in=user_ids, is_active=True)
+        count = users.update(is_active=False)
+
+        # Log the activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action='suspend',
+            resource_type='user',
+            description=f'Bulk deactivated {count} user accounts',
+            metadata={'user_ids': user_ids, 'count': count}
+        )
+
+        return Response({'message': f'Deactivated {count} users'})
+
+
+class AdminOrderManagementViewSet(viewsets.ModelViewSet):
+    """Admin order management"""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get_queryset(self):
+        """Get orders queryset"""
+        from apps.orders.models import Order
+        queryset = Order.objects.select_related('customer', 'chef').all()
+
+        # Filter parameters
+        status_filter = self.request.query_params.get('status')
+        payment_status = self.request.query_params.get('payment_status')
+        customer_id = self.request.query_params.get('customer_id')
+        chef_id = self.request.query_params.get('chef_id')
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        search = self.request.query_params.get('search')
+
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if payment_status:
+            queryset = queryset.filter(payment_status=payment_status)
+        if customer_id:
+            queryset = queryset.filter(customer_id=customer_id)
+        if chef_id:
+            queryset = queryset.filter(chef_id=chef_id)
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+        if search:
+            queryset = queryset.filter(
+                models.Q(order_number__icontains=search) |
+                models.Q(customer__email__icontains=search) |
+                models.Q(customer__first_name__icontains=search) |
+                models.Q(customer__last_name__icontains=search)
+            )
+
+        return queryset.order_by('-created_at')
+
+    def get_serializer_class(self):
+        """Use different serializers for different actions"""
+        return AdminOrderSummarySerializer
+
+    @action(detail=True, methods=['post'])
+    def update_status(self, request, pk=None):
+        """Update order status"""
+        from apps.orders.models import Order
+
+        order = self.get_object()
+        new_status = request.data.get('status')
+
+        if not new_status:
+            return Response(
+                {'error': 'Status is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        old_status = order.status
+        order.status = new_status
+        order.save()
+
+        # Log the activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action='update',
+            resource_type='order',
+            resource_id=str(order.id),
+            description=f'Updated order {order.order_number} status from {old_status} to {new_status}',
+            metadata={
+                'order_number': order.order_number,
+                'old_status': old_status,
+                'new_status': new_status
+            }
+        )
+
+        serializer = self.get_serializer(order)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def update_payment_status(self, request, pk=None):
+        """Update order payment status"""
+        from apps.orders.models import Order
+
+        order = self.get_object()
+        new_payment_status = request.data.get('payment_status')
+
+        if not new_payment_status:
+            return Response(
+                {'error': 'Payment status is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        old_payment_status = order.payment_status
+        order.payment_status = new_payment_status
+        order.save()
+
+        # Log the activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action='update',
+            resource_type='order',
+            resource_id=str(order.id),
+            description=f'Updated order {order.order_number} payment status from {old_payment_status} to {new_payment_status}',
+            metadata={
+                'order_number': order.order_number,
+                'old_payment_status': old_payment_status,
+                'new_payment_status': new_payment_status
+            }
+        )
+
+        serializer = self.get_serializer(order)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get order statistics"""
+        from apps.orders.models import Order
+
+        total_orders = Order.objects.count()
+        orders_by_status = Order.objects.values('status').annotate(
+            count=models.Count('id')
+        ).order_by('status')
+
+        orders_by_payment_status = Order.objects.values('payment_status').annotate(
+            count=models.Count('id')
+        ).order_by('payment_status')
+
+        # Revenue stats
+        total_revenue = Order.objects.filter(
+            payment_status='paid'
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+
+        # Recent orders (last 30 days)
+        recent_orders = Order.objects.filter(
+            created_at__gte=timezone.now() - timedelta(days=30)
+        ).count()
+
+        return Response({
+            'total_orders': total_orders,
+            'orders_by_status': list(orders_by_status),
+            'orders_by_payment_status': list(orders_by_payment_status),
+            'total_revenue': float(total_revenue),
+            'recent_orders': recent_orders
+        })
+
+    @action(detail=False, methods=['post'])
+    def bulk_update_status(self, request):
+        """Bulk update order statuses"""
+        from apps.orders.models import Order
+
+        order_ids = request.data.get('order_ids', [])
+        new_status = request.data.get('status')
+
+        if not order_ids or not new_status:
+            return Response(
+                {'error': 'order_ids and status are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        orders = Order.objects.filter(id__in=order_ids)
+        count = orders.update(status=new_status)
+
+        # Log the activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action='update',
+            resource_type='order',
+            description=f'Bulk updated {count} orders to status {new_status}',
+            metadata={'order_ids': order_ids, 'new_status': new_status, 'count': count}
+        )
+
+        return Response({'message': f'Updated {count} orders to status {new_status}'})
+
+    @action(detail=True, methods=['get'])
+    def details(self, request, pk=None):
+        """Get detailed order information including items"""
+        from apps.orders.models import Order
+
+        order = self.get_object()
+        # This would need a more detailed serializer that includes order items
+        # For now, return basic order info
+        serializer = self.get_serializer(order)
+        return Response(serializer.data)
+
+
+class AdminActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """Admin activity log viewing"""
+    queryset = AdminActivityLog.objects.all()
+    serializer_class = AdminActivityLogSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get_queryset(self):
+        """Filter activity logs based on query parameters"""
+        queryset = AdminActivityLog.objects.select_related('admin').all()
+
+        admin_id = self.request.query_params.get('admin_id')
+        action = self.request.query_params.get('action')
+        resource_type = self.request.query_params.get('resource_type')
+        resource_id = self.request.query_params.get('resource_id')
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        search = self.request.query_params.get('search')
+
+        if admin_id:
+            queryset = queryset.filter(admin_id=admin_id)
+        if action:
+            queryset = queryset.filter(action=action)
+        if resource_type:
+            queryset = queryset.filter(resource_type=resource_type)
+        if resource_id:
+            queryset = queryset.filter(resource_id=resource_id)
+        if date_from:
+            queryset = queryset.filter(timestamp__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(timestamp__date__lte=date_to)
+        if search:
+            queryset = queryset.filter(
+                models.Q(description__icontains=search) |
+                models.Q(admin__email__icontains=search) |
+                models.Q(resource_id__icontains=search)
+            )
+
+        return queryset.order_by('-timestamp')
+
+    @action(detail=False, methods=['get'])
+    def actions(self, request):
+        """Get available action types"""
+        actions = AdminActivityLog.ACTION_CHOICES
+        return Response({'actions': actions})
+
+    @action(detail=False, methods=['get'])
+    def resource_types(self, request):
+        """Get available resource types"""
+        resource_types = AdminActivityLog.RESOURCE_CHOICES
+        return Response({'resource_types': resource_types})
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get activity log statistics"""
+        total_logs = AdminActivityLog.objects.count()
+
+        # Actions distribution
+        actions_stats = AdminActivityLog.objects.values('action').annotate(
+            count=models.Count('id')
+        ).order_by('-count')
+
+        # Resource types distribution
+        resource_stats = AdminActivityLog.objects.values('resource_type').annotate(
+            count=models.Count('id')
+        ).order_by('-count')
+
+        # Recent activity (last 24 hours)
+        recent_activity = AdminActivityLog.objects.filter(
+            timestamp__gte=timezone.now() - timedelta(hours=24)
+        ).count()
+
+        # Top active admins
+        admin_activity = AdminActivityLog.objects.values(
+            'admin__email'
+        ).annotate(
+            count=models.Count('id')
+        ).order_by('-count')[:10]
+
+        return Response({
+            'total_logs': total_logs,
+            'actions_distribution': list(actions_stats),
+            'resource_distribution': list(resource_stats),
+            'recent_activity': recent_activity,
+            'top_admins': list(admin_activity)
+        })
+
+    @action(detail=False, methods=['delete'])
+    def clear_old_logs(self, request):
+        """Clear activity logs older than specified days"""
+        days = int(request.query_params.get('days', 90))
+
+        cutoff_date = timezone.now() - timedelta(days=days)
+        deleted_count = AdminActivityLog.objects.filter(
+            timestamp__lt=cutoff_date
+        ).delete()[0]
+
+        # Log this action
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action='delete',
+            resource_type='system',
+            description=f'Cleared {deleted_count} activity logs older than {days} days',
+            metadata={'days': days, 'deleted_count': deleted_count}
+        )
+
+        return Response({
+            'message': f'Cleared {deleted_count} activity logs older than {days} days'
+        })

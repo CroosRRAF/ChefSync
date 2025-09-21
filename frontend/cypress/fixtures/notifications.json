@@ -1,0 +1,58 @@
+[
+  {
+    "id": 1,
+    "title": "System Maintenance Scheduled",
+    "message": "Scheduled maintenance will occur tonight from 2:00 AM to 4:00 AM EST. Services may be temporarily unavailable.",
+    "notification_type": "maintenance",
+    "priority": "medium",
+    "is_read": false,
+    "is_active": true,
+    "created_at": "2025-09-21T10:30:00Z",
+    "read_at": null,
+    "expires_at": "2025-09-22T04:00:00Z",
+    "time_ago": "2 hours ago",
+    "is_expired": false,
+    "metadata": {
+      "maintenance_start": "2025-09-22T02:00:00Z",
+      "maintenance_end": "2025-09-22T04:00:00Z"
+    }
+  },
+  {
+    "id": 2,
+    "title": "High CPU Usage Alert",
+    "message": "Server CPU usage has exceeded 85% for the last 15 minutes. Please investigate.",
+    "notification_type": "system_alert",
+    "priority": "high",
+    "is_read": false,
+    "is_active": true,
+    "created_at": "2025-09-21T09:45:00Z",
+    "read_at": null,
+    "expires_at": null,
+    "time_ago": "3 hours ago",
+    "is_expired": false,
+    "metadata": {
+      "cpu_usage": 87.5,
+      "threshold": 85,
+      "duration_minutes": 15
+    }
+  },
+  {
+    "id": 3,
+    "title": "New Chef Registration",
+    "message": "Chef 'Mario Rossi' has registered and is pending approval.",
+    "notification_type": "user_activity",
+    "priority": "medium",
+    "is_read": true,
+    "is_active": true,
+    "created_at": "2025-09-21T08:15:00Z",
+    "read_at": "2025-09-21T08:30:00Z",
+    "expires_at": null,
+    "time_ago": "4 hours ago",
+    "is_expired": false,
+    "metadata": {
+      "chef_id": 123,
+      "chef_name": "Mario Rossi",
+      "registration_date": "2025-09-21T08:15:00Z"
+    }
+  }
+]

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,16 +61,7 @@ const AdminAnalytics: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<string>('30d');
 
-  useEffect(() => {
-    if (isAuthenticated && user?.role === 'admin') {
-      fetchAnalytics();
-    } else {
-      setIsLoading(false);
-      console.log('User not authenticated or not admin:', { isAuthenticated, userRole: user?.role });
-    }
-  }, [timeRange, isAuthenticated, user]);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setIsLoading(true);
       console.log('Fetching analytics with timeRange:', timeRange);
@@ -84,7 +75,16 @@ const AdminAnalytics: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [timeRange]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'admin') {
+      fetchAnalytics();
+    } else {
+      setIsLoading(false);
+      console.log('User not authenticated or not admin:', { isAuthenticated, userRole: user?.role });
+    }
+  }, [timeRange, isAuthenticated, user, fetchAnalytics]);
 
   if (!isAuthenticated) {
     return (

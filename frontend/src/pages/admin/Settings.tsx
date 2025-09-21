@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Settings, Save, RefreshCw, Shield, Bell, Globe, AlertCircle, CheckCircl
 import { adminService, type SystemSetting } from '@/services/adminService';
 import { toast } from 'sonner';
 
-const AdminSettings: React.FC = () => {
+const AdminSettings: React.FC = memo(() => {
   const { user } = useUserStore();
   const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,7 +18,7 @@ const AdminSettings: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Local state for form values
-  const [formValues, setFormValues] = useState<Record<string, any>>({});
+  const [formValues, setFormValues] = useState<Record<string, string | boolean | number>>({});
 
   // Load settings on component mount
   useEffect(() => {
@@ -33,7 +33,7 @@ const AdminSettings: React.FC = () => {
       setSettings(settingsData);
 
       // Initialize form values
-      const initialValues: Record<string, any> = {};
+      const initialValues: Record<string, string | boolean | number> = {};
       settingsData.forEach(setting => {
         initialValues[setting.key] = setting.typed_value || setting.value;
       });
@@ -46,7 +46,7 @@ const AdminSettings: React.FC = () => {
     }
   };
 
-  const handleInputChange = (key: string, value: any) => {
+  const handleInputChange = (key: string, value: string | boolean | number) => {
     setFormValues(prev => ({
       ...prev,
       [key]: value
@@ -87,7 +87,7 @@ const AdminSettings: React.FC = () => {
 
   const handleReset = () => {
     // Reset form values to original settings
-    const resetValues: Record<string, any> = {};
+    const resetValues: Record<string, string | boolean | number> = {};
     settings.forEach(setting => {
       resetValues[setting.key] = setting.typed_value || setting.value;
     });
@@ -96,9 +96,20 @@ const AdminSettings: React.FC = () => {
     setError(null);
   };
 
-  // Helper function to get setting value
-  const getSettingValue = (key: string, defaultValue: any = '') => {
-    return formValues[key] !== undefined ? formValues[key] : defaultValue;
+  // Helper function to get setting value with proper typing
+  const getSettingValue = <T extends string | boolean | number>(key: string, defaultValue: T): T => {
+    const value = formValues[key];
+    if (value !== undefined) {
+      // Type assertion based on default value type
+      if (typeof defaultValue === 'boolean') {
+        return (value === true || value === 'true') as T;
+      }
+      if (typeof defaultValue === 'number') {
+        return (typeof value === 'number' ? value : parseFloat(String(value)) || defaultValue) as T;
+      }
+      return String(value) as T;
+    }
+    return defaultValue;
   };
 
   // Helper function to get setting by key
@@ -419,7 +430,7 @@ const AdminSettings: React.FC = () => {
         </div>
       </div>
   );
-};
+});
 
 export default AdminSettings;
 

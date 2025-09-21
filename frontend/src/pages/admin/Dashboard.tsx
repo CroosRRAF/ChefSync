@@ -143,7 +143,7 @@ const Dashboard: React.FC = () => {
       subtitle: `${stats?.active_foods || 0} active`,
       icon: <Package />,
       color: 'green' as const,
-      onClick: () => handleCardClick('/admin/food')
+      onClick: () => handleCardClick('/admin/foods')
     },
     {
       title: 'New Users',
@@ -204,7 +204,7 @@ const Dashboard: React.FC = () => {
       icon: Package,
       iconColor: 'text-emerald-700 dark:text-emerald-300',
       bgColor: 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 border-emerald-200 dark:border-emerald-700',
-      path: '/admin/food',
+      path: '/admin/foods',
       badge: stats?.total_foods ? `${stats.total_foods} items` : null
     },
     {

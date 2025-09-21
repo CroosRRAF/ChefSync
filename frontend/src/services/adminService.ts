@@ -174,7 +174,7 @@ export interface AdminNotification {
   expires_at: string | null;
   time_ago: string;
   is_expired: boolean;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export interface AdminActivityLog {
@@ -190,21 +190,21 @@ export interface AdminActivityLog {
   user_agent: string | null;
   timestamp: string;
   time_ago: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export interface SystemSetting {
   id: number;
   key: string;
   value: string;
-  typed_value: any;
+  typed_value: string | number | boolean;
   setting_type: string;
   category: string;
   description: string;
   is_public: boolean;
   is_encrypted: boolean;
   default_value: string;
-  validation_rules: Record<string, any>;
+  validation_rules: Record<string, unknown>;
   updated_by: number | null;
   updated_at: string;
   created_at: string;
@@ -270,7 +270,18 @@ class AdminService {
       });
       
       // Transform data to ensure type safety
-      const orders: AdminOrder[] = response.data.map((order: any) => ({
+      const orders: AdminOrder[] = response.data.map((order: {
+        id: number;
+        order_number: string;
+        customer_name: string;
+        customer_email: string;
+        status: string;
+        total_amount: string | number;
+        created_at: string;
+        updated_at: string;
+        payment_status: string;
+        items_count: string | number;
+      }) => ({
         ...order,
         total_amount: typeof order.total_amount === 'string' 
           ? parseFloat(order.total_amount) 
@@ -364,7 +375,19 @@ class AdminService {
   }
 
   // User Details and Management
-  async getUserDetails(userId: number): Promise<any> {
+  async getUserDetails(userId: number): Promise<{
+    id: number;
+    email: string;
+    name: string;
+    role: string;
+    is_active: boolean;
+    date_joined: string;
+    phone_no?: string;
+    address?: string;
+    total_orders: number;
+    total_spent: number;
+    last_login?: string;
+  }> {
     try {
       const response = await apiClient.get(`${this.baseUrl}/users/${userId}/details/`);
       return response.data;
@@ -438,7 +461,25 @@ class AdminService {
     }
   }
 
-  async getOrderDetails(orderId: number): Promise<any> {
+  async getOrderDetails(orderId: number): Promise<{
+    id: number;
+    order_number: string;
+    customer_name: string;
+    customer_email: string;
+    status: string;
+    total_amount: number;
+    created_at: string;
+    updated_at: string;
+    payment_status: string;
+    items_count: number;
+    items: Array<{
+      id: number;
+      food_name: string;
+      quantity: number;
+      price: number;
+      total: number;
+    }>;
+  }> {
     try {
       const response = await apiClient.get(`${this.baseUrl}/orders/${orderId}/details/`);
       return response.data;
@@ -601,7 +642,11 @@ class AdminService {
   }
 
   // Quick actions
-  async performQuickAction(actionType: string, params: Record<string, any> = {}): Promise<any> {
+  async performQuickAction(actionType: string, params: Record<string, unknown> = {}): Promise<{
+    success: boolean;
+    message: string;
+    data?: unknown;
+  }> {
     try {
       const response = await apiClient.post(`${this.baseUrl}/quick-actions/${actionType}/`, params);
       return response.data;

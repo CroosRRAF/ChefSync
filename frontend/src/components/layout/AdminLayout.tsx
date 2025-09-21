@@ -87,31 +87,31 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       icon: Users
     },
     {
-      label: 'Approvals',
-      href: '/admin/approvals',
-      icon: Shield,
-      badge: 0 // Will be updated with actual count
-    },
-    {
-      label: 'Orders',
+      label: 'Order Management',
       href: '/admin/orders',
       icon: ShoppingCart,
       badge: 5
     },
     {
       label: 'Food Management',
-      href: '/admin/food',
+      href: '/admin/foods',
       icon: ChefHat
     },
     {
-      label: 'Analytics',
+      label: 'System Analytics',
       href: '/admin/analytics',
       icon: BarChart3
     },
     {
-      label: 'Communications',
-      href: '/admin/communications',
+      label: 'Complaints & Feedback',
+      href: '/admin/complaints',
       icon: MessageSquare,
+      badge: 2
+    },
+    {
+      label: 'Notifications',
+      href: '/admin/notifications',
+      icon: Bell,
       badge: 3
     },
     {
@@ -164,7 +164,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       }
     });
     setExpandedItems(activeItems);
-  }, [location.pathname]);
+  }, [location.pathname, isActiveRoute, navItems]);
 
   // Handle expanding/collapsing navigation items
   const toggleExpanded = (href: string) => {
