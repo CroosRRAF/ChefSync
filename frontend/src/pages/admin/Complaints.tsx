@@ -1,8 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { MessageSquare, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useCommunicationStats } from '@/hooks/useCommunicationStats';
+import ComplaintManagement from '@/components/admin/communications/ComplaintManagement';
+import FeedbackManagement from '@/components/admin/communications/FeedbackManagement';
 
 const AdminComplaints: React.FC = () => {
+  const { stats, loading, error } = useCommunicationStats();
+
+  // Calculate derived stats
+  const totalComplaints = stats?.by_type.find(type => type.communication_type === 'complaint')?.count || 0;
+  const pendingReview = stats?.by_status.find(status => status.status === 'pending')?.count || 0;
+  const resolved = stats?.by_status.find(status => status.status === 'resolved')?.count || 0;
+  const positiveFeedback = stats?.by_type.find(type => type.communication_type === 'feedback')?.count || 0;
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -19,8 +30,17 @@ const AdminComplaints: React.FC = () => {
             <AlertCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24</div>
-            <p className="text-xs text-muted-foreground">+2 from last week</p>
+            {loading ? (
+              <div className="flex items-center space-x-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">Loading...</span>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{totalComplaints}</div>
+                <p className="text-xs text-muted-foreground">Total complaint entries</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -30,8 +50,17 @@ const AdminComplaints: React.FC = () => {
             <Clock className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">Requires attention</p>
+            {loading ? (
+              <div className="flex items-center space-x-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">Loading...</span>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{pendingReview}</div>
+                <p className="text-xs text-muted-foreground">Requires attention</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -41,8 +70,17 @@ const AdminComplaints: React.FC = () => {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">16</div>
-            <p className="text-xs text-muted-foreground">This month</p>
+            {loading ? (
+              <div className="flex items-center space-x-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">Loading...</span>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{resolved}</div>
+                <p className="text-xs text-muted-foreground">Successfully resolved</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -52,30 +90,42 @@ const AdminComplaints: React.FC = () => {
             <MessageSquare className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">42</div>
-            <p className="text-xs text-muted-foreground">+12% from last month</p>
+            {loading ? (
+              <div className="flex items-center space-x-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">Loading...</span>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{positiveFeedback}</div>
+                <p className="text-xs text-muted-foreground">Positive feedback received</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Placeholder Content */}
+      {/* Complaints & Feedback Management */}
       <Card>
         <CardHeader>
           <CardTitle>Complaints & Feedback Management</CardTitle>
           <CardDescription>
-            This page will contain full management functionality for complaints and feedback.
+            Manage all complaints and feedback from users. View, respond, and resolve issues.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-12">
-            <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Coming Soon
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Full complaints and feedback management system will be implemented here.
-            </p>
-          </div>
+          <Tabs defaultValue="complaints" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="complaints">Complaints</TabsTrigger>
+              <TabsTrigger value="feedback">Feedback</TabsTrigger>
+            </TabsList>
+            <TabsContent value="complaints" className="mt-6">
+              <ComplaintManagement />
+            </TabsContent>
+            <TabsContent value="feedback" className="mt-6">
+              <FeedbackManagement />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

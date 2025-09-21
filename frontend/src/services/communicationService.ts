@@ -161,7 +161,7 @@ class CommunicationService {
 
   async getCommunicationById(id: number): Promise<Communication> {
     try {
-      const response = await apiClient.get(`/communications/${id}/`);
+      const response = await apiClient.get(`/communications/communications/${id}/`);
       return response.data;
     } catch (error) {
       return this.handleError(error, 'getCommunicationById');
@@ -183,7 +183,11 @@ class CommunicationService {
 
   async addResponse(communicationId: number, data: { response: string; is_resolution?: boolean }): Promise<CommunicationResponse> {
     try {
-      const response = await apiClient.post(`/communications/${communicationId}/responses/`, data);
+      const response = await apiClient.post('/communications/responses/', {
+        communication: communicationId,
+        message: data.response,
+        is_resolution: data.is_resolution || false
+      });
       toast({
         title: 'Success',
         description: 'Response submitted successfully',
@@ -196,7 +200,7 @@ class CommunicationService {
 
   async updateStatus(communicationId: number, status: string): Promise<Communication> {
     try {
-      const response = await apiClient.patch(`/communications/${communicationId}/`, { status });
+      const response = await apiClient.patch(`/communications/communications/${communicationId}/`, { status });
       toast({
         title: 'Success',
         description: 'Status updated successfully',
@@ -228,7 +232,22 @@ class CommunicationService {
     return this.getCommunications({ ...params, type: 'complaint' });
   }
 
-
+  async getStats(): Promise<{
+    total: number;
+    unread: number;
+    unassigned: number;
+    resolved: number;
+    by_type: Array<{ communication_type: string; count: number }>;
+    by_priority: Array<{ priority: string; count: number }>;
+    by_status: Array<{ status: string; count: number }>;
+  }> {
+    try {
+      const response = await apiClient.get('/communications/communications/stats/');
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, 'getStats');
+    }
+  }
 
   // Email Templates
   async getEmailTemplates(params: {

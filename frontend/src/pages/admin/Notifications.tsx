@@ -13,10 +13,12 @@ import { toast } from 'sonner';
 const AdminNotifications: React.FC = memo(() => {
   const { user } = useUserStore();
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  console.log('AdminNotifications component rendered', { user, loading, error });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -30,19 +32,24 @@ const AdminNotifications: React.FC = memo(() => {
     is_urgent: false
   });
 
-  // Load notifications on component mount
+  // Load notifications when user becomes available and is admin
   useEffect(() => {
-    loadNotifications();
-    loadUnreadCount();
-  }, []);
+    if (user && user.role === 'admin') {
+      loadNotifications();
+      loadUnreadCount();
+    }
+  }, [user]);
 
   const loadNotifications = async () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Loading notifications...');
       const response = await adminService.getNotifications();
-      setNotifications(response.results);
+      console.log('Notifications response:', response);
+      setNotifications(response.results || []);
     } catch (err) {
+      console.error('Error loading notifications:', err);
       setError(err instanceof Error ? err.message : 'Failed to load notifications');
       toast.error('Failed to load notifications');
     } finally {
@@ -153,7 +160,42 @@ const AdminNotifications: React.FC = memo(() => {
   if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">Loading user information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user.role !== 'admin') {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-600">You don't have permission to access this page.</p>
+          <p className="text-sm text-gray-500 mt-2">Admin access required.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-600">Failed to load notifications</p>
+          <p className="text-sm text-gray-500 mt-2">{error}</p>
+          <Button
+            variant="outline"
+            onClick={() => loadNotifications()}
+            className="mt-4"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }

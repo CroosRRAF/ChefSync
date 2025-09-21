@@ -599,7 +599,18 @@ class AdminService {
           is_active: params.is_active
         }
       });
-      return response.data;
+      
+      // Handle both paginated and non-paginated responses
+      if (Array.isArray(response.data)) {
+        return {
+          count: response.data.length,
+          next: null,
+          previous: null,
+          results: response.data
+        };
+      } else {
+        return response.data;
+      }
     } catch (error) {
       console.error('Error fetching notifications:', error);
       throw new Error('Failed to fetch notifications');
