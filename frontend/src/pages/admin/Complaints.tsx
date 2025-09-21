@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { MessageSquare, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCommunicationStats } from '@/hooks/useCommunicationStats';
-import ComplaintManagement from '@/components/admin/communications/ComplaintManagement';
-import FeedbackManagement from '@/components/admin/communications/FeedbackManagement';
+import ComplaintManagement from '@/components/admin/ComplaintManagement';
+import FeedbackManagement from '@/components/admin/FeedbackManagement';
 
 const AdminComplaints: React.FC = () => {
   const { stats, loading, error } = useCommunicationStats();
