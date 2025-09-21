@@ -2,11 +2,11 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 
-// Lazy load the communication components from components path
-const FeedbackManagement = lazy(() => import('@/components/admin/communications/FeedbackManagement'));
-const ComplaintManagement = lazy(() => import('@/components/admin/communications/ComplaintManagement'));
-const SystemAlerts = lazy(() => import('@/components/admin/communications/SystemAlerts'));
-const EmailTemplates = lazy(() => import('@/components/admin/communications/EmailTemplates'));
+// Lazy load the communication components using relative paths to avoid alias resolution issues in certain tools
+const FeedbackManagement = lazy(() => import('./communications/FeedbackManagement'));
+const ComplaintManagement = lazy(() => import('./communications/ComplaintManagement'));
+const SystemAlerts = lazy(() => import('./communications/SystemAlerts'));
+const EmailTemplates = lazy(() => import('./communications/EmailTemplates'));
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;

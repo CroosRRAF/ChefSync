@@ -356,8 +356,9 @@ describe('AdminNotifications Component', () => {
     // Check for order notification icon (Package)
     expect(document.querySelector('.lucide-package')).toBeInTheDocument();
 
-    // Check for system notification icon (AlertTriangle)
-    expect(document.querySelector('.lucide-alert-triangle')).toBeInTheDocument();
+    // Check for system notification icon (AlertTriangle/TriangleAlert in newer lucide)
+    const systemIcon = document.querySelector('.lucide-alert-triangle, .lucide-triangle-alert');
+    expect(systemIcon).toBeInTheDocument();
   });
 
   it('loads unread count on mount', async () => {
