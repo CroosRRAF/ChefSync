@@ -104,7 +104,7 @@ describe('AdminNotifications Component', () => {
 
     expect(screen.getByText('Notifications')).toBeInTheDocument();
     // The component doesn't show a loading spinner initially, just renders the form
-    expect(screen.getByText('Send Notification')).toBeInTheDocument();
+    expect(screen.getByText('Compose Notification')).toBeInTheDocument();
   });
 
   it('loads and displays notifications correctly', async () => {
@@ -117,7 +117,7 @@ describe('AdminNotifications Component', () => {
     expect(screen.getByText('New Order Received')).toBeInTheDocument();
     // Use getAllByText to handle multiple elements with same text
     expect(screen.getAllByText('System Maintenance')).toHaveLength(2); // One in template, one in notification
-    expect(screen.getByText('Send Notification')).toBeInTheDocument();
+    expect(screen.getByText('Compose Notification')).toBeInTheDocument();
     expect(screen.getByText('Quick Templates')).toBeInTheDocument();
   });
 

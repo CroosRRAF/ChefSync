@@ -198,7 +198,7 @@ const AdminNotifications: React.FC = memo(() => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Send className="h-5 w-5" />
-                <span>Send Notification</span>
+                <span>Compose Notification</span>
               </CardTitle>
               <CardDescription>Send notifications to users or groups</CardDescription>
             </CardHeader>
