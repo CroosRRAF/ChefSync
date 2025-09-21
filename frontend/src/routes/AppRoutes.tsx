@@ -7,6 +7,9 @@ import { useApprovalStatus } from '@/hooks/useApprovalStatus';
 
 // Layout components
 import Navbar from '@/components/layout/Navbar';
+import CustomerNavbar from '@/components/layout/CustomerNavbar';
+import CustomerHomeNavbar from '@/components/layout/CustomerHomeNavbar';
+import CustomerDashboardLayout from '@/components/layout/CustomerDashboardLayout';
 import AdminLayout from '@/components/layout/AdminLayout';
 
 // Public pages
@@ -31,6 +34,7 @@ import CustomerDashboard from '@/pages/customer/Dashboard';
 import CustomerOrders from '@/pages/customer/Orders';
 import CustomerProfile from '@/pages/customer/Profile';
 import CustomerSettings from '@/pages/customer/Settings';
+import CustomerCart from '@/pages/customer/Cart';
 
 import DeliveryDashboard from '@/pages/delivery/Dashboard';
 import DeliveryDeliveries from '@/pages/delivery/Deliveries';
@@ -147,7 +151,7 @@ const InnerRoutes: React.FC = () => {
     
     switch (user.role) {
       case 'customer':
-        return '/customer/dashboard';
+        return '/'; // Customers go to home page after login
       case 'cook':
         return '/cook/dashboard';
       case 'delivery_agent':
@@ -167,25 +171,25 @@ const InnerRoutes: React.FC = () => {
           isAuthenticated && user && user.role !== 'customer' ? 
             <Navigate to={getDefaultRoute()} replace /> : 
             <>
-              <Navbar />
+              {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
               <Home />
             </>
         } />
         <Route path="/menu" element={
           <>
-            <Navbar />
+            {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
             <Menu />
           </>
         } />
         <Route path="/about" element={
           <>
-            <Navbar />
+            {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
             <About />
           </>
         } />
         <Route path="/contact" element={
           <>
-            <Navbar />
+            {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
             <Contact />
           </>
         } />
@@ -254,42 +258,44 @@ const InnerRoutes: React.FC = () => {
         } />
         <Route path="/customer/home" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerDashboard />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/dashboard" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerDashboard />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/orders" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerOrders />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/profile" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerProfile />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/settings" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerSettings />
-            </>
+            </CustomerDashboardLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/customer/cart" element={
+          <ProtectedRoute allowedRoles={['customer']}>
+            <CustomerDashboardLayout>
+              <CustomerCart />
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
 

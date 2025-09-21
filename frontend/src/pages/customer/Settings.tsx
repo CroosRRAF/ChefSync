@@ -5,10 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useUserStore } from '@/store/userStore';
-import { Settings, Save, User, Bell, Shield, MapPin, CreditCard } from 'lucide-react';
+import { Settings, Save, User, Bell, Shield, MapPin, CreditCard, Home, LayoutDashboard } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const CustomerSettings: React.FC = () => {
   const { user } = useUserStore();
+  const navigate = useNavigate();
 
   if (!user) {
     return <div>Loading...</div>;
@@ -17,6 +19,26 @@ const CustomerSettings: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Navigation */}
+        <div className="mb-6 flex items-center space-x-4">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/customer/dashboard')}
+            className="hover:bg-blue-50"
+          >
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            Dashboard
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/')}
+            className="hover:bg-green-50"
+          >
+            <Home className="h-4 w-4 mr-2" />
+            Home
+          </Button>
+        </div>
+
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>

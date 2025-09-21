@@ -1,13 +1,16 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useUserStore } from '@/store/userStore';
 import { useOrderStore } from '@/store/orderStore';
-import { Package, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Package, Clock, CheckCircle, XCircle, Home, LayoutDashboard } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const CustomerOrders: React.FC = () => {
   const { user } = useUserStore();
   const { orders, getOrdersByCustomer } = useOrderStore();
+  const navigate = useNavigate();
 
   // Get customer's orders
   const customerOrders = user ? getOrdersByCustomer(user.user_id) : [];
@@ -48,6 +51,25 @@ const CustomerOrders: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Navigation */}
+        <div className="mb-6 flex items-center space-x-4">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/customer/dashboard')}
+            className="hover:bg-blue-50"
+          >
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            Dashboard
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/')}
+            className="hover:bg-green-50"
+          >
+            <Home className="h-4 w-4 mr-2" />
+            Home
+          </Button>
+        </div>
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">My Orders</h1>

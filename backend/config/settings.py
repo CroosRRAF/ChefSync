@@ -314,7 +314,7 @@ except Exception:
 # In development, disable COOP to avoid postMessage/window.closed warnings with Google OAuth
 if DEBUG:
     SECURE_CROSS_ORIGIN_OPENER_POLICY = None
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+    SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None
 
 # Cloudinary Configuration
 CLOUDINARY_STORAGE = {

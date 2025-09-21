@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, AuthState, LoginCredentials, RegisterData } from '@/types/auth';
 import authService, { AuthResponse } from '@/services/authService';
 
@@ -99,7 +100,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 export function getRoleBasedPath(role: string): string {
   switch (role) {
     case 'customer':
-      return '/customer/dashboard';
+      return '/'; // Customers go to home page after login
     case 'cook':
       return '/cook/dashboard';
     case 'delivery_agent':
@@ -114,6 +115,7 @@ export function getRoleBasedPath(role: string): string {
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const token = getSecureToken();

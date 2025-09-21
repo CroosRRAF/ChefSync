@@ -228,7 +228,7 @@ export interface OrderListResponse {
 }
 
 class AdminService {
-  private baseUrl = '/admin';
+  private baseUrl = '/api/admin';
 
   // Dashboard Statistics
   async getDashboardStats(): Promise<DashboardStats> {

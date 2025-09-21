@@ -29,14 +29,19 @@ import {
   CreditCard,
   Bell,
   Shield,
-  Settings
+  Settings,
+  ArrowLeft,
+  Home,
+  LayoutDashboard
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const CustomerProfile: React.FC = () => {
   const { user } = useAuth();
   const { updateUser } = useUserStore();
   const { orders, getOrdersByCustomer } = useOrderStore();
   const [isEditing, setIsEditing] = useState(false);
+  const navigate = useNavigate();
   
   // Get customer's orders
   const customerOrders = user ? getOrdersByCustomer(user.id) : [];
@@ -121,6 +126,26 @@ const CustomerProfile: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Navigation */}
+        <div className="mb-6 flex items-center space-x-4">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/customer/dashboard')}
+            className="hover:bg-blue-50"
+          >
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            Dashboard
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/')}
+            className="hover:bg-green-50"
+          >
+            <Home className="h-4 w-4 mr-2" />
+            Home
+          </Button>
+        </div>
+
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">

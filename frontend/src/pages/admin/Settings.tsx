@@ -4,14 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useUserStore } from '@/store/userStore';
+import { useAuth } from '@/context/AuthContext';
 import { Settings, Save, RefreshCw, Shield, Bell, Globe } from 'lucide-react';
 
 const AdminSettings: React.FC = () => {
-  const { user } = useUserStore();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
-  if (!user) {
+  if (isLoading) {
     return <div>Loading...</div>;
+  }
+
+  if (!isAuthenticated || !user) {
+    return <div>Please log in to access settings.</div>;
   }
 
   return (

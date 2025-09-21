@@ -56,7 +56,11 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
-    if (!user) return;
+    if (!user || user.role !== 'admin') {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
@@ -86,10 +90,24 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
         setError('Failed to load notifications: Invalid response format');
         setNotifications([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching notifications:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch notifications');
-      setNotifications([]);
+      
+      // Handle authentication errors gracefully
+      if (err?.response?.status === 401 || err?.code === 'token_not_valid') {
+        console.warn('NotificationCenter: Authentication required - user may need to log in');
+        // Don't show error for auth issues, just set empty notifications
+        setNotifications([]);
+        setError(null);
+      } else if (err?.response?.status === 403) {
+        console.warn('NotificationCenter: User does not have admin permissions');
+        setNotifications([]);
+        setError(null);
+      } else {
+        // Show error for other issues
+        setError(err instanceof Error ? err.message : 'Failed to fetch notifications');
+        setNotifications([]);
+      }
     } finally {
       setLoading(false);
     }

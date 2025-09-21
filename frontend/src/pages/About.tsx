@@ -2,281 +2,296 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
-import {
-  Shield,
-  Award,
+import { 
+  Heart, 
+  Users, 
+  Award, 
+  Shield, 
+  ChefHat, 
+  MapPin,
+  Star,
   Clock,
-  Users,
-  ChefHat,
-  Heart,
-  Truck,
-  CheckCircle,
-  Star
+  CheckCircle
 } from 'lucide-react';
 
 const About: React.FC = () => {
-  const navigate = useNavigate();
-
-  const values = [
+  const teamMembers = [
     {
-      icon: Shield,
-      title: 'Safety First',
-      description: 'Highest hygiene standards and food safety protocols in every kitchen',
-      color: 'text-primary'
+      name: 'Priya Sharma',
+      role: 'Founder & CEO',
+      image: 'https://images.unsplash.com/photo-1494790108755-2616b612b647?w=150&h=150&fit=crop&crop=face',
+      bio: 'Passionate about connecting food lovers with authentic home cooks.'
     },
     {
-      icon: ChefHat,
-      title: 'Quality Cuisine',
-      description: 'Expert chefs creating authentic flavors with premium ingredients',
-      color: 'text-secondary'
+      name: 'Raj Kumar',
+      role: 'Head of Operations',
+      image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
+      bio: 'Ensuring smooth operations and quality control across all kitchens.'
     },
     {
-      icon: Clock,
-      title: 'Fast Delivery',
-      description: 'Lightning-fast delivery without compromising on food quality',
-      color: 'text-accent'
-    },
-    {
-      icon: Heart,
-      title: 'Customer Care',
-      description: 'Dedicated support team ensuring exceptional customer experience',
-      color: 'text-primary'
+      name: 'Meera Patel',
+      role: 'Chef Partner Lead',
+      image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+      bio: 'Building relationships with talented home cooks and chefs.'
     }
   ];
 
-  const achievements = [
-    { icon: Users, stat: '50,000+', label: 'Happy Customers' },
-    { icon: Award, stat: '4.8/5', label: 'Average Rating' },
-    { icon: Truck, stat: '25min', label: 'Average Delivery' },
-    { icon: ChefHat, stat: '100+', label: 'Partner Restaurants' }
+  const values = [
+    {
+      icon: <Heart className="h-8 w-8" />,
+      title: 'Made with Love',
+      description: 'Every dish is prepared with care and passion by skilled home cooks who take pride in their craft.',
+      color: 'bg-red-500'
+    },
+    {
+      icon: <Shield className="h-8 w-8" />,
+      title: 'Quality Assured',
+      description: 'We maintain strict hygiene standards and quality checks to ensure every meal is safe and delicious.',
+      color: 'bg-green-500'
+    },
+    {
+      icon: <Users className="h-8 w-8" />,
+      title: 'Community First',
+      description: 'We support local cooks and create opportunities for home-based food entrepreneurs to thrive.',
+      color: 'bg-blue-500'
+    },
+    {
+      icon: <Award className="h-8 w-8" />,
+      title: 'Authentic Flavors',
+      description: 'Traditional recipes passed down through generations, preserving the authentic taste of Tamil cuisine.',
+      color: 'bg-orange-500'
+    }
   ];
 
-  const certifications = [
-    'ISO 22000 Food Safety',
-    'HACCP Certified',
-    'Sri Lanka Health Ministry Approved',
-    'Green Kitchen Initiative'
+  const milestones = [
+    { year: '2023', event: 'ChefSync Founded', description: 'Started with a vision to connect food lovers with home cooks' },
+    { year: '2023', event: '50+ Cooks Onboarded', description: 'Reached our first milestone of partnering with 50 talented cooks' },
+    { year: '2024', event: '1000+ Happy Customers', description: 'Crossed 1000 satisfied customers across Chennai' },
+    { year: '2024', event: 'Multiple Locations', description: 'Expanded to serve 50+ locations in Chennai and suburbs' }
   ];
 
   return (
-    <div className="min-h-screen bg-background pt-16">
-      {/* Hero Section */}
-      <section className="py-20 bg-muted/30">
-        <div className="container mx-auto px-4 text-center">
-          <Badge className="mb-6">About ChefSync</Badge>
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            Revolutionizing Food
-            <span className="block text-gradient-primary">Delivery Experience</span>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-20">
+      <div className="container mx-auto px-4 py-8">
+        {/* Hero Section */}
+        <div className="text-center mb-16">
+          <Badge className="mb-4 bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 animate-fadeIn">
+            About ChefSync
+          </Badge>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6 animate-slideUp">
+            Connecting Hearts Through
+            <span className="block text-orange-500 mt-2 animate-slideUp animation-delay-200">Homemade Food</span>
           </h1>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            ChefSync is Sri Lanka's premier cloud kitchen platform, connecting food lovers 
-            with exceptional cuisine through innovative technology and uncompromising quality standards.
+          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed animate-slideUp animation-delay-400">
+            ChefSync is more than just a food platform. We're a community that celebrates the art of home cooking 
+            and brings authentic Tamil flavors directly to your doorstep.
           </p>
         </div>
-      </section>
 
-      {/* Mission Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <Badge className="mb-4">Our Mission</Badge>
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Making Great Food Accessible to Everyone
-              </h2>
-              <p className="text-lg text-muted-foreground mb-6">
-                We believe exceptional food should be accessible to everyone, anywhere, anytime. 
-                Our mission is to bridge the gap between talented chefs and food enthusiasts 
-                through cutting-edge technology and reliable service.
-              </p>
-              <p className="text-lg text-muted-foreground mb-8">
-                From our state-of-the-art cloud kitchens to our efficient delivery network, 
-                every aspect of ChefSync is designed to deliver not just food, but experiences 
-                that bring joy to your dining table.
-              </p>
-              <Button onClick={() => navigate('/menu')} className="button-gradient-primary">
-                Explore Our Menu
-              </Button>
+        {/* Our Story */}
+        <div className="mb-16">
+          <Card className="overflow-hidden animate-slideUp animation-delay-600">
+            <div className="grid md:grid-cols-2 gap-0">
+              <div className="relative h-64 md:h-auto">
+                <img
+                  src="https://images.unsplash.com/photo-1749359669134-289058a33c63"
+                  alt="Traditional cooking"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent"></div>
+              </div>
+              <CardContent className="p-8 flex flex-col justify-center">
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Our Story</h2>
+                <p className="text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">
+                  Born from a simple belief that the best food comes from the heart, ChefSync started as a way to 
+                  bridge the gap between passionate home cooks and food enthusiasts seeking authentic, homemade meals.
+                </p>
+                <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+                  We recognized that many talented cooks in our community had incredible skills but lacked a platform 
+                  to share their culinary creations. Today, we're proud to be that platform, empowering home cooks 
+                  while delivering exceptional food experiences.
+                </p>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Star className="h-5 w-5 text-yellow-400 fill-current" />
+                    <span className="font-semibold">4.8+ Rating</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Users className="h-5 w-5 text-blue-500" />
+                    <span className="font-semibold">200+ Cooks</span>
+                  </div>
+                </div>
+              </CardContent>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              {achievements.map((achievement, index) => (
-                <Card key={index} className="text-center hover:shadow-card transition-all duration-300">
-                  <CardContent className="p-6">
-                    <achievement.icon className="h-8 w-8 mx-auto mb-4 text-primary" />
-                    <div className="text-3xl font-bold mb-2 text-gradient-primary">
-                      {achievement.stat}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {achievement.label}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+          </Card>
         </div>
-      </section>
 
-      {/* Values Section */}
-      <section className="py-20 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge className="mb-4">Our Values</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              What Drives Us Every Day
+        {/* Our Values */}
+        <div className="mb-16">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 animate-slideUp">
+              Our Values
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Our core values shape every decision we make and every service we deliver.
+            <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto animate-slideUp animation-delay-200">
+              The principles that guide everything we do
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {values.map((value, index) => (
-              <Card key={index} className="text-center hover:shadow-card transition-all duration-300 food-card-hover">
-                <CardContent className="p-8">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-6">
-                    <value.icon className={`h-8 w-8 ${value.color}`} />
+              <Card key={index} className="text-center hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 animate-scaleIn" style={{ animationDelay: `${index * 200}ms` }}>
+                <CardContent className="p-6">
+                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${value.color} text-white mb-4 animate-float`}>
+                    {value.icon}
                   </div>
-                  <h3 className="text-xl font-semibold mb-4">{value.title}</h3>
-                  <p className="text-muted-foreground">{value.description}</p>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                    {value.title}
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                    {value.description}
+                  </p>
                 </CardContent>
               </Card>
             ))}
           </div>
         </div>
-      </section>
 
-      {/* Safety & Certifications Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <Badge className="mb-4 bg-success text-success-foreground">Safety Certified</Badge>
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Hygiene & Safety Standards
-              </h2>
-              <p className="text-lg text-muted-foreground mb-8">
-                Your health and safety are our top priorities. Our kitchens maintain the 
-                highest international standards for food safety, with regular audits and 
-                continuous monitoring to ensure every meal meets our quality benchmarks.
-              </p>
-              
-              <div className="space-y-4">
-                {certifications.map((cert, index) => (
-                  <div key={index} className="flex items-center space-x-3">
-                    <CheckCircle className="h-5 w-5 text-success" />
-                    <span className="font-medium">{cert}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-success/10 p-8 rounded-xl">
-              <div className="text-center">
-                <Shield className="h-16 w-16 text-success mx-auto mb-6" />
-                <h3 className="text-2xl font-bold mb-4">100% Safe & Hygienic</h3>
-                <p className="text-muted-foreground mb-6">
-                  Every meal is prepared in certified kitchens following strict hygiene protocols, 
-                  ensuring your food is not just delicious but completely safe.
-                </p>
-                <div className="flex items-center justify-center space-x-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star key={star} className="h-5 w-5 fill-current text-yellow-500" />
-                  ))}
-                  <span className="ml-2 font-semibold">5-Star Safety Rating</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Team Section */}
-      <section className="py-20 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge className="mb-4">Our Team</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Passionate People Behind Great Food
+        {/* Our Journey */}
+        <div className="mb-16">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 animate-slideUp">
+              Our Journey
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              From our expert chefs to our dedicated delivery partners, every team member 
-              is committed to bringing you the best culinary experience.
+            <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto animate-slideUp animation-delay-200">
+              Key milestones in our mission to connect communities through food
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="text-center hover:shadow-card transition-all duration-300">
-              <CardContent className="p-8">
-                <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold mx-auto mb-4">
-                  👨‍🍳
+          <div className="relative animate-fadeIn animation-delay-400">
+            <div className="absolute left-1/2 transform -translate-x-1/2 w-1 h-full bg-orange-200 dark:bg-orange-800"></div>
+            <div className="space-y-8">
+              {milestones.map((milestone, index) => (
+                <div key={index} className={`flex items-center ${index % 2 === 0 ? 'flex-row' : 'flex-row-reverse'} animate-slideUp`} style={{ animationDelay: `${index * 300}ms` }}>
+                  <div className={`w-1/2 ${index % 2 === 0 ? 'pr-8 text-right' : 'pl-8 text-left'}`}>
+                    <Card className="hover:shadow-lg transition-shadow duration-300">
+                      <CardContent className="p-6">
+                        <Badge className="mb-2 bg-orange-100 text-orange-800">
+                          {milestone.year}
+                        </Badge>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                          {milestone.event}
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {milestone.description}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  <div className="relative z-10 flex items-center justify-center w-12 h-12 bg-orange-500 rounded-full animate-scaleIn">
+                    <CheckCircle className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="w-1/2"></div>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Expert Chefs</h3>
-                <p className="text-muted-foreground">
-                  Culinary masters with years of experience crafting authentic and innovative dishes.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center hover:shadow-card transition-all duration-300">
-              <CardContent className="p-8">
-                <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center text-secondary-foreground text-2xl font-bold mx-auto mb-4">
-                  🚚
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Delivery Heroes</h3>
-                <p className="text-muted-foreground">
-                  Reliable delivery partners ensuring your food reaches you fresh and on time.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center hover:shadow-card transition-all duration-300">
-              <CardContent className="p-8">
-                <div className="w-20 h-20 bg-accent rounded-full flex items-center justify-center text-accent-foreground text-2xl font-bold mx-auto mb-4">
-                  🎯
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Support Team</h3>
-                <p className="text-muted-foreground">
-                  Dedicated customer support ensuring every interaction exceeds your expectations.
-                </p>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
           </div>
         </div>
-      </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-primary text-primary-foreground">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Ready to Experience ChefSync?
-          </h2>
-          <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Join our community of food lovers and discover why we're Sri Lanka's 
-            most trusted food delivery platform.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button 
-              size="lg" 
-              variant="secondary"
-              onClick={() => navigate('/menu')}
-              className="text-lg px-8 py-6"
-            >
-              Order Now
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline"
-              onClick={() => navigate('/contact')}
-              className="text-lg px-8 py-6 bg-transparent border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary"
-            >
-              Get in Touch
-            </Button>
+        {/* Team Section */}
+        <div className="mb-16">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 animate-slideUp">
+              Meet Our Team
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto animate-slideUp animation-delay-200">
+              The passionate people behind ChefSync
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {teamMembers.map((member, index) => (
+              <Card key={index} className="text-center hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 animate-scaleIn" style={{ animationDelay: `${index * 200}ms` }}>
+                <CardContent className="p-6">
+                  <img
+                    src={member.image}
+                    alt={member.name}
+                    className="w-24 h-24 rounded-full mx-auto mb-4 object-cover animate-float"
+                  />
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    {member.name}
+                  </h3>
+                  <Badge className="mb-3 bg-orange-100 text-orange-800">
+                    {member.role}
+                  </Badge>
+                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                    {member.bio}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
-      </section>
+
+        {/* Cook Partner Program */}
+        <div className="mb-16">
+          <Card className="bg-gradient-to-r from-orange-500 to-red-500 text-white overflow-hidden animate-slideUp animation-delay-600">
+            <CardContent className="p-8 md:p-12 text-center">
+              <ChefHat className="h-16 w-16 mx-auto mb-6 text-white/90 animate-float" />
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Become a Cook Partner
+              </h2>
+              <p className="text-xl mb-8 text-white/90 max-w-2xl mx-auto">
+                Join our community of talented home cooks and turn your passion for cooking into a rewarding opportunity.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="text-center">
+                  <Clock className="h-8 w-8 mx-auto mb-2 text-white/90 animate-float" />
+                  <h3 className="font-semibold mb-1">Flexible Hours</h3>
+                  <p className="text-white/80 text-sm">Cook when you want</p>
+                </div>
+                <div className="text-center">
+                  <MapPin className="h-8 w-8 mx-auto mb-2 text-white/90 animate-float" />
+                  <h3 className="font-semibold mb-1">From Home</h3>
+                  <p className="text-white/80 text-sm">Use your own kitchen</p>
+                </div>
+                <div className="text-center">
+                  <Award className="h-8 w-8 mx-auto mb-2 text-white/90 animate-float" />
+                  <h3 className="font-semibold mb-1">Recognition</h3>
+                  <p className="text-white/80 text-sm">Build your reputation</p>
+                </div>
+              </div>
+              <Button 
+                size="lg"
+                className="bg-white text-orange-500 hover:bg-gray-100 px-8 py-3 transform hover:scale-105 transition-all duration-300"
+              >
+                Join as Cook Partner
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Stats */}
+        <div className="text-center animate-fadeIn animation-delay-800">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div>
+              <div className="text-3xl md:text-4xl font-bold text-orange-500 mb-2 animate-scaleIn">1000+</div>
+              <div className="text-gray-600 dark:text-gray-400">Happy Customers</div>
+            </div>
+            <div>
+              <div className="text-3xl md:text-4xl font-bold text-orange-500 mb-2 animate-scaleIn animation-delay-200">200+</div>
+              <div className="text-gray-600 dark:text-gray-400">Home Cooks</div>
+            </div>
+            <div>
+              <div className="text-3xl md:text-4xl font-bold text-orange-500 mb-2 animate-scaleIn animation-delay-400">50+</div>
+              <div className="text-gray-600 dark:text-gray-400">Locations</div>
+            </div>
+            <div>
+              <div className="text-3xl md:text-4xl font-bold text-orange-500 mb-2 animate-scaleIn animation-delay-600">4.8</div>
+              <div className="text-gray-600 dark:text-gray-400">Average Rating</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
