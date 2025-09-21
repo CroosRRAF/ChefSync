@@ -17,8 +17,8 @@ import Register from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import VerifyEmail from "./pages/auth/VerifyEmail";
 import ResetPassword from "./pages/auth/ResetPassword";
-import UnifiedAdminDashboard from "./pages/admin/UnifiedAdminDashboard";
-import ManageUsers from "./pages/admin/ManageUsers";
+import Dashboard from "./pages/admin/Dashboard";
+import EnhancedUserManagement from "./pages/admin/EnhancedUserManagement";
 import AdminAnalytics from "./pages/admin/Analytics";
 
 const queryClient = new QueryClient();
@@ -41,9 +41,9 @@ const AppContent = () => {
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/admin/dashboard" element={<UnifiedAdminDashboard />} />
-        <Route path="/admin/enhanced-dashboard" element={<UnifiedAdminDashboard />} />
-        <Route path="/admin/manage-users" element={<ManageUsers />} />
+        <Route path="/admin/dashboard" element={<Dashboard />} />
+        <Route path="/admin/enhanced-dashboard" element={<Dashboard />} />
+        <Route path="/admin/manage-users" element={<EnhancedUserManagement />} />
         <Route path="/admin/analytics" element={<AdminAnalytics />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />

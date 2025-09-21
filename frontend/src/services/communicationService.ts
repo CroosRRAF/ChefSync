@@ -18,10 +18,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
 
-    }
-    
     return Promise.reject(error);
   }
 );
