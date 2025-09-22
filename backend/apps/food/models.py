@@ -53,7 +53,7 @@ class Food(models.Model):
         ("Rejected", "Rejected"),
     ]
 
-    food_id = models.AutoField(primary_key=True)
+    # Removed food_id field to match database schema
     name = models.CharField(max_length=100, null=False)
     category = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)

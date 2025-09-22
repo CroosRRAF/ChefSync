@@ -184,8 +184,8 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),  # Standard: 15 minutes
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),  # Standard: 1 day
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
@@ -214,7 +214,7 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = str(
     config(
         "CORS_ALLOWED_ORIGINS",
-        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:8080,http://0.0.0.0:8081",
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000",
     )
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
@@ -245,7 +245,7 @@ CORS_ALLOW_HEADERS = [
 CSRF_TRUSTED_ORIGINS = str(
     config(
         "CORS_ALLOWED_ORIGINS",
-        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:8080,http://0.0.0.0:8081",
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000",
     )
 ).split(",")
 CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=False, cast=bool)
