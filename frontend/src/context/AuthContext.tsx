@@ -247,8 +247,8 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     if (!data?.access || !data?.user) return;
 
     // Persist tokens
-    localStorage.setItem('chefsync_token', data.access);
-    if (data.refresh) localStorage.setItem('chefsync_refresh_token', data.refresh);
+    localStorage.setItem('access_token', data.access);
+    if (data.refresh) localStorage.setItem('refresh_token', data.refresh);
 
     const frontendUser: User = {
       id: data.user.user_id,

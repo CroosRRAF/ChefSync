@@ -62,7 +62,7 @@ const UserApproval: React.FC = () => {
   const fetchPendingUsers = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('chefsync_token');
+      const token = localStorage.getItem('access_token');
       
       const response = await fetch(`${apiUrl}/api/auth/admin/pending-approvals/`, {
         headers: {
@@ -73,7 +73,17 @@ const UserApproval: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setPendingUsers(data);
+        console.log('UserApproval API response:', data);
+        
+        // Handle both old format (direct array) and new format (wrapped in users property)
+        const usersArray = data.users || data;
+        
+        if (Array.isArray(usersArray)) {
+          setPendingUsers(usersArray);
+        } else {
+          console.error('API response is not an array:', usersArray);
+          setPendingUsers([]);
+        }
       } else {
         throw new Error('Failed to fetch pending users');
       }
@@ -92,7 +102,7 @@ const UserApproval: React.FC = () => {
   const handleUserSelect = async (user: User) => {
     try {
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('chefsync_token');
+      const token = localStorage.getItem('access_token');
       
       const response = await fetch(`${apiUrl}/api/auth/admin/user/${user.user_id}/`, {
         headers: {
@@ -132,7 +142,7 @@ const UserApproval: React.FC = () => {
     setIsApproving(true);
     try {
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('chefsync_token');
+      const token = localStorage.getItem('access_token');
       
       const response = await fetch(`${apiUrl}/api/auth/admin/user/${selectedUser.user_id}/approve/`, {
         method: 'POST',

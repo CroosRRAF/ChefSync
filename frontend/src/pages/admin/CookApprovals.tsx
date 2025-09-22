@@ -66,7 +66,7 @@ const CookApprovals: React.FC = () => {
   const fetchPendingCooks = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('chefsync_token');
+      const token = localStorage.getItem('access_token');
       
       const response = await fetch(`${apiUrl}/api/auth/admin/pending-approvals/?role=cook`, {
         headers: {
@@ -96,7 +96,7 @@ const CookApprovals: React.FC = () => {
   const handleCookSelect = async (cook: Cook) => {
     try {
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('chefsync_token');
+      const token = localStorage.getItem('access_token');
       
       console.log('Fetching cook details for:', cook.user_id);
       console.log('API URL:', `${apiUrl}/api/auth/admin/user/${cook.user_id}/`);
@@ -165,7 +165,7 @@ const CookApprovals: React.FC = () => {
     setIsApproving(true);
     try {
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('chefsync_token');
+      const token = localStorage.getItem('access_token');
       
       const response = await fetch(`${apiUrl}/api/auth/admin/user/${selectedCook.user_id}/approve/`, {
         method: 'POST',
@@ -241,7 +241,7 @@ const CookApprovals: React.FC = () => {
       
       // Use backend proxy for all downloads to handle Cloudinary authentication
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('chefsync_token');
+      const token = localStorage.getItem('access_token');
       
       if (!token) {
         toast({
@@ -300,7 +300,7 @@ const CookApprovals: React.FC = () => {
           url: `${apiUrl}/api/auth/documents/proxy-download/`,
           requestBody: { document_id: doc.id, file_url: doc.file }
         });
-        throw new Error(errorData.error || `Proxy request failed: ${proxyResponse.status} ${proxyResponse.statusText}`);
+        throw new Error((errorData as any)?.error || `Proxy request failed: ${proxyResponse.status} ${proxyResponse.statusText}`);
       }
       
     } catch (error) {
@@ -333,7 +333,7 @@ const CookApprovals: React.FC = () => {
       
       // Use backend proxy for all previews to handle Cloudinary authentication
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('chefsync_token');
+      const token = localStorage.getItem('access_token');
       
       if (!token) {
         toast({
@@ -393,7 +393,7 @@ const CookApprovals: React.FC = () => {
           url: `${apiUrl}/api/auth/documents/proxy-download/`,
           requestBody: { document_id: doc.id, file_url: doc.file, preview: true }
         });
-        throw new Error(errorData.error || `Proxy request failed: ${proxyResponse.status} ${proxyResponse.statusText}`);
+        throw new Error((errorData as any)?.error || `Proxy request failed: ${proxyResponse.status} ${proxyResponse.statusText}`);
       }
       
     } catch (error) {

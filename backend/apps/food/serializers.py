@@ -29,7 +29,7 @@ class FoodReviewSerializer(serializers.ModelSerializer):
 class FoodPriceSerializer(serializers.ModelSerializer):
     class Meta:
         model = FoodPrice
-        fields = ["id", "price", "cooking_time", "quantity", "availability"]
+        fields = ['price_id', 'size', 'price', 'image_url', 'food', 'cook', 'created_at', 'updated_at']
 
 
 class OfferSerializer(serializers.ModelSerializer):

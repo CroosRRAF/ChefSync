@@ -288,8 +288,15 @@ export default function Orders() {
   // ✅ Fetch orders from backend
   useEffect(() => {
     orderAPI.getAllOrders()
-      .then((orders) => setOrders(orders))
-      .catch((err) => console.error("Failed to fetch orders", err));
+      .then((response) => {
+        // Handle both array response and object with results property
+        const ordersData = Array.isArray(response) ? response : response?.results || response?.orders || [];
+        setOrders(ordersData);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch orders", err);
+        setOrders([]); // Ensure orders is always an array
+      });
   }, []);
 
   // ✅ Accept / Decline order
@@ -297,7 +304,7 @@ export default function Orders() {
     orderAPI.updateOrderStatus(orderId.toString(), "in_progress")
       .then((updatedOrder) =>
         setOrders((prev) =>
-          prev.map((o) => (o.id === orderId ? updatedOrder : o))
+          Array.isArray(prev) ? prev.map((o) => (o.id === orderId ? updatedOrder : o)) : []
         )
       )
       .catch((err) => console.error("Failed to accept order", err));
@@ -307,14 +314,14 @@ export default function Orders() {
     orderAPI.updateOrderStatus(orderId.toString(), "declined")
       .then((updatedOrder) =>
         setOrders((prev) =>
-          prev.map((o) => (o.id === orderId ? updatedOrder : o))
+          Array.isArray(prev) ? prev.map((o) => (o.id === orderId ? updatedOrder : o)) : []
         )
       )
       .catch((err) => console.error("Failed to decline order", err));
   };
 
   // ✅ Search filter
-  const filteredOrders = orders.filter(
+  const filteredOrders = (Array.isArray(orders) ? orders : []).filter(
     (order) =>
       order.customer.username
         .toLowerCase()
@@ -342,9 +349,9 @@ export default function Orders() {
   };
 
   // ✅ Counters from backend data
-  const pendingCount = orders.filter((o) => o.status === "pending").length;
-  const inProgressCount = orders.filter((o) => o.status === "in_progress").length;
-  const completedCount = orders.filter((o) => o.status === "completed").length;
+  const pendingCount = (Array.isArray(orders) ? orders : []).filter((o) => o.status === "pending").length;
+  const inProgressCount = (Array.isArray(orders) ? orders : []).filter((o) => o.status === "in_progress").length;
+  const completedCount = (Array.isArray(orders) ? orders : []).filter((o) => o.status === "completed").length;
 
   return (
     <div className="p-6 space-y-6">

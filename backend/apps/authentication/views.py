@@ -1149,7 +1149,11 @@ def get_pending_approvals(request):
     Get all users pending approval (cooks and delivery agents)
     """
     try:
+        print(f"🔍 Getting pending approvals")
+        print(f"👤 Request user: {request.user}, Is staff: {request.user.is_staff}")
+        
         role_filter = request.GET.get('role')
+        print(f"🏷️ Role filter: {role_filter}")
         
         if role_filter:
             # Filter by specific role if provided
@@ -1164,9 +1168,19 @@ def get_pending_approvals(request):
                 approval_status='pending'
             ).order_by('created_at')
         
+        print(f"📊 Found {pending_users.count()} pending users")
+        for user in pending_users:
+            print(f"  👤 {user.name} ({user.email}, {user.role}) - Documents: {user.documents.count()}")
+        
         serializer = UserApprovalSerializer(pending_users, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        data = serializer.data
+        
+        print(f"🔄 Serialized {len(data)} users")
+        return Response({'users': data}, status=status.HTTP_200_OK)
     except Exception as e:
+        print(f"💥 Error fetching pending approvals: {str(e)}")
+        import traceback
+        print(f"📍 Traceback: {traceback.format_exc()}")
         return Response({'error': f'Failed to fetch pending approvals: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1177,33 +1191,36 @@ def get_user_for_approval(request, user_id):
     Get detailed information about a user for approval review
     """
     try:
-        print(f"Getting user details for user_id: {user_id}")
-        print(f"Request user: {request.user}, Is staff: {request.user.is_staff}")
+        print(f"🔍 Getting user details for user_id: {user_id}")
+        print(f"👤 Request user: {request.user}, Is staff: {request.user.is_staff}")
         
         user = User.objects.select_related('approved_by').prefetch_related('documents__document_type').get(
             user_id=user_id, 
             role__in=['cook', 'delivery_agent']
         )
         
-        print(f"Found user: {user.name} ({user.email})")
-        print(f"User approval status: {user.approval_status}")
-        print(f"User documents count: {user.documents.count()}")
+        print(f"✅ Found user: {user.name} ({user.email})")
+        print(f"📋 User approval status: {user.approval_status}")
+        print(f"📄 User documents count: {user.documents.count()}")
         
         # Log document details
         for doc in user.documents.all():
-            print(f"Document: {doc.file_name}, URL: {doc.file}, Visible: {doc.is_visible_to_admin}")
+            print(f"  📎 Document: {doc.file_name}, URL: {doc.file}, Visible: {doc.is_visible_to_admin}, Type: {doc.document_type.name}")
         
         serializer = UserApprovalSerializer(user)
         data = serializer.data
         
-        print(f"Serialized data documents count: {len(data.get('documents', []))}")
+        print(f"🔄 Serialized data documents count: {len(data.get('documents', []))}")
+        print(f"📊 Response data keys: {list(data.keys())}")
         
         return Response(data, status=status.HTTP_200_OK)
     except User.DoesNotExist:
-        print(f"User not found: {user_id}")
+        print(f"❌ User not found: {user_id}")
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        print(f"Error fetching user details: {str(e)}")
+        print(f"💥 Error fetching user details: {str(e)}")
+        import traceback
+        print(f"📍 Traceback: {traceback.format_exc()}")
         return Response({'error': f'Failed to fetch user details: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1214,10 +1231,19 @@ def approve_user(request, user_id):
     Approve or reject a user
     """
     try:
+        print(f"🔍 Approval request for user_id: {user_id}")
+        print(f"👤 Admin user: {request.user} (ID: {request.user.user_id})")
+        print(f"📋 Request data: {request.data}")
+        print(f"🔑 Request headers: {dict(request.headers)}")
+        
         user = User.objects.get(user_id=user_id, role__in=['cook', 'delivery_agent'])
+        print(f"✅ Found user: {user.name} ({user.email}, {user.role})")
+        print(f"📊 Current status: {user.approval_status}")
     except User.DoesNotExist:
+        print(f"❌ User not found: {user_id}")
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
+        print(f"💥 Error fetching user: {str(e)}")
         return Response({'error': f'Failed to fetch user: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     serializer = UserApprovalActionSerializer(data=request.data)
@@ -1225,19 +1251,28 @@ def approve_user(request, user_id):
         action = serializer.validated_data['action']
         notes = serializer.validated_data.get('notes', '')
         
+        print(f"🔄 Processing {action} action with notes: '{notes}'")
+        
         if action == 'approve':
             user.approval_status = 'approved'
             user.approval_notes = notes
             user.approved_by = request.user
             user.approved_at = timezone.now()
             user.save()
+            print(f"✅ User approved and saved")
             
             # Make all user documents visible to admin after approval
-            user.documents.update(is_visible_to_admin=True)
+            docs_updated = user.documents.update(is_visible_to_admin=True)
+            print(f"📄 Updated {docs_updated} documents to be visible")
             
             # Send approval email using the new email service
-            from .services.email_service import EmailService
-            EmailService.send_approval_email(user, 'approved', notes)
+            try:
+                from .services.email_service import EmailService
+                EmailService.send_approval_email(user, 'approved', notes)
+                print(f"📧 Approval email sent successfully")
+            except Exception as email_error:
+                print(f"⚠️ Email sending failed: {str(email_error)}")
+                # Don't fail the approval if email fails
             
             return Response({
                 'message': 'User approved successfully',
@@ -1250,15 +1285,23 @@ def approve_user(request, user_id):
             user.approved_by = request.user
             user.approved_at = timezone.now()
             user.save()
+            print(f"❌ User rejected and saved")
             
             # Send rejection email using the new email service
-            from .services.email_service import EmailService
-            EmailService.send_approval_email(user, 'rejected', notes)
+            try:
+                from .services.email_service import EmailService
+                EmailService.send_approval_email(user, 'rejected', notes)
+                print(f"📧 Rejection email sent successfully")
+            except Exception as email_error:
+                print(f"⚠️ Email sending failed: {str(email_error)}")
+                # Don't fail the rejection if email fails
             
             return Response({
                 'message': 'User rejected successfully',
                 'user': UserApprovalSerializer(user).data
             }, status=status.HTTP_200_OK)
+    else:
+        print(f"❌ Invalid serializer data: {serializer.errors}")
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

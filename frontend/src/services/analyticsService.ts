@@ -2,13 +2,15 @@
 import { adminService, type DashboardStats } from './adminService';
 
 class AnalyticsService {
+  private baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+
   async getDashboardStats(): Promise<DashboardStats> {
     try {
       const response = await fetch(`${this.baseUrl}/dashboard/stats/`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('chefsync_token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
       });
 

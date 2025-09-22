@@ -46,11 +46,10 @@ class User(AbstractUser):
     """
     # Role choices for user types - matching SQL schema
     ROLE_CHOICES = [
-        ('admin', 'Admin'),  # Lowercase for compatibility
-        ('Admin', 'Admin'),  # Capitalized version
-        ('Customer', 'Customer'),
-        ('Cook', 'Cook'),
-        ('DeliveryAgent', 'DeliveryAgent'),
+        ('admin', 'Admin'),
+        ('customer', 'Customer'),
+        ('cook', 'Cook'),
+        ('delivery_agent', 'Delivery Agent'),
     ]
     
     # Approval status choices
@@ -74,7 +73,7 @@ class User(AbstractUser):
     address = models.TextField(blank=True, null=True, help_text="Full address of the user")
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=255)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='Customer', help_text="User role in the system")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer', help_text="User role in the system")
     profile_image = models.BinaryField(blank=True, null=True)  # LONGBLOB equivalent
     password = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)

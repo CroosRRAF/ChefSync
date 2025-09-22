@@ -37,6 +37,7 @@ class DashboardViewSet(viewsets.ViewSet):
         # User statistics
         total_users = User.objects.count()
         active_users = User.objects.filter(is_active=True).count()
+        new_users_today = User.objects.filter(date_joined__date=today).count()
         new_users_this_week = User.objects.filter(date_joined__gte=week_ago).count()
         new_users_this_month = User.objects.filter(date_joined__gte=month_ago).count()
         
