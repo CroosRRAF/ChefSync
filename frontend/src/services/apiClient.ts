@@ -1,16 +1,16 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL + "/api";
 
 // Function to get CSRF token from cookies
 const getCsrfToken = (): string | null => {
-  const name = 'csrftoken';
+  const name = "csrftoken";
   let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
+  if (document.cookie && document.cookie !== "") {
+    const cookies = document.cookie.split(";");
     for (let i = 0; i < cookies.length; i++) {
       const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+      if (cookie.substring(0, name.length + 1) === name + "=") {
         cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
         break;
       }
@@ -23,7 +23,7 @@ const getCsrfToken = (): string | null => {
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
   withCredentials: true, // Important for CSRF cookies
 });
@@ -32,16 +32,16 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     // Add JWT auth token
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem("chefsync_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
     // Add CSRF token for non-GET requests
-    if (config.method && config.method.toLowerCase() !== 'get') {
+    if (config.method && config.method.toLowerCase() !== "get") {
       const csrfToken = getCsrfToken();
       if (csrfToken) {
-        config.headers['X-CSRFToken'] = csrfToken;
+        config.headers["X-CSRFToken"] = csrfToken;
       }
     }
 
@@ -60,29 +60,12 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Handle unauthorized access
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      window.location.href = '/login';
+      localStorage.removeItem("chefsync_token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }
 );
 
-export default apiClient;
-
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL + '/api';
-// ✅ Create axios instance
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-});
-// ✅ Attach token automatically
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('chefsync_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 export default apiClient;
