@@ -1,74 +1,92 @@
-from django.db import models
-from django.conf import settings
-from django.core.validators import MinValueValidator, MaxValueValidator
+from decimal import Decimal
+
 from apps.users.fields import LongBlobImageField
+from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
 
 
 class Cuisine(models.Model):
     """Cuisine categories (e.g., Italian, Chinese, Indian)"""
-    
+
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
     image = LongBlobImageField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
-    
+
     def __str__(self):
         return self.name
-    
+
     class Meta:
-        db_table = 'cuisines'
-        ordering = ['sort_order', 'name']
+        db_table = "cuisines"
+        ordering = ["sort_order", "name"]
 
 
 class FoodCategory(models.Model):
     """Food categories within cuisines (e.g., Appetizers, Main Course)"""
-    
+
     name = models.CharField(max_length=100)
-    cuisine = models.ForeignKey(Cuisine, on_delete=models.CASCADE, related_name='categories')
+    cuisine = models.ForeignKey(
+        Cuisine, on_delete=models.CASCADE, related_name="categories"
+    )
     description = models.TextField(blank=True)
     image = LongBlobImageField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
-    
+
     def __str__(self):
         return f"{self.cuisine.name} - {self.name}"
-    
+
     class Meta:
-        db_table = 'food_categories'
-        ordering = ['sort_order', 'name']
-        unique_together = ['cuisine', 'name']
+        db_table = "food_categories"
+        ordering = ["sort_order", "name"]
+        unique_together = ["cuisine", "name"]
 
 
 class Food(models.Model):
     """Food items offered by chefs - Admin controlled as per SQL schema"""
-    
+
     STATUS_CHOICES = [
-        ('Pending', 'Pending'),
-        ('Approved', 'Approved'),
-        ('Rejected', 'Rejected'),
+        ("Pending", "Pending"),
+        ("Approved", "Approved"),
+        ("Rejected", "Rejected"),
     ]
-    
+
     food_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=100, null=False)
     category = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Pending")
     admin = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='approved_foods',
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="approved_foods",
         null=True,
         blank=True,
-        limit_choices_to={'is_staff': True}
+        limit_choices_to={"is_staff": True},
     )
-    
+
     # Keep existing fields for backward compatibility
-    chef = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='foods', null=True, blank=True)
-    food_category = models.ForeignKey(FoodCategory, on_delete=models.CASCADE, related_name='foods', null=True, blank=True)
+    chef = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="foods",
+        null=True,
+        blank=True,
+    )
+    food_category = models.ForeignKey(
+        FoodCategory,
+        on_delete=models.CASCADE,
+        related_name="foods",
+        null=True,
+        blank=True,
+    )
     is_available = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
-    preparation_time = models.PositiveIntegerField(help_text='Preparation time in minutes', null=True, blank=True)
+    preparation_time = models.PositiveIntegerField(
+        help_text="Preparation time in minutes", null=True, blank=True
+    )
     calories_per_serving = models.PositiveIntegerField(blank=True, null=True)
     ingredients = models.JSONField(default=list, blank=True)
     allergens = models.JSONField(default=list, blank=True)
@@ -76,137 +94,152 @@ class Food(models.Model):
     is_vegetarian = models.BooleanField(default=False)
     is_vegan = models.BooleanField(default=False)
     is_gluten_free = models.BooleanField(default=False)
-    spice_level = models.CharField(max_length=20, choices=[
-        ('mild', 'Mild'),
-        ('medium', 'Medium'),
-        ('hot', 'Hot'),
-        ('very_hot', 'Very Hot'),
-    ], blank=True, null=True)
-    rating_average = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
+    spice_level = models.CharField(
+        max_length=20,
+        choices=[
+            ("mild", "Mild"),
+            ("medium", "Medium"),
+            ("hot", "Hot"),
+            ("very_hot", "Very Hot"),
+        ],
+        blank=True,
+        null=True,
+    )
+    rating_average = models.DecimalField(
+        max_digits=3, decimal_places=2, default=Decimal("0.00")
+    )
     total_reviews = models.PositiveIntegerField(default=0)
     total_orders = models.PositiveIntegerField(default=0)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return self.name
-    
+
     @property
     def is_approved(self):
-        return self.status == 'Approved'
-    
+        return self.status == "Approved"
+
     class Meta:
-        db_table = 'Food'
-        ordering = ['-created_at']
+        db_table = "foods"
+        ordering = ["-created_at"]
 
 
 class FoodPrice(models.Model):
     """Food pricing with size variations as per SQL schema"""
-    
+
     SIZE_CHOICES = [
-        ('Small', 'Small'),
-        ('Medium', 'Medium'),
-        ('Large', 'Large'),
+        ("Small", "Small"),
+        ("Medium", "Medium"),
+        ("Large", "Large"),
     ]
-    
+
     price_id = models.AutoField(primary_key=True)
     size = models.CharField(max_length=10, choices=SIZE_CHOICES)
-    price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
-    image_url = models.CharField(max_length=255, blank=True, null=True)
-    food = models.ForeignKey(Food, on_delete=models.CASCADE, related_name='prices')
-    cook = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='food_prices'
+    price = models.DecimalField(
+        max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)]
     )
-    
+    image_url = models.CharField(max_length=255, blank=True, null=True)
+    food = models.ForeignKey(Food, on_delete=models.CASCADE, related_name="prices")
+    cook = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="food_prices"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return f"{self.food.name} - {self.size} (${self.price})"
-    
+
     class Meta:
-        db_table = 'FoodPrice'
-        ordering = ['food', 'size']
-        unique_together = ['food', 'size', 'cook']
+        db_table = "FoodPrice"
+        ordering = ["food", "size"]
+        unique_together = ["food", "size", "cook"]
 
 
 class FoodImage(models.Model):
     """Images for food items"""
-    
-    food = models.ForeignKey(Food, on_delete=models.CASCADE, related_name='images')
+
+    food = models.ForeignKey(Food, on_delete=models.CASCADE, related_name="images")
     image = LongBlobImageField()
     thumbnail = LongBlobImageField(blank=True, null=True)
     caption = models.CharField(max_length=200, blank=True)
     is_primary = models.BooleanField(default=False)
     sort_order = models.PositiveIntegerField(default=0)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     def __str__(self):
         return f"Image for {self.food.name}"
-    
+
     class Meta:
-        db_table = 'food_images'
-        ordering = ['sort_order', 'created_at']
+        db_table = "food_images"
+        ordering = ["sort_order", "created_at"]
 
 
 class Offer(models.Model):
     """Offers/discounts for food prices based on SQL schema"""
+
     offer_id = models.AutoField(primary_key=True)
     description = models.TextField()
     discount = models.DecimalField(max_digits=5, decimal_places=2)
     valid_until = models.DateField()
-    price = models.ForeignKey(FoodPrice, on_delete=models.CASCADE, related_name='offers')
+    price = models.ForeignKey(
+        FoodPrice, on_delete=models.CASCADE, related_name="offers"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     def __str__(self):
         return f"Offer for {self.price.food.name} ({self.price.size}): {self.discount}% off"
-    
+
     class Meta:
-        db_table = 'Offer'
-        ordering = ['-created_at']
+        db_table = "Offer"
+        ordering = ["-created_at"]
 
 
 class FoodReview(models.Model):
     """Customer reviews for food prices as per SQL schema"""
-    
+
     review_id = models.AutoField(primary_key=True)
-    rating = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
-    comment = models.TextField(blank=True, null=True)
-    price = models.ForeignKey(FoodPrice, on_delete=models.CASCADE, related_name='reviews')
-    customer = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='food_reviews'
+    rating = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
-    
+    comment = models.TextField(blank=True, null=True)
+    price = models.ForeignKey(
+        FoodPrice, on_delete=models.CASCADE, related_name="reviews"
+    )
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="food_reviews"
+    )
+
     # Keep existing fields for enhanced functionality
-    order = models.ForeignKey('orders.Order', on_delete=models.CASCADE, related_name='food_reviews', null=True, blank=True)
+    order = models.ForeignKey(
+        "orders.Order",
+        on_delete=models.CASCADE,
+        related_name="food_reviews",
+        null=True,
+        blank=True,
+    )
     taste_rating = models.PositiveIntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(5)],
-        blank=True, null=True
+        validators=[MinValueValidator(1), MaxValueValidator(5)], blank=True, null=True
     )
     presentation_rating = models.PositiveIntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(5)],
-        blank=True, null=True
+        validators=[MinValueValidator(1), MaxValueValidator(5)], blank=True, null=True
     )
     value_rating = models.PositiveIntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(5)],
-        blank=True, null=True
+        validators=[MinValueValidator(1), MaxValueValidator(5)], blank=True, null=True
     )
     is_verified_purchase = models.BooleanField(default=True)
     helpful_votes = models.PositiveIntegerField(default=0)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return f"Review by {self.customer.username} for {self.price.food.name} ({self.price.size})"
-    
+
     class Meta:
-        db_table = 'FoodReview'
-        ordering = ['-created_at']
-        unique_together = ['customer', 'price']
+        db_table = "FoodReview"
+        ordering = ["-created_at"]
+        unique_together = ["customer", "price"]

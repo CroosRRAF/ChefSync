@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig(({ mode }: { mode: string }) => ({
   server: {
     host: "::",
-    port: 8081,
+    port: 3000,
     // In dev, omit COOP/OAC headers entirely to avoid any postMessage/closed warnings.
     // In non-dev, keep a permissive COOP for OAuth popups.
     headers: mode === 'development' ? {} : {
