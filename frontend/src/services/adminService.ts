@@ -694,17 +694,13 @@ class AdminService {
         },
       });
 
-      // Handle both paginated and non-paginated responses
-      if (Array.isArray(response.data)) {
-        return {
-          count: response.data.length,
-          next: null,
-          previous: null,
-          results: response.data,
-        };
-      } else {
-        return response.data;
-      }
+      // Since pagination is disabled, always return as paginated format for consistency
+      return {
+        count: response.data.length,
+        next: null,
+        previous: null,
+        results: response.data,
+      };
     } catch (error) {
       console.error("Error fetching notifications:", error);
       throw new Error("Failed to fetch notifications");

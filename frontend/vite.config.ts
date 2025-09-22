@@ -1,8 +1,8 @@
-import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import { componentTagger } from "lovable-tagger";
 import path from "path";
 import { fileURLToPath } from "url";
-import { componentTagger } from "lovable-tagger";
+import { defineConfig } from "vite";
 
 // __dirname is not defined in ESM; compute it from import.meta.url
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -14,9 +14,12 @@ export default defineConfig(({ mode }: { mode: string }) => ({
     port: 3000,
     // In dev, omit COOP/OAC headers entirely to avoid any postMessage/closed warnings.
     // In non-dev, keep a permissive COOP for OAuth popups.
-    headers: mode === 'development' ? {} : {
-      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
-    },
+    headers:
+      mode === "development"
+        ? {}
+        : {
+            "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+          },
     proxy: {
       "/api": {
         target: "http://127.0.0.1:8000",
@@ -25,11 +28,9 @@ export default defineConfig(({ mode }: { mode: string }) => ({
       },
     },
   },
-  plugins: [
-    react(),
-    mode === 'development' &&
-    componentTagger(),
-  ].filter(Boolean),
+  plugins: [react(), mode === "development" && componentTagger()].filter(
+    Boolean
+  ),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

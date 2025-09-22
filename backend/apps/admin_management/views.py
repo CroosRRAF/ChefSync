@@ -1248,32 +1248,55 @@ class AdminNotificationViewSet(viewsets.ModelViewSet):
     queryset = AdminNotification.objects.all()
     serializer_class = AdminNotificationSerializer
     permission_classes = [IsAdminUser]
+    pagination_class = None  # Disable pagination to return array directly
 
     def get_queryset(self):
         """Filter notifications based on query parameters"""
-        queryset = self.queryset
+        try:
+            queryset = self.queryset
 
-        # Filter by read status
-        is_read = self.request.query_params.get("is_read")  # type: ignore
-        if is_read is not None:
-            queryset = queryset.filter(is_read=is_read.lower() == "true")
+            # Filter by read status
+            is_read = self.request.query_params.get("is_read")  # type: ignore
+            if is_read is not None:
+                queryset = queryset.filter(is_read=is_read.lower() == "true")
 
-        # Filter by notification type
-        notification_type = self.request.query_params.get("type")  # type: ignore
-        if notification_type:
-            queryset = queryset.filter(notification_type=notification_type)
+            # Filter by notification type
+            notification_type = self.request.query_params.get("type")  # type: ignore
+            if notification_type:
+                queryset = queryset.filter(notification_type=notification_type)
 
-        # Filter by priority
-        priority = self.request.query_params.get("priority")  # type: ignore
-        if priority:
-            queryset = queryset.filter(priority=priority)
+            # Filter by priority
+            priority = self.request.query_params.get("priority")  # type: ignore
+            if priority:
+                queryset = queryset.filter(priority=priority)
 
-        # Filter by active status
-        is_active = self.request.query_params.get("is_active")  # type: ignore
-        if is_active is not None:
-            queryset = queryset.filter(is_active=is_active.lower() == "true")
+            # Filter by active status
+            is_active = self.request.query_params.get("is_active")  # type: ignore
+            if is_active is not None:
+                queryset = queryset.filter(is_active=is_active.lower() == "true")
 
-        return queryset.order_by("-created_at")
+            return queryset.order_by("-created_at")
+        except Exception as e:
+            print(f"Error in AdminNotificationViewSet.get_queryset: {e}")
+            import traceback
+
+            traceback.print_exc()
+            # Return empty queryset on error to prevent 500
+            return AdminNotification.objects.none()
+
+    def list(self, request, *args, **kwargs):
+        """Override list to add error handling"""
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            print(f"Error in AdminNotificationViewSet.list: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return Response(
+                {"error": f"Failed to fetch notifications: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     @action(detail=True, methods=["patch"])
     def mark_read(self, request, pk=None):
