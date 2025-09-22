@@ -17,7 +17,7 @@ from apps.admin_management.models import (
     AdminActivityLog, AdminNotification, SystemHealthMetric,
     AdminDashboardWidget, AdminQuickAction, AdminSystemSettings, AdminBackupLog
 )
-from apps.food.models import Cuisine, FoodCategory, Food, FoodImage, FoodReview
+from apps.food.models import Cuisine, FoodCategory, Food, FoodImage, FoodReview, FoodPrice
 from apps.orders.models import Order, OrderItem, OrderStatusHistory, CartItem
 from apps.payments.models import Payment, Refund, PaymentMethod, Transaction
 from apps.users.models import ChefProfile, DeliveryProfile
@@ -348,11 +348,13 @@ class Command(BaseCommand):
             chef = random.choice(self.cook_users)
 
             food = Food.objects.create(
-                chef=chef,
                 name=food_data['name'],
+                category=food_data['category'],
                 description=f'Delicious {food_data["name"]} prepared with fresh ingredients and authentic {food_data["cuisine"]} techniques.',
-                category=category,
-                price=Decimal(str(food_data['price'])),
+                status='Approved',  # Set as approved for dummy data
+                admin=random.choice(self.admin_users) if hasattr(self, 'admin_users') and self.admin_users else None,
+                chef=chef,
+                food_category=category,
                 is_available=random.choice([True, True, True, False]),  # 75% available
                 is_featured=random.choice([True, False, False, False]),  # 25% featured
                 preparation_time=food_data['prep_time'],
@@ -369,6 +371,24 @@ class Command(BaseCommand):
                 total_orders=random.randint(0, 100),
                 created_at=timezone.now() - timedelta(days=random.randint(1, 365))
             )
+            
+            # Create FoodPrice entries for different sizes
+            base_price = Decimal(str(food_data['price']))
+            for size_choice in ['Small', 'Medium', 'Large']:
+                if size_choice == 'Small':
+                    price = base_price * Decimal('0.8')  # 20% less
+                elif size_choice == 'Medium':
+                    price = base_price  # Base price
+                else:  # Large
+                    price = base_price * Decimal('1.3')  # 30% more
+                
+                FoodPrice.objects.create(
+                    food=food,
+                    size=size_choice,
+                    price=price,
+                    cook=chef,
+                    image_url=f'https://example.com/food_{food.food_id}_{size_choice.lower()}.jpg'
+                )
             foods.append(food)
 
         self.stdout.write(self.style.SUCCESS(
@@ -447,23 +467,29 @@ class Command(BaseCommand):
                 if not available_foods:
                     break  # No more unique foods available
 
+                # Get a random food with its prices
                 food = random.choice(available_foods)
                 selected_foods.add(food)
-
+                
+                food_prices = FoodPrice.objects.filter(food=food)
+                if not food_prices:
+                    continue
+                    
+                food_price = random.choice(food_prices)
                 quantity = random.randint(1, 3)
-                unit_price = food.price
+                unit_price = food_price.price
                 total_price = quantity * unit_price
                 subtotal += total_price
 
                 OrderItem.objects.create(
                     order=order,
-                    food=food,
+                    price=food_price,
                     quantity=quantity,
                     unit_price=unit_price,
                     total_price=total_price,
                     special_instructions=random.choice(['', 'Extra sauce', 'Less salt', 'Medium rare']),
                     food_name=food.name,
-                    food_description=food.description
+                    food_description=food.description if hasattr(food, 'description') else ''
                 )
 
             # Calculate totals

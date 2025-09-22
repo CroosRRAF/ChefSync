@@ -7,6 +7,9 @@ import { useApprovalStatus } from '@/hooks/useApprovalStatus';
 
 // Layout components
 import Navbar from '@/components/layout/Navbar';
+import CustomerNavbar from '@/components/layout/CustomerNavbar';
+import CustomerHomeNavbar from '@/components/layout/CustomerHomeNavbar';
+import CustomerDashboardLayout from '@/components/layout/CustomerDashboardLayout';
 import AdminLayout from '@/components/layout/AdminLayout';
 
 // Public pages
@@ -31,6 +34,7 @@ import CustomerDashboard from '@/pages/customer/Dashboard';
 import CustomerOrders from '@/pages/customer/Orders';
 import CustomerProfile from '@/pages/customer/Profile';
 import CustomerSettings from '@/pages/customer/Settings';
+import CustomerCart from '@/pages/customer/Cart';
 
 import DeliveryDashboard from '@/pages/delivery/Dashboard';
 import DeliveryDeliveries from '@/pages/delivery/Deliveries';
@@ -95,7 +99,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Check approval status for cooks and delivery agents
-  if (user && (user.role === 'cook' || user.role === 'delivery_agent')) {
+  if (user && (user.role.toLowerCase() === 'cook' || user.role.toLowerCase() === 'delivery_agent' || user.role.toLowerCase() === 'deliveryagent')) {
     // Check if user has approval status in localStorage (from login attempt)
     const pendingUserData = localStorage.getItem('pending_user_data');
     if (pendingUserData) {
@@ -115,14 +119,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }
 
-  if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
+  if (allowedRoles.length > 0 && user && !allowedRoles.map(role => role.toLowerCase()).includes(user.role.toLowerCase())) {
+    // Debug: Log role mismatch
+    console.log('Role mismatch - User role:', user.role, 'Allowed roles:', allowedRoles);
+    
     // Redirect based on user role
-    switch (user.role) {
+    switch (user.role.toLowerCase()) {
       case 'customer':
         return <Navigate to="/customer/dashboard" replace />;
       case 'cook':
         return <Navigate to="/cook/dashboard" replace />;
       case 'delivery_agent':
+      case 'deliveryagent':
         return <Navigate to="/delivery/dashboard" replace />;
       case 'admin':
         return <Navigate to="/admin/dashboard" replace />;
@@ -142,12 +150,13 @@ const InnerRoutes: React.FC = () => {
   const getDefaultRoute = () => {
     if (!isAuthenticated || !user) return '/';
     
-    switch (user.role) {
+    switch (user.role.toLowerCase()) {
       case 'customer':
-        return '/customer/dashboard';
+        return '/'; // Customers go to home page after login
       case 'cook':
         return '/cook/dashboard';
       case 'delivery_agent':
+      case 'deliveryagent':
         return '/delivery/dashboard';
       case 'admin':
         return '/admin/dashboard';
@@ -161,28 +170,28 @@ const InnerRoutes: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={
-          isAuthenticated && user && user.role !== 'customer' ? 
+          isAuthenticated && user && user.role.toLowerCase() !== 'customer' ? 
             <Navigate to={getDefaultRoute()} replace /> : 
             <>
-              <Navbar />
+              {isAuthenticated && user && user.role.toLowerCase() === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
               <Home />
             </>
         } />
         <Route path="/menu" element={
           <>
-            <Navbar />
+            {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
             <Menu />
           </>
         } />
         <Route path="/about" element={
           <>
-            <Navbar />
+            {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
             <About />
           </>
         } />
         <Route path="/contact" element={
           <>
-            <Navbar />
+            {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
             <Contact />
           </>
         } />
@@ -251,42 +260,44 @@ const InnerRoutes: React.FC = () => {
         } />
         <Route path="/customer/home" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerDashboard />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/dashboard" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerDashboard />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/orders" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerOrders />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/profile" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerProfile />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/settings" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerSettings />
-            </>
+            </CustomerDashboardLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/customer/cart" element={
+          <ProtectedRoute allowedRoles={['customer']}>
+            <CustomerDashboardLayout>
+              <CustomerCart />
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
 

@@ -4,6 +4,8 @@ import { useAuth } from '@/context/AuthContext';
 import { performAdminSearch } from '@/utils/adminSearch';
 import { SearchResults } from '@/components/admin/SearchResults';
 import { useTheme } from '@/context/ThemeContext';
+import logoImage from '@/assets/2.png';
+import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import {
   LayoutDashboard,
   Users,
@@ -246,14 +248,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         {/* Sidebar Header */}
         <div className="p-4 border-b flex items-center justify-between">
           {!sidebarCollapsed && (
-            <Link to="/admin/dashboard" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold" style={{
-                backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6',
-                color: '#FFFFFF'
-              }}>
-                C
+            <Link to="/admin/dashboard" className="flex items-center gap-3">
+              <img 
+                src={navbarLogo} 
+                alt="ChefSync" 
+                className="h-14 w-auto object-contain"
+              />
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Admin Panel</p>
               </div>
-              <span className="font-bold text-lg">ChefSync Admin</span>
             </Link>
           )}
           <Button
@@ -303,14 +306,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <div className="flex flex-col h-full">
             {/* Mobile Header */}
             <div className="p-4 border-b">
-              <Link to="/admin/dashboard" className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold" style={{
-                  backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6',
-                  color: '#FFFFFF'
-                }}>
-                  C
+              <Link to="/admin/dashboard" className="flex items-center gap-3">
+                <img 
+                  src={navbarLogo} 
+                  alt="ChefSync" 
+                  className="h-14 w-auto object-contain"
+                />
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Admin Panel</p>
                 </div>
-                <span className="font-bold text-lg">ChefSync Admin</span>
               </Link>
             </div>
 

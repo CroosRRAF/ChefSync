@@ -26,7 +26,8 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/auth/', include('apps.authentication.urls')),
+    # API paths
+    path('api/auth/', include('apps.authentication.urls', namespace='api-auth')),
     path('api/analytics/', include('apps.analytics.urls')),
     path('api/admin/', include('apps.admin_management.urls')),
     path('api/communications/', include('apps.communications.urls')),
@@ -34,6 +35,8 @@ urlpatterns = [
     path('api/orders/', include('apps.orders.urls')),
     path('api/payments/', include('apps.payments.urls')),
     path('api/users/', include('apps.users.urls')),
+    # Alternative paths for frontend compatibility
+    path('auth/', include('apps.authentication.urls', namespace='auth')),
 ]
 
 # Serve media files in development

@@ -326,7 +326,7 @@ const UnifiedApprovals: React.FC = () => {
         </Card>
       )}
 
-      {isAuthenticated && userProfile && userProfile.role !== 'admin' && (
+      {isAuthenticated && userProfile && userProfile.role.toLowerCase() !== 'admin' && (
         <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">

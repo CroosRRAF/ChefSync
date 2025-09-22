@@ -5,6 +5,44 @@ from django.utils import timezone
 User = get_user_model()
 
 
+class Contact(models.Model):
+    """Simple contact form model based on SQL schema"""
+    contact_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100)
+    email = models.EmailField(max_length=100)
+    message = models.TextField()
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Contact from {self.name} - {self.email}"
+    
+    class Meta:
+        db_table = 'Contact'
+
+
+class Notification(models.Model):
+    """User notification model based on SQL schema"""
+    STATUS_CHOICES = [
+        ('Read', 'Read'),
+        ('Unread', 'Unread'),
+    ]
+    
+    notification_id = models.AutoField(primary_key=True)
+    subject = models.CharField(max_length=200)
+    message = models.TextField()
+    time = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Unread')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    
+    def __str__(self):
+        return f"Notification for {self.user.name}: {self.subject}"
+    
+    class Meta:
+        db_table = 'Notification'
+        ordering = ['-time']
+
+
 class Communication(models.Model):
     """Model for handling all types of communications"""
     COMMUNICATION_TYPE = [

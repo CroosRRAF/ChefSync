@@ -44,12 +44,13 @@ class User(AbstractUser):
     """
     Custom User model for ChefSync application
     """
-    # Role choices for user types
+    # Role choices for user types - matching SQL schema
     ROLE_CHOICES = [
-        ('admin', 'Admin'),
-        ('customer', 'Customer'),
-        ('cook', 'Cook'),
-        ('delivery_agent', 'Delivery Agent'),
+        ('admin', 'Admin'),  # Lowercase for compatibility
+        ('Admin', 'Admin'),  # Capitalized version
+        ('Customer', 'Customer'),
+        ('Cook', 'Cook'),
+        ('DeliveryAgent', 'DeliveryAgent'),
     ]
     
     # Approval status choices
@@ -59,12 +60,21 @@ class User(AbstractUser):
         ('rejected', 'Rejected'),
     ]
     
+    # Gender choices
+    GENDER_CHOICES = [
+        ('Male', 'Male'),
+        ('Female', 'Female'),
+        ('Other', 'Other'),
+    ]
+    
     user_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=100)
-    phone_no = models.CharField(max_length=15, blank=True, null=True)
-    email = models.EmailField(unique=True)
+    phone_no = models.CharField(max_length=20, blank=True, null=True)  # Updated max_length to match SQL schema
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
     address = models.TextField(blank=True, null=True, help_text="Full address of the user")
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer', help_text="User role in the system")
+    email = models.EmailField(unique=True)
+    password = models.CharField(max_length=255)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='Customer', help_text="User role in the system")
     profile_image = models.BinaryField(blank=True, null=True)  # LONGBLOB equivalent
     password = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -190,8 +200,8 @@ class User(AbstractUser):
         if self.role in ['cook', 'delivery_agent']:
             return self.approval_status == 'approved'
         
-        # Admins can always login
-        if self.role == 'admin':
+        # Admins can always login (handle both cases)
+        if self.role in ['Admin', 'admin']:
             return True
         
         return False
@@ -216,6 +226,18 @@ class User(AbstractUser):
 
     class Meta:
         db_table = 'User'
+
+
+class Admin(models.Model):
+    """Admin model as per SQL schema"""
+    admin_id = models.AutoField(primary_key=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, unique=True)
+    
+    def __str__(self):
+        return f"Admin: {self.user.name}"
+    
+    class Meta:
+        db_table = 'Admin'
 
 
 
@@ -256,6 +278,7 @@ class DeliveryAgent(models.Model):
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     vehicle_type = models.CharField(max_length=50, blank=True, null=True)
+    license_no = models.CharField(max_length=100, blank=True, null=True)  # Added to match SQL schema
     vehicle_number = models.CharField(max_length=20, blank=True, null=True)
     current_location = models.CharField(max_length=255, blank=True, null=True)
     is_available = models.BooleanField(default=True)

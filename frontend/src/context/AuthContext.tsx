@@ -26,7 +26,7 @@ export function useAuth() {
 }
 
 // Define action types
-type AuthAction = 
+type AuthAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_USER'; payload: { user: User; token: string } }
   | { type: 'CLEAR_USER' }
@@ -98,12 +98,13 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 // Helper function to get role-based path
 export function getRoleBasedPath(role: string): string {
-  switch (role) {
+  switch (role.toLowerCase()) { // Convert to lowercase for comparison
     case 'customer':
-      return '/customer/dashboard';
+      return '/'; // Customers go to home page after login
     case 'cook':
       return '/cook/dashboard';
     case 'delivery_agent':
+    case 'deliveryagent':
       return '/delivery/dashboard';
     case 'admin':
       return '/admin/dashboard';
@@ -115,6 +116,7 @@ export function getRoleBasedPath(role: string): string {
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const navigate = useNavigate();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -153,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const response: AuthResponse = await authService.login(credentials);
-            
+
       const frontendUser: User = {
         id: response.user.user_id,
         email: response.user.email,
@@ -165,33 +167,33 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         createdAt: response.user.created_at,
         updatedAt: response.user.updated_at
       };
-            
+
       // Add a small delay before state update to ensure clean state
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Set both auth context and user store state
       dispatch({ type: 'SET_USER', payload: { user: frontendUser, token: response.access } });
-      
+
       // Add another small delay after state update
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Get the role-specific dashboard path
       const dashboardPath = getRoleBasedPath(frontendUser.role);
-      
+
       // Force navigate to the dashboard path with state
-      navigate(dashboardPath, { 
+      navigate(dashboardPath, {
         replace: true,
         state: { from: 'login' }
       });
     } catch (error: any) {
       dispatch({ type: 'SET_LOADING', payload: false });
-      
+
       // Handle approval pending case
       if (error.message === 'APPROVAL_PENDING') {
         navigate('/approval-status', { replace: true });
         return;
       }
-      
+
       throw error;
     }
   }, []);
@@ -262,11 +264,11 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
   const updateProfile = useCallback(async (data: { name?: string; phone?: string; address?: string }) => {
     if (!state.user) throw new Error('No user logged in');
-    
+
     try {
       // Call the auth service to update profile on backend
       const response = await authService.updateProfile(data);
-      
+
       // Update the user in state with new data
       const updatedUser: User = {
         ...state.user,
@@ -274,10 +276,10 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         phone: data.phone || state.user.phone,
         address: data.address || state.user.address
       };
-      
-      dispatch({ 
-        type: 'SET_USER', 
-        payload: { user: updatedUser, token: state.token! } 
+
+      dispatch({
+        type: 'SET_USER',
+        payload: { user: updatedUser, token: state.token! }
       });
     } catch (error) {
       console.error('Profile update failed:', error);
