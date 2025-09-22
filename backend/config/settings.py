@@ -21,6 +21,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 config = Config(RepositoryEnv(BASE_DIR / ".env"))
 
 
+# Helper: robust boolean parsing for environment values
+def to_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    s = str(value).strip().lower()
+    if s in {"1", "true", "yes", "on", "y", "t", "enable", "enabled", "warn"}:
+        return True
+    if s in {"0", "false", "no", "off", "n", "f", "disable", "disabled"}:
+        return False
+    return default
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -33,7 +47,7 @@ SECRET_KEY = config(
 JWT_SIGNING_KEY = config("JWT_SECRET_KEY", default=SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG", default=False, cast=bool)
+DEBUG = to_bool(config("DEBUG", default=False))
 
 ALLOWED_HOSTS = str(config("ALLOWED_HOSTS", default="localhost,127.0.0.1")).split(",")
 

@@ -1,29 +1,44 @@
-from rest_framework import serializers
+from apps.orders.models import Order
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from rest_framework import serializers
+
 from .models import (
-    AdminActivityLog, AdminNotification, SystemHealthMetric,
-    AdminDashboardWidget, AdminQuickAction, AdminSystemSettings,
-    AdminBackupLog
+    AdminActivityLog,
+    AdminBackupLog,
+    AdminDashboardWidget,
+    AdminNotification,
+    AdminQuickAction,
+    AdminSystemSettings,
+    SystemHealthMetric,
 )
-from apps.orders.models import Order
 
 User = get_user_model()
 
 
 class AdminActivityLogSerializer(serializers.ModelSerializer):
-    admin_email = serializers.CharField(source='admin.email', read_only=True)
-    admin_name = serializers.CharField(source='admin.name', read_only=True)
+    admin_email = serializers.CharField(source="admin.email", read_only=True)
+    admin_name = serializers.CharField(source="admin.name", read_only=True)
     time_ago = serializers.SerializerMethodField()
 
     class Meta:
         model = AdminActivityLog
         fields = [
-            'id', 'admin', 'admin_email', 'admin_name', 'action', 'resource_type',
-            'resource_id', 'description', 'ip_address', 'user_agent', 'timestamp',
-            'time_ago', 'metadata'
+            "id",
+            "admin",
+            "admin_email",
+            "admin_name",
+            "action",
+            "resource_type",
+            "resource_id",
+            "description",
+            "ip_address",
+            "user_agent",
+            "timestamp",
+            "time_ago",
+            "metadata",
         ]
-        read_only_fields = ['id', 'timestamp', 'time_ago']
+        read_only_fields = ["id", "timestamp", "time_ago"]
 
     def get_time_ago(self, obj):
         """Calculate time difference from now"""
@@ -49,11 +64,21 @@ class AdminNotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdminNotification
         fields = [
-            'id', 'title', 'message', 'notification_type', 'priority',
-            'is_read', 'is_active', 'created_at', 'read_at', 'expires_at',
-            'time_ago', 'is_expired', 'metadata'
+            "id",
+            "title",
+            "message",
+            "notification_type",
+            "priority",
+            "is_read",
+            "is_active",
+            "created_at",
+            "read_at",
+            "expires_at",
+            "time_ago",
+            "is_expired",
+            "metadata",
         ]
-        read_only_fields = ['id', 'created_at', 'time_ago', 'is_expired']
+        read_only_fields = ["id", "created_at", "time_ago", "is_expired"]
 
     def get_time_ago(self, obj):
         """Calculate time difference from now"""
@@ -81,32 +106,53 @@ class AdminNotificationSerializer(serializers.ModelSerializer):
 class SystemHealthMetricSerializer(serializers.ModelSerializer):
     class Meta:
         model = SystemHealthMetric
-        fields = [
-            'id', 'metric_type', 'value', 'unit', 'timestamp', 'metadata'
-        ]
-        read_only_fields = ['id', 'timestamp']
+        fields = ["id", "metric_type", "value", "unit", "timestamp", "metadata"]
+        read_only_fields = ["id", "timestamp"]
 
 
 class AdminDashboardWidgetSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdminDashboardWidget
         fields = [
-            'id', 'name', 'widget_type', 'chart_type', 'title', 'description',
-            'data_source', 'position_x', 'position_y', 'width', 'height',
-            'is_active', 'refresh_interval', 'config', 'created_at', 'updated_at'
+            "id",
+            "name",
+            "widget_type",
+            "chart_type",
+            "title",
+            "description",
+            "data_source",
+            "position_x",
+            "position_y",
+            "width",
+            "height",
+            "is_active",
+            "refresh_interval",
+            "config",
+            "created_at",
+            "updated_at",
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ["id", "created_at", "updated_at"]
 
 
 class AdminQuickActionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdminQuickAction
         fields = [
-            'id', 'name', 'action_type', 'title', 'description', 'icon',
-            'color', 'is_active', 'requires_confirmation', 'confirmation_message',
-            'position', 'config', 'created_at'
+            "id",
+            "name",
+            "action_type",
+            "title",
+            "description",
+            "icon",
+            "color",
+            "is_active",
+            "requires_confirmation",
+            "confirmation_message",
+            "position",
+            "config",
+            "created_at",
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ["id", "created_at"]
 
 
 class AdminSystemSettingsSerializer(serializers.ModelSerializer):
@@ -115,11 +161,22 @@ class AdminSystemSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdminSystemSettings
         fields = [
-            'id', 'key', 'value', 'typed_value', 'setting_type', 'category',
-            'description', 'is_public', 'is_encrypted', 'default_value',
-            'validation_rules', 'updated_by', 'updated_at', 'created_at'
+            "id",
+            "key",
+            "value",
+            "typed_value",
+            "setting_type",
+            "category",
+            "description",
+            "is_public",
+            "is_encrypted",
+            "default_value",
+            "validation_rules",
+            "updated_by",
+            "updated_at",
+            "created_at",
         ]
-        read_only_fields = ['id', 'typed_value', 'updated_at', 'created_at']
+        read_only_fields = ["id", "typed_value", "updated_at", "created_at"]
 
     def get_typed_value(self, obj):
         """Return the value converted to its proper type"""
@@ -127,32 +184,49 @@ class AdminSystemSettingsSerializer(serializers.ModelSerializer):
 
     def validate_value(self, value):
         """Validate value based on setting type"""
-        setting_type = self.initial_data.get('setting_type', 'string')
+        # initial_data may be missing or not a dict in some code paths; fall back to instance/default
+        data = getattr(self, "initial_data", None)
+        if isinstance(data, dict):
+            setting_type = data.get("setting_type") or getattr(
+                self.instance, "setting_type", "string"
+            )
+        else:
+            setting_type = getattr(self.instance, "setting_type", "string")
 
-        if setting_type == 'boolean':
-            if value.lower() not in ('true', 'false', '1', '0', 'yes', 'no', 'on', 'off'):
-                raise serializers.ValidationError("Boolean value must be true/false, 1/0, yes/no, or on/off")
-        elif setting_type == 'integer':
+        if setting_type == "boolean":
+            sval = str(value).lower()
+            if sval not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
+                raise serializers.ValidationError(
+                    "Boolean value must be true/false, 1/0, yes/no, or on/off"
+                )
+        elif setting_type == "integer":
             try:
-                int(value)
+                int(str(value))
             except ValueError:
                 raise serializers.ValidationError("Value must be a valid integer")
-        elif setting_type == 'float':
+        elif setting_type == "float":
             try:
-                float(value)
+                float(str(value))
             except ValueError:
                 raise serializers.ValidationError("Value must be a valid float")
-        elif setting_type == 'json':
-            try:
-                import json
-                json.loads(value)
-            except (ValueError, TypeError):
-                raise serializers.ValidationError("Value must be valid JSON")
-        elif setting_type == 'email':
+        elif setting_type == "json":
+            # Accept dict/list directly, otherwise parse string as JSON
+            if isinstance(value, (dict, list)):
+                pass
+            else:
+                try:
+                    import json
+
+                    json.loads(str(value))
+                except (ValueError, TypeError):
+                    raise serializers.ValidationError("Value must be valid JSON")
+        elif setting_type == "email":
+            from django.core.exceptions import ValidationError as DjangoValidationError
             from django.core.validators import validate_email
+
             try:
-                validate_email(value)
-            except:
+                validate_email(str(value))
+            except DjangoValidationError:
                 raise serializers.ValidationError("Value must be a valid email address")
 
         return value
@@ -161,17 +235,27 @@ class AdminSystemSettingsSerializer(serializers.ModelSerializer):
 class AdminBackupLogSerializer(serializers.ModelSerializer):
     duration_display = serializers.SerializerMethodField()
     file_size_display = serializers.SerializerMethodField()
-    created_by_email = serializers.CharField(source='created_by.email', read_only=True)
+    created_by_email = serializers.CharField(source="created_by.email", read_only=True)
 
     class Meta:
         model = AdminBackupLog
         fields = [
-            'id', 'backup_type', 'status', 'file_path', 'file_size',
-            'file_size_display', 'started_at', 'completed_at', 'duration',
-            'duration_display', 'error_message', 'created_by', 'created_by_email',
-            'metadata'
+            "id",
+            "backup_type",
+            "status",
+            "file_path",
+            "file_size",
+            "file_size_display",
+            "started_at",
+            "completed_at",
+            "duration",
+            "duration_display",
+            "error_message",
+            "created_by",
+            "created_by_email",
+            "metadata",
         ]
-        read_only_fields = ['id', 'started_at', 'duration_display', 'file_size_display']
+        read_only_fields = ["id", "started_at", "duration_display", "file_size_display"]
 
     def get_duration_display(self, obj):
         """Format duration for display"""
@@ -192,7 +276,7 @@ class AdminBackupLogSerializer(serializers.ModelSerializer):
         """Format file size for display"""
         if obj.file_size:
             size = obj.file_size
-            for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            for unit in ["B", "KB", "MB", "GB", "TB"]:
                 if size < 1024.0:
                     return f"{size:.1f} {unit}"
                 size /= 1024.0
@@ -203,6 +287,7 @@ class AdminBackupLogSerializer(serializers.ModelSerializer):
 # Dashboard Statistics Serializers
 class DashboardStatsSerializer(serializers.Serializer):
     """Comprehensive dashboard statistics"""
+
     # User Statistics
     total_users = serializers.IntegerField()
     active_users = serializers.IntegerField()
@@ -245,6 +330,7 @@ class DashboardStatsSerializer(serializers.Serializer):
 
 class SystemHealthSerializer(serializers.Serializer):
     """System health overview"""
+
     overall_health = serializers.CharField()
     health_score = serializers.FloatField()
     cpu_usage = serializers.FloatField()
@@ -260,41 +346,62 @@ class SystemHealthSerializer(serializers.Serializer):
 
 class AdminUserSummarySerializer(serializers.ModelSerializer):
     """User summary for admin dashboard"""
+
     total_orders = serializers.SerializerMethodField()
     total_spent = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            'user_id', 'email', 'name', 'role', 'is_active', 'last_login',
-            'date_joined', 'total_orders', 'total_spent'
+            "user_id",
+            "email",
+            "name",
+            "role",
+            "is_active",
+            "last_login",
+            "date_joined",
+            "total_orders",
+            "total_spent",
         ]
 
     def get_total_orders(self, obj):
         from apps.orders.models import Order
+
         return Order.objects.filter(customer=obj).count()
 
     def get_total_spent(self, obj):
         from apps.orders.models import Order
         from django.db.models import Sum
-        total = Order.objects.filter(
-            customer=obj, payment_status='paid'
-        ).aggregate(total=Sum('total_amount'))['total'] or 0
+
+        total = (
+            Order.objects.filter(customer=obj, payment_status="paid").aggregate(
+                total=Sum("total_amount")
+            )["total"]
+            or 0
+        )
         return float(total)
 
 
 class AdminOrderSummarySerializer(serializers.ModelSerializer):
     """Order summary for admin dashboard"""
-    customer_name = serializers.CharField(source='customer.name', read_only=True)
-    customer_email = serializers.CharField(source='customer.email', read_only=True)
+
+    customer_name = serializers.CharField(source="customer.name", read_only=True)
+    customer_email = serializers.CharField(source="customer.email", read_only=True)
     items_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = [
-            'id', 'order_number', 'customer_name', 'customer_email',
-            'status', 'total_amount', 'created_at', 'updated_at',
-            'payment_status', 'items_count'
+            "id",
+            "order_number",
+            "customer_name",
+            "customer_email",
+            "status",
+            "total_amount",
+            "created_at",
+            "updated_at",
+            "payment_status",
+            "items_count",
         ]
 
     def get_items_count(self, obj):
