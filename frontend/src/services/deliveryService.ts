@@ -1,5 +1,5 @@
 import apiClient from './apiClient'; // your centralized axios instance
-import type { Order } from '../types/order';
+import type { Order } from '../types/orderType';
 
 // 🚚 Fetch available orders
 export const getAvailableOrders = async (): Promise<Order[]> => {

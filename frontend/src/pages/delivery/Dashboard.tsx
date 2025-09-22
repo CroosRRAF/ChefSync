@@ -16,14 +16,8 @@ import {
   getDashboardSummary,
 } from "@/services/deliveryService";
 import { Link } from "react-router-dom";
-import type { Order } from "../../types/order";
-import {
-  Truck,
-  CheckCircle,
-  LogOut,
-  Package,
-  DollarSign,
-} from "lucide-react";
+import type { Order } from "../../types/orderType";
+import { Truck, CheckCircle, LogOut, Package, DollarSign } from "lucide-react";
 
 const DeliveryDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -72,8 +66,8 @@ const DeliveryDashboard: React.FC = () => {
     (o) => o.status === "out_for_delivery"
   ).length;
 
-  const pendingPickups = orders.filter(
-    (o) => ["ready", "pending"].includes(o.status)
+  const pendingPickups = orders.filter((o) =>
+    ["ready", "pending"].includes(o.status)
   ).length;
 
   const completedToday = orders.filter(
