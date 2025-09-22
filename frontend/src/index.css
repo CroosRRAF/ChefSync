@@ -2,183 +2,104 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ChefSync Design System - Food-inspired color palette and animations */
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* ChefSync Admin Design System - Modern Professional Theme */
+/* ChefSync Admin Design System - Fresh Food-Inspired Theme */
 
 @layer base {
   :root {
-    /* Core Colors - Professional Corporate Theme */
-    --background: 210 40% 98%;
-    --foreground: 222.2 84% 4.9%;
-    
+    /* Light Mode */
+    --background: 0 0% 100%; /* White */
+    --foreground: 24 10% 10%; /* Dark brownish text */
+
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    
+    --card-foreground: 24 10% 10%;
+
+    --primary: 18 85% 52%; /* Vibrant orange-red (appetite stimulant) */
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 18 85% 60%;
+    --primary-dark: 18 85% 42%;
+
+    --secondary: 142 65% 45%; /* Fresh green */
+    --secondary-foreground: 0 0% 100%;
+    --secondary-light: 142 65% 55%;
+    --secondary-dark: 142 65% 35%;
+
+    --accent: 45 95% 55%; /* Golden yellow */
+    --accent-foreground: 24 10% 10%;
+    --accent-light: 45 95% 65%;
+    --accent-dark: 45 95% 45%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-light: 142 70% 55%;
+    --success-dark: 142 70% 35%;
+
+    --warning: 38 90% 55%; /* Amber */
+    --warning-foreground: 24 10% 10%;
+    --warning-light: 38 90% 65%;
+    --warning-dark: 38 90% 45%;
+
+    --error: 0 80% 55%; /* Rich red */
+    --error-foreground: 0 0% 100%;
+    --error-light: 0 80% 65%;
+    --error-dark: 0 80% 45%;
+
+    --info: 210 85% 55%; /* Trustworthy blue */
+    --info-foreground: 0 0% 100%;
+    --info-light: 210 85% 65%;
+    --info-dark: 210 85% 45%;
+
+    --muted: 210 20% 95%;
+    --muted-foreground: 215 15% 40%;
+
+    --border: 210 20% 90%;
+    --input: 210 20% 90%;
+    --ring: 18 85% 52%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    
-    /* Primary - Deep Corporate Blue */
-    --primary: 217 91% 60%;
-    --primary-foreground: 210 40% 98%;
-    --primary-light: 217 91% 65%;
-    --primary-dark: 217 91% 55%;
-    
-    /* Secondary - Neutral Gray */
-    --secondary: 215 16% 47%;
-    --secondary-foreground: 210 40% 98%;
-    --secondary-light: 215 20% 65%;
-    --secondary-dark: 215 25% 27%;
-    
-    /* Accent - Electric Blue */
-    --accent: 217 91% 70%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --accent-light: 217 91% 80%;
-    --accent-dark: 217 91% 60%;
-    
-    /* Neutral Palette */
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 217 91% 60%;
-    
-    /* Success - Emerald Green */
-    --success: 160 84% 39%;
-    --success-foreground: 210 40% 98%;
-    --success-light: 160 84% 49%;
-    --success-dark: 160 84% 29%;
-    
-    /* Warning - Amber */
-    --warning: 38 92% 50%;
-    --warning-foreground: 222.2 84% 4.9%;
-    --warning-light: 38 92% 60%;
-    --warning-dark: 38 92% 40%;
-    
-    /* Info - Sky Blue */
-    --info: 199 89% 48%;
-    --info-foreground: 210 40% 98%;
-    --info-light: 199 89% 58%;
-    --info-dark: 199 89% 38%;
-    
-    /* Error - Red */
-    --error: 0 84% 60%;
-    --error-foreground: 210 40% 98%;
-    --error-light: 0 84% 70%;
-    --error-dark: 0 84% 50%;
-    
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
-    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-light)));
-    --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-light)));
-    --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.9), hsl(var(--secondary) / 0.8));
-    --gradient-card: linear-gradient(145deg, hsl(var(--background)), hsl(var(--muted) / 0.3));
-    
-    /* Shadows - Professional with blue tones */
-    --shadow-sm: 0 1px 2px 0 hsl(var(--primary) / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(var(--primary) / 0.1), 0 2px 4px -1px hsl(var(--primary) / 0.06);
-    --shadow-lg: 0 10px 15px -3px hsl(var(--primary) / 0.1), 0 4px 6px -2px hsl(var(--primary) / 0.05);
-    --shadow-xl: 0 20px 25px -5px hsl(var(--primary) / 0.1), 0 10px 10px -5px hsl(var(--primary) / 0.04);
-    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.3);
-    --shadow-card: 0 4px 12px hsl(var(--primary) / 0.08);
-    
-    /* Animation & Transitions */
-    --transition-base: all 0.2s ease-in-out;
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-spring: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-    
+    --popover-foreground: 24 10% 10%;
+
     --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 222.2 84% 4.9%;
-
-    --sidebar-primary: 222.2 47.4% 11.2%;
-
-    --sidebar-primary-foreground: 210 40% 98%;
-
-    --sidebar-accent: 210 40% 96%;
-
-    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-
-    --sidebar-border: 214.3 31.8% 91.4%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    /* Dark Mode - Professional dark theme with corporate blue accent colors */
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    
-    --card: 222.2 84% 7%;
-    --card-foreground: 210 40% 98%;
-    
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    
-    /* Dark Mode Primary - Corporate Blue */
-    --primary: 217 91% 55%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --primary-light: 217 91% 65%;
-    --primary-dark: 217 91% 45%;
-    
-    /* Dark Mode Secondary - Muted Gray */
-    --secondary: 215 25% 27%;
-    --secondary-foreground: 210 40% 98%;
-    --secondary-light: 215 16% 47%;
-    --secondary-dark: 215 25% 17%;
-    
-    /* Dark Mode Accent - Electric Blue */
-    --accent: 217 91% 60%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --accent-light: 217 91% 70%;
-    --accent-dark: 217 91% 50%;
-    
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 217 91% 55%;
-    
-    --success: 160 84% 29%;
-    --success-foreground: 210 40% 98%;
-    --success-light: 160 84% 39%;
-    --success-dark: 160 84% 19%;
-    
-    --warning: 38 92% 40%;
-    --warning-foreground: 210 40% 98%;
-    --warning-light: 38 92% 50%;
-    --warning-dark: 38 92% 30%;
-    
-    --info: 199 89% 38%;
-    --info-foreground: 210 40% 98%;
-    --info-light: 199 89% 48%;
-    --info-dark: 199 89% 28%;
-    
-    --error: 0 84% 50%;
-    --error-foreground: 210 40% 98%;
-    --error-light: 0 84% 60%;
-    --error-dark: 0 84% 40%;
-    
-    /* Dark Mode Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
-    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-light)));
-    --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-light)));
-    --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.8), hsl(var(--secondary) / 0.7));
-    --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(var(--muted) / 0.3));
+    /* Dark Mode */
+    --background: 24 10% 8%; /* Deep brownish black */
+    --foreground: 0 0% 96%; /* Almost white text */
+
+    --card: 24 10% 12%;
+    --card-foreground: 0 0% 96%;
+
+    --primary: 18 85% 58%; 
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 18 85% 65%;
+    --primary-dark: 18 85% 48%;
+
+    --secondary: 142 65% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-light: 142 65% 60%;
+    --secondary-dark: 142 65% 40%;
+
+    --accent: 45 95% 60%;
+    --accent-foreground: 24 10% 10%;
+    --accent-light: 45 95% 70%;
+    --accent-dark: 45 95% 50%;
+
+    --success: 142 70% 50%;
+    --warning: 38 90% 60%;
+    --error: 0 80% 60%;
+    --info: 210 85% 60%;
+
+    --muted: 24 10% 14%;
+    --muted-foreground: 215 20% 65%;
+
+    --border: 24 10% 20%;
+    --input: 24 10% 20%;
+    --ring: 18 85% 58%;
+
+    --popover: 24 10% 12%;
+    --popover-foreground: 0 0% 96%;
+
+    --radius: 0.5rem;
   }
 }
 
@@ -189,69 +110,5 @@
 
   body {
     @apply bg-background text-foreground font-sans;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
-  
-  html {
-    scroll-behavior: smooth;
-  }
-}
-
-@layer components {
-  /* ChefSync Component Styles */
-  .navbar-blur {
-    @apply backdrop-blur-md bg-background/80 border-b border-border/50;
-    transition: var(--transition-smooth);
-  }
-  
-  .hero-gradient {
-    background: var(--gradient-hero);
-  }
-  
-  .card-gradient {
-    background: var(--gradient-card);
-  }
-  
-  .button-gradient-primary {
-    background: var(--gradient-primary);
-    @apply text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300;
-  }
-  
-  .button-gradient-secondary {
-    background: var(--gradient-secondary);
-    @apply text-secondary-foreground shadow-lg hover:shadow-xl transition-all duration-300;
-  }
-  
-  .glass-effect {
-    @apply backdrop-blur-md bg-white/10 border border-white/20;
-  }
-  
-  .food-card-hover {
-    @apply hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer;
-  }
-  
-  .text-gradient-primary {
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  
-  .scroll-smooth {
-    scroll-behavior: smooth;
-  }
-}
-
-@layer utilities {
-  .animation-delay-200 {
-    animation-delay: 200ms;
-  }
-  
-  .animation-delay-400 {
-    animation-delay: 400ms;
-  }
-  
-  .animation-delay-600 {
-    animation-delay: 600ms;
   }
 }

@@ -5,12 +5,12 @@ export { analyticsService } from './analyticsService';
 export { adminService } from './adminService';
 
 // Export types
-export type { 
-  LoginCredentials, 
-  RegisterData, 
-  User, 
-  AuthResponse, 
-  RefreshTokenResponse 
+export type {
+  LoginCredentials,
+  RegisterData,
+  User,
+  AuthResponse,
+  RefreshTokenResponse
 } from '../types/auth';
 
 export type {

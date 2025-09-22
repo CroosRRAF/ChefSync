@@ -91,28 +91,28 @@ export interface DashboardStats {
   new_users_this_week: number;
   new_users_this_month: number;
   user_growth: number;
-  
+
   total_chefs: number;
   active_chefs: number;
   pending_chef_approvals: number;
   chef_growth: number;
-  
+
   total_orders: number;
   orders_today: number;
   orders_this_week: number;
   orders_this_month: number;
   order_growth: number;
-  
+
   total_revenue: number;
   revenue_today: number;
   revenue_this_week: number;
   revenue_this_month: number;
   revenue_growth: number;
-  
+
   total_foods: number;
   active_foods: number;
   pending_food_approvals: number;
-  
+
   system_health_score: number;
   active_sessions: number;
   unread_notifications: number;
@@ -268,7 +268,7 @@ class AdminService {
       const response = await apiClient.get(`${this.baseUrl}/dashboard/recent_orders/`, {
         params: { limit }
       });
-      
+
       // Transform data to ensure type safety
       const orders: AdminOrder[] = response.data.map((order: {
         id: number;
@@ -283,13 +283,13 @@ class AdminService {
         items_count: string | number;
       }) => ({
         ...order,
-        total_amount: typeof order.total_amount === 'string' 
-          ? parseFloat(order.total_amount) 
+        total_amount: typeof order.total_amount === 'string'
+          ? parseFloat(order.total_amount)
           : Number(order.total_amount) || 0,
         items_count: Number(order.items_count) || 0,
         id: Number(order.id) || 0
       }));
-      
+
       return orders;
     } catch (error) {
       console.error('Error fetching recent orders:', error);
@@ -599,7 +599,7 @@ class AdminService {
           is_active: params.is_active
         }
       });
-      
+
       // Handle both paginated and non-paginated responses
       if (Array.isArray(response.data)) {
         return {
@@ -748,12 +748,12 @@ class AdminService {
   }[]> {
     try {
       console.log('🔄 AdminService: Fetching pending approvals with params:', params);
-      
+
       // If no role is specified, don't send any params to get all pending approvals
       const config = params.role && params.role.trim() !== ''
         ? { params: { role: params.role } }
         : {};
-      
+
       console.log('🌐 Making request to: /auth/admin/pending-approvals/ with config:', config);
       const response = await apiClient.get('/auth/admin/pending-approvals/', config);
       console.log('✅ API Response received:', response.status, response.data);
