@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 import uuid
 
 
@@ -118,36 +118,41 @@ class Order(models.Model):
 
 
 class OrderItem(models.Model):
-    """Items in an order"""
+    """Items in an order - updated to use FoodPrice as per SQL schema"""
     
+    order_item_id = models.AutoField(primary_key=True)
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
-    food = models.ForeignKey('food.Food', on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
-    total_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    price = models.ForeignKey('food.FoodPrice', on_delete=models.CASCADE, related_name='order_items')
+    quantity = models.IntegerField(validators=[MinValueValidator(1)])
+    
+    # Keep existing fields for enhanced functionality
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], null=True, blank=True)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], null=True, blank=True)
     special_instructions = models.TextField(blank=True, help_text='Special cooking instructions')
     
     # Snapshot of food details at time of order
-    food_name = models.CharField(max_length=200, help_text='Food name at time of order')
-    food_description = models.TextField(help_text='Food description at time of order')
+    food_name = models.CharField(max_length=200, help_text='Food name at time of order', blank=True)
+    food_description = models.TextField(help_text='Food description at time of order', blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     
     def save(self, *args, **kwargs):
-        # Calculate total price
-        self.total_price = self.quantity * self.unit_price
-        # Store food snapshot
-        if self.food:
-            self.food_name = self.food.name
-            self.food_description = self.food.description
+        # Calculate prices based on FoodPrice
+        if self.price:
+            self.unit_price = self.price.price
+            self.total_price = self.quantity * self.unit_price
+            # Store food snapshot
+            self.food_name = self.price.food.name
+            if self.price.food.description:
+                self.food_description = self.price.food.description
         super().save(*args, **kwargs)
     
     def __str__(self):
-        return f"{self.quantity}x {self.food_name} - Order {self.order.order_number}"
+        return f"{self.quantity}x {self.food_name} ({self.price.size if self.price else 'N/A'}) - Order {self.order.order_number}"
     
     class Meta:
-        db_table = 'order_items'
-        unique_together = ['order', 'food']
+        db_table = 'OrderItem'
+        unique_together = ['order', 'price']
 
 
 class OrderStatusHistory(models.Model):
@@ -168,10 +173,10 @@ class OrderStatusHistory(models.Model):
 
 
 class CartItem(models.Model):
-    """Shopping cart for customers"""
+    """Shopping cart for customers - updated to use FoodPrice"""
     
     customer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cart_items')
-    food = models.ForeignKey('food.Food', on_delete=models.CASCADE)
+    price = models.ForeignKey('food.FoodPrice', on_delete=models.CASCADE, related_name='cart_items')
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     special_instructions = models.TextField(blank=True)
     
@@ -180,11 +185,67 @@ class CartItem(models.Model):
     
     @property
     def total_price(self):
-        return self.quantity * self.food.price
+        return self.quantity * self.price.price if self.price else 0
     
     def __str__(self):
-        return f"{self.customer.username} - {self.quantity}x {self.food.name}"
+        food_name = self.price.food.name if self.price else 'Unknown Food'
+        size = self.price.size if self.price else 'Unknown Size'
+        return f"{self.customer.username} - {self.quantity}x {food_name} ({size})"
     
     class Meta:
         db_table = 'cart_items'
-        unique_together = ['customer', 'food']
+        unique_together = ['customer', 'price']
+
+
+class Delivery(models.Model):
+    """Delivery tracking model based on SQL schema"""
+    STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('On the way', 'On the way'),
+        ('Delivered', 'Delivered'),
+    ]
+    
+    delivery_id = models.AutoField(primary_key=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
+    delivery_time = models.DateTimeField(null=True, blank=True)
+    address = models.TextField()
+    order = models.OneToOneField(Order, on_delete=models.CASCADE)
+    agent = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='deliveries'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Delivery {self.delivery_id} - {self.status}"
+    
+    class Meta:
+        db_table = 'Delivery'
+        ordering = ['-created_at']
+
+
+class DeliveryReview(models.Model):
+    """Delivery review model based on SQL schema"""
+    review_id = models.AutoField(primary_key=True)
+    rating = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    comment = models.TextField(blank=True, null=True)
+    delivery = models.ForeignKey(Delivery, on_delete=models.CASCADE)
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='delivery_reviews'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Delivery Review by {self.customer.name} - {self.rating}/5"
+    
+    class Meta:
+        db_table = 'DeliveryReview'
+        ordering = ['-created_at']

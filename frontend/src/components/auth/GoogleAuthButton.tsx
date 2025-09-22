@@ -132,6 +132,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
         theme="outline"
         size="large"
         text={mode === 'login' ? 'signin_with' : 'signup_with'}
+        width="300"
         // Avoid passing width="100%" which causes GSI width invalid warnings; let it fill container.
       />
     </div>

@@ -4,23 +4,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useUserStore } from '@/store/userStore';
+import { useAuth } from '@/context/AuthContext';
 import { Settings, Save, RefreshCw, Shield, Bell, Globe } from 'lucide-react';
 
 const AdminSettings: React.FC = () => {
-  const { user } = useUserStore();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
-  if (!user) {
+  if (isLoading) {
     return <div>Loading...</div>;
   }
 
+  if (!isAuthenticated || !user) {
+    return <div>Please log in to access settings.</div>;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="space-y-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Admin Settings</h1>
-          <p className="text-gray-600 mt-2">Configure platform settings and preferences</p>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Configure platform settings and preferences</p>
         </div>
 
         {/* Settings Sections */}
@@ -199,7 +202,6 @@ const AdminSettings: React.FC = () => {
           </Card>
         </div>
       </div>
-    </div>
   );
 };
 

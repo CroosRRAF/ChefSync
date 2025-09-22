@@ -1,0 +1,50 @@
+Project Setup
+1.	Create a new branch: feature/admin-dashboard
+2.	Set up folder structure for frontend (/client/admin) and backend admin APIs (/server/admin or Django apps)
+3.	Pull latest changes from main before starting work
+4.	Confirm Python/Django + Node.js versions with your team to avoid env mismatches
+5.	Create .env file for storing API keys (AI service, DB config, etc.)
+
+API & Data Planning
+1.	List all admin features & required API endpoints (orders, revenue, chefs, AI summaries, etc.)
+2.	Confirm data shape (JSON format) for each API response with backend team
+3.	Identify which data will be real-time (needs frequent updates) vs static
+4.	Plan how AI will get the data (direct from DB or from processed API endpoint)
+5.	Decide authentication method (JWT tokens via DRF or Django sessions)
+
+Authentication & Access Control
+1.	Backend: Create admin role in Django (group or permission-based)
+2.	Frontend: Redirect non-admin users away from admin pages
+3.	Protect admin routes (React Router + auth check)
+4.	Add logout & session expiry handling
+
+Core Admin UI Pages
+1.	Dashboard Home
+	Quick stats cards: Total Orders, Revenue, Active Chefs, Pending Approvals
+	Charts: Sales trends, Top dishes
+2. User Management
+	List, approve/reject chefs
+	Block/unblock users
+3. Menu Management
+	Add/update/remove dishes
+	Stock alerts
+4. Order Management
+	View orders by status
+	Assign delivery partner
+5. Delivery Partner Management
+	Approve/reject delivery partners
+	Assign/reassign deliveries
+
+AI Features Integration
+1.	Test API responses in Postman/Insomnia
+2.	Test role-based access (admin vs non-admin)
+3.	Test dashboard layout on different screen sizes
+4.	Test AI output with dummy data and real data
+5.	Check error handling (e.g., API fails, AI service unavailable)
+
+Deployment Prep
+1.	Merge feature/admin-dashboard into main after review
+2.	Remove console logs & unused code
+3.	Store AI API keys securely (env variables, not in code)
+4.	Ensure Django Admin is still available for dev team
+5.	Document admin dashboard features for final presentation/demo

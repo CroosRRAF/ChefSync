@@ -1,18 +1,25 @@
 import React from 'react';
+import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUserStore } from '@/store/userStore';
 import { useOrderStore } from '@/store/orderStore';
-import { FileText, Download, Calendar, TrendingUp, Users, Package } from 'lucide-react';
+import { FileText, Download, Calendar, TrendingUp, Users, Package, RefreshCw } from 'lucide-react';
 
 const AdminReports: React.FC = () => {
   const { user } = useUserStore();
   const { orders } = useOrderStore();
 
   if (!user) {
-    return <div>Loading...</div>;
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      </AdminLayout>
+    );
   }
 
   // Calculate report data
@@ -23,12 +30,12 @@ const AdminReports: React.FC = () => {
   const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <AdminLayout>
+      <div className="space-y-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-gray-600 mt-2">Generate and download platform reports</p>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Reports & Analytics</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Generate and download platform reports</p>
         </div>
 
         {/* Report Generation */}
@@ -254,7 +261,7 @@ const AdminReports: React.FC = () => {
           </Card>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

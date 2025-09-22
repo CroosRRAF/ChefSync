@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, AuthState, LoginCredentials, RegisterData } from '@/types/auth';
 import authService, { AuthResponse } from '@/services/authService';
-import { useNavigate } from 'react-router-dom';
 
 // Define the shape of our context
 export interface AuthContextType extends AuthState {
@@ -35,7 +35,7 @@ type AuthAction =
 // Secure token storage functions
 const getSecureToken = (): string | null => {
   try {
-    return localStorage.getItem('chefsync_token');
+    return localStorage.getItem('access_token');
   } catch (error) {
     console.error('Error accessing localStorage:', error);
     return null;
@@ -44,7 +44,7 @@ const getSecureToken = (): string | null => {
 
 const setSecureToken = (token: string): void => {
   try {
-    localStorage.setItem('chefsync_token', token);
+    localStorage.setItem('access_token', token);
   } catch (error) {
     console.error('Error setting token in localStorage:', error);
   }
@@ -52,8 +52,8 @@ const setSecureToken = (token: string): void => {
 
 const removeSecureToken = (): void => {
   try {
-    localStorage.removeItem('chefsync_token');
-    localStorage.removeItem('chefsync_refresh_token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
   } catch (error) {
     console.error('Error removing tokens from localStorage:', error);
   }
@@ -98,12 +98,13 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 // Helper function to get role-based path
 export function getRoleBasedPath(role: string): string {
-  switch (role) {
+  switch (role.toLowerCase()) { // Convert to lowercase for comparison
     case 'customer':
-      return '/customer/dashboard';
+      return '/'; // Customers go to home page after login
     case 'cook':
       return '/cook/dashboard';
     case 'delivery_agent':
+    case 'deliveryagent':
       return '/delivery/dashboard';
     case 'admin':
       return '/admin/dashboard';
@@ -165,6 +166,10 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         createdAt: response.user.created_at,
         updatedAt: response.user.updated_at
       };
+      
+      // Debug: Log user role
+      console.log('Login - User role from backend:', response.user.role);
+      console.log('Login - Frontend user object:', frontendUser);
             
       // Add a small delay before state update to ensure clean state
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -224,7 +229,6 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       console.error('Logout error:', error);
     } finally {
       dispatch({ type: 'CLEAR_USER' });
-      navigate('/', { replace: true });
     }
   };
 

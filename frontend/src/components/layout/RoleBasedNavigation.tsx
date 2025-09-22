@@ -18,7 +18,7 @@ import {
   Calendar,
   Package
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/libs/utils';
 
 const RoleBasedNavigation: React.FC = () => {
   const { user } = useUserStore();

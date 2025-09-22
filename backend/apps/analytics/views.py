@@ -37,8 +37,8 @@ class DashboardViewSet(viewsets.ViewSet):
         # User statistics
         total_users = User.objects.count()
         active_users = User.objects.filter(is_active=True).count()
-        new_users_this_week = User.objects.filter(created_at__gte=week_ago).count()
-        new_users_this_month = User.objects.filter(created_at__gte=month_ago).count()
+        new_users_this_week = User.objects.filter(date_joined__gte=week_ago).count()
+        new_users_this_month = User.objects.filter(date_joined__gte=month_ago).count()
         
         # Chef statistics
         total_chefs = User.objects.filter(role='cook').count()
@@ -82,6 +82,7 @@ class DashboardViewSet(viewsets.ViewSet):
         stats_data = {
             'total_users': total_users,
             'active_users': active_users,
+            'new_users_today': new_users_today,
             'new_users_this_week': new_users_this_week,
             'new_users_this_month': new_users_this_month,
             'user_growth': round(user_growth, 2),

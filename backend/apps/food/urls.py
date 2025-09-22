@@ -8,6 +8,8 @@ router.register(r'cuisines', views.CuisineViewSet, basename='cuisines')
 router.register(r'categories', views.FoodCategoryViewSet, basename='categories')
 router.register(r'foods', views.FoodViewSet, basename='foods')
 router.register(r'reviews', views.FoodReviewViewSet, basename='reviews')
+router.register(r'prices', views.FoodPriceViewSet, basename='prices')
+router.register(r'offers', views.OfferViewSet, basename='offers')
 
 
 router.register(r"chef/foods", ChefFoodViewSet, basename="chef-foods")

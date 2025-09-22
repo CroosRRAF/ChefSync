@@ -1,0 +1,162 @@
+{
+  "backup": {
+    "enabled": true,
+    "schedule": {
+      "type": "cron",
+      "expression": "0 2 * * *",
+      "description": "Daily at 2:00 AM"
+    },
+    "retention": {
+      "days": 30,
+      "max_backups": 30,
+      "cleanup_old_backups": true
+    },
+    "compression": {
+      "enabled": true,
+      "algorithm": "gzip",
+      "level": 6
+    },
+    "encryption": {
+      "enabled": true,
+      "algorithm": "AES-256",
+      "key_rotation_days": 90
+    },
+    "destinations": [
+      {
+        "type": "local",
+        "path": "/backups/chefsync",
+        "enabled": true,
+        "priority": 1
+      },
+      {
+        "type": "s3",
+        "bucket": "chefsync-backups",
+        "region": "us-east-1",
+        "path": "database/",
+        "enabled": false,
+        "priority": 2,
+        "credentials": {
+          "access_key": "",
+          "secret_key": ""
+        }
+      },
+      {
+        "type": "ftp",
+        "host": "",
+        "port": 21,
+        "username": "",
+        "password": "",
+        "path": "/backups/",
+        "enabled": false,
+        "priority": 3
+      }
+    ],
+    "databases": [
+      {
+        "name": "chefsync_kitchen",
+        "enabled": true,
+        "tables": "all",
+        "exclude_tables": [
+          "django_session",
+          "django_migrations"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "path": "/uploads",
+        "enabled": true,
+        "exclude_patterns": [
+          "*.tmp",
+          "*.log",
+          "*.cache"
+        ]
+      },
+      {
+        "path": "/logs",
+        "enabled": true,
+        "exclude_patterns": [
+          "*.tmp"
+        ]
+      },
+      {
+        "path": "/config",
+        "enabled": true,
+        "exclude_patterns": []
+      }
+    ],
+    "notifications": {
+      "enabled": true,
+      "on_success": true,
+      "on_failure": true,
+      "on_cleanup": false,
+      "email": {
+        "enabled": true,
+        "recipients": [
+          "admin@chefsync.com"
+        ],
+        "subject": "ChefSync Backup Report"
+      },
+      "webhook": {
+        "enabled": false,
+        "url": "",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    "verification": {
+      "enabled": true,
+      "verify_integrity": true,
+      "test_restore": false,
+      "checksum_verification": true
+    },
+    "monitoring": {
+      "enabled": true,
+      "log_level": "INFO",
+      "metrics": {
+        "enabled": true,
+        "collect_size": true,
+        "collect_duration": true,
+        "collect_success_rate": true
+      }
+    }
+  },
+  "restore": {
+    "enabled": true,
+    "verification_required": true,
+    "backup_verification": true,
+    "dry_run_support": true,
+    "point_in_time_recovery": {
+      "enabled": true,
+      "max_days_back": 30
+    }
+  },
+  "maintenance": {
+    "enabled": true,
+    "auto_cleanup": true,
+    "cleanup_schedule": {
+      "type": "cron",
+      "expression": "0 3 * * 0",
+      "description": "Weekly on Sunday at 3:00 AM"
+    },
+    "cleanup_tasks": [
+      {
+        "name": "old_backups",
+        "enabled": true,
+        "retention_days": 30
+      },
+      {
+        "name": "temp_files",
+        "enabled": true,
+        "retention_hours": 24
+      },
+      {
+        "name": "log_files",
+        "enabled": true,
+        "retention_days": 90
+      }
+    ]
+  }
+}

@@ -3,8 +3,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Cuisine, FoodCategory, Food, FoodReview
-from .serializers import CuisineSerializer, FoodCategorySerializer, FoodSerializer, FoodReviewSerializer
+from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
+from .serializers import CuisineSerializer, FoodCategorySerializer, FoodSerializer, FoodReviewSerializer, FoodPriceSerializer, OfferSerializer
 
 
 class CuisineViewSet(viewsets.ModelViewSet):
@@ -50,3 +50,15 @@ class ChefFoodViewSet(viewsets.ModelViewSet):
             Q(name__icontains=q) | Q(cuisine__name__icontains=q)
         )
         return Response(FoodSerializer(foods, many=True).data)
+
+
+class FoodPriceViewSet(viewsets.ModelViewSet):
+    queryset = FoodPrice.objects.all()
+    serializer_class = FoodPriceSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class OfferViewSet(viewsets.ModelViewSet):
+    queryset = Offer.objects.all()
+    serializer_class = OfferSerializer
+    permission_classes = [IsAuthenticated]

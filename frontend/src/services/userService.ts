@@ -28,7 +28,7 @@ export interface UserResponse {
 }
 
 class UserService {
-  private baseUrl = '/api/users';
+  private baseUrl = 'users';
 
   async getUsers(filters: UserFilters = {}): Promise<UserResponse> {
     try {
@@ -44,7 +44,7 @@ class UserService {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('chefsync_token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
       });
 

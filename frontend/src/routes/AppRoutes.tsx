@@ -7,6 +7,10 @@ import { useApprovalStatus } from '@/hooks/useApprovalStatus';
 
 // Layout components
 import Navbar from '@/components/layout/Navbar';
+import CustomerNavbar from '@/components/layout/CustomerNavbar';
+import CustomerHomeNavbar from '@/components/layout/CustomerHomeNavbar';
+import CustomerDashboardLayout from '@/components/layout/CustomerDashboardLayout';
+import AdminLayout from '@/components/layout/AdminLayout';
 
 // Public pages
 import Home from '@/pages/Home';
@@ -30,6 +34,7 @@ import CustomerDashboard from '@/pages/customer/Dashboard';
 import CustomerOrders from '@/pages/customer/Orders';
 import CustomerProfile from '@/pages/customer/Profile';
 import CustomerSettings from '@/pages/customer/Settings';
+import CustomerCart from '@/pages/customer/Cart';
 
 import DeliveryDashboard from '@/pages/delivery/Dashboard';
 import DeliveryDeliveries from '@/pages/delivery/Deliveries';
@@ -49,16 +54,17 @@ import CookSettings from '@/pages/cook/Settings';
 import CookLayout from '@/components/layout/CookLayout';
 
 // Admin pages
-import AdminDashboard from '@/pages/admin/AdminDashboard';
+import ModernDashboard from '@/pages/admin/ModernDashboard';
 import AdminManageUsers from '@/pages/admin/ManageUsers';
 import AdminOrders from '@/pages/admin/Orders';
 import AdminAnalytics from '@/pages/admin/Analytics';
 import AdminSettings from '@/pages/admin/Settings';
 import AdminProfile from '@/pages/admin/Profile';
 import AdminReports from '@/pages/admin/Reports';
-import UserApproval from '@/pages/admin/UserApproval';
-import CookApprovals from '@/pages/admin/CookApprovals';
-import DeliveryAgentApprovals from '@/pages/admin/DeliveryAgentApprovals';
+import UnifiedApprovals from '@/pages/admin/UnifiedApprovals';
+import FoodManagement from '@/pages/admin/FoodManagement';
+import AdminNotifications from '@/pages/admin/Notifications';
+import Communications from '@/pages/admin/Communications';
 
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
@@ -99,7 +105,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Check approval status for cooks and delivery agents
-  if (user && (user.role === 'cook' || user.role === 'delivery_agent')) {
+  if (user && (user.role.toLowerCase() === 'cook' || user.role.toLowerCase() === 'delivery_agent' || user.role.toLowerCase() === 'deliveryagent')) {
     // Check if user has approval status in localStorage (from login attempt)
     const pendingUserData = localStorage.getItem('pending_user_data');
     if (pendingUserData) {
@@ -119,14 +125,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }
 
-  if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
+  if (allowedRoles.length > 0 && user && !allowedRoles.map(role => role.toLowerCase()).includes(user.role.toLowerCase())) {
+    // Debug: Log role mismatch
+    console.log('Role mismatch - User role:', user.role, 'Allowed roles:', allowedRoles);
+    
     // Redirect based on user role
-    switch (user.role) {
+    switch (user.role.toLowerCase()) {
       case 'customer':
         return <Navigate to="/customer/dashboard" replace />;
       case 'cook':
         return <Navigate to="/cook/dashboard" replace />;
       case 'delivery_agent':
+      case 'deliveryagent':
         return <Navigate to="/delivery/dashboard" replace />;
       case 'admin':
         return <Navigate to="/admin/dashboard" replace />;
@@ -146,12 +156,13 @@ const InnerRoutes: React.FC = () => {
   const getDefaultRoute = () => {
     if (!isAuthenticated || !user) return '/';
     
-    switch (user.role) {
+    switch (user.role.toLowerCase()) {
       case 'customer':
-        return '/customer/dashboard';
+        return '/'; // Customers go to home page after login
       case 'cook':
         return '/cook/dashboard';
       case 'delivery_agent':
+      case 'deliveryagent':
         return '/delivery/dashboard';
       case 'admin':
         return '/admin/dashboard';
@@ -165,28 +176,28 @@ const InnerRoutes: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={
-          isAuthenticated && user && user.role !== 'customer' ? 
+          isAuthenticated && user && user.role.toLowerCase() !== 'customer' ? 
             <Navigate to={getDefaultRoute()} replace /> : 
             <>
-              <Navbar />
+              {isAuthenticated && user && user.role.toLowerCase() === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
               <Home />
             </>
         } />
         <Route path="/menu" element={
           <>
-            <Navbar />
+            {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
             <Menu />
           </>
         } />
         <Route path="/about" element={
           <>
-            <Navbar />
+            {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
             <About />
           </>
         } />
         <Route path="/contact" element={
           <>
-            <Navbar />
+            {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
             <Contact />
           </>
         } />
@@ -255,42 +266,44 @@ const InnerRoutes: React.FC = () => {
         } />
         <Route path="/customer/home" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerDashboard />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/dashboard" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerDashboard />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/orders" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerOrders />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/profile" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerProfile />
-            </>
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer/settings" element={
           <ProtectedRoute allowedRoles={['customer']}>
-            <>
-              <Navbar />
+            <CustomerDashboardLayout>
               <CustomerSettings />
-            </>
+            </CustomerDashboardLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/customer/cart" element={
+          <ProtectedRoute allowedRoles={['customer']}>
+            <CustomerDashboardLayout>
+              <CustomerCart />
+            </CustomerDashboardLayout>
           </ProtectedRoute>
         } />
 
@@ -356,52 +369,72 @@ const InnerRoutes: React.FC = () => {
         } />
         <Route path="/admin/dashboard" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminDashboard />
+            <AdminLayout>
+              <ModernDashboard />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/users" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminManageUsers />
+            <AdminLayout>
+              <AdminManageUsers />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/orders" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminOrders />
+            <AdminLayout>
+              <AdminOrders />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/analytics" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminAnalytics />
+            <AdminLayout>
+              <AdminAnalytics />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/settings" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminSettings />
+            <AdminLayout>
+              <AdminSettings />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/profile" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminProfile />
+            <AdminLayout>
+              <AdminProfile />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/reports" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminReports />
+            <AdminLayout>
+              <AdminReports />
+            </AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/food" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout>
+              <FoodManagement />
+            </AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/communications" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout>
+              <Communications />
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/approvals" element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <UserApproval />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/approvals/cooks" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <CookApprovals />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin/approvals/delivery-agents" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <DeliveryAgentApprovals />
+            <AdminLayout>
+              <UnifiedApprovals />
+            </AdminLayout>
           </ProtectedRoute>
         } />
 

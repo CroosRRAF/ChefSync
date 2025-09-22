@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/auth';
+// Use Vite dev proxy by default to avoid protocol mismatches in development.
+// Set VITE_API_BASE_URL in production builds.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -13,7 +15,7 @@ const api = axios.create({
 // Secure token access function
 const getSecureToken = (): string | null => {
   try {
-    return localStorage.getItem('chefsync_token');
+    return localStorage.getItem('access_token');
   } catch (error) {
     console.error('Error accessing localStorage:', error);
     return null;
@@ -31,7 +33,7 @@ const getRefreshToken = (): string | null => {
 
 const setSecureToken = (token: string): void => {
   try {
-    localStorage.setItem('chefsync_token', token);
+    localStorage.setItem('access_token', token);
   } catch (error) {
     console.error('Error setting token in localStorage:', error);
   }
@@ -47,8 +49,8 @@ const setRefreshToken = (token: string): void => {
 
 const removeSecureTokens = (): void => {
   try {
-    localStorage.removeItem('chefsync_token');
-    localStorage.removeItem('chefsync_refresh_token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
   } catch (error) {
     console.error('Error removing tokens from localStorage:', error);
   }
@@ -71,7 +73,7 @@ api.interceptors.request.use(
 // Helper function to format error messages
 const formatErrorMessage = (error: any): string => {
   if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
-    return '🔌 Connection Error: Backend server is not running. Please start the backend server at http://127.0.0.1:8000';
+    return '🔌 Connection Error: Backend server is not running. Please start the backend server.';
   }
   
   if (error.code === 'ECONNREFUSED') {
@@ -108,10 +110,9 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = getRefreshToken(); // Get refresh token
+        const refreshToken = localStorage.getItem('refresh_token'); // Get refresh token from localStorage
         if (refreshToken) {
-          console.log('Attempting token refresh...');
-          const response = await api.post('/token/refresh/', {
+          const response = await api.post('/auth/token/refresh/', {
             refresh: refreshToken,
           });
           
@@ -154,7 +155,7 @@ export interface RegisterData {
   password: string;
   confirm_password: string;
   phone_no?: string;
-  role: 'customer' | 'cook' | 'delivery_agent';
+  role: 'customer' | 'cook' | 'delivery_agent' | 'admin';
   address?: string;
 }
 
@@ -208,7 +209,7 @@ class AuthService {
   // Check if backend server is running
   async checkServerStatus(): Promise<boolean> {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/auth/health/', {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/auth/health/`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000) // 5 second timeout
       });
@@ -221,11 +222,11 @@ class AuthService {
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await api.post<AuthResponse>('/login/', credentials);
+      const response = await api.post<AuthResponse>('/auth/login/', credentials);
       
       // Store tokens
-      localStorage.setItem('chefsync_token', response.data.access);
-      localStorage.setItem('chefsync_refresh_token', response.data.refresh);
+      localStorage.setItem('access_token', response.data.access);
+      localStorage.setItem('refresh_token', response.data.refresh);
       
       return response.data;
     } catch (error: any) {
@@ -253,7 +254,7 @@ class AuthService {
 
   async register(data: RegisterData): Promise<RegisterResponse> {
     try {
-      const response = await api.post<RegisterResponse>('/register/', data);
+      const response = await api.post<RegisterResponse>('/auth/register/', data);
       return response.data;
     } catch (error: any) {
       const formattedError = formatErrorMessage(error);
@@ -263,56 +264,55 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
-      const refreshToken = localStorage.getItem('chefsync_refresh_token');
+      const refreshToken = localStorage.getItem('refresh_token');
       if (refreshToken) {
-        await api.post('/logout/', { refresh: refreshToken });
+        await api.post('/auth/logout/', { refresh: refreshToken });
       }
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
       // Always clear local storage
-      localStorage.removeItem('chefsync_token');
-      localStorage.removeItem('chefsync_refresh_token');
+      removeSecureTokens();
     }
   }
 
   async verifyEmail(data: EmailVerificationData): Promise<{ message: string }> {
-    const response = await api.post<{ message: string }>('/verify-email/', data);
+    const response = await api.post<{ message: string }>('/auth/verify-email/', data);
     return response.data;
   }
 
   async requestPasswordReset(data: PasswordResetRequestData): Promise<{ message: string }> {
-    const response = await api.post<{ message: string }>('/password/reset/request/', data);
+    const response = await api.post<{ message: string }>('/auth/password/reset/request/', data);
     return response.data;
   }
 
   async confirmPasswordReset(data: PasswordResetConfirmData): Promise<{ message: string }> {
-    const response = await api.post<{ message: string }>('/password/reset/confirm/', data);
+    const response = await api.post<{ message: string }>('/auth/password/reset/confirm/', data);
     return response.data;
   }
 
   async googleOAuth(data: GoogleOAuthData): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/google/login/', data);
+    const response = await api.post<AuthResponse>('/auth/google/login/', data);
     
     // Store tokens
-    localStorage.setItem('chefsync_token', response.data.access);
-    localStorage.setItem('chefsync_refresh_token', response.data.refresh);
+    localStorage.setItem('access_token', response.data.access);
+    localStorage.setItem('refresh_token', response.data.refresh);
     
     return response.data;
   }
 
   async getProfile(): Promise<User> {
-    const response = await api.get<User>('/profile/');
+    const response = await api.get<User>('/auth/profile/');
     return response.data;
   }
 
   async updateProfile(data: Partial<User>): Promise<{ message: string; user: User }> {
-    const response = await api.put<{ message: string; user: User }>('/profile/update/', data);
+    const response = await api.put<{ message: string; user: User }>('/auth/profile/update/', data);
     return response.data;
   }
 
   async changePassword(oldPassword: string, newPassword: string, confirmNewPassword: string): Promise<{ message: string }> {
-    const response = await api.post<{ message: string }>('/password/change/', {
+    const response = await api.post<{ message: string }>('/auth/password/change/', {
       old_password: oldPassword,
       new_password: newPassword,
       confirm_new_password: confirmNewPassword,
@@ -321,35 +321,35 @@ class AuthService {
   }
 
   async refreshToken(): Promise<{ access: string; refresh: string }> {
-    const refreshToken = localStorage.getItem('chefsync_refresh_token');
+    const refreshToken = localStorage.getItem('refresh_token');
     if (!refreshToken) {
       throw new Error('No refresh token available');
     }
 
-    const response = await api.post<{ access: string; refresh: string }>('/token/refresh/', {
+    const response = await api.post<{ access: string; refresh: string }>('/auth/token/refresh/', {
       refresh: refreshToken,
     });
 
     // Update stored tokens
-    localStorage.setItem('chefsync_token', response.data.access);
-    localStorage.setItem('chefsync_refresh_token', response.data.refresh);
+    localStorage.setItem('access_token', response.data.access);
+    localStorage.setItem('refresh_token', response.data.refresh);
 
     return response.data;
   }
 
   // Helper method to check if user is authenticated
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('chefsync_token');
+    return !!localStorage.getItem('access_token');
   }
 
   // Helper method to get current token
   getToken(): string | null {
-    return localStorage.getItem('chefsync_token');
+    return localStorage.getItem('access_token');
   }
 
   // Helper method to get current refresh token
   getRefreshToken(): string | null {
-    return localStorage.getItem('chefsync_refresh_token');
+    return localStorage.getItem('refresh_token');
   }
 }
 

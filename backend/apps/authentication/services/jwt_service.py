@@ -156,6 +156,7 @@ class JWTTokenService:
                 
                 # For refresh tokens: Check database record
                 token_hash = cls.generate_token_hash(token)
+                
                 try:
                     token_record = JWTToken.objects.get(
                         token_hash=token_hash,

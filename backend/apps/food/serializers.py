@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Cuisine, FoodCategory, Food, FoodPrice, FoodReview
+from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
 
 
 class CuisineSerializer(serializers.ModelSerializer):
@@ -30,3 +30,9 @@ class FoodPriceSerializer(serializers.ModelSerializer):
     class Meta:
         model = FoodPrice
         fields = ["id", "price", "cooking_time", "quantity", "availability"]
+
+
+class OfferSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Offer
+        fields = '__all__'

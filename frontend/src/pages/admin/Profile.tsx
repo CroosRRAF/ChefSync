@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +41,7 @@ const AdminProfile: React.FC = () => {
     phone: user?.phone || '',
     address: user?.address || '',
     bio: 'System Administrator with 10+ years of experience in platform management, user administration, and system optimization. Committed to ensuring smooth operations and excellent user experience.',
-    role: 'Super Admin',
+    role: 'admin',
     department: 'IT Administration',
     permissions: ['User Management', 'System Settings', 'Analytics Access', 'Report Generation', 'Platform Configuration'],
     experience: '10 years',
@@ -72,7 +72,7 @@ const AdminProfile: React.FC = () => {
     setFormData(prev => ({
       ...prev,
       [parent]: {
-        ...prev[parent as keyof typeof prev],
+        ...(prev[parent as keyof typeof prev] as unknown as Record<string, unknown>),
         [field]: value
       }
     }));
@@ -80,8 +80,15 @@ const AdminProfile: React.FC = () => {
 
   const handleSave = async () => {
     try {
-      // Here you would typically call an API to update the user profile
-      await updateUser(formData);
+      // Only pass fields that exist in the User interface
+      const userUpdates = {
+        name: formData.name,
+        email: formData.email,
+        phone_no: formData.phone,
+        address: formData.address,
+        role: 'admin' as const // Ensure role is one of the allowed values
+      };
+      await updateUser(userUpdates);
       setIsEditing(false);
     } catch (error) {
       console.error('Failed to update profile:', error);

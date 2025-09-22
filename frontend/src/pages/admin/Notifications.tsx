@@ -5,13 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserStore } from '@/store/userStore';
-import { Bell, Send, Users, Package, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Bell, Send, Users, Package, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
 
 const AdminNotifications: React.FC = () => {
   const { user } = useUserStore();
 
   if (!user) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    );
   }
 
   // Mock notification data
@@ -69,12 +73,11 @@ const AdminNotifications: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="space-y-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-gray-600 mt-2">Send and manage platform notifications</p>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Notifications</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Send and manage platform notifications</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -229,7 +232,6 @@ const AdminNotifications: React.FC = () => {
           </Card>
         </div>
       </div>
-    </div>
   );
 };
 

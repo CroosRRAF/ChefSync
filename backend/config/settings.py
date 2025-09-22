@@ -25,6 +25,8 @@ config = Config(RepositoryEnv(BASE_DIR / '.env'))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-3oo5lepmhh(qlf-m^s+ftjk=g0r7)h-jb$2vzu%1g7&jq0a32o')
+# Optional: allow using a separate JWT signing key; falls back to SECRET_KEY if not provided
+JWT_SIGNING_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
@@ -57,6 +59,8 @@ INSTALLED_APPS = [
     # Local apps
     'apps.authentication',
     'apps.analytics',
+    'apps.admin_management',
+    'apps.communications',
     'apps.food',
     'apps.orders',
     'apps.payments',
@@ -183,7 +187,7 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
+    'SIGNING_KEY': JWT_SIGNING_KEY,
     'VERIFYING_KEY': None,
     'AUDIENCE': None,
     'ISSUER': None,
@@ -206,7 +210,7 @@ SIMPLE_JWT = {
 # CORS settings
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:8080,http://127.0.0.1:8080,http://localhost:8081,http://127.0.0.1:8081,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:8080,http://0.0.0.0:8081').split(',')
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)  # Allow all origins for development
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)  # Temporarily allow all origins for development
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -310,7 +314,7 @@ except Exception:
 # In development, disable COOP to avoid postMessage/window.closed warnings with Google OAuth
 if DEBUG:
     SECURE_CROSS_ORIGIN_OPENER_POLICY = None
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+    SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None
 
 # Cloudinary Configuration
 CLOUDINARY_STORAGE = {
