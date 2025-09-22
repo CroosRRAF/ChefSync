@@ -15,6 +15,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import AuthPattern from '@/assets/auth-pattern.svg';
 import logo from '@/assets/logo.svg';
+import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 
 // Floating food icons component
 const FloatingIcons = () => {
@@ -145,7 +146,8 @@ const Login: React.FC = () => {
         description: "You've been successfully logged in.",
       });
 
-      navigate(redirectTo);
+      // Don't navigate here - let AuthContext handle role-based navigation
+      // navigate(redirectTo);
     } catch (error: any) {
       // Handle specific error types
       if (error.message === 'APPROVAL_PENDING') {
@@ -220,16 +222,16 @@ const Login: React.FC = () => {
                 transition={{ type: 'spring', stiffness: 300 }}
               >
                 <img 
-                  src={logo} 
-                  alt="ChefSync Logo" 
-                  className="w-10 h-10"
+                  src={navbarLogo} 
+                  alt="ChefSync" 
+                  className="h-12 w-auto object-contain"
                 />
               </motion.div>
               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 Welcome Back
               </CardTitle>
               <CardDescription className="text-muted-foreground mt-2">
-                Sign in to your ChefSync account to continue your culinary journey
+                Sign in to your account to continue your culinary journey
               </CardDescription>
             </CardHeader>
 

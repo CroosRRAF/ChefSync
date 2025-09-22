@@ -1,7 +1,7 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from .models import Cuisine, FoodCategory, Food, FoodReview
-from .serializers import CuisineSerializer, FoodCategorySerializer, FoodSerializer, FoodReviewSerializer
+from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
+from .serializers import CuisineSerializer, FoodCategorySerializer, FoodSerializer, FoodReviewSerializer, FoodPriceSerializer, OfferSerializer
 
 
 class CuisineViewSet(viewsets.ModelViewSet):
@@ -25,4 +25,16 @@ class FoodViewSet(viewsets.ModelViewSet):
 class FoodReviewViewSet(viewsets.ModelViewSet):
     queryset = FoodReview.objects.all()
     serializer_class = FoodReviewSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class FoodPriceViewSet(viewsets.ModelViewSet):
+    queryset = FoodPrice.objects.all()
+    serializer_class = FoodPriceSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class OfferViewSet(viewsets.ModelViewSet):
+    queryset = Offer.objects.all()
+    serializer_class = OfferSerializer
     permission_classes = [IsAuthenticated]

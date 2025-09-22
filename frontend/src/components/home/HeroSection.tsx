@@ -4,6 +4,13 @@ import { Play, ArrowRight, MapPin, Clock, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 
+// Import hero images
+import heroImage1 from '@/assets/images/hero/Gemini_Generated_Image_afvupeafvupeafvu.png';
+import heroImage2 from '@/assets/images/hero/Gemini_Generated_Image_dwlbjcdwlbjcdwlb.png';
+import heroImage3 from '@/assets/images/hero/Gemini_Generated_Image_k5p5g8k5p5g8k5p5.png';
+import heroImage4 from '@/assets/images/hero/Gemini_Generated_Image_v86hq4v86hq4v86h.png';
+import heroImage5 from '@/assets/images/hero/Gemini_Generated_Image_xonn8hxonn8hxonn.png';
+
 interface HeroSectionProps {
   onStartOrder: () => void;
 }
@@ -14,16 +21,17 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onStartOrder }) => {
   const navigate = useNavigate();
 
   const heroImages = [
-    'https://images.unsplash.com/photo-1736239092023-ba677fd6751c',
-    'https://images.unsplash.com/photo-1723066217456-cf0b10ceda2b',
-    'https://images.unsplash.com/photo-1736239092819-da2e9b4b5c6b',
-    'https://images.unsplash.com/photo-1749359669134-289058a33c63'
+    heroImage1, // Gemini generated food image
+    heroImage2, // Gemini generated food image  
+    heroImage3, // Gemini generated food image
+    heroImage4, // Gemini generated food image
+    heroImage5, // Gemini generated food image
   ];
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
+    }, 5000); // 5 seconds for each image transition
     return () => clearInterval(interval);
   }, [heroImages.length]);
 
@@ -32,7 +40,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onStartOrder }) => {
   };
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden" style={{ cursor: 'default' }}>
       {/* Background Image Slideshow */}
       <div className="absolute inset-0">
         {heroImages.map((image, index) => (
@@ -44,11 +52,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onStartOrder }) => {
           >
             <img
               src={image}
-              alt={`Tamil cuisine ${index + 1}`}
-              className="w-full h-full object-cover"
+              alt={`Delicious food ${index + 1}`}
+              className="w-full h-full object-cover brightness-110 contrast-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent"></div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-black/15 via-transparent to-black/5"></div>
           </div>
         ))}
       </div>
@@ -57,35 +64,35 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onStartOrder }) => {
       <div className="relative z-10 container mx-auto px-4 text-center lg:text-left">
         <div className="max-w-4xl mx-auto lg:mx-0">
           {/* Badge */}
-          <div className="inline-flex items-center space-x-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full px-6 py-2 mb-6 animate-fadeIn">
+          <div className="inline-flex items-center space-x-2 bg-white/30 backdrop-blur-md border border-white/40 rounded-full px-6 py-2 mb-6 animate-fadeIn shadow-lg">
             <Star className="h-4 w-4 text-yellow-400 fill-current" />
-            <span className="text-white text-sm font-medium">Rated #1 Cloud Kitchen Platform</span>
+            <span className="text-white text-sm font-medium drop-shadow-md">Rated #1 Cloud Kitchen Platform</span>
           </div>
 
           {/* Main Heading */}
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight animate-slideUp">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight animate-slideUp drop-shadow-lg">
             Authentic Homemade Food
-            <span className="block text-orange-400 mt-2">From Local Cooks</span>
+            <span className="block text-orange-400 mt-2 drop-shadow-lg">From Local Cooks</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-lg md:text-xl text-gray-200 mb-8 max-w-2xl mx-auto lg:mx-0 animate-slideUp animation-delay-200">
+          <p className="text-lg md:text-xl text-gray-100 mb-8 max-w-2xl mx-auto lg:mx-0 animate-slideUp animation-delay-200 drop-shadow-md">
             Experience the rich flavors of Tamil cuisine, prepared with love by passionate home cooks in your neighborhood.
           </p>
 
           {/* Stats */}
           <div className="flex flex-wrap justify-center lg:justify-start gap-6 mb-10 animate-slideUp animation-delay-400">
-            <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+            <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-md rounded-lg px-4 py-2 shadow-lg">
               <MapPin className="h-5 w-5 text-orange-400" />
-              <span className="text-white font-medium">50+ Locations</span>
+              <span className="text-white font-medium drop-shadow-md">50+ Locations</span>
             </div>
-            <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+            <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-md rounded-lg px-4 py-2 shadow-lg">
               <Clock className="h-5 w-5 text-green-400" />
-              <span className="text-white font-medium">30 Min Delivery</span>
+              <span className="text-white font-medium drop-shadow-md">30 Min Delivery</span>
             </div>
-            <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+            <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-md rounded-lg px-4 py-2 shadow-lg">
               <Star className="h-5 w-5 text-yellow-400 fill-current" />
-              <span className="text-white font-medium">4.8+ Rating</span>
+              <span className="text-white font-medium drop-shadow-md">4.8+ Rating</span>
             </div>
           </div>
 

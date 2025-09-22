@@ -98,12 +98,13 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 // Helper function to get role-based path
 export function getRoleBasedPath(role: string): string {
-  switch (role) {
+  switch (role.toLowerCase()) { // Convert to lowercase for comparison
     case 'customer':
       return '/'; // Customers go to home page after login
     case 'cook':
       return '/cook/dashboard';
     case 'delivery_agent':
+    case 'deliveryagent':
       return '/delivery/dashboard';
     case 'admin':
       return '/admin/dashboard';
@@ -165,6 +166,10 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         createdAt: response.user.created_at,
         updatedAt: response.user.updated_at
       };
+      
+      // Debug: Log user role
+      console.log('Login - User role from backend:', response.user.role);
+      console.log('Login - Frontend user object:', frontendUser);
             
       // Add a small delay before state update to ensure clean state
       await new Promise(resolve => setTimeout(resolve, 100));

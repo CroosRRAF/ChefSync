@@ -62,7 +62,7 @@ const AdminAnalytics: React.FC = () => {
   const [timeRange, setTimeRange] = useState<string>('30d');
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'admin') {
+    if (isAuthenticated && user?.role.toLowerCase() === 'admin') {
       fetchAnalytics();
     } else {
       setIsLoading(false);
@@ -111,7 +111,7 @@ const AdminAnalytics: React.FC = () => {
     );
   }
 
-  if (user?.role !== 'admin') {
+  if (user?.role.toLowerCase() !== 'admin') {
     return (
       <AdminLayout>
         <Card className="text-center py-12" style={{

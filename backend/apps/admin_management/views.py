@@ -113,7 +113,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             total_foods = Food.objects.count()
             active_foods = Food.objects.filter(is_available=True).count()
             pending_food_approvals = Food.objects.filter(
-                is_available=False
+                status='Pending'
             ).count()
             
             # System statistics

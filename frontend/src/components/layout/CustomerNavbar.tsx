@@ -3,6 +3,8 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import logoImage from '@/assets/2.png';
+import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import { 
   ShoppingCart, 
   User, 
@@ -60,16 +62,15 @@ const CustomerNavbar: React.FC = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div 
-            className="flex items-center space-x-2 cursor-pointer group"
+            className="flex items-center cursor-pointer group"
             onClick={() => navigate('/customer/dashboard')}
           >
-            <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center transform group-hover:scale-110 transition-transform duration-200">
-              <span className="text-white font-bold text-xl">C</span>
-            </div>
-            <span className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-orange-500 transition-colors duration-200">
-              ChefSync
-            </span>
-            <Badge className="bg-orange-100 text-orange-800 text-xs">
+            <img 
+              src={navbarLogo} 
+              alt="ChefSync" 
+              className="h-16 w-auto object-contain transform group-hover:scale-105 transition-all duration-300"
+            />
+            <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs">
               Customer
             </Badge>
           </div>

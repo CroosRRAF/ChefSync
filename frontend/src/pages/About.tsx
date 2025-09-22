@@ -14,6 +14,11 @@ import {
   CheckCircle
 } from 'lucide-react';
 
+// Import hero images
+import heroImage1 from '@/assets/images/hero/Gemini_Generated_Image_afvupeafvupeafvu.png';
+import heroImage2 from '@/assets/images/hero/Gemini_Generated_Image_dwlbjcdwlbjcdwlb.png';
+import heroImage3 from '@/assets/images/hero/Gemini_Generated_Image_k5p5g8k5p5g8k5p5.png';
+
 const About: React.FC = () => {
   const teamMembers = [
     {
@@ -71,23 +76,31 @@ const About: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-20">
-      <div className="container mx-auto px-4 py-8">
-        {/* Hero Section */}
-        <div className="text-center mb-16">
-          <Badge className="mb-4 bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 animate-fadeIn">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Hero Section with Background Image */}
+      <div className="relative h-screen flex items-center justify-center overflow-hidden">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000"
+          style={{ backgroundImage: `url(${heroImage1})` }}
+        />
+        <div className="absolute inset-0 bg-black/50"></div>
+        
+        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
+          <Badge className="mb-6 bg-orange-100/90 text-orange-800 dark:bg-orange-900/90 dark:text-orange-200 animate-fadeIn backdrop-blur-sm">
             About ChefSync
           </Badge>
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6 animate-slideUp">
+          <h1 className="text-5xl md:text-7xl font-bold text-white mb-8 animate-slideUp">
             Connecting Hearts Through
-            <span className="block text-orange-500 mt-2 animate-slideUp animation-delay-200">Homemade Food</span>
+            <span className="block text-orange-400 mt-4 animate-slideUp animation-delay-200">Homemade Food</span>
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed animate-slideUp animation-delay-400">
+          <p className="text-xl md:text-2xl text-gray-200 max-w-3xl mx-auto leading-relaxed animate-slideUp animation-delay-400 backdrop-blur-sm bg-black/20 p-4 rounded-lg">
             ChefSync is more than just a food platform. We're a community that celebrates the art of home cooking 
             and brings authentic Tamil flavors directly to your doorstep.
           </p>
         </div>
+      </div>
 
+      <div className="container mx-auto px-4 py-16">
         {/* Our Story */}
         <div className="mb-16">
           <Card className="overflow-hidden animate-slideUp animation-delay-600">

@@ -161,17 +161,53 @@
   body {
     @apply bg-background text-foreground font-sans;
     font-feature-settings: "rlig" 1, "calt" 1;
+    cursor: default !important; /* Ensure default cursor is used */
   }
   
   html {
     scroll-behavior: smooth;
+    cursor: default !important; /* Ensure default cursor is used */
+  }
+  
+  /* Remove any custom cursor overlays */
+  *,
+  *::before,
+  *::after {
+    cursor: inherit !important;
+  }
+  
+  /* Ensure no cursor images or overlays */
+  body *[style*="cursor"],
+  body *[class*="cursor"] {
+    cursor: default !important;
+  }
+  
+  /* Override any absolute positioned cursor elements */
+  .cursor-none,
+  .cursor-auto,
+  .cursor-pointer,
+  .cursor-wait,
+  .cursor-text,
+  .cursor-move,
+  .cursor-help,
+  .cursor-not-allowed {
+    position: relative !important;
+    visibility: visible !important;
+  }
+  
+  /* Hide any potential cursor overlay elements */
+  [role="cursor"],
+  .custom-cursor,
+  .mouse-cursor,
+  .cursor-overlay {
+    display: none !important;
   }
 }
 
 @layer components {
   /* ChefSync Component Styles */
   .navbar-blur {
-    @apply backdrop-blur-md bg-background/80 border-b border-border/50;
+    @apply backdrop-blur-lg bg-white/90 dark:bg-gray-900/90 border-b border-gray-200/50 dark:border-gray-700/50;
     transition: var(--transition-smooth);
   }
   
@@ -389,4 +425,39 @@
 .dark .glass {
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Enhanced blur effects for navbar */
+.navbar-blur-light {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .navbar-blur-light {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.navbar-blur-dark {
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.navbar-blur-heavy {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(25px) saturate(200%) brightness(110%);
+  -webkit-backdrop-filter: blur(25px) saturate(200%) brightness(110%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .navbar-blur-heavy {
+  background: rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(25px) saturate(200%) brightness(90%);
+  -webkit-backdrop-filter: blur(25px) saturate(200%) brightness(90%);
 }

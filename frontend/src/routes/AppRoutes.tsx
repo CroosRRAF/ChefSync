@@ -102,7 +102,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Check approval status for cooks and delivery agents
-  if (user && (user.role === 'cook' || user.role === 'delivery_agent')) {
+  if (user && (user.role.toLowerCase() === 'cook' || user.role.toLowerCase() === 'delivery_agent' || user.role.toLowerCase() === 'deliveryagent')) {
     // Check if user has approval status in localStorage (from login attempt)
     const pendingUserData = localStorage.getItem('pending_user_data');
     if (pendingUserData) {
@@ -122,14 +122,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }
 
-  if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
+  if (allowedRoles.length > 0 && user && !allowedRoles.map(role => role.toLowerCase()).includes(user.role.toLowerCase())) {
+    // Debug: Log role mismatch
+    console.log('Role mismatch - User role:', user.role, 'Allowed roles:', allowedRoles);
+    
     // Redirect based on user role
-    switch (user.role) {
+    switch (user.role.toLowerCase()) {
       case 'customer':
         return <Navigate to="/customer/dashboard" replace />;
       case 'cook':
         return <Navigate to="/cook/dashboard" replace />;
       case 'delivery_agent':
+      case 'deliveryagent':
         return <Navigate to="/delivery/dashboard" replace />;
       case 'admin':
         return <Navigate to="/admin/dashboard" replace />;
@@ -149,12 +153,13 @@ const InnerRoutes: React.FC = () => {
   const getDefaultRoute = () => {
     if (!isAuthenticated || !user) return '/';
     
-    switch (user.role) {
+    switch (user.role.toLowerCase()) {
       case 'customer':
         return '/'; // Customers go to home page after login
       case 'cook':
         return '/cook/dashboard';
       case 'delivery_agent':
+      case 'deliveryagent':
         return '/delivery/dashboard';
       case 'admin':
         return '/admin/dashboard';
@@ -168,10 +173,10 @@ const InnerRoutes: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={
-          isAuthenticated && user && user.role !== 'customer' ? 
+          isAuthenticated && user && user.role.toLowerCase() !== 'customer' ? 
             <Navigate to={getDefaultRoute()} replace /> : 
             <>
-              {isAuthenticated && user && user.role === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
+              {isAuthenticated && user && user.role.toLowerCase() === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
               <Home />
             </>
         } />

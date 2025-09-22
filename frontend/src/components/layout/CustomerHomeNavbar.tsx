@@ -4,6 +4,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import logoImage from '@/assets/2.png';
+import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,28 +70,28 @@ const CustomerHomeNavbar: React.FC = () => {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+  const isHomePage = location.pathname === '/';
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       isScrolled 
-        ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-lg border-b border-gray-200/50 dark:border-gray-700/50' 
-        : 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm'
+        ? isHomePage 
+          ? 'navbar-blur-light shadow-xl'
+          : 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg shadow-xl border-b border-gray-200/50 dark:border-gray-700/50'
+        : isHomePage
+          ? 'navbar-blur-heavy'
+          : 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-md'
     }`}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-3 cursor-pointer group">
+          <Link to="/" className="flex items-center cursor-pointer group">
             <div className="relative">
-              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center transform group-hover:scale-110 transition-all duration-300 shadow-lg">
-                <ChefHat className="text-white w-6 h-6" />
-              </div>
-              <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 to-red-500 rounded-full opacity-20 group-hover:opacity-40 transition-opacity duration-300 animate-pulse"></div>
-            </div>
-            <div>
-              <span className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent group-hover:from-orange-500 group-hover:to-red-500 transition-all duration-300">
-                ChefSync
-              </span>
-              <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">Delicious Delivered</p>
+              <img 
+                src={navbarLogo} 
+                alt="ChefSync" 
+                className="h-16 w-auto object-contain transform group-hover:scale-105 transition-all duration-300"
+              />
             </div>
           </Link>
 
@@ -99,10 +101,14 @@ const CustomerHomeNavbar: React.FC = () => {
               <Link
                 key={item.name}
                 to={item.path}
-                className={`flex items-center space-x-2 text-sm font-medium transition-all duration-200 hover:text-orange-500 relative group ${
+                className={`flex items-center space-x-2 text-sm font-medium transition-all duration-300 hover:text-orange-500 relative group ${
                   isActive(item.path)
-                    ? 'text-orange-500'
-                    : 'text-gray-700 dark:text-gray-300'
+                    ? 'text-orange-500 font-semibold'
+                    : isHomePage
+                      ? 'text-white/90 hover:text-white hover:text-orange-300'
+                      : theme === 'light'
+                        ? 'text-gray-900 hover:text-orange-500'
+                        : 'text-gray-300 hover:text-orange-400'
                 }`}
               >
                 <item.icon className="h-4 w-4" />
@@ -123,9 +129,21 @@ const CustomerHomeNavbar: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="relative hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all duration-200"
+                  className={`relative transition-all duration-300 ${
+                    isHomePage 
+                      ? 'hover:bg-white/20 text-white' 
+                      : theme === 'light'
+                        ? 'hover:bg-orange-50 text-gray-900'
+                        : 'hover:bg-orange-900/20 text-gray-400'
+                  }`}
                 >
-                  <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                  <Bell className={`h-5 w-5 transition-colors duration-300 ${
+                    isHomePage 
+                      ? 'text-white' 
+                      : theme === 'light'
+                        ? 'text-gray-900'
+                        : 'text-gray-400'
+                  }`} />
                   {notifications > 0 && (
                     <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
                       {notifications}
@@ -138,12 +156,26 @@ const CustomerHomeNavbar: React.FC = () => {
                   variant="ghost"
                   size="sm"
                   onClick={toggleTheme}
-                  className="hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all duration-200"
+                  className={`transition-all duration-300 ${
+                    isHomePage 
+                      ? 'hover:bg-white/20 text-white' 
+                      : theme === 'light'
+                        ? 'hover:bg-orange-50 text-gray-900'
+                        : 'hover:bg-orange-900/20 text-gray-400'
+                  }`}
                 >
                   {theme === 'dark' ? (
-                    <Sun className="h-5 w-5 text-yellow-500" />
+                    <Sun className={`h-5 w-5 transition-colors duration-300 ${
+                      isHomePage ? 'text-yellow-300' : 'text-yellow-500'
+                    }`} />
                   ) : (
-                    <Moon className="h-5 w-5 text-gray-600" />
+                    <Moon className={`h-5 w-5 transition-colors duration-300 ${
+                      isHomePage 
+                        ? 'text-white' 
+                        : theme === 'light'
+                          ? 'text-gray-900'
+                          : 'text-gray-400'
+                    }`} />
                   )}
                 </Button>
 
@@ -197,19 +229,37 @@ const CustomerHomeNavbar: React.FC = () => {
                   variant="ghost"
                   size="sm"
                   onClick={toggleTheme}
-                  className="hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                  className={`transition-all duration-300 ${
+                    isHomePage 
+                      ? 'hover:bg-white/20 text-white' 
+                      : theme === 'light'
+                        ? 'hover:bg-orange-50 text-black'
+                        : 'hover:bg-orange-900/20 text-gray-400'
+                  }`}
                 >
                   {theme === 'dark' ? (
-                    <Sun className="h-5 w-5 text-yellow-500" />
+                    <Sun className={`h-5 w-5 transition-colors duration-300 ${
+                      isHomePage ? 'text-yellow-300' : 'text-yellow-500'
+                    }`} />
                   ) : (
-                    <Moon className="h-5 w-5 text-gray-600" />
+                    <Moon className={`h-5 w-5 transition-colors duration-300 ${
+                      isHomePage 
+                        ? 'text-white' 
+                        : theme === 'light'
+                          ? 'text-black'
+                          : 'text-gray-400'
+                    }`} />
                   )}
                 </Button>
 
                 {/* Login Button */}
                 <Button 
                   onClick={() => navigate('/auth/login')}
-                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-medium px-6 py-2 rounded-full transition-all duration-200 shadow-md hover:shadow-lg"
+                  className={`font-medium px-6 py-2 rounded-full transition-all duration-300 shadow-md hover:shadow-lg ${
+                    isHomePage 
+                      ? 'bg-white/20 text-white border-white/30 hover:bg-white/30 hover:text-white backdrop-blur-sm' 
+                      : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
+                  }`}
                 >
                   Login
                 </Button>
@@ -220,10 +270,32 @@ const CustomerHomeNavbar: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              className="md:hidden"
+              className={`md:hidden transition-colors duration-300 ${
+                isHomePage 
+                  ? 'text-white hover:bg-white/20 hover:text-white' 
+                  : theme === 'light'
+                    ? 'text-black hover:bg-gray-100'
+                    : 'text-gray-300 hover:bg-gray-800'
+              }`}
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
-              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isMenuOpen ? (
+                <X className={`h-6 w-6 transition-colors duration-300 ${
+                  isHomePage 
+                    ? 'text-white' 
+                    : theme === 'light'
+                      ? 'text-black'
+                      : 'text-gray-300'
+                }`} />
+              ) : (
+                <Menu className={`h-6 w-6 transition-colors duration-300 ${
+                  isHomePage 
+                    ? 'text-white' 
+                    : theme === 'light'
+                      ? 'text-black'
+                      : 'text-gray-300'
+                }`} />
+              )}
             </Button>
           </div>
         </div>

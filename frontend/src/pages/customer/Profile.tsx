@@ -87,7 +87,7 @@ const CustomerProfile: React.FC = () => {
     setFormData(prev => ({
       ...prev,
       [parent]: {
-        ...prev[parent as keyof typeof prev],
+        ...(prev[parent as keyof typeof prev] as Record<string, any>),
         [field]: value
       }
     }));
@@ -105,10 +105,10 @@ const CustomerProfile: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your profile...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading your profile...</p>
         </div>
       </div>
     );
@@ -124,14 +124,14 @@ const CustomerProfile: React.FC = () => {
   const customerLevel = getCustomerLevel(completedOrders);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Navigation */}
         <div className="mb-6 flex items-center space-x-4">
           <Button 
             variant="outline" 
             onClick={() => navigate('/customer/dashboard')}
-            className="hover:bg-blue-50"
+            className="hover:bg-blue-50 dark:hover:bg-blue-900/20 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
           >
             <LayoutDashboard className="h-4 w-4 mr-2" />
             Dashboard
@@ -139,7 +139,7 @@ const CustomerProfile: React.FC = () => {
           <Button 
             variant="outline" 
             onClick={() => navigate('/')}
-            className="hover:bg-green-50"
+            className="hover:bg-green-50 dark:hover:bg-green-900/20 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
           >
             <Home className="h-4 w-4 mr-2" />
             Home

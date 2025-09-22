@@ -4,6 +4,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import logoImage from '@/assets/2.png';
+import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -85,27 +87,23 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
       {/* Top Navbar */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled 
-          ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-lg border-b border-gray-200/50 dark:border-gray-700/50' 
-          : 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200/30 dark:border-gray-700/30'
+          ? 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg shadow-xl border-b border-gray-200/40 dark:border-gray-700/40' 
+          : 'bg-white/40 dark:bg-gray-900/40 backdrop-blur-md border-b border-gray-200/20 dark:border-gray-700/20'
       }`}>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link to="/" className="flex items-center space-x-3 cursor-pointer group">
+            <Link to="/" className="flex items-center cursor-pointer group">
               <div className="relative">
-                <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center transform group-hover:scale-110 transition-all duration-300 shadow-lg">
-                  <ChefHat className="text-white w-6 h-6" />
-                </div>
-                <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 to-red-500 rounded-full opacity-20 group-hover:opacity-40 transition-opacity duration-300 animate-pulse"></div>
+                <img 
+                  src={navbarLogo} 
+                  alt="ChefSync" 
+                  className="h-16 w-auto object-contain transform group-hover:scale-105 transition-all duration-300"
+                />
               </div>
-              <div>
-                <span className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent group-hover:from-orange-500 group-hover:to-red-500 transition-all duration-300">
-                  ChefSync
-                </span>
-                <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs">
-                  Dashboard
-                </Badge>
-              </div>
+              <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs">
+                Dashboard
+              </Badge>
             </Link>
 
             {/* Desktop Top Navigation */}
