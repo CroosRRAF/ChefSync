@@ -1,28 +1,22 @@
 import axios from 'axios';
 
-const API_BASE_URL = '/api';
-
-// Create axios instance with default config
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL + '/api';
+// ✅ Create axios instance
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
-
-// Request interceptor to add auth token
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+// ✅ Attach token automatically
+apiClient.interceptors.request.use((config) => {
+  const chefsync_token = localStorage.getItem('chefsync_token');
+  if (chefsync_token) {
+    config.headers.Authorization = `Bearer ${chefsync_token}`;
   }
-);
+  const access_token = localStorage.getItem('access_token');
+  if (access_token) {
+    config.headers.Authorization = `Bearer ${access_token}`;
+  }
+  return config;
+});
 
 // Response interceptor to handle common errors
 apiClient.interceptors.response.use(
