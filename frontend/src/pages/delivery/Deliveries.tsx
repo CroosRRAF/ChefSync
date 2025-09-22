@@ -49,7 +49,7 @@ import {
   type DeliveryIssue,
   type ChatMessage as ServiceChatMessage,
 } from "@/services/deliveryService";
-import type { Order } from "@/types/order";
+import type { Order } from "@/types/orderType";
 
 const DeliveryDeliveries: React.FC = () => {
   const { user } = useAuth();

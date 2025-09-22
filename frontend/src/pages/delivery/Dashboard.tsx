@@ -29,7 +29,7 @@ import {
   type DeliveryLog,
 } from "@/services/deliveryService";
 import { Link, useNavigate } from "react-router-dom";
-import type { Order } from "../../types/order";
+import type { Order } from "../../types/orderType";
 import {
   Truck,
   CheckCircle,
