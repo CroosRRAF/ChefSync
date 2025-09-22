@@ -1,228 +1,221 @@
-import React from 'react';
-import { useForm } from 'react-hook-form';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import {
-  MapPin,
-  Phone,
-  Mail,
-  Clock,
+import { 
+  Phone, 
+  Mail, 
+  MapPin, 
+  Clock, 
   MessageSquare,
   Send,
-  ExternalLink
+  CheckCircle,
+  Facebook,
+  Twitter,
+  Instagram,
+  Linkedin
 } from 'lucide-react';
 
-interface ContactFormData {
-  name: string;
-  email: string;
-  phone: string;
-  message: string;
-}
+// Import hero images
+import heroImage4 from '@/assets/images/hero/Gemini_Generated_Image_v86hq4v86hq4v86h.png';
+import heroImage5 from '@/assets/images/hero/Gemini_Generated_Image_xonn8hxonn8hxonn.png';
 
 const Contact: React.FC = () => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    subject: '',
+    message: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    reset
-  } = useForm<ContactFormData>();
 
-  const onSubmit = async (data: ContactFormData) => {
-    try {
-      // TODO: Implement actual form submission
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    // Simulate form submission
+    setTimeout(() => {
       toast({
-        title: "Message sent successfully!",
-        description: "We'll get back to you within 24 hours.",
+        title: "Message Sent!",
+        description: "Thank you for contacting us. We'll get back to you within 24 hours.",
       });
-      
-      reset();
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Failed to send message",
-        description: "Please try again or contact us directly.",
-      });
-    }
+      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+      setIsSubmitting(false);
+    }, 2000);
   };
 
   const contactInfo = [
     {
-      icon: MapPin,
-      title: 'Our Location',
-      details: ['123 Galle Road', 'Colombo 03, Sri Lanka'],
-      action: 'Get Directions',
-      link: 'https://maps.google.com'
+      icon: <Phone className="h-6 w-6" />,
+      title: 'Phone',
+      details: ['+91 98765 43210', '+91 87654 32109'],
+      description: 'Call us for immediate assistance'
     },
     {
-      icon: Phone,
-      title: 'Call Us',
-      details: ['+94 11 234 5678', '+94 77 123 4567'],
-      action: 'Call Now',
-      link: 'tel:+94112345678'
+      icon: <Mail className="h-6 w-6" />,
+      title: 'Email',
+      details: ['hello@chefsync.com', 'support@chefsync.com'],
+      description: 'Send us an email anytime'
     },
     {
-      icon: Mail,
-      title: 'Email Us',
-      details: ['hello@chefsync.lk', 'support@chefsync.lk'],
-      action: 'Send Email',
-      link: 'mailto:hello@chefsync.lk'
+      icon: <MapPin className="h-6 w-6" />,
+      title: 'Office',
+      details: ['123 Anna Salai, T. Nagar', 'Chennai, Tamil Nadu 600017'],
+      description: 'Visit our office'
     },
     {
-      icon: Clock,
+      icon: <Clock className="h-6 w-6" />,
       title: 'Business Hours',
-      details: ['Mon - Sun: 9:00 AM - 11:00 PM', 'Customer Support: 24/7'],
-      action: 'View Schedule',
-      link: '#'
+      details: ['Mon - Fri: 9:00 AM - 8:00 PM', 'Sat - Sun: 10:00 AM - 6:00 PM'],
+      description: 'We are here to help'
     }
   ];
 
-  const socialLinks = [
-    { name: 'WhatsApp', link: 'https://wa.me/94771234567', color: 'bg-green-500' },
-    { name: 'Facebook', link: 'https://facebook.com/chefsync', color: 'bg-blue-600' },
-    { name: 'Instagram', link: 'https://instagram.com/chefsync', color: 'bg-pink-500' },
-    { name: 'Twitter', link: 'https://twitter.com/chefsync', color: 'bg-blue-400' }
+  const faqs = [
+    {
+      question: 'How do I place an order?',
+      answer: 'Simply click "Start Order", enter your delivery address, choose your order type, and browse our menu to select your favorite dishes.'
+    },
+    {
+      question: 'What are your delivery areas?',
+      answer: 'We currently deliver to 50+ locations across Chennai and surrounding areas. Enter your address to check if we deliver to your location.'
+    },
+    {
+      question: 'How can I become a cook partner?',
+      answer: 'You can join our cook partner program by contacting us through this form or calling our support number. We provide training and support to get you started.'
+    },
+    {
+      question: 'What payment methods do you accept?',
+      answer: 'We accept all major payment methods including UPI, credit/debit cards, net banking, and cash on delivery in select areas.'
+    },
+    {
+      question: 'How do you ensure food quality?',
+      answer: 'All our cook partners follow strict hygiene standards. We conduct regular quality checks and maintain cold chain delivery to ensure fresh, safe food.'
+    }
   ];
 
-  const validateSriLankanPhone = (phone: string) => {
-    const phoneRegex = /^(\+94|0)?[1-9]\d{8}$/;
-    return phoneRegex.test(phone.replace(/\s/g, '')) || 'Please enter a valid Sri Lankan phone number';
-  };
-
   return (
-    <div className="min-h-screen bg-background pt-16">
-      {/* Hero Section */}
-      <section className="py-20 bg-muted/30">
-        <div className="container mx-auto px-4 text-center">
-          <Badge className="mb-6">Get in Touch</Badge>
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            We'd Love to
-            <span className="block text-gradient-primary">Hear From You</span>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Hero Section with Background Image */}
+      <div className="relative h-screen flex items-center justify-center overflow-hidden">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000"
+          style={{ backgroundImage: `url(${heroImage4})` }}
+        />
+        <div className="absolute inset-0 bg-black/50"></div>
+        
+        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
+          <Badge className="mb-6 bg-orange-100/90 text-orange-800 dark:bg-orange-900/90 dark:text-orange-200 animate-fadeIn backdrop-blur-sm">
+            Contact Us
+          </Badge>
+          <h1 className="text-5xl md:text-7xl font-bold text-white mb-8 animate-slideUp">
+            Get in Touch
+            <span className="block text-orange-400 mt-4 animate-slideUp animation-delay-200">We're Here to Help</span>
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Have a question, suggestion, or need support? Our friendly team is here to help 
-            you have the best possible experience with ChefSync.
+          <p className="text-xl md:text-2xl text-gray-200 max-w-3xl mx-auto leading-relaxed animate-slideUp animation-delay-400 backdrop-blur-sm bg-black/20 p-4 rounded-lg">
+            Have questions about our platform, want to become a cook partner, or need support? 
+            We'd love to hear from you.
           </p>
         </div>
-      </section>
+      </div>
 
       <div className="container mx-auto px-4 py-16">
-        <div className="grid lg:grid-cols-2 gap-12">
+        <div className="grid lg:grid-cols-3 gap-8 mb-16">
           {/* Contact Form */}
-          <div>
-            <Card className="shadow-food">
-              <CardHeader>
-                <CardTitle className="text-2xl flex items-center">
-                  <MessageSquare className="h-6 w-6 mr-2 text-primary" />
-                  Send Us a Message
-                </CardTitle>
-                <CardDescription>
-                  Fill out the form below and we'll get back to you as soon as possible.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name</Label>
+          <div className="lg:col-span-2">
+            <Card className="animate-slideUp animation-delay-600">
+              <CardContent className="p-8">
+                <div className="flex items-center space-x-2 mb-6">
+                  <MessageSquare className="h-6 w-6 text-orange-500" />
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    Send us a Message
+                  </h2>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="name">Full Name *</Label>
                       <Input
                         id="name"
-                        placeholder="Enter your full name"
-                        {...register('name', {
-                          required: 'Name is required',
-                          minLength: {
-                            value: 2,
-                            message: 'Name must be at least 2 characters'
-                          },
-                          maxLength: {
-                            value: 100,
-                            message: 'Name must be less than 100 characters'
-                          }
-                        })}
+                        placeholder="Your full name"
+                        value={formData.name}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        required
                       />
-                      {errors.name && (
-                        <p className="text-sm text-destructive">{errors.name.message}</p>
-                      )}
                     </div>
+                    <div>
+                      <Label htmlFor="email">Email Address *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
 
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
                       <Label htmlFor="phone">Phone Number</Label>
                       <Input
                         id="phone"
-                        placeholder="+94 77 123 4567"
-                        {...register('phone', {
-                          required: 'Phone number is required',
-                          validate: validateSriLankanPhone
-                        })}
+                        placeholder="+91 98765 43210"
+                        value={formData.phone}
+                        onChange={(e) => handleInputChange('phone', e.target.value)}
                       />
-                      {errors.phone && (
-                        <p className="text-sm text-destructive">{errors.phone.message}</p>
-                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="subject">Subject *</Label>
+                      <Input
+                        id="subject"
+                        placeholder="What is this about?"
+                        value={formData.subject}
+                        onChange={(e) => handleInputChange('subject', e.target.value)}
+                        required
+                      />
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email address"
-                      {...register('email', {
-                        required: 'Email is required',
-                        pattern: {
-                          value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                          message: 'Please enter a valid email address'
-                        }
-                      })}
-                    />
-                    {errors.email && (
-                      <p className="text-sm text-destructive">{errors.email.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="message">Message</Label>
+                  <div>
+                    <Label htmlFor="message">Message *</Label>
                     <Textarea
                       id="message"
-                      placeholder="Tell us how we can help you..."
-                      className="min-h-[120px]"
-                      {...register('message', {
-                        required: 'Message is required',
-                        minLength: {
-                          value: 10,
-                          message: 'Message must be at least 10 characters'
-                        },
-                        maxLength: {
-                          value: 1000,
-                          message: 'Message must be less than 1000 characters'
-                        }
-                      })}
+                      placeholder="Tell us more about your inquiry..."
+                      rows={6}
+                      value={formData.message}
+                      onChange={(e) => handleInputChange('message', e.target.value)}
+                      required
                     />
-                    {errors.message && (
-                      <p className="text-sm text-destructive">{errors.message.message}</p>
-                    )}
                   </div>
 
                   <Button
                     type="submit"
-                    className="w-full button-gradient-primary"
                     disabled={isSubmitting}
+                    className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white py-3 transform hover:scale-105 transition-all duration-300"
                   >
                     {isSubmitting ? (
-                      <>Sending...</>
+                      <span className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Sending...
+                      </span>
                     ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
+                      <span className="flex items-center">
                         Send Message
-                      </>
+                        <Send className="ml-2 h-4 w-4" />
+                      </span>
                     )}
                   </Button>
                 </form>
@@ -231,109 +224,105 @@ const Contact: React.FC = () => {
           </div>
 
           {/* Contact Information */}
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-2xl font-bold mb-6">Get in Touch</h2>
-              <p className="text-muted-foreground mb-8">
-                Whether you're a customer with a question or a restaurant partner looking to join us, 
-                we're always here to help. Reach out through any of these channels.
-              </p>
-            </div>
-
-            <div className="grid gap-6">
-              {contactInfo.map((info, index) => (
-                <Card key={index} className="hover:shadow-card transition-all duration-300">
-                  <CardContent className="p-6">
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0">
-                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <info.icon className="h-6 w-6 text-primary" />
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold mb-2">{info.title}</h3>
-                        {info.details.map((detail, idx) => (
-                          <p key={idx} className="text-muted-foreground text-sm">
-                            {detail}
-                          </p>
-                        ))}
-                        {info.link && info.link !== '#' && (
-                          <Button
-                            variant="link"
-                            className="p-0 h-auto mt-2 text-primary"
-                            onClick={() => window.open(info.link, '_blank')}
-                          >
-                            {info.action}
-                            <ExternalLink className="h-3 w-3 ml-1" />
-                          </Button>
-                        )}
+          <div className="space-y-6">
+            {contactInfo.map((info, index) => (
+              <Card key={index} className="hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 animate-scaleIn" style={{ animationDelay: `${index * 200}ms` }}>
+                <CardContent className="p-6">
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0 p-3 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+                      <div className="text-orange-500 animate-float">
+                        {info.icon}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                        {info.title}
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                        {info.description}
+                      </p>
+                      {info.details.map((detail, i) => (
+                        <p key={i} className="text-gray-600 dark:text-gray-300 text-sm">
+                          {detail}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
 
-            {/* Social Media Links */}
-            <div>
-              <h3 className="font-semibold mb-4">Follow Us</h3>
-              <div className="flex space-x-3">
-                {socialLinks.map((social, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="sm"
-                    className={`${social.color} text-white border-0 hover:opacity-80`}
-                    onClick={() => window.open(social.link, '_blank')}
-                  >
-                    {social.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* FAQ Link */}
-            <Card className="bg-muted/50">
+            {/* Social Media */}
+            <Card className="animate-scaleIn animation-delay-800">
               <CardContent className="p-6">
-                <h3 className="font-semibold mb-2">Frequently Asked Questions</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Looking for quick answers? Check out our FAQ section for common questions 
-                  about orders, delivery, and our services.
-                </p>
-                <Button variant="outline" size="sm">
-                  View FAQ
-                </Button>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
+                  Follow Us
+                </h3>
+                <div className="flex space-x-4">
+                  <Button size="sm" variant="outline" className="p-2 hover:bg-orange-50 hover:border-orange-300 transition-all duration-300">
+                    <Facebook className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" className="p-2 hover:bg-orange-50 hover:border-orange-300 transition-all duration-300">
+                    <Twitter className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" className="p-2 hover:bg-orange-50 hover:border-orange-300 transition-all duration-300">
+                    <Instagram className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" className="p-2 hover:bg-orange-50 hover:border-orange-300 transition-all duration-300">
+                    <Linkedin className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
         </div>
-      </div>
 
-      {/* Map Section (Placeholder) */}
-      <section className="bg-muted/30 py-16">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">Find Us</h2>
-            <p className="text-muted-foreground">
-              Visit our main office or any of our cloud kitchen locations across Colombo.
+        {/* FAQ Section */}
+        <div className="mb-16">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 animate-slideUp">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto animate-slideUp animation-delay-200">
+              Quick answers to common questions
             </p>
           </div>
-          
-          <div className="bg-muted rounded-lg h-96 flex items-center justify-center">
-            <div className="text-center">
-              <MapPin className="h-12 w-12 text-primary mx-auto mb-4" />
-              <p className="text-muted-foreground">Interactive map coming soon</p>
-              <Button 
-                variant="outline" 
-                className="mt-4"
-                onClick={() => window.open('https://maps.google.com', '_blank')}
-              >
-                View on Google Maps
-              </Button>
-            </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {faqs.map((faq, index) => (
+              <Card key={index} className="hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 animate-scaleIn" style={{ animationDelay: `${index * 200}ms` }}>
+                <CardContent className="p-6">
+                  <div className="flex items-start space-x-3">
+                    <CheckCircle className="h-5 w-5 text-green-500 mt-1 flex-shrink-0 animate-float" />
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                        {faq.question}
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
+                        {faq.answer}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
-      </section>
+
+        {/* Map Section (Placeholder) */}
+        <Card className="overflow-hidden animate-fadeIn animation-delay-800">
+          <div className="bg-gradient-to-r from-orange-500 to-red-500 p-8 text-center text-white">
+            <MapPin className="h-12 w-12 mx-auto mb-4 text-white/90 animate-float" />
+            <h3 className="text-2xl font-bold mb-2">Visit Our Office</h3>
+            <p className="text-white/90 mb-4">
+              123 Anna Salai, T. Nagar, Chennai, Tamil Nadu 600017
+            </p>
+            <Button className="bg-white text-orange-500 hover:bg-gray-100 transform hover:scale-105 transition-all duration-300">
+              Get Directions
+            </Button>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 };

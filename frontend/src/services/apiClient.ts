@@ -50,7 +50,8 @@ apiClient.interceptors.request.use(
   (error) => {
     return Promise.reject(error);
   }
-);
+  return config;
+});
 
 // Response interceptor to handle common errors
 apiClient.interceptors.response.use(

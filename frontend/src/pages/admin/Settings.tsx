@@ -42,12 +42,12 @@ const AdminSettings: React.FC = memo(() => {
       setLoading(true);
       setError(null);
       const settingsData = await adminService.getSystemSettings();
-      
+
       // Ensure settingsData is an array
       if (!Array.isArray(settingsData)) {
         throw new Error('Invalid settings data received from server');
       }
-      
+
       setSettings(settingsData);
 
       // Initialize form values
@@ -189,6 +189,10 @@ const AdminSettings: React.FC = memo(() => {
         </div>
       </div>
     );
+  }
+
+  if (!isAuthenticated || !user) {
+    return <div>Please log in to access settings.</div>;
   }
 
   return (

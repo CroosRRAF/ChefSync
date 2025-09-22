@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/context/AuthContext';
-import heroImage from '@/assets/hero-food-banner.jpg';
+import HeroSection from '@/components/home/HeroSection';
+import FeaturesSection from '@/components/home/FeaturesSection';
+import AddressModal from '@/components/home/AddressModal';
+import OrderTypeModal from '@/components/home/OrderTypeModal';
 import {
   Clock,
   Shield,
@@ -20,17 +22,29 @@ import {
 } from 'lucide-react';
 
 const Home: React.FC = () => {
-  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [addressModalOpen, setAddressModalOpen] = useState(false);
+  const [orderTypeModalOpen, setOrderTypeModalOpen] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState<any>(null);
+  const [orderType, setOrderType] = useState<'normal' | 'bulk' | null>(null);
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const handleOrderTypeSelect = (type: 'normal' | 'bulk') => {
+  const handleStartOrder = () => {
     if (!isAuthenticated) {
-      navigate('/auth/login', { state: { redirectTo: `/menu?mode=${type}` } });
+      navigate('/auth/login', { state: { redirectTo: '/menu' } });
       return;
     }
+    setAddressModalOpen(true);
+  };
+
+  const handleAddressContinue = (address: any) => {
+    setDeliveryAddress(address);
+    setOrderTypeModalOpen(true);
+  };
+
+  const handleOrderTypeContinue = (type: 'normal' | 'bulk') => {
+    setOrderType(type);
     navigate(`/menu?mode=${type}`);
-    setOrderModalOpen(false);
   };
 
   const features = [
@@ -86,140 +100,25 @@ const Home: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" style={{ cursor: 'default' }}>
       {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        {/* Background Image with Overlay */}
-        <div className="absolute inset-0">
-          <img 
-            src={heroImage} 
-            alt="Delicious food spread" 
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 hero-gradient" />
-        </div>
-
-        {/* Hero Content */}
-        <div className="relative z-10 text-center text-white px-4 max-w-4xl mx-auto">
-          <div className="animate-fade-up">
-            <Badge className="mb-6 bg-white/20 text-white border-white/30 hover:bg-white/30">
-              <Star className="w-3 h-3 mr-1 fill-current" />
-              Rated #1 Food Delivery Platform
-            </Badge>
-            
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-              Delicious Food
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">
-                Delivered Fast
-              </span>
-            </h1>
-            
-            <p className="text-xl md:text-2xl mb-8 text-white/90 max-w-2xl mx-auto">
-              Experience the finest cuisine from top chefs, delivered fresh to your doorstep in minutes.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Dialog open={orderModalOpen} onOpenChange={setOrderModalOpen}>
-                <DialogTrigger asChild>
-                  <Button size="lg" className="text-lg px-8 py-6 bg-white text-primary hover:bg-white/90 shadow-glow">
-                    Start Order
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="text-center text-2xl">Choose Order Type</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <Button
-                      onClick={() => handleOrderTypeSelect('normal')}
-                      variant="outline"
-                      className="w-full h-20 flex-col space-y-2 hover:bg-primary hover:text-primary-foreground"
-                    >
-                      <Package className="h-6 w-6" />
-                      <div className="text-center">
-                        <div className="font-semibold">Normal Order</div>
-                        <div className="text-sm text-muted-foreground">Individual meals & small portions</div>
-                      </div>
-                    </Button>
-                    
-                    <Button
-                      onClick={() => handleOrderTypeSelect('bulk')}
-                      variant="outline"
-                      className="w-full h-20 flex-col space-y-2 hover:bg-secondary hover:text-secondary-foreground"
-                    >
-                      <Users className="h-6 w-6" />
-                      <div className="text-center">
-                        <div className="font-semibold">Bulk Order</div>
-                        <div className="text-sm text-muted-foreground">10+ items for events & offices</div>
-                      </div>
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              <Button 
-                variant="outline" 
-                size="lg" 
-                className="text-lg px-8 py-6 bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
-                onClick={() => navigate('/about')}
-              >
-                <Play className="mr-2 h-5 w-5" />
-                Learn More
-              </Button>
-            </div>
-          </div>
-
-          {/* Floating Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 animate-fade-up animation-delay-400">
-            {stats.map((stat, index) => (
-              <Card key={index} className="bg-white/10 backdrop-blur-md border-white/20">
-                <CardContent className="p-4 text-center text-white">
-                  <stat.icon className="h-6 w-6 mx-auto mb-2 text-accent" />
-                  <div className="text-2xl font-bold">{stat.number}</div>
-                  <div className="text-sm text-white/80">{stat.label}</div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce-gentle">
-          <div className="w-6 h-10 border-2 border-white/50 rounded-full flex justify-center">
-            <div className="w-1 h-3 bg-white/70 rounded-full mt-2 animate-pulse"></div>
-          </div>
-        </div>
-      </section>
+      <HeroSection onStartOrder={handleStartOrder} />
 
       {/* Features Section */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge className="mb-4">Why Choose ChefSync</Badge>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">
-              Excellence in Every Bite
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              We're committed to delivering not just food, but an exceptional culinary experience.
-            </p>
-          </div>
+      <FeaturesSection />
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <Card key={index} className="group hover:shadow-card transition-all duration-300 food-card-hover">
-                <CardContent className="p-8 text-center">
-                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                    <feature.icon className={`h-8 w-8 ${feature.color}`} />
-                  </div>
-                  <h3 className="text-2xl font-semibold mb-4">{feature.title}</h3>
-                  <p className="text-muted-foreground">{feature.description}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Modals */}
+      <AddressModal 
+        isOpen={addressModalOpen}
+        onClose={() => setAddressModalOpen(false)}
+        onContinue={handleAddressContinue}
+      />
+      
+      <OrderTypeModal
+        isOpen={orderTypeModalOpen}
+        onClose={() => setOrderTypeModalOpen(false)}
+        onContinue={handleOrderTypeContinue}
+      />
 
       {/* Testimonials Section */}
       <section className="py-20 bg-muted/30">
@@ -266,14 +165,15 @@ const Home: React.FC = () => {
           <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
             Join thousands of satisfied customers and discover your new favorite meals today.
           </p>
-          <Dialog open={orderModalOpen} onOpenChange={setOrderModalOpen}>
-            <DialogTrigger asChild>
-              <Button size="lg" variant="secondary" className="text-lg px-8 py-6">
-                Order Now
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </DialogTrigger>
-          </Dialog>
+          <Button 
+            size="lg" 
+            variant="secondary" 
+            className="text-lg px-8 py-6"
+            onClick={handleStartOrder}
+          >
+            Order Now
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
         </div>
       </section>
     </div>
