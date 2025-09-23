@@ -6,7 +6,7 @@ import {
   Heart, MapPin, Truck, ShoppingBag, X, Gift, Percent, RotateCcw,
   Eye, ChevronRight, Plus, Minus, Leaf, Sun, Moon, Settings,
   Bell, User, LogOut, Menu as MenuIcon, Home, History, 
-  TrendingUp, Award, Zap, Target, Flame, Shield, Sparkles
+  TrendingUp, Award, Zap, Target, Flame, Shield, Sparkles, Check
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -489,54 +489,68 @@ const Menu: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Search and Filter Bar */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-16 z-30 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-            {/* Search Bar */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      {/* Professional Search and Filter Bar */}
+      <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 sticky top-16 z-30 shadow-lg shadow-gray-200/20 dark:shadow-gray-900/20">
+        <div className="container mx-auto px-6 py-5">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+            {/* Enhanced Search Bar */}
+            <div className="flex-1 relative group">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors duration-200" />
               <Input
-                placeholder="Search for dishes, cuisines..."
+                placeholder="Search for dishes, cuisines, or chefs..."
                 value={filters.search}
                 onChange={(e) => updateFilter('search', e.target.value)}
-                className="pl-10 h-12 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white"
+                className="pl-12 h-14 bg-gray-50/80 dark:bg-gray-700/80 border-gray-200/60 dark:border-gray-600/60 text-gray-900 dark:text-white rounded-xl shadow-sm hover:shadow-md focus:shadow-lg transition-all duration-300 focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
 
-            {/* Filter Controls */}
-            <div className="flex items-center gap-3">
-              {/* Delivery/Pickup Toggle */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <Truck className={`h-4 w-4 ${isDelivery ? 'text-primary' : 'text-gray-400'}`} />
+            {/* Professional Filter Controls */}
+            <div className="flex items-center gap-4">
+              {/* Enhanced Delivery/Pickup Toggle */}
+              <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-600/50 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Truck className={`h-5 w-5 transition-colors duration-200 ${isDelivery ? 'text-primary' : 'text-gray-400'}`} />
+                  <span className={`text-sm font-medium transition-colors duration-200 ${isDelivery ? 'text-primary' : 'text-gray-500'}`}>Delivery</span>
+                </div>
                 <Switch
                   checked={!isDelivery}
                   onCheckedChange={(checked) => setIsDelivery(!checked)}
-                  className="scale-75"
+                  className="scale-90"
                 />
-                <ShoppingBag className={`h-4 w-4 ${!isDelivery ? 'text-primary' : 'text-gray-400'}`} />
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className={`h-5 w-5 transition-colors duration-200 ${!isDelivery ? 'text-primary' : 'text-gray-400'}`} />
+                  <span className={`text-sm font-medium transition-colors duration-200 ${!isDelivery ? 'text-primary' : 'text-gray-500'}`}>Pickup</span>
+                </div>
               </div>
 
-              {/* Filter Button */}
+              {/* Professional Filter Button */}
               <Button
-                variant="outline"
+                variant={sidebarOpen ? "default" : "outline"}
                 onClick={toggleSidebar}
-                className="flex items-center gap-2"
+                className={`flex items-center gap-3 px-6 py-3 h-14 rounded-xl font-medium transition-all duration-300 shadow-sm hover:shadow-md ${
+                  sidebarOpen 
+                    ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg shadow-primary/25" 
+                    : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary/50"
+                }`}
               >
-                <Filter className="h-4 w-4" />
-                <span className="hidden sm:inline">Filters</span>
-                {sidebarOpen && <span className="sm:hidden">Close</span>}
+                <Filter className="h-5 w-5" />
+                <span className="hidden sm:inline font-semibold">
+                  {sidebarOpen ? "Close Filters" : "Advanced Filters"}
+                </span>
+                <span className="sm:hidden font-semibold">
+                  {sidebarOpen ? "Close" : "Filter"}
+                </span>
               </Button>
 
-              {/* Theme Toggle */}
+              {/* Enhanced Theme Toggle */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={toggleTheme}
-                className="h-10 w-10 p-0"
+                className="h-12 w-12 p-0 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
               >
-                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {theme === 'dark' ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-blue-500" />}
               </Button>
             </div>
           </div>
@@ -547,18 +561,18 @@ const Menu: React.FC = () => {
         {/* Responsive Layout */}
         <div className="flex gap-6">
           {/* Filter Sidebar */}
-          <div className={`${sidebarOpen ? 'fixed lg:relative' : 'hidden lg:block'} lg:block w-full lg:w-80 flex-shrink-0 z-50 lg:z-auto`}>
-            <div className={`${sidebarOpen ? 'fixed top-0 left-0 h-full w-80 lg:relative lg:top-24 lg:h-auto lg:w-auto' : 'sticky top-24'}`}>
-              <Card className="h-full lg:h-auto bg-white dark:bg-gray-900 border-0 shadow-lg lg:shadow-md">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className={`${sidebarOpen ? 'block' : 'hidden'} w-full lg:w-80 flex-shrink-0`}>
+            <div className={`${sidebarOpen ? 'fixed top-0 left-0 h-full w-80 z-40 lg:relative lg:top-24 lg:h-auto lg:w-auto lg:z-auto' : 'hidden'}`}>
+              <Card className="h-full lg:h-auto bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 shadow-2xl shadow-gray-200/20 dark:shadow-gray-900/20 rounded-2xl overflow-hidden">
+                <div className="p-6 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 border-b border-gray-200/50 dark:border-gray-700/50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        <Filter className="h-5 w-5 text-primary" />
+                      <div className="p-3 bg-gradient-to-r from-primary/10 to-primary/20 rounded-xl">
+                        <Filter className="h-6 w-6 text-primary" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filters</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Refine your search</p>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Smart Filters</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Refine your culinary journey</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -566,7 +580,7 @@ const Menu: React.FC = () => {
                         variant="outline" 
                         size="sm" 
                         onClick={clearFilters}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800 rounded-lg font-medium"
                       >
                         Clear All
                       </Button>
@@ -574,9 +588,9 @@ const Menu: React.FC = () => {
                         variant="ghost" 
                         size="sm" 
                         onClick={closeSidebar} 
-                        className="lg:hidden hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className="lg:hidden hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl p-2"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-5 w-5" />
                       </Button>
                     </div>
                   </div>
@@ -584,24 +598,33 @@ const Menu: React.FC = () => {
                 
                 <div className="p-6 max-h-[calc(100vh-200px)] lg:max-h-[calc(100vh-300px)] overflow-y-auto">
                   <div className="space-y-6">
-                  {/* Sort By */}
-                  <div>
-                    <label className="text-sm font-semibold mb-4 block text-gray-900 dark:text-white flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-primary" />
+                  {/* Enhanced Sort By */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-5 rounded-xl border border-blue-200/50 dark:border-blue-800/50">
+                    <label className="text-sm font-bold mb-4 block text-gray-900 dark:text-white flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
+                        <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
                       Sort By
                     </label>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {sortOptions.map((option) => (
                         <div
                           key={option.value}
-                          className={`p-3 rounded-lg cursor-pointer transition-all duration-200 border ${
+                          className={`p-4 rounded-xl cursor-pointer transition-all duration-300 hover:scale-105 ${
                             filters.sortBy === option.value 
-                              ? "bg-primary text-white border-primary shadow-md" 
-                              : "bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-600"
+                              ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg shadow-primary/25" 
+                              : "bg-white/80 dark:bg-gray-800/80 hover:bg-gray-50 dark:hover:bg-gray-700 hover:shadow-md border border-gray-200/50 dark:border-gray-700/50"
                           }`}
                           onClick={() => updateFilter('sortBy', option.value)}
                         >
-                          <span className="text-sm font-medium">{option.label}</span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold">{option.label}</span>
+                            {filters.sortBy === option.value && (
+                              <div className="p-1 bg-white/20 rounded-full">
+                                <Check className="h-4 w-4" />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -822,18 +845,23 @@ const Menu: React.FC = () => {
 
           {/* Mobile Sidebar Overlay */}
           {sidebarOpen && (
-            <div className="fixed inset-0 z-40 lg:hidden" onClick={closeSidebar}>
-              <div className="fixed inset-0 bg-black/50" />
+            <div className="fixed inset-0 z-30 lg:hidden" onClick={closeSidebar}>
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
             </div>
           )}
 
-          {/* Main Content */}
+          {/* Enhanced Main Content */}
           <div className="flex-1 min-w-0">
-            <div className="space-y-8">
-          {/* Quick Filter Bar */}
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Filters:</span>
+            <div className="space-y-10">
+          {/* Professional Quick Filter Bar */}
+          <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg shadow-gray-200/10 dark:shadow-gray-900/10">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Filter className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Active Filters:</span>
+              </div>
               
               {/* Active Filters Display */}
               {filters.category && (
@@ -894,19 +922,31 @@ const Menu: React.FC = () => {
               )}
             </div>
           </div>
-          {/* User Stats Section */}
+          {/* Professional User Stats Section */}
           <div>
-            <SectionHeader title="📊 Your Stats" subtitle="Track your ordering journey" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
+                  <TrendingUp className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Performance</h2>
+                  <p className="text-gray-600 dark:text-gray-400">Track your ordering journey and achievements</p>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {mockStats.map((stat, index) => (
-                <Card key={index} className="p-4 hover:shadow-md transition-shadow">
+                <Card key={index} className="group p-6 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border border-gray-200/50 dark:border-gray-700/50 hover:shadow-xl hover:shadow-gray-200/20 dark:hover:shadow-gray-900/20 transition-all duration-300 hover:-translate-y-1">
                   <CardContent className="p-0">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">{stat.label}</p>
-                        <p className="text-2xl font-bold">{stat.value}</p>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.label}</p>
+                        <p className="text-3xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
                       </div>
-                      <stat.icon className={`h-8 w-8 ${stat.color}`} />
+                      <div className="p-3 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                        <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -914,22 +954,38 @@ const Menu: React.FC = () => {
             </div>
           </div>
 
-          {/* Offers Section */}
+          {/* Professional Offers Section */}
           <div>
-            <SectionHeader title="🔥 Limited Time Offers" subtitle="Don't miss out on these deals!" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-3 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl">
+                  <Flame className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Exclusive Offers</h2>
+                  <p className="text-gray-600 dark:text-gray-400">Limited time deals you won't want to miss</p>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {mockOffers.map((offer) => (
-                <Card key={offer.id} className={`${offer.color} text-white cursor-pointer hover:shadow-lg transition-all duration-300 hover:scale-105`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-bold text-lg">{offer.title}</h3>
-                        <p className="text-sm opacity-90">{offer.subtitle}</p>
-                        <Badge variant="secondary" className="mt-2 bg-white/20 text-white">
-                          Code: {offer.code}
-                        </Badge>
+                <Card key={offer.id} className={`${offer.color} text-white cursor-pointer hover:shadow-2xl transition-all duration-300 hover:scale-105 hover:-translate-y-2 group overflow-hidden`}>
+                  <CardContent className="p-6 relative">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-10 translate-x-10"></div>
+                    <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/5 rounded-full translate-y-8 -translate-x-8"></div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="font-bold text-xl mb-1">{offer.title}</h3>
+                          <p className="text-sm opacity-90 mb-3">{offer.subtitle}</p>
+                          <Badge variant="secondary" className="bg-white/20 text-white border-white/30 hover:bg-white/30 transition-colors">
+                            {offer.code}
+                          </Badge>
+                        </div>
+                        <div className="p-3 bg-white/20 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                          <offer.icon className="h-8 w-8 opacity-90" />
+                        </div>
                       </div>
-                      <offer.icon className="h-8 w-8 opacity-80" />
                     </div>
                   </CardContent>
                 </Card>
@@ -937,20 +993,47 @@ const Menu: React.FC = () => {
             </div>
           </div>
 
-          {/* Achievements Section */}
+          {/* Professional Achievements Section */}
           <div>
-            <SectionHeader title="🏆 Achievements" subtitle="Unlock rewards and badges" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-3 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl">
+                  <Award className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Achievements</h2>
+                  <p className="text-gray-600 dark:text-gray-400">Unlock rewards and showcase your progress</p>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {mockAchievements.map((achievement, index) => (
-                <Card key={index} className={`p-4 ${achievement.completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-800'}`}>
+                <Card key={index} className={`group p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
+                  achievement.completed 
+                    ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800 shadow-green-200/20 dark:shadow-green-900/20' 
+                    : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 border-gray-200 dark:border-gray-700'
+                }`}>
                   <CardContent className="p-0">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${achievement.completed ? 'bg-green-100 dark:bg-green-800' : 'bg-gray-100 dark:bg-gray-700'}`}>
-                        <achievement.icon className={`h-5 w-5 ${achievement.completed ? 'text-green-600' : 'text-gray-400'}`} />
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-xl transition-all duration-300 group-hover:scale-110 ${
+                        achievement.completed 
+                          ? 'bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-800 dark:to-emerald-800' 
+                          : 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600'
+                      }`}>
+                        <achievement.icon className={`h-6 w-6 ${
+                          achievement.completed 
+                            ? 'text-green-600 dark:text-green-400' 
+                            : 'text-gray-400 dark:text-gray-500'
+                        }`} />
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-sm">{achievement.title}</h4>
-                        <p className="text-xs text-muted-foreground">{achievement.description}</p>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-sm text-gray-900 dark:text-white mb-1">{achievement.title}</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">{achievement.description}</p>
+                        {achievement.completed && (
+                          <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200 text-xs">
+                            ✓ Completed
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -1090,7 +1173,7 @@ const Menu: React.FC = () => {
 
       {/* Enhanced Cart Summary */}
       {getTotalCartItems() > 0 && (
-        <div className="fixed bottom-4 right-4 bg-gradient-to-r from-orange-500 to-red-500 text-white p-4 rounded-lg shadow-2xl animate-scaleIn z-[60]">
+        <div className="fixed bottom-4 right-4 bg-gradient-to-r from-orange-500 to-red-500 text-white p-4 rounded-lg shadow-2xl animate-scaleIn z-50">
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-2 rounded-full">
               <span className="text-lg font-bold">{getTotalCartItems()}</span>

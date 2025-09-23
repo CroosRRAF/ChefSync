@@ -11,7 +11,7 @@ import {
   Users
 } from "lucide-react";
 
-export default function Dashboard() {
+export default function Home() {
   const stats = [
     {
       title: "Menu Items",

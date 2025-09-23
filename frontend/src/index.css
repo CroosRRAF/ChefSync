@@ -261,6 +261,32 @@
   .animation-delay-600 {
     animation-delay: 600ms;
   }
+
+  /* Chef Dashboard specific styles */
+  .status-indicator {
+    @apply h-3 w-3 rounded-full shadow-sm;
+  }
+  
+  .status-free {
+    background: hsl(120 60% 50%);
+    box-shadow: 0 0 8px hsl(120 60% 50% / 0.4);
+  }
+  
+  .status-busy {
+    background: hsl(0 84% 60%);
+    box-shadow: 0 0 8px hsl(0 84% 60% / 0.4);
+  }
+
+  .chef-card {
+    background: var(--gradient-card);
+    box-shadow: var(--shadow-card);
+    transition: var(--transition-smooth);
+  }
+
+  .chef-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
   
   .animation-delay-800 {
     animation-delay: 800ms;

@@ -1,8 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
-from apps.users.fields import LongBlobImageField
-
+from apps.users.fields import LongBlobImageField   
 
 class Cuisine(models.Model):
     """Cuisine categories (e.g., Italian, Chinese, Indian)"""
@@ -53,6 +52,7 @@ class Food(models.Model):
     name = models.CharField(max_length=100, null=False)
     category = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    image = LongBlobImageField(blank=True, null=True, help_text='Food image')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     admin = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
@@ -113,6 +113,7 @@ class FoodPrice(models.Model):
     price_id = models.AutoField(primary_key=True)
     size = models.CharField(max_length=10, choices=SIZE_CHOICES)
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
+    preparation_time = models.PositiveIntegerField(help_text='Preparation time in minutes for this size', default=15)
     image_url = models.CharField(max_length=255, blank=True, null=True)
     food = models.ForeignKey(Food, on_delete=models.CASCADE, related_name='prices')
     cook = models.ForeignKey(
@@ -163,7 +164,7 @@ class Offer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"Offer for {self.price.food.name} ({self.price.size}): {self.discount}% off"
+        return f"Offer for {self.price.food.name}: {self.discount}% off"
     
     class Meta:
         db_table = 'Offer'
@@ -204,9 +205,11 @@ class FoodReview(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"Review by {self.customer.username} for {self.price.food.name} ({self.price.size})"
+        return f"Review by {self.customer.username} for {self.price.food.name}"
     
     class Meta:
         db_table = 'FoodReview'
         ordering = ['-created_at']
-        unique_together = ['customer', 'price']
+        unique_together = ['customer', 'price', 'order']
+
+
