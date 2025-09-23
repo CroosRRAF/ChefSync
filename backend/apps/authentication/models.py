@@ -1,7 +1,9 @@
 import datetime
 import random
+import secrets
 import string
 from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
@@ -48,9 +50,12 @@ class User(AbstractUser):
     ROLE_CHOICES = [
         ("admin", "Admin"),  # Lowercase for compatibility
         ("Admin", "Admin"),  # Capitalized version
-        ("Customer", "Customer"),
-        ("Cook", "Cook"),
-        ("DeliveryAgent", "DeliveryAgent"),
+        ("customer", "Customer"),  # Lowercase for consistency
+        ("Customer", "Customer"),  # Capitalized version
+        ("cook", "Cook"),  # Lowercase for consistency
+        ("Cook", "Cook"),  # Capitalized version
+        ("delivery_agent", "Delivery Agent"),  # Underscore version for frontend
+        ("DeliveryAgent", "DeliveryAgent"),  # CamelCase version for compatibility
     ]
 
     # Approval status choices
@@ -79,6 +84,7 @@ class User(AbstractUser):
         blank=True, null=True, help_text="Full address of the user"
     )
     email = models.EmailField(unique=True)
+    password = models.CharField(max_length=255)
     role = models.CharField(
         max_length=20,
         choices=ROLE_CHOICES,
@@ -86,6 +92,7 @@ class User(AbstractUser):
         help_text="User role in the system",
     )
     profile_image = models.BinaryField(blank=True, null=True)  # LONGBLOB equivalent
+    password = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -122,6 +129,44 @@ class User(AbstractUser):
     account_locked = models.BooleanField(default=False)
     account_locked_until = models.DateTimeField(blank=True, null=True)
 
+    # Referral system fields
+    referral_code = models.CharField(
+        max_length=20,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text="User's unique referral code",
+    )
+    referred_by = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="referred_users",
+        help_text="User who referred this user",
+    )
+    referral_token_used = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Referral token that was used during registration",
+    )
+    total_referrals = models.PositiveIntegerField(
+        default=0, help_text="Total number of successful referrals made by this user"
+    )
+    referral_rewards_earned = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Total referral rewards earned",
+    )
+    referral_rewards_used = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Total referral rewards used",
+    )
+
     # Override username field to use email
     username = models.CharField(max_length=150, unique=True, blank=True, null=True)
 
@@ -129,21 +174,22 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ["name", "role"]
 
     def __str__(self):
-        return f"{self.name} ({self.get_role_display()})"
+        role_display = dict(self.ROLE_CHOICES).get(self.role, self.role)
+        return f"{self.name} ({role_display})"
 
     def create_profile(self):
         """Create the appropriate profile model based on user role"""
-        if self.role == "customer":
+        if self.role in ["customer", "Customer"]:
             Customer.objects.get_or_create(user=self)
             # Customers are automatically approved
             self.approval_status = "approved"
             self.save()
-        elif self.role == "cook":
+        elif self.role in ["cook", "Cook"]:
             Cook.objects.get_or_create(user=self)
             # Cooks need admin approval
             self.approval_status = "pending"
             self.save()
-        elif self.role == "delivery_agent":
+        elif self.role in ["delivery_agent", "DeliveryAgent"]:
             DeliveryAgent.objects.get_or_create(user=self)
             # Delivery agents need admin approval
             self.approval_status = "pending"
@@ -151,19 +197,19 @@ class User(AbstractUser):
 
     def get_profile(self):
         """Get the user's profile model instance"""
-        if self.role == "customer":
+        if self.role in ["customer", "Customer"]:
             try:
-                return self.customer
+                return Customer.objects.get(user=self)
             except Customer.DoesNotExist:
                 return None
-        elif self.role == "cook":
+        elif self.role in ["cook", "Cook"]:
             try:
-                return self.cook
+                return Cook.objects.get(user=self)
             except Cook.DoesNotExist:
                 return None
-        elif self.role == "delivery_agent":
+        elif self.role in ["delivery_agent", "DeliveryAgent"]:
             try:
-                return self.deliveryagent
+                return DeliveryAgent.objects.get(user=self)
             except DeliveryAgent.DoesNotExist:
                 return None
         return None
@@ -188,6 +234,7 @@ class User(AbstractUser):
         """Verify email with token"""
         if (
             self.email_verification_token == token
+            and self.email_verification_expires
             and self.email_verification_expires > timezone.now()
         ):
             self.email_verified = True
@@ -221,11 +268,11 @@ class User(AbstractUser):
     def can_login(self):
         """Check if user can login based on approval status"""
         # Customers can always login
-        if self.role == "customer":
+        if self.role in ["customer", "Customer"]:
             return True
 
         # Cooks and delivery agents need approval
-        if self.role in ["cook", "delivery_agent"]:
+        if self.role in ["cook", "Cook", "delivery_agent", "DeliveryAgent"]:
             return self.approval_status == "approved"
 
         # Admins can always login (handle both cases)
@@ -236,7 +283,7 @@ class User(AbstractUser):
 
     def get_approval_message(self):
         """Get appropriate message based on approval status"""
-        if self.role == "customer":
+        if self.role in ["customer", "Customer"]:
             return "Welcome! Your account is ready to use."
 
         if self.approval_status == "pending":
@@ -250,7 +297,84 @@ class User(AbstractUser):
 
         return "Account status unknown. Please contact support."
 
-    objects = UserManager()
+    def generate_referral_code(self):
+        """Generate a unique referral code for the user"""
+        import secrets
+        import string
+
+        # Generate a unique referral code
+        while True:
+            # Create a code with user's initials + random string
+            initials = (
+                "".join([name[0].upper() for name in self.name.split()[:2]])
+                if self.name
+                else "US"
+            )
+            random_part = "".join(
+                random.choices(string.ascii_uppercase + string.digits, k=6)
+            )
+            code = f"{initials}{random_part}"
+
+            # Check if code is unique
+            if not User.objects.filter(referral_code=code).exists():
+                self.referral_code = code
+                self.save()
+                return code
+
+    def get_referral_code(self):
+        """Get or generate referral code for the user"""
+        if not self.referral_code:
+            return self.generate_referral_code()
+        return self.referral_code
+
+    def get_referral_url(self):
+        """Get the referral URL for this user"""
+        from django.conf import settings
+
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:8080")
+        return f"{frontend_url}/auth/register?ref={self.get_referral_code()}"
+
+    def get_referred_users(self):
+        """Get all users referred by this user"""
+        return User.objects.filter(referred_by=self)
+
+    def get_referral_stats(self):
+        """Get referral statistics for this user"""
+        referred_users = self.get_referred_users()
+        return {
+            "total_referrals": self.total_referrals,
+            "successful_referrals": referred_users.filter(
+                approval_status="approved"
+            ).count(),
+            "pending_referrals": referred_users.filter(
+                approval_status="pending"
+            ).count(),
+            "rewards_earned": float(self.referral_rewards_earned),
+            "rewards_available": float(
+                self.referral_rewards_earned - self.referral_rewards_used
+            ),
+            "rewards_used": float(self.referral_rewards_used),
+        }
+
+    def add_referral_reward(self, amount):
+        """Add referral reward to user's account"""
+        self.referral_rewards_earned += amount
+        self.save()
+
+    def use_referral_reward(self, amount):
+        """Use referral reward from user's account"""
+        available_rewards = self.referral_rewards_earned - self.referral_rewards_used
+        if available_rewards >= amount:
+            self.referral_rewards_used += amount
+            self.save()
+            return True
+        return False
+
+    def get_available_referral_rewards(self):
+        """Get available referral rewards balance"""
+        return self.referral_rewards_earned - self.referral_rewards_used
+
+    objects = UserManager()  # type: ignore
 
     class Meta:
         db_table = "User"
@@ -365,7 +489,10 @@ class DocumentType(models.Model):
     )
 
     def __str__(self):
-        return f"{self.get_category_display()} - {self.name}"
+        category_display = dict(self.DOCUMENT_CATEGORIES).get(
+            self.category, self.category
+        )
+        return f"{category_display} - {self.name}"
 
     class Meta:
         db_table = "document_types"
@@ -496,6 +623,7 @@ class JWTToken(models.Model):
     TOKEN_TYPES = [
         ("access", "Access Token"),
         ("refresh", "Refresh Token"),
+        ("referral", "Referral Token"),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="jwt_tokens")
@@ -526,6 +654,34 @@ class JWTToken(models.Model):
     last_used_at = models.DateTimeField(null=True, blank=True)
     usage_count = models.PositiveIntegerField(default=0)
 
+    # Referral-specific fields (only used when token_type = 'referral')
+    max_uses = models.PositiveIntegerField(
+        default=1, help_text="Maximum number of times this referral token can be used"
+    )
+    used_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="used_referral_tokens",
+        help_text="User who used this referral token",
+    )
+    referrer_reward = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Reward amount for referrer",
+    )
+    referee_reward = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Reward amount for referee",
+    )
+    campaign_name = models.CharField(
+        max_length=100, blank=True, null=True, help_text="Name of the referral campaign"
+    )
+
     class Meta:
         db_table = "jwt_tokens"
         ordering = ["-issued_at"]
@@ -543,7 +699,15 @@ class JWTToken(models.Model):
     def is_valid(self):
         """Check if token is valid (not expired, revoked, or blacklisted)"""
         now = timezone.now()
-        return not self.is_revoked and not self.is_blacklisted and now < self.expires_at
+        is_valid = (
+            not self.is_revoked and not self.is_blacklisted and now < self.expires_at
+        )
+
+        # For referral tokens, also check usage count
+        if self.token_type == "referral":
+            is_valid = is_valid and self.usage_count < self.max_uses
+
+        return is_valid
 
     def is_expired(self):
         """Check if token has expired"""
@@ -586,6 +750,123 @@ class JWTToken(models.Model):
         queryset.update(is_revoked=True, revoked_at=timezone.now())
         return count
 
+    def can_be_used_for_referral(self):
+        """Check if this referral token can be used"""
+        if self.token_type != "referral":
+            return False
+        return self.is_valid() and self.usage_count < self.max_uses
 
+    def use_for_referral(self, referee_user):
+        """Use this referral token for a user"""
+        if not self.can_be_used_for_referral():
+            return False
+
+        # Update token usage
+        self.usage_count += 1
+        self.used_by = referee_user
+        self.last_used_at = timezone.now()
+
+        # Revoke token if max uses reached
+        if self.usage_count >= self.max_uses:
+            self.revoke()
+
+        self.save()
+
+        # Update user's referral information
+        referee_user.referred_by = self.user
+        referee_user.referral_token_used = self.jti  # Store JTI as the token identifier
+        referee_user.save()
+
+        # Update referrer's total referrals count
+        self.user.total_referrals += 1
+        self.user.save()
+
+        # Add rewards if configured
+        if self.referrer_reward > 0:
+            self.user.add_referral_reward(self.referrer_reward)
+
+        if self.referee_reward > 0:
+            referee_user.add_referral_reward(self.referee_reward)
+
+        return True
+
+    @classmethod
+    def create_referral_token(
+        cls,
+        referrer,
+        expires_days=30,
+        max_uses=1,
+        referrer_reward=0,
+        referee_reward=0,
+        campaign_name=None,
+    ):
+        """Create a new referral JWT token"""
+        import hashlib
+        import secrets
+        import string
+        from datetime import timedelta
+
+        # Generate unique token string
+        while True:
+            token_string = "".join(
+                random.choices(string.ascii_uppercase + string.digits, k=12)
+            )
+            token_hash = hashlib.sha256(token_string.encode()).hexdigest()
+            if not cls.objects.filter(token_hash=token_hash).exists():
+                break
+
+        # Generate unique JTI
+        while True:
+            jti = "".join(random.choices(string.ascii_letters + string.digits, k=32))
+            if not cls.objects.filter(jti=jti).exists():
+                break
+
+        # Calculate expiry date
+        expires_at = timezone.now() + timedelta(days=expires_days)
+
+        # Create referral token
+        referral_token = cls.objects.create(
+            user=referrer,
+            token_hash=token_hash,
+            token_type="referral",
+            jti=jti,
+            expires_at=expires_at,
+            max_uses=max_uses,
+            referrer_reward=referrer_reward,
+            referee_reward=referee_reward,
+            campaign_name=campaign_name,
+        )
+
+        return referral_token, token_string
+
+    @classmethod
+    def get_user_referral_tokens(cls, user):
+        """Get all referral tokens for a user"""
+        return cls.objects.filter(user=user, token_type="referral")
+
+    @classmethod
+    def validate_referral_token(cls, token_string):
+        """Validate a referral token string"""
+        import hashlib
+
+        token_hash = hashlib.sha256(token_string.encode()).hexdigest()
+
+        try:
+            token = cls.objects.get(token_hash=token_hash, token_type="referral")
+            return {
+                "valid": token.is_valid(),
+                "token": token,
+                "referrer": token.user,
+                "rewards": {
+                    "referrer_reward": float(token.referrer_reward),
+                    "referee_reward": float(token.referee_reward),
+                },
+            }
+        except cls.DoesNotExist:
+            return {"valid": False, "token": None, "referrer": None, "rewards": None}
+
+
+# DocumentType and UserDocument models are defined in migrations
+# and will be loaded automatically by Django
 # DocumentType and UserDocument models are defined in migrations
 # and will be loaded automatically by Django

@@ -1,3 +1,5 @@
+from typing import Any, Dict, Optional
+
 from django.apps import apps
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
@@ -5,7 +7,15 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Cook, Customer, DeliveryAgent, EmailOTP, User
+from .models import (
+    Cook,
+    Customer,
+    DeliveryAgent,
+    DocumentType,
+    EmailOTP,
+    User,
+    UserDocument,
+)
 
 # Get models from Django's app registry to avoid import issues
 DocumentType = apps.get_model("authentication", "DocumentType")
@@ -58,8 +68,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
         # Role validation
         role = attrs.get("role")
-        if role not in dict(User.ROLE_CHOICES):
-            raise serializers.ValidationError("Invalid role selected")
+        valid_roles = [choice[0] for choice in User.ROLE_CHOICES]
+        if role not in valid_roles:
+            raise serializers.ValidationError(
+                f"Invalid role selected. Valid roles are: {valid_roles}"
+            )
 
         return attrs
 
@@ -293,15 +306,7 @@ class GoogleOAuthSerializer(serializers.Serializer):
     Serializer for Google OAuth
     """
 
-    id_token = serializers.CharField(required=False)
-    access_token = serializers.CharField(required=False)
-
-    def validate(self, attrs):
-        if not attrs.get("id_token") and not attrs.get("access_token"):
-            raise serializers.ValidationError(
-                "Either id_token or access_token is required"
-            )
-        return attrs
+    id_token = serializers.CharField(required=True)
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -371,7 +376,8 @@ class SendOTPSerializer(serializers.Serializer):
     )
 
     def validate_email(self, value):
-        purpose = self.initial_data.get("purpose", "registration")
+        # Get purpose from initial_data with safety check
+        purpose = getattr(self, "initial_data", {}).get("purpose", "registration")
 
         if purpose == "registration":
             # Check if email already exists and is fully registered (active)
@@ -403,9 +409,13 @@ class SendOTPSerializer(serializers.Serializer):
         return value
 
     def send_otp(self):
-        email = self.validated_data["email"]
-        name = self.validated_data.get("name", "User")
-        purpose = self.validated_data.get("purpose", "registration")
+        validated_data = getattr(self, "validated_data", {})
+        email = validated_data.get("email")
+        name = validated_data.get("name", "User")
+        purpose = validated_data.get("purpose", "registration")
+
+        if not email:
+            raise serializers.ValidationError("Email is required")
 
         # For registration, create a temporary user record if it doesn't exist
         if purpose == "registration":
@@ -448,9 +458,13 @@ class VerifyOTPSerializer(serializers.Serializer):
         return value
 
     def verify_otp(self):
-        email = self.validated_data["email"]
-        otp = self.validated_data["otp"]
-        purpose = self.validated_data.get("purpose", "registration")
+        validated_data = getattr(self, "validated_data", {})
+        email = validated_data.get("email")
+        otp = validated_data.get("otp")
+        purpose = validated_data.get("purpose", "registration")
+
+        if not email or not otp:
+            raise serializers.ValidationError("Email and OTP are required")
 
         return EmailService.verify_otp(email, otp, purpose)
 
@@ -704,7 +718,8 @@ class UserDocumentSerializer(serializers.ModelSerializer):
 
     def validate_file_upload(self, value):
         # Get document type from context or from document_type_id
-        document_type_id = self.initial_data.get("document_type_id")
+        initial_data = getattr(self, "initial_data", {})
+        document_type_id = initial_data.get("document_type_id")
         if not document_type_id:
             raise serializers.ValidationError("Document type is required")
 
@@ -718,11 +733,12 @@ class UserDocumentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("File cannot be empty")
 
         # Validate file size
-        max_size_bytes = document_type.max_file_size_mb * 1024 * 1024
+        max_file_size_mb = getattr(document_type, "max_file_size_mb", 5)
+        max_size_bytes = max_file_size_mb * 1024 * 1024
         if value.size > max_size_bytes:
             file_size_mb = round(value.size / (1024 * 1024), 2)
             raise serializers.ValidationError(
-                f"File size ({file_size_mb}MB) exceeds maximum allowed size ({document_type.max_file_size_mb}MB). Please choose a smaller file."
+                f"File size ({file_size_mb}MB) exceeds maximum allowed size ({max_file_size_mb}MB). Please choose a smaller file."
             )
 
         # Validate file name
@@ -737,10 +753,11 @@ class UserDocumentSerializer(serializers.ModelSerializer):
         file_extension = file_name_parts[-1].lower()
 
         # Handle both JSON list and comma-separated string formats
-        if isinstance(document_type.allowed_file_types, str):
-            allowed_types = document_type.allowed_file_types.split(",")
+        allowed_file_types = getattr(document_type, "allowed_file_types", [])
+        if isinstance(allowed_file_types, str):
+            allowed_types = allowed_file_types.split(",")
         else:
-            allowed_types = document_type.allowed_file_types or []
+            allowed_types = allowed_file_types or []
 
         allowed_types = [t.strip().lower() for t in allowed_types]
 
@@ -781,9 +798,15 @@ class UserDocumentSerializer(serializers.ModelSerializer):
                     "Invalid PNG file. Please ensure the file is a valid PNG image."
                 )
 
+        # Store document_type in context for later use
+        self.context["document_type"] = document_type
         return value
 
     def create(self, validated_data):
+        # Get document type from context
+        document_type = self.context.get("document_type")
+        if not document_type:
+            raise serializers.ValidationError("Document type is required")
         from django.conf import settings
 
         from .services.pdf_service import (
@@ -827,8 +850,9 @@ class UserDocumentSerializer(serializers.ModelSerializer):
             # Handle PDF conversion to images
             try:
                 pdf_service = PDFService()
+                doc_name = getattr(document_type, "name", "Document")
                 conversion_result = pdf_service.validate_and_convert_pdf(
-                    file, user.email, document_type.name
+                    file, user.email, doc_name
                 )
 
                 if not conversion_result["success"]:
@@ -1097,9 +1121,12 @@ class UserDocumentSerializer(serializers.ModelSerializer):
         # Store converted images metadata if this was a PDF
         if is_pdf and converted_images:
             # Update the document with converted images metadata
-            document.converted_images = converted_images
-            document.is_pdf_converted = True
-            document.save()
+            # Use update() to avoid attribute access issues
+            UserDocument.objects.filter(pk=document.pk).update(
+                converted_images=converted_images, is_pdf_converted=True
+            )
+            # Refresh the document instance
+            document.refresh_from_db()
 
         return document
 
@@ -1109,8 +1136,10 @@ class UserApprovalSerializer(serializers.ModelSerializer):
     Serializer for user approval status
     """
 
-    approval_status_display = serializers.SerializerMethodField()
-    approved_by_name = serializers.SerializerMethodField()
+    approval_status_display = serializers.CharField(
+        source="get_approval_status_display", read_only=True
+    )
+    approved_by_name = serializers.CharField(source="approved_by.name", read_only=True)
     documents = serializers.SerializerMethodField()
 
     class Meta:
@@ -1137,21 +1166,6 @@ class UserApprovalSerializer(serializers.ModelSerializer):
             "documents",
         ]
 
-    def get_approval_status_display(self, obj):
-        """Get human readable approval status"""
-        status_map = {
-            "pending": "Pending Approval",
-            "approved": "Approved",
-            "rejected": "Rejected",
-        }
-        return status_map.get(obj.approval_status, obj.approval_status)
-
-    def get_approved_by_name(self, obj):
-        """Get the name of the admin who approved this user"""
-        if obj.approved_by:
-            return obj.approved_by.name
-        return None
-
     def get_documents(self, obj):
         """Return documents for admin review"""
         # For pending users, show all documents so admin can review them for approval
@@ -1171,7 +1185,8 @@ class UserApprovalActionSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
 
     def validate_notes(self, value):
-        if not value and self.initial_data.get("action") == "reject":
+        initial_data = getattr(self, "initial_data", {})
+        if not value and initial_data.get("action") == "reject":
             raise serializers.ValidationError(
                 "Notes are required when rejecting a user"
             )

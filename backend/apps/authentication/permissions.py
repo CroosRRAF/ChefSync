@@ -13,7 +13,7 @@ class IsAdminUser(BasePermission):
             return False
 
         # Check if user has admin role
-        return getattr(request.user, 'role', None) == 'admin'
+        return getattr(request.user, "role", None) == "admin"
 
 
 class IsCookUser(BasePermission):
@@ -27,7 +27,7 @@ class IsCookUser(BasePermission):
             return False
 
         # Check if user has cook role
-        return getattr(request.user, 'role', None) == 'cook'
+        return getattr(request.user, "role", None) == "cook"
 
 
 class IsDeliveryAgentUser(BasePermission):
@@ -41,7 +41,7 @@ class IsDeliveryAgentUser(BasePermission):
             return False
 
         # Check if user has delivery_agent role
-        return getattr(request.user, 'role', None) == 'delivery_agent'
+        return getattr(request.user, "role", None) == "delivery_agent"
 
 
 class IsCustomerUser(BasePermission):
@@ -55,4 +55,4 @@ class IsCustomerUser(BasePermission):
             return False
 
         # Check if user has customer role
-        return getattr(request.user, 'role', None) == 'customer'
+        return getattr(request.user, "role", None) == "customer"

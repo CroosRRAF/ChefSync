@@ -1,9 +1,12 @@
 """
 Custom JWT Authentication for ChefSync
 """
+
+from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.tokens import UntypedToken
+
 from .services.jwt_service import JWTTokenService
 
 
@@ -11,54 +14,51 @@ class CustomJWTAuthentication(JWTAuthentication):
     """
     Custom JWT Authentication that validates tokens against database
     """
-    
+
     def get_validated_token(self, raw_token):
         """
         Validates an encoded JSON web token and returns a validated token
         wrapper object.
         """
-        messages = []
-        for AuthToken in self.get_auth_token_classes():
-            try:
-                # Validate token with SimpleJWT first
-                validated_token = AuthToken(raw_token)
-                
-                # Additional validation against database
-                is_valid, user, error = JWTTokenService.validate_token(
-                    str(validated_token), 
-                    'access'
-                )
-                
-                if not is_valid:
-                    raise InvalidToken(error)
-                
-                return validated_token
-                
-            except TokenError as e:
-                messages.append({'token_class': AuthToken.__name__,
-                               'token_type': AuthToken.token_type,
-                               'message': e.args[0]})
+        try:
+            # Use the parent's method to get validated token
+            validated_token = super().get_validated_token(raw_token)
 
-        raise InvalidToken({
-            'detail': 'Given token not valid for any token type',
-            'messages': messages,
-        })
-    
+            # Additional validation against database
+            is_valid, user, error = JWTTokenService.validate_token(
+                str(raw_token), "access"
+            )
+
+            if not is_valid:
+                raise InvalidToken(error)
+
+            return validated_token
+
+        except TokenError as e:
+            raise InvalidToken(
+                {
+                    "detail": "Given token not valid",
+                    "message": str(e),
+                }
+            )
+
     def get_user(self, validated_token):
         """
         Attempts to find and return a user using the given validated token.
         """
         try:
-            user_id = validated_token[self.get_user_id_claim()]
+            user_id = validated_token["user_id"]
         except KeyError:
-            raise InvalidToken('Token contained no recognizable user identification')
+            raise InvalidToken("Token contained no recognizable user identification")
 
+        User = get_user_model()
         try:
-            user = self.get_user_model().objects.get(**{self.get_user_id_field(): user_id})
-        except self.get_user_model().DoesNotExist:
-            raise InvalidToken('User not found')
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            raise InvalidToken("User not found")
 
         if not user.is_active:
-            raise InvalidToken('User is inactive')
+            raise InvalidToken("User is inactive")
 
+        return user
         return user
