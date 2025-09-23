@@ -1,0 +1,11 @@
+{
+  "include": ["backend"],
+  "extraPaths": ["backend"],
+  "typeCheckingMode": "basic",
+  "executionEnvironments": [
+    {
+      "root": "backend",
+      "extraPaths": ["backend"]
+    }
+  ]
+}

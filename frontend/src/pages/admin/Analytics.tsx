@@ -1,13 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import AdminLayout from '@/components/layout/AdminLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth } from '@/context/AuthContext';
-import { useTheme } from '@/context/ThemeContext';
-import { apiClient } from '@/utils/fetcher';
-import InteractiveChart from '@/components/admin/InteractiveChart';
+import React, { useState, useEffect, useCallback } from "react";
+import AdminLayout from "@/components/layout/AdminLayout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
+import { apiClient } from "@/utils/fetcher";
+import InteractiveChart from "@/components/admin/InteractiveChart";
+import Reports from "@/components/admin/Reports";
 import {
   BarChart3,
   TrendingUp,
@@ -21,8 +35,9 @@ import {
   Truck,
   User,
   Activity,
-  RefreshCw
-} from 'lucide-react';
+  RefreshCw,
+  FileText,
+} from "lucide-react";
 
 interface AnalyticsData {
   total_users: number;
@@ -59,50 +74,70 @@ const AdminAnalytics: React.FC = () => {
   const { theme } = useTheme();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<string>('30d');
+  const [timeRange, setTimeRange] = useState<string>("30d");
+  const [activeTab, setActiveTab] = useState<string>("analytics");
 
-  useEffect(() => {
-    if (isAuthenticated && user?.role.toLowerCase() === 'admin') {
-      fetchAnalytics();
-    } else {
-      setIsLoading(false);
-      console.log('User not authenticated or not admin:', { isAuthenticated, userRole: user?.role });
-    }
-  }, [timeRange, isAuthenticated, user]);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('Fetching analytics with timeRange:', timeRange);
-      const response = await apiClient.get(`/analytics/dashboard/stats/?range=${timeRange}`);
-      console.log('Analytics response:', response);
-      setAnalytics(response.data || response);
+      console.log("Fetching analytics with timeRange:", timeRange);
+      const response = await apiClient.get(
+        `/analytics/dashboard/stats/?range=${timeRange}`
+      );
+      console.log("Analytics response:", response);
+      setAnalytics(response);
     } catch (error) {
-      console.error('Error fetching analytics:', error);
+      console.error("Error fetching analytics:", error);
       // Show error state instead of fallback to dummy data
       setAnalytics(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [timeRange]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role === "admin") {
+      fetchAnalytics();
+    } else {
+      setIsLoading(false);
+      console.log("User not authenticated or not admin:", {
+        isAuthenticated,
+        userRole: user?.role,
+      });
+    }
+  }, [timeRange, isAuthenticated, user, fetchAnalytics]);
 
   if (!isAuthenticated) {
     return (
       <AdminLayout>
-        <Card className="text-center py-12" style={{
-          backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-          borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-        }}>
+        <Card
+          className="text-center py-12"
+          style={{
+            backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+            borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+          }}
+        >
           <CardContent>
-            <BarChart3 className="h-16 w-16 mx-auto mb-4" style={{
-              color: theme === 'light' ? '#9CA3AF' : '#6B7280'
-            }} />
-            <h3 className="text-lg font-semibold mb-2" style={{
-              color: theme === 'light' ? '#111827' : '#F9FAFB'
-            }}>Authentication Required</h3>
-            <p className="mb-4" style={{
-              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-            }}>
+            <BarChart3
+              className="h-16 w-16 mx-auto mb-4"
+              style={{
+                color: theme === "light" ? "#9CA3AF" : "#6B7280",
+              }}
+            />
+            <h3
+              className="text-lg font-semibold mb-2"
+              style={{
+                color: theme === "light" ? "#111827" : "#F9FAFB",
+              }}
+            >
+              Authentication Required
+            </h3>
+            <p
+              className="mb-4"
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            >
               Please log in to access analytics data.
             </p>
           </CardContent>
@@ -111,23 +146,37 @@ const AdminAnalytics: React.FC = () => {
     );
   }
 
-  if (user?.role.toLowerCase() !== 'admin') {
+  if (user?.role !== "admin") {
     return (
       <AdminLayout>
-        <Card className="text-center py-12" style={{
-          backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-          borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-        }}>
+        <Card
+          className="text-center py-12"
+          style={{
+            backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+            borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+          }}
+        >
           <CardContent>
-            <BarChart3 className="h-16 w-16 mx-auto mb-4" style={{
-              color: theme === 'light' ? '#9CA3AF' : '#6B7280'
-            }} />
-            <h3 className="text-lg font-semibold mb-2" style={{
-              color: theme === 'light' ? '#111827' : '#F9FAFB'
-            }}>Access Denied</h3>
-            <p className="mb-4" style={{
-              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-            }}>
+            <BarChart3
+              className="h-16 w-16 mx-auto mb-4"
+              style={{
+                color: theme === "light" ? "#9CA3AF" : "#6B7280",
+              }}
+            />
+            <h3
+              className="text-lg font-semibold mb-2"
+              style={{
+                color: theme === "light" ? "#111827" : "#F9FAFB",
+              }}
+            >
+              Access Denied
+            </h3>
+            <p
+              className="mb-4"
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            >
               You need admin privileges to access analytics data.
             </p>
           </CardContent>
@@ -141,21 +190,32 @@ const AdminAnalytics: React.FC = () => {
       <AdminLayout>
         <div className="space-y-8">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 rounded w-1/4" style={{
-              backgroundColor: theme === 'light' ? '#E5E7EB' : '#4B5563'
-            }}></div>
+            <div
+              className="h-8 rounded w-1/4"
+              style={{
+                backgroundColor: theme === "light" ? "#E5E7EB" : "#4B5563",
+              }}
+            ></div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-24 rounded" style={{
-                  backgroundColor: theme === 'light' ? '#E5E7EB' : '#4B5563'
-                }}></div>
+                <div
+                  key={i}
+                  className="h-24 rounded"
+                  style={{
+                    backgroundColor: theme === "light" ? "#E5E7EB" : "#4B5563",
+                  }}
+                ></div>
               ))}
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {[1, 2].map((i) => (
-                <div key={i} className="h-80 rounded" style={{
-                  backgroundColor: theme === 'light' ? '#E5E7EB' : '#4B5563'
-                }}></div>
+                <div
+                  key={i}
+                  className="h-80 rounded"
+                  style={{
+                    backgroundColor: theme === "light" ? "#E5E7EB" : "#4B5563",
+                  }}
+                ></div>
               ))}
             </div>
           </div>
@@ -167,20 +227,34 @@ const AdminAnalytics: React.FC = () => {
   if (!analytics) {
     return (
       <AdminLayout>
-        <Card className="text-center py-12" style={{
-          backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-          borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-        }}>
+        <Card
+          className="text-center py-12"
+          style={{
+            backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+            borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+          }}
+        >
           <CardContent>
-            <BarChart3 className="h-16 w-16 mx-auto mb-4" style={{
-              color: theme === 'light' ? '#9CA3AF' : '#6B7280'
-            }} />
-            <h3 className="text-lg font-semibold mb-2" style={{
-              color: theme === 'light' ? '#111827' : '#F9FAFB'
-            }}>Analytics Unavailable</h3>
-            <p className="mb-4" style={{
-              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-            }}>
+            <BarChart3
+              className="h-16 w-16 mx-auto mb-4"
+              style={{
+                color: theme === "light" ? "#9CA3AF" : "#6B7280",
+              }}
+            />
+            <h3
+              className="text-lg font-semibold mb-2"
+              style={{
+                color: theme === "light" ? "#111827" : "#F9FAFB",
+              }}
+            >
+              Analytics Unavailable
+            </h3>
+            <p
+              className="mb-4"
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            >
               Unable to load analytics data at this time.
             </p>
             <Button onClick={fetchAnalytics}>
@@ -198,14 +272,20 @@ const AdminAnalytics: React.FC = () => {
       {/* Time Range Selector */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-semibold" style={{
-            color: theme === 'light' ? '#111827' : '#F9FAFB'
-          }}>
+          <h2
+            className="text-xl font-semibold"
+            style={{
+              color: theme === "light" ? "#111827" : "#F9FAFB",
+            }}
+          >
             Analytics Overview
           </h2>
-          <p className="mt-1" style={{
-            color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-          }}>
+          <p
+            className="mt-1"
+            style={{
+              color: theme === "light" ? "#6B7280" : "#9CA3AF",
+            }}
+          >
             Business insights and performance metrics
           </p>
         </div>
@@ -229,102 +309,183 @@ const AdminAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Key Metrics */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="analytics" className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card style={{
-          backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-          borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-        }}>
+        <Card
+          style={{
+            backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+            borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium" style={{
-              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-            }}>Total Users</CardTitle>
-            <Users className="h-4 w-4" style={{
-              color: theme === 'light' ? '#2563EB' : '#3B82F6'
-            }} />
+            <CardTitle
+              className="text-sm font-medium"
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            >
+              Total Users
+            </CardTitle>
+            <Users
+              className="h-4 w-4"
+              style={{
+                color: theme === "light" ? "#2563EB" : "#3B82F6",
+              }}
+            />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" style={{
-              color: theme === 'light' ? '#111827' : '#F9FAFB'
-            }}>{analytics.total_users.toLocaleString()}</div>
-            <p className="text-xs" style={{
-              color: theme === 'light' ? '#10B981' : '#34D399'
-            }}>
+            <div
+              className="text-2xl font-bold"
+              style={{
+                color: theme === "light" ? "#111827" : "#F9FAFB",
+              }}
+            >
+              {analytics.total_users.toLocaleString()}
+            </div>
+            <p
+              className="text-xs"
+              style={{
+                color: theme === "light" ? "#10B981" : "#34D399",
+              }}
+            >
               <TrendingUp className="inline h-3 w-3 mr-1" />
-              {analytics.user_growth > 0 ? '+' : ''}{analytics.user_growth}% from last month
+              {analytics.user_growth > 0 ? "+" : ""}
+              {analytics.user_growth}% from last month
             </p>
           </CardContent>
         </Card>
 
-        <Card style={{
-          backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-          borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-        }}>
+        <Card
+          style={{
+            backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+            borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium" style={{
-              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-            }}>Total Orders</CardTitle>
-            <Package className="h-4 w-4" style={{
-              color: theme === 'light' ? '#F59E0B' : '#FBBF24'
-            }} />
+            <CardTitle
+              className="text-sm font-medium"
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            >
+              Total Orders
+            </CardTitle>
+            <Package
+              className="h-4 w-4"
+              style={{
+                color: theme === "light" ? "#F59E0B" : "#FBBF24",
+              }}
+            />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" style={{
-              color: theme === 'light' ? '#111827' : '#F9FAFB'
-            }}>{analytics.total_orders.toLocaleString()}</div>
-            <p className="text-xs" style={{
-              color: theme === 'light' ? '#10B981' : '#34D399'
-            }}>
+            <div
+              className="text-2xl font-bold"
+              style={{
+                color: theme === "light" ? "#111827" : "#F9FAFB",
+              }}
+            >
+              {analytics.total_orders.toLocaleString()}
+            </div>
+            <p
+              className="text-xs"
+              style={{
+                color: theme === "light" ? "#10B981" : "#34D399",
+              }}
+            >
               <TrendingUp className="inline h-3 w-3 mr-1" />
-              {analytics.order_growth > 0 ? '+' : ''}{analytics.order_growth}% from last month
+              {analytics.order_growth > 0 ? "+" : ""}
+              {analytics.order_growth}% from last month
             </p>
           </CardContent>
         </Card>
 
-        <Card style={{
-          backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-          borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-        }}>
+        <Card
+          style={{
+            backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+            borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium" style={{
-              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-            }}>Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4" style={{
-              color: theme === 'light' ? '#10B981' : '#34D399'
-            }} />
+            <CardTitle
+              className="text-sm font-medium"
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            >
+              Total Revenue
+            </CardTitle>
+            <DollarSign
+              className="h-4 w-4"
+              style={{
+                color: theme === "light" ? "#10B981" : "#34D399",
+              }}
+            />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" style={{
-              color: theme === 'light' ? '#111827' : '#F9FAFB'
-            }}>${analytics.total_revenue.toLocaleString()}</div>
-            <p className="text-xs" style={{
-              color: theme === 'light' ? '#10B981' : '#34D399'
-            }}>
+            <div
+              className="text-2xl font-bold"
+              style={{
+                color: theme === "light" ? "#111827" : "#F9FAFB",
+              }}
+            >
+              ${analytics.total_revenue.toLocaleString()}
+            </div>
+            <p
+              className="text-xs"
+              style={{
+                color: theme === "light" ? "#10B981" : "#34D399",
+              }}
+            >
               <TrendingUp className="inline h-3 w-3 mr-1" />
-              {analytics.revenue_growth > 0 ? '+' : ''}{analytics.revenue_growth}% from last month
+              {analytics.revenue_growth > 0 ? "+" : ""}
+              {analytics.revenue_growth}% from last month
             </p>
           </CardContent>
         </Card>
 
-        <Card style={{
-          backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-          borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-        }}>
+        <Card
+          style={{
+            backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+            borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium" style={{
-              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-            }}>Active Users</CardTitle>
-            <Activity className="h-4 w-4" style={{
-              color: theme === 'light' ? '#7C3AED' : '#A78BFA'
-            }} />
+            <CardTitle
+              className="text-sm font-medium"
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            >
+              Active Users
+            </CardTitle>
+            <Activity
+              className="h-4 w-4"
+              style={{
+                color: theme === "light" ? "#7C3AED" : "#A78BFA",
+              }}
+            />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" style={{
-              color: theme === 'light' ? '#111827' : '#F9FAFB'
-            }}>{analytics.active_users.toLocaleString()}</div>
-            <p className="text-xs" style={{
-              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-            }}>
+            <div
+              className="text-2xl font-bold"
+              style={{
+                color: theme === "light" ? "#111827" : "#F9FAFB",
+              }}
+            >
+              {analytics.active_users.toLocaleString()}
+            </div>
+            <p
+              className="text-xs"
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            >
               Currently active users
             </p>
           </CardContent>
@@ -334,164 +495,301 @@ const AdminAnalytics: React.FC = () => {
       {/* Charts and Detailed Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* User Statistics */}
-        <Card style={{
-          backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-          borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-        }}>
+        <Card
+          style={{
+            backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+            borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+          }}
+        >
           <CardHeader>
-            <CardTitle style={{
-              color: theme === 'light' ? '#111827' : '#F9FAFB'
-            }}>User Statistics</CardTitle>
-            <CardDescription style={{
-              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-            }}>User registration and activity breakdown</CardDescription>
+            <CardTitle
+              style={{
+                color: theme === "light" ? "#111827" : "#F9FAFB",
+              }}
+            >
+              User Statistics
+            </CardTitle>
+            <CardDescription
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            >
+              User registration and activity breakdown
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{
-                    backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6'
-                  }} />
-                  <span style={{
-                    color: theme === 'light' ? '#111827' : '#F9FAFB'
-                  }}>Total Users</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor:
+                        theme === "light" ? "#2563EB" : "#3B82F6",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: theme === "light" ? "#111827" : "#F9FAFB",
+                    }}
+                  >
+                    Total Users
+                  </span>
                 </div>
-                <Badge variant="secondary" style={{
-                  backgroundColor: theme === 'light' ? '#F3F4F6' : '#374151',
-                  color: theme === 'light' ? '#374151' : '#D1D5DB'
-                }}>{analytics.total_users}</Badge>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: theme === "light" ? "#F3F4F6" : "#374151",
+                    color: theme === "light" ? "#374151" : "#D1D5DB",
+                  }}
+                >
+                  {analytics.total_users}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{
-                    backgroundColor: theme === 'light' ? '#10B981' : '#34D399'
-                  }} />
-                  <span style={{
-                    color: theme === 'light' ? '#111827' : '#F9FAFB'
-                  }}>Active Users</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor:
+                        theme === "light" ? "#10B981" : "#34D399",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: theme === "light" ? "#111827" : "#F9FAFB",
+                    }}
+                  >
+                    Active Users
+                  </span>
                 </div>
-                <Badge variant="secondary" style={{
-                  backgroundColor: theme === 'light' ? '#F3F4F6' : '#374151',
-                  color: theme === 'light' ? '#374151' : '#D1D5DB'
-                }}>{analytics.active_users}</Badge>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: theme === "light" ? "#F3F4F6" : "#374151",
+                    color: theme === "light" ? "#374151" : "#D1D5DB",
+                  }}
+                >
+                  {analytics.active_users}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{
-                    backgroundColor: theme === 'light' ? '#F59E0B' : '#FBBF24'
-                  }} />
-                  <span style={{
-                    color: theme === 'light' ? '#111827' : '#F9FAFB'
-                  }}>New Today</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor:
+                        theme === "light" ? "#F59E0B" : "#FBBF24",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: theme === "light" ? "#111827" : "#F9FAFB",
+                    }}
+                  >
+                    New Today
+                  </span>
                 </div>
-                <Badge variant="secondary" style={{
-                  backgroundColor: theme === 'light' ? '#F3F4F6' : '#374151',
-                  color: theme === 'light' ? '#374151' : '#D1D5DB'
-                }}>{analytics.new_users_today}</Badge>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: theme === "light" ? "#F3F4F6" : "#374151",
+                    color: theme === "light" ? "#374151" : "#D1D5DB",
+                  }}
+                >
+                  {analytics.new_users_today}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{
-                    backgroundColor: theme === 'light' ? '#EF4444' : '#F87171'
-                  }} />
-                  <span style={{
-                    color: theme === 'light' ? '#111827' : '#F9FAFB'
-                  }}>New This Week</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor:
+                        theme === "light" ? "#EF4444" : "#F87171",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: theme === "light" ? "#111827" : "#F9FAFB",
+                    }}
+                  >
+                    New This Week
+                  </span>
                 </div>
-                <Badge variant="secondary" style={{
-                  backgroundColor: theme === 'light' ? '#F3F4F6' : '#374151',
-                  color: theme === 'light' ? '#374151' : '#D1D5DB'
-                }}>{analytics.new_users_this_week}</Badge>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: theme === "light" ? "#F3F4F6" : "#374151",
+                    color: theme === "light" ? "#374151" : "#D1D5DB",
+                  }}
+                >
+                  {analytics.new_users_this_week}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{
-                    backgroundColor: theme === 'light' ? '#7C3AED' : '#A78BFA'
-                  }} />
-                  <span style={{
-                    color: theme === 'light' ? '#111827' : '#F9FAFB'
-                  }}>New This Month</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor:
+                        theme === "light" ? "#7C3AED" : "#A78BFA",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: theme === "light" ? "#111827" : "#F9FAFB",
+                    }}
+                  >
+                    New This Month
+                  </span>
                 </div>
-                <Badge variant="secondary" style={{
-                  backgroundColor: theme === 'light' ? '#F3F4F6' : '#374151',
-                  color: theme === 'light' ? '#374151' : '#D1D5DB'
-                }}>{analytics.new_users_this_month}</Badge>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: theme === "light" ? "#F3F4F6" : "#374151",
+                    color: theme === "light" ? "#374151" : "#D1D5DB",
+                  }}
+                >
+                  {analytics.new_users_this_month}
+                </Badge>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Order Statistics */}
-        <Card style={{
-          backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-          borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-        }}>
+        <Card
+          style={{
+            backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+            borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+          }}
+        >
           <CardHeader>
-            <CardTitle style={{
-              color: theme === 'light' ? '#111827' : '#F9FAFB'
-            }}>Order Statistics</CardTitle>
-            <CardDescription style={{
-              color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-            }}>Order volume and trends</CardDescription>
+            <CardTitle
+              style={{
+                color: theme === "light" ? "#111827" : "#F9FAFB",
+              }}
+            >
+              Order Statistics
+            </CardTitle>
+            <CardDescription
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            >
+              Order volume and trends
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{
-                    backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6'
-                  }} />
-                  <span style={{
-                    color: theme === 'light' ? '#111827' : '#F9FAFB'
-                  }}>Total Orders</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor:
+                        theme === "light" ? "#2563EB" : "#3B82F6",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: theme === "light" ? "#111827" : "#F9FAFB",
+                    }}
+                  >
+                    Total Orders
+                  </span>
                 </div>
-                <Badge variant="secondary" style={{
-                  backgroundColor: theme === 'light' ? '#F3F4F6' : '#374151',
-                  color: theme === 'light' ? '#374151' : '#D1D5DB'
-                }}>{analytics.total_orders}</Badge>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: theme === "light" ? "#F3F4F6" : "#374151",
+                    color: theme === "light" ? "#374151" : "#D1D5DB",
+                  }}
+                >
+                  {analytics.total_orders}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{
-                    backgroundColor: theme === 'light' ? '#10B981' : '#34D399'
-                  }} />
-                  <span style={{
-                    color: theme === 'light' ? '#111827' : '#F9FAFB'
-                  }}>Orders Today</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor:
+                        theme === "light" ? "#10B981" : "#34D399",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: theme === "light" ? "#111827" : "#F9FAFB",
+                    }}
+                  >
+                    Orders Today
+                  </span>
                 </div>
-                <Badge variant="secondary" style={{
-                  backgroundColor: theme === 'light' ? '#F3F4F6' : '#374151',
-                  color: theme === 'light' ? '#374151' : '#D1D5DB'
-                }}>{analytics.orders_today}</Badge>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: theme === "light" ? "#F3F4F6" : "#374151",
+                    color: theme === "light" ? "#374151" : "#D1D5DB",
+                  }}
+                >
+                  {analytics.orders_today}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{
-                    backgroundColor: theme === 'light' ? '#F59E0B' : '#FBBF24'
-                  }} />
-                  <span style={{
-                    color: theme === 'light' ? '#111827' : '#F9FAFB'
-                  }}>Orders This Week</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor:
+                        theme === "light" ? "#F59E0B" : "#FBBF24",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: theme === "light" ? "#111827" : "#F9FAFB",
+                    }}
+                  >
+                    Orders This Week
+                  </span>
                 </div>
-                <Badge variant="secondary" style={{
-                  backgroundColor: theme === 'light' ? '#F3F4F6' : '#374151',
-                  color: theme === 'light' ? '#374151' : '#D1D5DB'
-                }}>{analytics.orders_this_week}</Badge>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: theme === "light" ? "#F3F4F6" : "#374151",
+                    color: theme === "light" ? "#374151" : "#D1D5DB",
+                  }}
+                >
+                  {analytics.orders_this_week}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{
-                    backgroundColor: theme === 'light' ? '#7C3AED' : '#A78BFA'
-                  }} />
-                  <span style={{
-                    color: theme === 'light' ? '#111827' : '#F9FAFB'
-                  }}>Orders This Month</span>
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor:
+                        theme === "light" ? "#7C3AED" : "#A78BFA",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: theme === "light" ? "#111827" : "#F9FAFB",
+                    }}
+                  >
+                    Orders This Month
+                  </span>
                 </div>
-                <Badge variant="secondary" style={{
-                  backgroundColor: theme === 'light' ? '#F3F4F6' : '#374151',
-                  color: theme === 'light' ? '#374151' : '#D1D5DB'
-                }}>{analytics.orders_this_month}</Badge>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: theme === "light" ? "#F3F4F6" : "#374151",
+                    color: theme === "light" ? "#374151" : "#D1D5DB",
+                  }}
+                >
+                  {analytics.orders_this_month}
+                </Badge>
               </div>
             </div>
           </CardContent>
@@ -499,69 +797,124 @@ const AdminAnalytics: React.FC = () => {
       </div>
 
       {/* Revenue Statistics */}
-      <Card className="mb-8" style={{
-        backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-        borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-      }}>
+      <Card
+        className="mb-8"
+        style={{
+          backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+          borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+        }}
+      >
         <CardHeader>
-          <CardTitle style={{
-            color: theme === 'light' ? '#111827' : '#F9FAFB'
-          }}>Revenue Statistics</CardTitle>
-          <CardDescription style={{
-            color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-          }}>Revenue breakdown by time periods</CardDescription>
+          <CardTitle
+            style={{
+              color: theme === "light" ? "#111827" : "#F9FAFB",
+            }}
+          >
+            Revenue Statistics
+          </CardTitle>
+          <CardDescription
+            style={{
+              color: theme === "light" ? "#6B7280" : "#9CA3AF",
+            }}
+          >
+            Revenue breakdown by time periods
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 border rounded-lg" style={{
-              borderColor: theme === 'light' ? '#E5E7EB' : '#374151',
-              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
-            }}>
-              <div className="text-sm font-medium" style={{
-                color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-              }}>Total Revenue</div>
-              <div className="text-2xl font-bold" style={{
-                color: theme === 'light' ? '#10B981' : '#34D399'
-              }}>
+            <div
+              className="text-center p-4 border rounded-lg"
+              style={{
+                borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+                backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+              }}
+            >
+              <div
+                className="text-sm font-medium"
+                style={{
+                  color: theme === "light" ? "#6B7280" : "#9CA3AF",
+                }}
+              >
+                Total Revenue
+              </div>
+              <div
+                className="text-2xl font-bold"
+                style={{
+                  color: theme === "light" ? "#10B981" : "#34D399",
+                }}
+              >
                 ${analytics.total_revenue.toLocaleString()}
               </div>
             </div>
-            <div className="text-center p-4 border rounded-lg" style={{
-              borderColor: theme === 'light' ? '#E5E7EB' : '#374151',
-              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
-            }}>
-              <div className="text-sm font-medium" style={{
-                color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-              }}>Revenue Today</div>
-              <div className="text-2xl font-bold" style={{
-                color: theme === 'light' ? '#10B981' : '#34D399'
-              }}>
+            <div
+              className="text-center p-4 border rounded-lg"
+              style={{
+                borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+                backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+              }}
+            >
+              <div
+                className="text-sm font-medium"
+                style={{
+                  color: theme === "light" ? "#6B7280" : "#9CA3AF",
+                }}
+              >
+                Revenue Today
+              </div>
+              <div
+                className="text-2xl font-bold"
+                style={{
+                  color: theme === "light" ? "#10B981" : "#34D399",
+                }}
+              >
                 ${analytics.revenue_today.toLocaleString()}
               </div>
             </div>
-            <div className="text-center p-4 border rounded-lg" style={{
-              borderColor: theme === 'light' ? '#E5E7EB' : '#374151',
-              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
-            }}>
-              <div className="text-sm font-medium" style={{
-                color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-              }}>Revenue This Week</div>
-              <div className="text-2xl font-bold" style={{
-                color: theme === 'light' ? '#10B981' : '#34D399'
-              }}>
+            <div
+              className="text-center p-4 border rounded-lg"
+              style={{
+                borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+                backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+              }}
+            >
+              <div
+                className="text-sm font-medium"
+                style={{
+                  color: theme === "light" ? "#6B7280" : "#9CA3AF",
+                }}
+              >
+                Revenue This Week
+              </div>
+              <div
+                className="text-2xl font-bold"
+                style={{
+                  color: theme === "light" ? "#10B981" : "#34D399",
+                }}
+              >
                 ${analytics.revenue_this_week.toLocaleString()}
               </div>
             </div>
-            <div className="text-center p-4 border rounded-lg" style={{
-              borderColor: theme === 'light' ? '#E5E7EB' : '#374151',
-              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
-            }}>
-              <div className="text-sm font-medium" style={{
-                color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-              }}>Revenue This Month</div>
-              <div className="text-2xl font-bold" style={{
-                color: theme === 'light' ? '#10B981' : '#34D399'
-              }}>
+            <div
+              className="text-center p-4 border rounded-lg"
+              style={{
+                borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+                backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+              }}
+            >
+              <div
+                className="text-sm font-medium"
+                style={{
+                  color: theme === "light" ? "#6B7280" : "#9CA3AF",
+                }}
+              >
+                Revenue This Month
+              </div>
+              <div
+                className="text-2xl font-bold"
+                style={{
+                  color: theme === "light" ? "#10B981" : "#34D399",
+                }}
+              >
                 ${analytics.revenue_this_month.toLocaleString()}
               </div>
             </div>
@@ -570,62 +923,111 @@ const AdminAnalytics: React.FC = () => {
       </Card>
 
       {/* Food Statistics */}
-      <Card style={{
-        backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937',
-        borderColor: theme === 'light' ? '#E5E7EB' : '#374151'
-      }}>
+      <Card
+        style={{
+          backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+          borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+        }}
+      >
         <CardHeader>
-          <CardTitle style={{
-            color: theme === 'light' ? '#111827' : '#F9FAFB'
-          }}>Food Statistics</CardTitle>
-          <CardDescription style={{
-            color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-          }}>Menu items and availability status</CardDescription>
+          <CardTitle
+            style={{
+              color: theme === "light" ? "#111827" : "#F9FAFB",
+            }}
+          >
+            Food Statistics
+          </CardTitle>
+          <CardDescription
+            style={{
+              color: theme === "light" ? "#6B7280" : "#9CA3AF",
+            }}
+          >
+            Menu items and availability status
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 border rounded-lg" style={{
-              borderColor: theme === 'light' ? '#E5E7EB' : '#374151',
-              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
-            }}>
-              <div className="text-sm font-medium" style={{
-                color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-              }}>Total Foods</div>
-              <div className="text-2xl font-bold" style={{
-                color: theme === 'light' ? '#111827' : '#F9FAFB'
-              }}>
+            <div
+              className="text-center p-4 border rounded-lg"
+              style={{
+                borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+                backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+              }}
+            >
+              <div
+                className="text-sm font-medium"
+                style={{
+                  color: theme === "light" ? "#6B7280" : "#9CA3AF",
+                }}
+              >
+                Total Foods
+              </div>
+              <div
+                className="text-2xl font-bold"
+                style={{
+                  color: theme === "light" ? "#111827" : "#F9FAFB",
+                }}
+              >
                 {analytics.total_foods}
               </div>
             </div>
-            <div className="text-center p-4 border rounded-lg" style={{
-              borderColor: theme === 'light' ? '#E5E7EB' : '#374151',
-              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
-            }}>
-              <div className="text-sm font-medium" style={{
-                color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-              }}>Active Foods</div>
-              <div className="text-2xl font-bold" style={{
-                color: theme === 'light' ? '#10B981' : '#34D399'
-              }}>
+            <div
+              className="text-center p-4 border rounded-lg"
+              style={{
+                borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+                backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+              }}
+            >
+              <div
+                className="text-sm font-medium"
+                style={{
+                  color: theme === "light" ? "#6B7280" : "#9CA3AF",
+                }}
+              >
+                Active Foods
+              </div>
+              <div
+                className="text-2xl font-bold"
+                style={{
+                  color: theme === "light" ? "#10B981" : "#34D399",
+                }}
+              >
                 {analytics.active_foods}
               </div>
             </div>
-            <div className="text-center p-4 border rounded-lg" style={{
-              borderColor: theme === 'light' ? '#E5E7EB' : '#374151',
-              backgroundColor: theme === 'light' ? '#FFFFFF' : '#1F2937'
-            }}>
-              <div className="text-sm font-medium" style={{
-                color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-              }}>Inactive Foods</div>
-              <div className="text-2xl font-bold" style={{
-                color: theme === 'light' ? '#EF4444' : '#F87171'
-              }}>
+            <div
+              className="text-center p-4 border rounded-lg"
+              style={{
+                borderColor: theme === "light" ? "#E5E7EB" : "#374151",
+                backgroundColor: theme === "light" ? "#FFFFFF" : "#1F2937",
+              }}
+            >
+              <div
+                className="text-sm font-medium"
+                style={{
+                  color: theme === "light" ? "#6B7280" : "#9CA3AF",
+                }}
+              >
+                Inactive Foods
+              </div>
+              <div
+                className="text-2xl font-bold"
+                style={{
+                  color: theme === "light" ? "#EF4444" : "#F87171",
+                }}
+              >
                 {analytics.total_foods - analytics.active_foods}
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-6">
+          <Reports />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

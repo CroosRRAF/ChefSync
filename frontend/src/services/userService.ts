@@ -106,11 +106,6 @@ class UserService {
         first_name: 'Sarah',
         last_name: 'Wilson',
         phone_number: '+1234567893',
-        user_type: 'admin',
-        is_active: true,
-        date_joined: '2024-01-05T08:00:00Z',
-        last_login: '2024-01-20T10:30:00Z',
-      },
       {
         id: 5,
         username: 'chef_antonio',

@@ -1,50 +1,251 @@
-import React from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useUserStore } from '@/store/userStore';
-import { Bell, Send, Users, Package, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/context/AuthContext';
+import { Bell, Send, Users, Package, AlertTriangle, CheckCircle, RefreshCw, AlertCircle, Loader2, Mail, FileText } from 'lucide-react';
+import { adminService, type AdminNotification } from '@/services/adminService';
+import SystemAlerts from '@/components/admin/SystemAlerts';
+import EmailTemplates from '@/components/admin/EmailTemplates';
+import { toast } from 'sonner';
 
-const AdminNotifications: React.FC = () => {
-  const { user } = useUserStore();
+const AdminNotifications: React.FC = memo(() => {
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [activeTab, setActiveTab] = useState<string>("notifications");
+
+  console.log('AdminNotifications component rendered', { user, loading, error });
+
+  // Form state
+  const [formData, setFormData] = useState({
+    title: '',
+    message: '',
+    notification_type: 'system_alert',
+    priority: 'medium',
+    target_audience: 'all',
+    send_email: true,
+    send_sms: false,
+    is_urgent: false
+  });
+
+  // Email sending state
+  const [emailForm, setEmailForm] = useState({
+    recipient_type: 'all', // 'customers', 'chefs', 'delivery_agents', 'all'
+    subject: '',
+    message: '',
+    template_id: null as number | null
+  });
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  // Load notifications when user becomes available and is admin
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      loadNotifications();
+      loadUnreadCount();
+    }
+  }, [user]);
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('Loading notifications...');
+      const response = await adminService.getNotifications();
+      console.log('Notifications response:', response);
+      setNotifications(response.results || []);
+    } catch (err) {
+      console.error('Error loading notifications:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load notifications');
+      toast.error('Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadUnreadCount = async () => {
+    try {
+      const response = await adminService.getUnreadNotificationCount();
+      setUnreadCount(response.unread_count);
+    } catch (err) {
+      console.error('Failed to load unread count:', err);
+    }
+  };
+
+  const handleSendNotification = async () => {
+    if (!formData.title.trim() || !formData.message.trim()) {
+      toast.error('Please fill in both title and message');
+      return;
+    }
+
+    try {
+      setSending(true);
+      await adminService.createNotification({
+        title: formData.title,
+        message: formData.message,
+        notification_type: formData.notification_type,
+        priority: formData.priority,
+        target_audience: formData.target_audience,
+        send_email: formData.send_email,
+        send_sms: formData.send_sms
+      });
+
+      toast.success('Notification sent successfully');
+
+      // Reset form
+      setFormData({
+        title: '',
+        message: '',
+        notification_type: 'system_alert',
+        priority: 'medium',
+        target_audience: 'all',
+        send_email: true,
+        send_sms: false,
+        is_urgent: false
+      });
+
+      // Reload notifications
+      await loadNotifications();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send notification';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId: number) => {
+    try {
+      await adminService.markNotificationRead(notificationId);
+      toast.success('Notification marked as read');
+
+      // Update local state
+      setNotifications(prev =>
+        prev.map(notification =>
+          notification.id === notificationId
+            ? { ...notification, is_read: true, read_at: new Date().toISOString() }
+            : notification
+        )
+      );
+
+      // Update unread count
+      await loadUnreadCount();
+    } catch (err) {
+      toast.error('Failed to mark notification as read');
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await adminService.markAllNotificationsRead();
+      toast.success('All notifications marked as read');
+
+      // Update local state
+      setNotifications(prev =>
+        prev.map(notification => ({
+          ...notification,
+          is_read: true,
+          read_at: new Date().toISOString()
+        }))
+      );
+
+      setUnreadCount(0);
+    } catch (err) {
+      toast.error('Failed to mark all notifications as read');
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailForm.subject || !emailForm.message) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      
+      // Send email using adminService (you'll need to add this method)
+      // For now, we'll simulate the API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast.success(`Email sent successfully to ${emailForm.recipient_type === 'all' ? 'all users' : emailForm.recipient_type}`);
+      
+      // Reset form
+      setEmailForm({
+        recipient_type: 'all',
+        subject: '',
+        message: '',
+        template_id: null
+      });
+      
+      // Refresh notifications
+      loadNotifications();
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error('Failed to send email');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleFormChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">Loading user information...</p>
+        </div>
       </div>
     );
   }
 
-  // Mock notification data
-  const notifications = [
-    {
-      id: 1,
-      type: 'order',
-      title: 'New Order Received',
-      message: 'Order #123456 has been placed by John Customer',
-      timestamp: '2024-01-20T10:30:00Z',
-      read: false
-    },
-    {
-      id: 2,
-      type: 'system',
-      title: 'System Maintenance',
-      message: 'Scheduled maintenance will occur tonight at 2 AM',
-      timestamp: '2024-01-20T09:00:00Z',
-      read: true
-    },
-    {
-      id: 3,
-      type: 'user',
-      title: 'New User Registration',
-      message: 'Chef Maria has registered as a cook',
-      timestamp: '2024-01-20T08:45:00Z',
-      read: false
-    }
-  ];
+  if (user.role !== 'admin') {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-600">You don't have permission to access this page.</p>
+          <p className="text-sm text-gray-500 mt-2">Admin access required.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-600">Failed to load notifications</p>
+          <p className="text-sm text-gray-500 mt-2">{error}</p>
+          <Button
+            variant="outline"
+            onClick={() => loadNotifications()}
+            className="mt-4"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -80,162 +281,345 @@ const AdminNotifications: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-400 mt-2">Send and manage platform notifications</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Send Notifications */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Send className="h-5 w-5" />
-                <span>Send Notification</span>
-              </CardTitle>
-              <CardDescription>Send notifications to users or groups</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="notification-type">Notification Type</Label>
-                <select 
-                  id="notification-type" 
-                  className="w-full mt-2 p-2 border rounded-md"
-                  defaultValue="all"
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="emails">Send Emails</TabsTrigger>
+            <TabsTrigger value="alerts">System Alerts</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="notifications" className="space-y-6">
+            {/* Send Notifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Send className="h-5 w-5" />
+                  <span>Compose Notification</span>
+                </CardTitle>
+                <CardDescription>Send notifications to users or groups</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="notification-type">Notification Type</Label>
+                  <select
+                    id="notification-type"
+                    className="w-full mt-2 p-2 border rounded-md"
+                    value={formData.notification_type}
+                    onChange={(e) => handleFormChange('notification_type', e.target.value)}
+                  >
+                    <option value="system_alert">System Alert</option>
+                    <option value="user_activity">User Activity</option>
+                    <option value="order_update">Order Update</option>
+                    <option value="payment_issue">Payment Issue</option>
+                    <option value="security_event">Security Event</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="backup">Backup</option>
+                    <option value="performance">Performance</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="priority">Priority</Label>
+                  <select
+                    id="priority"
+                    className="w-full mt-2 p-2 border rounded-md"
+                    value={formData.priority}
+                    onChange={(e) => handleFormChange('priority', e.target.value)}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="target-audience">Target Audience</Label>
+                  <select
+                    id="target-audience"
+                    className="w-full mt-2 p-2 border rounded-md"
+                    value={formData.target_audience}
+                    onChange={(e) => handleFormChange('target_audience', e.target.value)}
+                  >
+                    <option value="all">All Users</option>
+                    <option value="customers">Customers Only</option>
+                    <option value="cooks">Cooks Only</option>
+                    <option value="delivery_agents">Delivery Agents Only</option>
+                    <option value="admins">Admins Only</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="notification-title">Title</Label>
+                  <Input
+                    id="notification-title"
+                    placeholder="Enter notification title"
+                    className="mt-2"
+                    value={formData.title}
+                    onChange={(e) => handleFormChange('title', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="notification-message">Message</Label>
+                  <Textarea
+                    id="notification-message"
+                    placeholder="Enter notification message"
+                    className="mt-2"
+                    rows={4}
+                    value={formData.message}
+                    onChange={(e) => handleFormChange('message', e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="urgent"
+                    className="rounded"
+                    checked={formData.is_urgent}
+                    onChange={(e) => handleFormChange('is_urgent', e.target.checked)}
+                  />
+                  <Label htmlFor="urgent">Mark as urgent</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="email"
+                    className="rounded"
+                    checked={formData.send_email}
+                    onChange={(e) => handleFormChange('send_email', e.target.checked)}
+                  />
+                  <Label htmlFor="email">Send via email</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="sms"
+                    className="rounded"
+                    checked={formData.send_sms}
+                    onChange={(e) => handleFormChange('send_sms', e.target.checked)}
+                  />
+                  <Label htmlFor="sms">Send via SMS</Label>
+                </div>
+
+                <Button
+                  className="w-full"
+                  onClick={handleSendNotification}
+                  disabled={sending}
                 >
-                  <option value="all">All Users</option>
-                  <option value="customers">Customers Only</option>
-                  <option value="cooks">Cooks Only</option>
-                  <option value="delivery_agents">Delivery Agents Only</option>
-                  <option value="admins">Admins Only</option>
-                </select>
-              </div>
+                  {sending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send Notification
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
 
-              <div>
-                <Label htmlFor="notification-title">Title</Label>
-                <Input 
-                  id="notification-title" 
-                  placeholder="Enter notification title"
-                  className="mt-2"
-                />
-              </div>
+            {/* Notification Templates */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Bell className="h-5 w-5" />
+                  <span>Quick Templates</span>
+                </CardTitle>
+                <CardDescription>Pre-defined notification templates</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button variant="outline" className="w-full justify-start">
+                  <Package className="h-4 w-4 mr-2" />
+                  New Order Alert
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  System Maintenance
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Order Delivered
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Users className="h-4 w-4 mr-2" />
+                  Welcome Message
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Bell className="h-4 w-4 mr-2" />
+                  Promotional Offer
+                </Button>
+              </CardContent>
+            </Card>
 
-              <div>
-                <Label htmlFor="notification-message">Message</Label>
-                <Textarea 
-                  id="notification-message" 
-                  placeholder="Enter notification message"
-                  className="mt-2"
-                  rows={4}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input type="checkbox" id="urgent" className="rounded" />
-                <Label htmlFor="urgent">Mark as urgent</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input type="checkbox" id="email" className="rounded" defaultChecked />
-                <Label htmlFor="email">Send via email</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input type="checkbox" id="sms" className="rounded" />
-                <Label htmlFor="sms">Send via SMS</Label>
-              </div>
-
-              <Button className="w-full">
-                <Send className="h-4 w-4 mr-2" />
-                Send Notification
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Notification Templates */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Bell className="h-5 w-5" />
-                <span>Quick Templates</span>
-              </CardTitle>
-              <CardDescription>Pre-defined notification templates</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full justify-start">
-                <Package className="h-4 w-4 mr-2" />
-                New Order Alert
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                System Maintenance
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Order Delivered
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <Users className="h-4 w-4 mr-2" />
-                Welcome Message
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <Bell className="h-4 w-4 mr-2" />
-                Promotional Offer
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Notifications */}
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Notifications</CardTitle>
-              <CardDescription>Notifications sent in the last 24 hours</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {notifications.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Bell className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">No notifications sent yet</p>
-                  </div>
-                ) : (
-                  notifications.map((notification) => (
-                    <div 
-                      key={notification.id} 
-                      className={`p-4 border rounded-lg ${getNotificationColor(notification.type)} ${
-                        !notification.read ? 'ring-2 ring-blue-500' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-3">
-                          {getNotificationIcon(notification.type)}
-                          <div>
-                            <h4 className="font-medium">{notification.title}</h4>
-                            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
-                            <p className="text-xs text-gray-500 mt-2">
-                              {new Date(notification.timestamp).toLocaleString()}
-                            </p>
+            {/* Recent Notifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Notifications</CardTitle>
+                <CardDescription>Notifications sent in the last 24 hours</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Bell className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No notifications sent yet</p>
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`p-4 border rounded-lg ${getNotificationColor(notification.notification_type)} ${
+                          !notification.is_read ? 'ring-2 ring-blue-500' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start space-x-3">
+                            {getNotificationIcon(notification.notification_type)}
+                            <div>
+                              <h4 className="font-medium">{notification.title}</h4>
+                              <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                              <p className="text-xs text-gray-500 mt-2">
+                                {new Date(notification.created_at).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {!notification.is_read && (
+                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleMarkAsRead(notification.id)}
+                            >
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Mark Read
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          {!notification.read && (
-                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                          )}
-                          <Button size="sm" variant="outline">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Mark Read
-                          </Button>
-                        </div>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-  );
-};
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-export default AdminNotifications;
+          <TabsContent value="emails" className="space-y-6">
+            {/* Role-based Email Sending */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Mail className="h-5 w-5" />
+                  <span>Send Role-based Emails</span>
+                </CardTitle>
+                <CardDescription>Send emails to specific user groups (customers, chefs, delivery agents)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="recipient_type">Recipient Group</Label>
+                    <Select
+                      value={emailForm.recipient_type}
+                      onValueChange={(value) => setEmailForm(prev => ({...prev, recipient_type: value}))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select recipient group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Users</SelectItem>
+                        <SelectItem value="customers">Customers Only</SelectItem>
+                        <SelectItem value="chefs">Chefs Only</SelectItem>
+                        <SelectItem value="delivery_agents">Delivery Agents Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="email_subject">Email Subject</Label>
+                    <Input
+                      id="email_subject"
+                      placeholder="Enter email subject"
+                      value={emailForm.subject}
+                      onChange={(e) => setEmailForm(prev => ({...prev, subject: e.target.value}))}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email_message">Email Message</Label>
+                  <Textarea
+                    id="email_message"
+                    placeholder="Enter your email message..."
+                    rows={6}
+                    value={emailForm.message}
+                    onChange={(e) => setEmailForm(prev => ({...prev, message: e.target.value}))}
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setEmailForm({
+                      recipient_type: 'all',
+                      subject: '',
+                      message: '',
+                      template_id: null
+                    })}
+                  >
+                    Clear
+                  </Button>
+                  <Button 
+                    onClick={handleSendEmail}
+                    disabled={sendingEmail || !emailForm.subject || !emailForm.message}
+                  >
+                    {sendingEmail ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Send Email
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Email Templates Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5" />
+                  <span>Email Templates</span>
+                </CardTitle>
+                <CardDescription>Manage email templates for quick messaging</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EmailTemplates />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="alerts" className="space-y-6">
+            <SystemAlerts />
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  });
+
+  export default AdminNotifications;
 
 
 

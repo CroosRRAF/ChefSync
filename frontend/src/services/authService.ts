@@ -4,12 +4,30 @@ import axios from 'axios';
 // Set VITE_API_BASE_URL in production builds.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
+// Function to get CSRF token from cookies
+const getCsrfToken = (): string | null => {
+  const name = 'csrftoken';
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+};
+
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Important for CSRF cookies
 });
 
 // Secure token access function
@@ -56,13 +74,22 @@ const removeSecureTokens = (): void => {
   }
 };
 
-// Add request interceptor to include auth token
+// Add request interceptor to include auth token and CSRF token
 api.interceptors.request.use(
   (config) => {
     const token = getSecureToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Add CSRF token for non-GET requests
+    if (config.method && config.method.toLowerCase() !== 'get') {
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        config.headers['X-CSRFToken'] = csrfToken;
+      }
+    }
+
     return config;
   },
   (error) => {
@@ -220,8 +247,22 @@ class AuthService {
     }
   }
 
+  // Get CSRF token from backend
+  async getCsrfToken(): Promise<string> {
+    try {
+      const response = await api.get('/auth/csrf-token/');
+      return response.data.csrf_token;
+    } catch (error) {
+      console.error('Failed to get CSRF token:', error);
+      throw error;
+    }
+  }
+
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
+      // Ensure CSRF token is available
+      await this.getCsrfToken();
+      
       const response = await api.post<AuthResponse>('/auth/login/', credentials);
       
       // Store tokens

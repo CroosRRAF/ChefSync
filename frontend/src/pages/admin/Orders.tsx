@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useUserStore } from '@/store/userStore';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { apiClient } from '@/utils/fetcher';
@@ -46,7 +45,7 @@ interface AdminOrder {
 }
 
 const OrderManagement: React.FC = () => {
-  const { user } = useUserStore();
+  const { user } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 
@@ -71,6 +70,11 @@ const OrderManagement: React.FC = () => {
   const [showOrderDetail, setShowOrderDetail] = useState(false);
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [orderDetailLoading, setOrderDetailLoading] = useState(false);
+
+  // Loading states
+  const [statusUpdateLoading, setStatusUpdateLoading] = useState(false);
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const [resourcesLoading, setResourcesLoading] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -210,12 +214,12 @@ const OrderManagement: React.FC = () => {
 
   const updateOrderStatus = async (orderId: string, newStatus: AdminOrder['status']) => {
     try {
-      // Use the correct API endpoint for status updates
-      const response = await apiClient.patch(`admin/orders/${orderId}/update_status/`, { 
-        status: newStatus 
-      });
+      setStatusUpdateLoading(true);
+      
+      // Use the new adminService method
+      const response = await adminService.updateOrderStatus(parseInt(orderId), newStatus);
 
-      if (response.status >= 200 && response.status < 300) {
+      if (response) {
         // Update local state
         setOrders(prev => 
           prev.map(order => 
@@ -227,11 +231,9 @@ const OrderManagement: React.FC = () => {
           )
         );
         
-        // Show success message (you can add a toast notification here)
+        // Show success message
         console.log(`Order ${orderId} status updated to ${newStatus}`);
         alert(`Order status updated successfully to ${newStatus.replace('_', ' ')}`);
-      } else {
-        throw new Error(response.data?.detail || 'Failed to update order status');
       }
     } catch (error: any) {
       console.error('Error updating order status:', {
@@ -251,6 +253,8 @@ const OrderManagement: React.FC = () => {
         const message = error?.response?.data?.detail || error?.response?.data?.message || error?.message || 'Unknown error';
         alert(`Failed to update order status: ${message}`);
       }
+    } finally {
+      setStatusUpdateLoading(false);
     }
   };
 
@@ -379,18 +383,16 @@ const OrderManagement: React.FC = () => {
   // Fetch available chefs and partners
   const fetchAvailableResources = async () => {
     try {
+      setResourcesLoading(true);
+      
       const [chefsResponse, partnersResponse] = await Promise.all([
-        apiClient.get('admin/orders/available_chefs/'),
-        apiClient.get('admin/orders/available_delivery_partners/')
+        adminService.getAvailableChefs(),
+        adminService.getAvailableDeliveryPartners()
       ]);
 
-      // Check responses
-      if (chefsResponse.status >= 200 && chefsResponse.status < 300) {
-        setAvailableChefs(chefsResponse.data.chefs || []);
-      }
-      if (partnersResponse.status >= 200 && partnersResponse.status < 300) {
-        setAvailablePartners(partnersResponse.data.partners || []);
-      }
+      // Set the responses
+      setAvailableChefs(chefsResponse || []);
+      setAvailablePartners(partnersResponse || []);
     } catch (error: any) {
       console.error('Error fetching available resources:', {
         message: error?.message,
@@ -407,28 +409,43 @@ const OrderManagement: React.FC = () => {
 
       setAvailableChefs([]);
       setAvailablePartners([]);
+    } finally {
+      setResourcesLoading(false);
     }
   };
 
   // Handle assignment
-  const handleAssignment = (order: AdminOrder, type: 'chef' | 'partner') => {
+  const handleAssignment = async (order: AdminOrder, type: 'chef' | 'partner') => {
     setSelectedOrder(order);
     setAssignmentType(type);
     setShowAssignmentModal(true);
+    
+    // Fetch available resources when modal opens
+    await fetchAvailableResources();
   };
 
   const confirmAssignment = async (resourceId: number) => {
     if (!selectedOrder || !assignmentType) return;
     
+    // Add confirmation dialog
+    const resourceType = assignmentType === 'chef' ? 'chef' : 'delivery partner';
+    const confirmMessage = `Are you sure you want to assign this ${resourceType} to order #${selectedOrder.order_number}?`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+    
     try {
-      const endpoint = assignmentType === 'chef' ? 'assign_chef' : 'assign_delivery_partner';
-      const data = assignmentType === 'chef' 
-        ? { chef_id: resourceId } 
-        : { partner_id: resourceId };
+      setAssignmentLoading(true);
       
-      const response = await apiClient.patch(`admin/orders/${selectedOrder.id}/${endpoint}/`, data);
+      let response;
+      if (assignmentType === 'chef') {
+        response = await adminService.assignChef(selectedOrder.id, resourceId);
+      } else {
+        response = await adminService.assignDeliveryPartner(selectedOrder.id, resourceId);
+      }
 
-      if (response.status >= 200 && response.status < 300) {
+      if (response) {
         // Update local state
         setOrders(prev => 
           prev.map(order => 
@@ -451,8 +468,6 @@ const OrderManagement: React.FC = () => {
         setSelectedOrder(null);
         setAssignmentType(null);
         alert(`${assignmentType === 'chef' ? 'Chef' : 'Delivery partner'} assigned successfully!`);
-      } else {
-        throw new Error(response.data?.detail || 'Failed to assign resource');
       }
     } catch (error: any) {
       console.error('Error assigning resource:', error);
@@ -468,6 +483,8 @@ const OrderManagement: React.FC = () => {
         const message = error.response?.data?.detail || error.response?.data?.message || error.message || 'Unknown error';
         alert(`Failed to assign resource: ${message}`);
       }
+    } finally {
+      setAssignmentLoading(false);
     }
   };
 
@@ -720,64 +737,76 @@ const OrderManagement: React.FC = () => {
                   >
                     Available {assignmentType === 'chef' ? 'Chefs' : 'Delivery Partners'}:
                   </label>
-                  <div 
-                    className="max-h-48 overflow-y-auto border rounded-lg"
-                    style={{
-                      borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
-                    }}
-                  >
-                    {(assignmentType === 'chef' ? availableChefs : availablePartners).map((resource: any) => (
-                      <div
-                        key={resource.id}
-                        className="p-3 border-b last:border-b-0 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
-                        style={{
-                          borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
-                        }}
-                        onClick={() => confirmAssignment(resource.id)}
-                      >
-                        <div 
-                          className="font-medium"
+                  {resourcesLoading ? (
+                    <div 
+                      className="flex items-center justify-center p-8"
+                      style={{
+                        borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+                      }}
+                    >
+                      <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+                      <span>Loading available {assignmentType === 'chef' ? 'chefs' : 'partners'}...</span>
+                    </div>
+                  ) : (
+                    <div 
+                      className="max-h-48 overflow-y-auto border rounded-lg"
+                      style={{
+                        borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
+                      }}
+                    >
+                      {(assignmentType === 'chef' ? availableChefs : availablePartners).map((resource: any) => (
+                        <div
+                          key={resource.id}
+                          className="p-3 border-b last:border-b-0 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                           style={{
-                            color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                            borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
                           }}
+                          onClick={() => confirmAssignment(resource.id)}
                         >
-                          {resource.name}
-                        </div>
-                        <div 
-                          className="text-sm"
-                          style={{
-                            color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
-                          }}
-                        >
-                          {resource.email}
-                        </div>
-                        {resource.phone && (
+                          <div 
+                            className="font-medium"
+                            style={{
+                              color: theme === 'dark' ? '#F9FAFB' : '#111827'
+                            }}
+                          >
+                            {resource.name}
+                          </div>
                           <div 
                             className="text-sm"
                             style={{
                               color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
                             }}
                           >
-                            {resource.phone}
+                            {resource.email}
                           </div>
-                        )}
-                      </div>
-                    ))}
-                    {(assignmentType === 'chef' ? availableChefs : availablePartners).length === 0 && (
-                      <div 
-                        className="p-4 text-center"
-                        style={{
-                          color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
-                        }}
-                      >
-                        No available {assignmentType === 'chef' ? 'chefs' : 'delivery partners'} found
-                      </div>
-                    )}
-                  </div>
+                          {resource.phone && (
+                            <div 
+                              className="text-sm"
+                              style={{
+                                color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                              }}
+                            >
+                              {resource.phone}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {(assignmentType === 'chef' ? availableChefs : availablePartners).length === 0 && (
+                        <div 
+                          className="p-4 text-center"
+                          style={{
+                            color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                          }}
+                        >
+                          No available {assignmentType === 'chef' ? 'chefs' : 'delivery partners'} found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex justify-end space-x-3">
-                <Button variant="outline" onClick={cancelAssignment}>
+                <Button variant="outline" onClick={cancelAssignment} disabled={assignmentLoading}>
                   Cancel
                 </Button>
               </div>
@@ -908,8 +937,13 @@ const OrderManagement: React.FC = () => {
                           variant="outline"
                           className="text-xs px-2 py-1 h-auto"
                           onClick={() => handleStatusChange(order, newStatus)}
+                          disabled={statusUpdateLoading}
                         >
-                          {getStatusTransitionLabel(order.status, newStatus)}
+                          {statusUpdateLoading ? (
+                            <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            getStatusTransitionLabel(order.status, newStatus)
+                          )}
                         </Button>
                       ))}
                       <Button 
@@ -917,18 +951,32 @@ const OrderManagement: React.FC = () => {
                         variant="outline" 
                         className="text-xs px-2 py-1 h-auto"
                         onClick={() => handleAssignment(order, 'chef')}
+                        disabled={assignmentLoading}
                       >
-                        <ChefHat className="h-3 w-3 mr-1" />
-                        Assign Chef
+                        {assignmentLoading ? (
+                          <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <>
+                            <ChefHat className="h-3 w-3 mr-1" />
+                            Assign Chef
+                          </>
+                        )}
                       </Button>
                       <Button 
                         size="sm" 
                         variant="outline" 
                         className="text-xs px-2 py-1 h-auto"
                         onClick={() => handleAssignment(order, 'partner')}
+                        disabled={assignmentLoading}
                       >
-                        <Package className="h-3 w-3 mr-1" />
-                        Assign Partner
+                        {assignmentLoading ? (
+                          <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <>
+                            <Package className="h-3 w-3 mr-1" />
+                            Assign Partner
+                          </>
+                        )}
                       </Button>
                     </div>
                   </TableCell>
@@ -1007,11 +1055,18 @@ const OrderManagement: React.FC = () => {
                 </div>
               </div>
               <div className="flex justify-end space-x-3">
-                <Button variant="outline" onClick={cancelStatusChange}>
+                <Button variant="outline" onClick={cancelStatusChange} disabled={statusUpdateLoading}>
                   Cancel
                 </Button>
-                <Button onClick={confirmStatusChange}>
-                  Confirm Change
+                <Button onClick={confirmStatusChange} disabled={statusUpdateLoading}>
+                  {statusUpdateLoading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Confirm Change'
+                  )}
                 </Button>
               </div>
             </div>

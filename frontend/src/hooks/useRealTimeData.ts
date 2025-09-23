@@ -48,7 +48,7 @@ export function useRealTimeData<T>(
       // In a real implementation, you would connect to your WebSocket server
       // For now, we'll simulate with polling
       const ws = new WebSocket(`ws://localhost:8000/ws/${endpoint}/`);
-      
+
       ws.onopen = () => {
         console.log(`Connected to ${endpoint}`);
         setState(prev => ({
