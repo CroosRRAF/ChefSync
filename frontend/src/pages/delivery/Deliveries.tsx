@@ -337,7 +337,7 @@ const DeliveryDeliveries: React.FC = () => {
                             order.delivery_address
                           );
                           window.open(
-                            `https://maps.apple.com/?q=${address}`,
+                            `https://www.google.com/maps/dir/?api=1&destination=${address}`,
                             "_blank"
                           );
                         }}
