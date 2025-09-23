@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('authentication', '0003_jwttoken_campaign_name_jwttoken_max_uses_and_more'),
+        ('authentication', '0002_jwttoken_campaign_name_jwttoken_max_uses_and_more'),
     ]
 
     operations = [
