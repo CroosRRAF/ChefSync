@@ -6,6 +6,7 @@ from django.contrib.auth import login, logout
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, permission_classes
@@ -60,9 +61,11 @@ def health_check(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@csrf_exempt
 def csrf_token(request):
     """Get CSRF token for the current session"""
     from django.middleware.csrf import get_token
+
     token = get_token(request)
     return Response({"csrf_token": token}, status=status.HTTP_200_OK)
 
