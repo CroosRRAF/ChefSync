@@ -30,7 +30,7 @@ User = get_user_model()
 
 class AdminDashboardViewSet(viewsets.ViewSet):
     """Admin dashboard analytics and statistics"""
-    permission_classes = [permissions.AllowAny]  # Temporarily allow all access for testing
+    permission_classes = [IsAuthenticated, IsAdminUser]
     
     @action(detail=False, methods=['get'])
     def stats(self, request):
@@ -267,7 +267,164 @@ class AdminDashboardViewSet(viewsets.ViewSet):
 
 class AdminUserManagementViewSet(viewsets.ViewSet):
     """Complete user management for admins"""
-    permission_classes = [permissions.AllowAny]  # Temporarily allow all access for testing
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    @action(detail=False, methods=['get'])
+    def pending_approvals(self, request):
+        """Get users pending approval (cooks and delivery agents)"""
+        try:
+            role = request.query_params.get('role')
+            if not role:
+                return Response(
+                    {'error': 'Role parameter is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate role
+            valid_roles = ['cook', 'delivery_agent']
+            if role not in valid_roles:
+                return Response(
+                    {'error': f'Invalid role. Must be one of: {valid_roles}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get pending users based on role
+            if role == 'cook':
+                pending_users = User.objects.filter(
+                    role='cook',
+                    approval_status='pending'
+                ).order_by('date_joined')
+            elif role == 'delivery_agent':
+                pending_users = User.objects.filter(
+                    role='delivery_agent',
+                    approval_status='pending'
+                ).order_by('date_joined')
+
+            users_data = []
+            for user in pending_users:
+                # Get user documents
+                documents = []
+                try:
+                    for doc in user.documents.all():
+                        documents.append({
+                            'id': doc.id,
+                            'file_name': doc.file_name,
+                            'document_type': doc.document_type.name if doc.document_type else 'Unknown',
+                            'uploaded_at': doc.uploaded_at,
+                            'file_url': doc.file.url if doc.file else None
+                        })
+                except Exception as e:
+                    print(f"Error getting documents for user {user.user_id}: {e}")
+
+                users_data.append({
+                    'id': user.user_id,
+                    'name': user.name or f"{user.first_name} {user.last_name}".strip(),
+                    'email': user.email,
+                    'role': user.role,
+                    'phone_no': user.phone_no,
+                    'address': user.address,
+                    'created_at': user.date_joined,
+                    'approval_status': user.approval_status,
+                    'documents': documents
+                })
+
+            return Response({
+                'users': users_data,
+                'count': len(users_data)
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to fetch pending approvals: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def approve_user(self, request, pk=None):
+        """Approve or reject a user"""
+        try:
+            user = User.objects.get(user_id=pk, role__in=['cook', 'delivery_agent'])
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        action = request.data.get('action')
+        notes = request.data.get('notes', '')
+        
+        if action not in ['approve', 'reject']:
+            return Response(
+                {'error': 'Action must be either "approve" or "reject"'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if action == 'approve':
+            user.approval_status = 'approved'
+            user.approval_notes = notes
+            user.approved_by = request.user
+            user.approved_at = timezone.now()
+            user.is_active = True  # Activate the user
+            user.save()
+            
+            # Make all user documents visible to admin after approval
+            user.documents.update(is_visible_to_admin=True)
+            
+            # Send approval email
+            from apps.authentication.services.email_service import EmailService
+            EmailService.send_approval_email(user, 'approved', notes)
+            
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action='approve',
+                resource_type='user',
+                resource_id=str(user.user_id),
+                description=f'Approved {user.role} user {user.email}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            
+            return Response({
+                'message': 'User approved successfully',
+                'user': {
+                    'id': user.user_id,
+                    'name': user.name,
+                    'email': user.email,
+                    'role': user.role,
+                    'approval_status': user.approval_status
+                }
+            }, status=status.HTTP_200_OK)
+        
+        elif action == 'reject':
+            user.approval_status = 'rejected'
+            user.approval_notes = notes
+            user.approved_by = request.user
+            user.approved_at = timezone.now()
+            user.save()
+            
+            # Send rejection email
+            from apps.authentication.services.email_service import EmailService
+            EmailService.send_approval_email(user, 'rejected', notes)
+            
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action='reject',
+                resource_type='user',
+                resource_id=str(user.user_id),
+                description=f'Rejected {user.role} user {user.email}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            
+            return Response({
+                'message': 'User rejected successfully',
+                'user': {
+                    'id': user.user_id,
+                    'name': user.name,
+                    'email': user.email,
+                    'role': user.role,
+                    'approval_status': user.approval_status
+                }
+            }, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['get'])
     def list_users(self, request):
@@ -772,7 +929,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
 class AdminOrderManagementViewSet(viewsets.ViewSet):
     """Order oversight and management"""
-    permission_classes = [permissions.AllowAny]  # Temporarily allow all access for testing
+    permission_classes = [IsAuthenticated, IsAdminUser]
     
     @action(detail=False, methods=['get'])
     def list_orders(self, request):
@@ -1147,7 +1304,7 @@ class AdminNotificationViewSet(viewsets.ModelViewSet):
     """Admin notifications management"""
     queryset = AdminNotification.objects.all()
     serializer_class = AdminNotificationSerializer
-    permission_classes = [permissions.AllowAny]  # Temporarily allow all access for testing
+    permission_classes = [IsAuthenticated, IsAdminUser]
     
     def get_queryset(self):
         """Filter notifications based on query parameters"""
@@ -1214,7 +1371,7 @@ class AdminSystemSettingsViewSet(viewsets.ModelViewSet):
     """System settings management"""
     queryset = AdminSystemSettings.objects.all()
     serializer_class = AdminSystemSettingsSerializer
-    permission_classes = [permissions.AllowAny]  # Temporarily allow all access for testing
+    permission_classes = [IsAuthenticated, IsAdminUser]
     lookup_field = 'key'
     
     def get_queryset(self):
@@ -1253,7 +1410,7 @@ class AdminActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
     """Admin activity logs (read-only)"""
     queryset = AdminActivityLog.objects.all()
     serializer_class = AdminActivityLogSerializer
-    permission_classes = [permissions.AllowAny]  # Temporarily allow all access for testing
+    permission_classes = [IsAuthenticated, IsAdminUser]
     
     def get_queryset(self):
         """Filter activity logs based on query parameters"""

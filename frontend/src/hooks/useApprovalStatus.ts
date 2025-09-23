@@ -20,7 +20,7 @@ export const useApprovalStatus = () => {
     setIsLoading(true);
     try {
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token'); // Fixed token key
       
       const response = await fetch(`${apiUrl}/api/auth/approval-status/`, {
         headers: {
@@ -32,6 +32,24 @@ export const useApprovalStatus = () => {
       if (response.ok) {
         const data = await response.json();
         setApprovalStatus(data);
+      } else if (response.status === 401) {
+        // If unauthorized, try without token (for users who just registered)
+        const responseWithoutAuth = await fetch(`${apiUrl}/api/auth/approval-status/?email=${encodeURIComponent(user.email)}`, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (responseWithoutAuth.ok) {
+          const data = await responseWithoutAuth.json();
+          setApprovalStatus(data);
+        } else {
+          setApprovalStatus({
+            approval_status: 'unknown',
+            can_login: false,
+            message: 'Unable to verify approval status'
+          });
+        }
       } else {
         // If we can't check status, assume they can't login
         setApprovalStatus({

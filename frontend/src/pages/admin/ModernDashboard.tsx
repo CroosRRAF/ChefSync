@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -170,8 +169,17 @@ const ModernDashboard: React.FC = () => {
       setRecentActivities(activitiesData);
       if (healthData) setSystemHealth(healthData);
       setLastRefresh(new Date());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
+    } catch (err: any) {
+      console.error('Dashboard data fetch error:', err);
+      const errorMessage = err?.message || 'Failed to fetch dashboard data';
+      setError(errorMessage);
+      
+      // If it's an authentication error, redirect to login
+      if (errorMessage.includes('Authentication required') || errorMessage.includes('permission')) {
+        setTimeout(() => {
+          window.location.href = '/auth/login';
+        }, 2000);
+      }
     } finally {
       setLoading(false);
     }

@@ -45,8 +45,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         
         # Role validation
         role = attrs.get('role')
-        if role not in dict(User.ROLE_CHOICES):
-            raise serializers.ValidationError("Invalid role selected")
+        valid_roles = [choice[0] for choice in User.ROLE_CHOICES]
+        if role not in valid_roles:
+            raise serializers.ValidationError(f"Invalid role selected. Valid roles are: {valid_roles}")
         
         return attrs
 
