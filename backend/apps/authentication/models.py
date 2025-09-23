@@ -92,7 +92,6 @@ class User(AbstractUser):
         help_text="User role in the system",
     )
     profile_image = models.BinaryField(blank=True, null=True)  # LONGBLOB equivalent
-    password = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -128,44 +127,6 @@ class User(AbstractUser):
     last_failed_login = models.DateTimeField(blank=True, null=True)
     account_locked = models.BooleanField(default=False)
     account_locked_until = models.DateTimeField(blank=True, null=True)
-
-    # Referral system fields
-    referral_code = models.CharField(
-        max_length=20,
-        unique=True,
-        blank=True,
-        null=True,
-        help_text="User's unique referral code",
-    )
-    referred_by = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="referred_users",
-        help_text="User who referred this user",
-    )
-    referral_token_used = models.CharField(
-        max_length=50,
-        blank=True,
-        null=True,
-        help_text="Referral token that was used during registration",
-    )
-    total_referrals = models.PositiveIntegerField(
-        default=0, help_text="Total number of successful referrals made by this user"
-    )
-    referral_rewards_earned = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal("0.00"),
-        help_text="Total referral rewards earned",
-    )
-    referral_rewards_used = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal("0.00"),
-        help_text="Total referral rewards used",
-    )
 
     # Referral system fields
     referral_code = models.CharField(

@@ -58,8 +58,8 @@ class AdminActivityLogSerializer(serializers.ModelSerializer):
 
 
 class AdminNotificationSerializer(serializers.ModelSerializer):
-    time_ago = serializers.SerializerMethodField()
     is_expired = serializers.SerializerMethodField()
+    time_ago = serializers.SerializerMethodField()
 
     class Meta:
         model = AdminNotification
@@ -74,11 +74,17 @@ class AdminNotificationSerializer(serializers.ModelSerializer):
             "created_at",
             "read_at",
             "expires_at",
-            "time_ago",
             "is_expired",
+            "time_ago",
             "metadata",
         ]
-        read_only_fields = ["id", "created_at", "time_ago", "is_expired"]
+        read_only_fields = ["id", "created_at", "is_expired", "time_ago"]
+
+    def get_is_expired(self, obj):
+        """Check if notification is expired"""
+        if obj.expires_at:
+            return timezone.now() > obj.expires_at
+        return False
 
     def get_time_ago(self, obj):
         """Calculate time difference from now"""
@@ -94,13 +100,7 @@ class AdminNotificationSerializer(serializers.ModelSerializer):
             minutes = diff.seconds // 60
             return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
         else:
-            return "Just now"
-
-    def get_is_expired(self, obj):
-        """Check if notification is expired"""
-        if obj.expires_at:
-            return timezone.now() > obj.expires_at
-        return False
+            return f"{diff.seconds} second{'s' if diff.seconds != 1 else ''} ago"
 
 
 class SystemHealthMetricSerializer(serializers.ModelSerializer):
@@ -405,4 +405,7 @@ class AdminOrderSummarySerializer(serializers.ModelSerializer):
         ]
 
     def get_items_count(self, obj):
-        return obj.items.count()
+        try:
+            return obj.items.count()
+        except:
+            return 0
