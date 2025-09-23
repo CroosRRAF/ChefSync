@@ -8,6 +8,14 @@ const apiClient = axios.create({
   },
   withCredentials: true, // Important for CSRF cookies
 });
+// ✅ Attach token automatically
+apiClient.interceptors.request.use((config) => {
+  const access_token = localStorage.getItem('access_token');
+  if (access_token) {
+    config.headers.Authorization = `Bearer ${access_token}`;
+  }
+  return config;
+});
 
 // Function to get CSRF token from cookies
 const getCsrfToken = (): string | null => {

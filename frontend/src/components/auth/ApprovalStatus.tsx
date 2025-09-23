@@ -63,7 +63,7 @@ const ApprovalStatus: React.FC<ApprovalStatusProps> = ({ onStatusChange }) => {
   const checkApprovalStatus = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('chefsync_token');
+      const token = localStorage.getItem('access_token'); // Fixed token key
       
       const response = await fetch(`${apiUrl}/api/auth/approval-status/`, {
         headers: {
@@ -76,6 +76,26 @@ const ApprovalStatus: React.FC<ApprovalStatusProps> = ({ onStatusChange }) => {
         const data = await response.json();
         setStatusData(data);
         onStatusChange?.(data.can_login);
+      } else if (response.status === 401) {
+        // If unauthorized, try to get user email from localStorage and check without auth
+        const userEmail = localStorage.getItem('user_email');
+        if (userEmail) {
+          const responseWithoutAuth = await fetch(`${apiUrl}/api/auth/approval-status/?email=${encodeURIComponent(userEmail)}`, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (responseWithoutAuth.ok) {
+            const data = await responseWithoutAuth.json();
+            setStatusData(data);
+            onStatusChange?.(data.can_login);
+          } else {
+            throw new Error('Failed to check approval status');
+          }
+        } else {
+          throw new Error('Failed to check approval status');
+        }
       } else {
         throw new Error('Failed to check approval status');
       }

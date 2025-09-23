@@ -1,243 +1,573 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useUserStore } from '@/store/userStore';
-import { useOrderStore } from '@/store/orderStore';
-import { MapPin, Navigation, Truck, Clock, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "react-router-dom";
+import DeliveryLayout from "@/components/delivery/DeliveryLayout";
+import {
+  getAvailableOrders,
+  updateDeliveryLocation,
+  getRouteDirections,
+  optimizeDeliveryRoute,
+} from "@/services/deliveryService";
+import {
+  MapPin,
+  Navigation,
+  Truck,
+  Clock,
+  CheckCircle,
+  RefreshCw,
+  Target,
+  Route,
+  AlertCircle,
+  Zap,
+} from "lucide-react";
+import type { Order } from "../../types/order";
+
+interface Location {
+  lat: number;
+  lng: number;
+  accuracy?: number;
+  timestamp?: number;
+}
+
+interface RouteOptimization {
+  optimizedOrder: Order[];
+  totalDistance: number;
+  estimatedTime: number;
+  savings: {
+    distance: number;
+    time: number;
+  };
+}
 
 const DeliveryMap: React.FC = () => {
-  const { user } = useUserStore();
-  const { orders, getOrdersByDeliveryAgent } = useOrderStore();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const location = useLocation();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
+  const [trackingEnabled, setTrackingEnabled] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [routeOptimization, setRouteOptimization] =
+    useState<RouteOptimization | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
-  // Get delivery agent's assigned orders
-  const deliveryOrders = user ? getOrdersByDeliveryAgent(user.user_id) : [];
-
-  if (!user) {
-    return <div>Loading...</div>;
-  }
-
-  // Mock map data - in real app this would be an actual map component
-  const mockDeliveries = [
-    {
-      id: '1',
-      orderId: '123456',
-      customerName: 'John Customer',
-      address: '123 Main St, Downtown',
-      coordinates: { lat: 40.7128, lng: -74.0060 },
-      status: 'out_for_delivery',
-      estimatedTime: '15 min',
-      distance: '2.3 km'
-    },
-    {
-      id: '2',
-      orderId: '123457',
-      customerName: 'Jane Smith',
-      address: '456 Oak Ave, West Side',
-      coordinates: { lat: 40.7589, lng: -73.9851 },
-      status: 'pending',
-      estimatedTime: '25 min',
-      distance: '4.1 km'
+  // Handle order details passed from dashboard
+  useEffect(() => {
+    const state = location.state as {
+      selectedOrderId?: number;
+      orderDetails?: Order;
+    };
+    if (state?.orderDetails) {
+      setSelectedOrder(state.orderDetails);
+      setShowOrderDetails(true);
+      // Auto-enable tracking when coming from accepted order
+      if (!trackingEnabled) {
+        requestLocationPermission();
+      }
     }
-  ];
+  }, [location.state]);
+
+  useEffect(() => {
+    fetchOrders();
+    checkLocationPermissions();
+  }, []);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      const ordersData = await getAvailableOrders();
+      // Only show orders that are assigned or in progress
+      const activeOrders = ordersData.filter((order) =>
+        ["assigned", "picked_up", "in_transit"].includes(order.status)
+      );
+      setOrders(activeOrders);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch orders. Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkLocationPermissions = async () => {
+    if ("geolocation" in navigator) {
+      try {
+        const permission = await navigator.permissions.query({
+          name: "geolocation",
+        });
+        if (permission.state === "granted") {
+          setTrackingEnabled(true);
+          startLocationTracking();
+        }
+      } catch (error) {
+        console.log("Location permission check failed:", error);
+      }
+    }
+  };
+
+  const requestLocationPermission = async () => {
+    if (!("geolocation" in navigator)) {
+      setLocationError("Geolocation is not supported by this browser.");
+      return;
+    }
+
+    try {
+      const position = await new Promise<GeolocationPosition>(
+        (resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          });
+        }
+      );
+
+      const location: Location = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: Date.now(),
+      };
+
+      setCurrentLocation(location);
+      setTrackingEnabled(true);
+      setLocationError(null);
+      startLocationTracking();
+
+      toast({
+        title: "Location Access Granted",
+        description: "GPS tracking is now active for deliveries.",
+      });
+    } catch (error) {
+      setLocationError(
+        "Failed to get location. Please check your permissions."
+      );
+      toast({
+        variant: "destructive",
+        title: "Location Error",
+        description: "Unable to access your location. Please enable GPS.",
+      });
+    }
+  };
+
+  const startLocationTracking = useCallback(() => {
+    if (!trackingEnabled) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const location: Location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: Date.now(),
+        };
+
+        setCurrentLocation(location);
+
+        // Update server with location
+        updateDeliveryLocation(location.lat, location.lng).catch((error) => {
+          console.error("Failed to update location:", error);
+        });
+      },
+      (error) => {
+        console.error("Location tracking error:", error);
+        setLocationError(
+          "Location tracking failed. Please check your settings."
+        );
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 30000,
+      }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [trackingEnabled]);
+
+  useEffect(() => {
+    return startLocationTracking();
+  }, [startLocationTracking]);
+
+  const handleOptimizeRoute = async () => {
+    if (orders.length < 2) {
+      toast({
+        title: "Route Optimization",
+        description: "Need at least 2 orders to optimize the route.",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const optimization = await optimizeDeliveryRoute(orders.map((o) => o.id));
+      setRouteOptimization(optimization);
+
+      toast({
+        title: "Route Optimized",
+        description: `Saved ${optimization.savings.distance.toFixed(
+          1
+        )} km and ${optimization.savings.time} minutes!`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Optimization Failed",
+        description: "Unable to optimize route. Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOrderSelect = (order: Order) => {
+    setSelectedOrder(order);
+    setShowOrderDetails(true);
+  };
+
+  const handleGetDirections = async (order: Order) => {
+    if (!currentLocation) {
+      toast({
+        variant: "destructive",
+        title: "Location Required",
+        description: "Please enable location access to get directions.",
+      });
+      return;
+    }
+
+    try {
+      const directions = await getRouteDirections(order.id);
+
+      // In a real implementation, this would open the directions in the map
+      toast({
+        title: "Directions",
+        description: `Route calculated for Order #${order.id}`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Directions Failed",
+        description: "Unable to calculate route. Please try again.",
+      });
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "assigned":
+        return <Badge variant="secondary">Assigned</Badge>;
+      case "picked_up":
+        return <Badge className="bg-blue-500">Picked Up</Badge>;
+      case "in_transit":
+        return <Badge className="bg-yellow-500">In Transit</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Delivery Map</h1>
-          <p className="text-gray-600 mt-2">Track your deliveries and optimize routes</p>
+    <DeliveryLayout
+      title="Delivery Map"
+      description="Track your deliveries and optimize routes in real-time"
+    >
+      <div className="space-y-6">
+        {/* Controls */}
+        <div className="flex space-x-2">
+          <Button
+            onClick={requestLocationPermission}
+            variant="outline"
+            disabled={trackingEnabled}
+          >
+            <Target
+              className={`h-4 w-4 mr-2 ${
+                trackingEnabled ? "text-green-500" : ""
+              }`}
+            />
+            {trackingEnabled ? "Tracking Active" : "Enable Tracking"}
+          </Button>
+          <Button onClick={handleOptimizeRoute} disabled={orders.length < 2}>
+            <Route className="h-4 w-4 mr-2" />
+            Optimize Route
+          </Button>
+          <Button onClick={fetchOrders} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Map View */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <MapPin className="h-5 w-5" />
-                  <span>Live Map</span>
-                </CardTitle>
-                <CardDescription>Real-time delivery tracking</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="w-full h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 mb-2">Interactive Map Component</p>
-                    <p className="text-sm text-gray-400">
-                      This would integrate with Google Maps, Mapbox, or similar service
+        {/* Location Status */}
+        {locationError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+              <span className="text-red-700">{locationError}</span>
+            </div>
+          </div>
+        )}
+
+        {currentLocation && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <MapPin className="h-5 w-5 text-green-500 mr-2" />
+              <span className="text-green-700">
+                Current Location: {currentLocation.lat.toFixed(6)},{" "}
+                {currentLocation.lng.toFixed(6)}
+                {currentLocation.accuracy &&
+                  ` (±${Math.round(currentLocation.accuracy)}m)`}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Route Optimization Results */}
+        {routeOptimization && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardHeader>
+              <CardTitle className="flex items-center text-blue-700">
+                <Zap className="h-5 w-5 mr-2" />
+                Route Optimized!
+              </CardTitle>
+              <CardDescription>
+                Optimized delivery sequence for{" "}
+                {routeOptimization.optimizedOrder.length} orders
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Total Distance</p>
+                  <p className="font-semibold">
+                    {routeOptimization.totalDistance.toFixed(1)} km
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Estimated Time</p>
+                  <p className="font-semibold">
+                    {routeOptimization.estimatedTime} min
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Distance Saved</p>
+                  <p className="font-semibold text-green-600">
+                    -{routeOptimization.savings.distance.toFixed(1)} km
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Time Saved</p>
+                  <p className="font-semibold text-green-600">
+                    -{routeOptimization.savings.time} min
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Map Placeholder */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <MapPin className="h-5 w-5 mr-2" />
+              Delivery Map
+            </CardTitle>
+            <CardDescription>
+              Interactive map with your location and delivery destinations
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-gray-100 rounded-lg p-8 text-center min-h-[400px] flex flex-col items-center justify-center">
+              <MapPin className="h-16 w-16 text-gray-400 mb-4" />
+              <p className="text-gray-500 mb-2">Map Integration Required</p>
+              <p className="text-sm text-gray-400">
+                Integrate with Google Maps, Mapbox, or similar service for live
+                map display
+              </p>
+              {currentLocation && (
+                <div className="mt-4 p-3 bg-white rounded-lg shadow">
+                  <p className="text-sm font-medium">Your Location</p>
+                  <p className="text-xs text-gray-600">
+                    {currentLocation.lat.toFixed(4)},{" "}
+                    {currentLocation.lng.toFixed(4)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Active Orders List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Deliveries</CardTitle>
+            <CardDescription>
+              {orders.length} orders ready for delivery
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+                Loading orders...
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Truck className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>No active deliveries</p>
+                <Button
+                  onClick={fetchOrders}
+                  className="mt-4"
+                  variant="outline"
+                >
+                  Refresh Orders
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {orders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="p-4 border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => handleOrderSelect(order)}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-semibold">Order #{order.id}</p>
+                        <p className="text-sm text-gray-600">
+                          {order.customer?.name || "Unknown Customer"}
+                        </p>
+                      </div>
+                      {getStatusBadge(order.status)}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4 text-sm text-gray-600">
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          <span className="truncate max-w-[200px]">
+                            {order.delivery_address || "Address not specified"}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 mr-1" />
+                          <span>
+                            {new Date(order.created_at).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleGetDirections(order);
+                        }}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <Navigation className="h-4 w-4 mr-1" />
+                        Directions
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Order Details Dialog */}
+        <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Order Details</DialogTitle>
+              <DialogDescription>
+                Complete information for Order #{selectedOrder?.id}
+              </DialogDescription>
+            </DialogHeader>
+            {selectedOrder && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-600">
+                    Customer
+                  </label>
+                  <p className="font-medium">
+                    {selectedOrder.customer?.name || "Unknown"}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-600">
+                    Delivery Address
+                  </label>
+                  <p className="font-medium">
+                    {selectedOrder.delivery_address || "Not specified"}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-600">
+                    Order Total
+                  </label>
+                  <p className="font-medium">${selectedOrder.total_amount}</p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-600">
+                    Status
+                  </label>
+                  <div className="mt-1">
+                    {getStatusBadge(selectedOrder.status)}
+                  </div>
+                </div>
+
+                {selectedOrder.delivery_instructions && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">
+                      Delivery Instructions
+                    </label>
+                    <p className="font-medium">
+                      {selectedOrder.delivery_instructions}
                     </p>
-                    <div className="mt-4 space-y-2">
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                        <span className="text-sm text-gray-600">Your Location</span>
-                      </div>
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                        <span className="text-sm text-gray-600">Delivery Points</span>
-                      </div>
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                        <span className="text-sm text-gray-600">Completed</span>
-                      </div>
-                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                )}
 
-          {/* Delivery List */}
-          <div className="space-y-6">
-            {/* Current Location */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Location</CardTitle>
-                <CardDescription>Current position and status</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm">Downtown Area</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Clock className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm">Last updated: 2 min ago</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Truck className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Available for delivery</span>
-                  </div>
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={() => handleGetDirections(selectedOrder)}
+                    className="flex-1"
+                  >
+                    <Navigation className="h-4 w-4 mr-2" />
+                    Navigate
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Active Deliveries */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Active Deliveries</CardTitle>
-                <CardDescription>Orders currently being delivered</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {mockDeliveries.filter(d => d.status === 'out_for_delivery').length === 0 ? (
-                    <div className="text-center py-4">
-                      <Truck className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500">No active deliveries</p>
-                    </div>
-                  ) : (
-                    mockDeliveries
-                      .filter(d => d.status === 'out_for_delivery')
-                      .map((delivery) => (
-                      <div key={delivery.id} className="p-3 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-sm">#{delivery.orderId}</span>
-                          <Badge variant="secondary">Active</Badge>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-2">{delivery.customerName}</p>
-                        <p className="text-xs text-gray-500 mb-2">{delivery.address}</p>
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span>{delivery.distance}</span>
-                          <span>{delivery.estimatedTime}</span>
-                        </div>
-                        <div className="mt-3 space-y-2">
-                          <Button size="sm" className="w-full">
-                            <Navigation className="h-3 w-3 mr-1" />
-                            Navigate
-                          </Button>
-                          <Button size="sm" variant="outline" className="w-full">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Mark Delivered
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Pending Deliveries */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Pending Deliveries</CardTitle>
-                <CardDescription>Orders waiting to be picked up</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {mockDeliveries.filter(d => d.status === 'pending').length === 0 ? (
-                    <div className="text-center py-4">
-                      <Clock className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500">No pending deliveries</p>
-                    </div>
-                  ) : (
-                    mockDeliveries
-                      .filter(d => d.status === 'pending')
-                      .map((delivery) => (
-                      <div key={delivery.id} className="p-3 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-sm">#{delivery.orderId}</span>
-                          <Badge variant="outline">Pending</Badge>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-2">{delivery.customerName}</p>
-                        <p className="text-xs text-gray-500 mb-2">{delivery.address}</p>
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span>{delivery.distance}</span>
-                          <span>{delivery.estimatedTime}</span>
-                        </div>
-                        <div className="mt-3">
-                          <Button size="sm" variant="outline" className="w-full">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            View on Map
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Route Optimization */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Route Optimization</CardTitle>
-                <CardDescription>Optimize your delivery route</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start">
-                  <Navigation className="h-4 w-4 mr-2" />
-                  Optimize Route
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Clock className="h-4 w-4 mr-2" />
-                  Calculate ETA
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  Show Traffic
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
-    </div>
+    </DeliveryLayout>
   );
 };
 
 export default DeliveryMap;
-
-
-
-
-
-
-
-
-
-
-

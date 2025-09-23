@@ -86,37 +86,27 @@ def user_registration(request):
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         # Get referral token from request data
-        referral_token = request.data.get("referral_token")
+        referral_token = request.data.get('referral_token')
         referral_result = None
 
         # Validate referral token if provided
         if referral_token:
             from .services.referral_service import ReferralService
-
             validation_result = ReferralService.validate_referral_token(referral_token)
-            if not validation_result["valid"]:
-                return Response(
-                    {
-                        "error": "Invalid referral token",
-                        "details": validation_result["message"],
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            if not validation_result['valid']:
+                return Response({
+                    'error': 'Invalid referral token',
+                    'details': validation_result['message']
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         # Save user
         user = serializer.save()
-        if not user:
-            return Response(
-                {"error": "Failed to create user"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
         # Use referral token if valid
         if referral_token:
             from .services.referral_service import ReferralService
-
             referral_result = ReferralService.use_referral_token(referral_token, user)
-            if not referral_result["success"]:
+            if not referral_result['success']:
                 # Log error but don't fail registration
                 print(f"Referral token usage failed: {referral_result['message']}")
 
@@ -140,19 +130,17 @@ def user_registration(request):
             # Log error but don't fail registration
             print(f"Email sending failed: {e}")
 
-        # Get user_id safely
-        user_id = getattr(user, "user_id", "unknown")
         response_data = {
-            "message": "User registered successfully. Please check your email for verification.",
-            "user_id": user_id,
+            'message': 'User registered successfully. Please check your email for verification.',
+            'user_id': user.user_id
         }
 
         # Add referral information to response if applicable
-        if referral_result and referral_result["success"]:
-            response_data["referral"] = {
-                "success": True,
-                "referrer": referral_result["referrer"].name,
-                "rewards": referral_result["rewards"],
+        if referral_result and referral_result['success']:
+            response_data['referral'] = {
+                'success': True,
+                'referrer': referral_result['referrer'].name,
+                'rewards': referral_result['rewards']
             }
 
         return Response(response_data, status=status.HTTP_201_CREATED)
@@ -160,7 +148,7 @@ def user_registration(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(["POST"])
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_referral_token(request):
     """
@@ -171,48 +159,43 @@ def create_referral_token(request):
         data = request.data
 
         # Get parameters
-        expires_days = data.get("expires_days", 30)
-        max_uses = data.get("max_uses", 1)
-        referrer_reward = data.get("referrer_reward", 0)
-        referee_reward = data.get("referee_reward", 0)
-        campaign_name = data.get("campaign_name")
+        expires_days = data.get('expires_days', 30)
+        max_uses = data.get('max_uses', 1)
+        referrer_reward = data.get('referrer_reward', 0)
+        referee_reward = data.get('referee_reward', 0)
+        campaign_name = data.get('campaign_name')
 
         # Create referral token
         from .services.referral_service import ReferralService
-
         result = ReferralService.create_referral_token(
             user=user,
             expires_days=expires_days,
             max_uses=max_uses,
             referrer_reward=referrer_reward,
             referee_reward=referee_reward,
-            campaign_name=campaign_name,
+            campaign_name=campaign_name
         )
 
-        if result["success"]:
-            return Response(
-                {
-                    "message": result["message"],
-                    "token": result["token"],
-                    "expires_at": result["expires_at"],
-                    "max_uses": result["max_uses"],
-                    "referral_url": f"{settings.FRONTEND_URL}/auth/register?ref={result['token']}",
-                },
-                status=status.HTTP_201_CREATED,
-            )
+        if result['success']:
+            return Response({
+                'message': result['message'],
+                'token': result['token'],
+                'expires_at': result['expires_at'],
+                'max_uses': result['max_uses'],
+                'referral_url': f"{settings.FRONTEND_URL}/auth/register?ref={result['token']}"
+            }, status=status.HTTP_201_CREATED)
         else:
-            return Response(
-                {"error": result["message"]}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'error': result['message']
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     except Exception as e:
-        return Response(
-            {"error": "Failed to create referral token"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        return Response({
+            'error': 'Failed to create referral token'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["GET"])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_referral_stats(request):
     """
@@ -222,30 +205,25 @@ def get_referral_stats(request):
         user = request.user
 
         from .services.referral_service import ReferralService
-
         stats = ReferralService.get_user_referral_stats(user)
 
         # Get referral code and URL
         referral_code = user.get_referral_code()
         referral_url = user.get_referral_url()
 
-        return Response(
-            {
-                "referral_code": referral_code,
-                "referral_url": referral_url,
-                "stats": stats,
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response({
+            'referral_code': referral_code,
+            'referral_url': referral_url,
+            'stats': stats
+        }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        return Response(
-            {"error": "Failed to get referral statistics"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        return Response({
+            'error': 'Failed to get referral statistics'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["GET"])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_referral_tokens(request):
     """
@@ -255,84 +233,76 @@ def get_referral_tokens(request):
         user = request.user
 
         from .services.referral_service import ReferralService
-
         tokens = ReferralService.get_user_referral_tokens(user)
 
         token_data = []
         for token in tokens:
-            token_data.append(
-                {
-                    "id": getattr(token, "id", None),
-                    "jti": token.jti,
-                    "created_at": token.issued_at,
-                    "expires_at": token.expires_at,
-                    "max_uses": token.max_uses,
-                    "usage_count": token.usage_count,
-                    "status": "active" if token.is_valid() else "expired",
-                    "referrer_reward": float(token.referrer_reward),
-                    "referee_reward": float(token.referee_reward),
-                    "campaign_name": token.campaign_name,
-                    "used_by": token.used_by.name if token.used_by else None,
-                }
-            )
+            token_data.append({
+                'id': token.id,
+                'jti': token.jti,
+                'created_at': token.issued_at,
+                'expires_at': token.expires_at,
+                'max_uses': token.max_uses,
+                'usage_count': token.usage_count,
+                'status': 'active' if token.is_valid() else 'expired',
+                'referrer_reward': float(token.referrer_reward),
+                'referee_reward': float(token.referee_reward),
+                'campaign_name': token.campaign_name,
+                'used_by': token.used_by.name if token.used_by else None
+            })
 
-        return Response(
-            {"tokens": token_data, "count": len(token_data)}, status=status.HTTP_200_OK
-        )
+        return Response({
+            'tokens': token_data,
+            'count': len(token_data)
+        }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        return Response(
-            {"error": "Failed to get referral tokens"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        return Response({
+            'error': 'Failed to get referral tokens'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["POST"])
+@api_view(['POST'])
 @permission_classes([AllowAny])
 def validate_referral_token(request):
     """
     Validate a referral token (public endpoint)
     """
     try:
-        token = request.data.get("token")
+        token = request.data.get('token')
 
         if not token:
-            return Response(
-                {"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'error': 'Token is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         from .services.referral_service import ReferralService
-
         result = ReferralService.validate_referral_token(token)
 
-        if result["valid"]:
-            return Response(
-                {
-                    "valid": True,
-                    "referrer": {
-                        "name": result["referrer"].name,
-                        "email": result["referrer"].email,
-                    },
-                    "rewards": result["rewards"],
+        if result['valid']:
+            return Response({
+                'valid': True,
+                'referrer': {
+                    'name': result['referrer'].name,
+                    'email': result['referrer'].email
                 },
-                status=status.HTTP_200_OK,
-            )
+                'rewards': result['rewards']
+            }, status=status.HTTP_200_OK)
         else:
-            return Response(
-                {"valid": False, "message": result["message"]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({
+                'valid': False,
+                'message': result['message']
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     except Exception as e:
-        return Response(
-            {"error": "Failed to validate referral token"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        return Response({
+            'error': 'Failed to validate referral token'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["POST"])
+@api_view(['POST'])
 @permission_classes([AllowAny])
-@ratelimit(key="ip", rate="5/m", method="POST", block=True)
+@ratelimit(key='ip', rate='5/m', method='POST', block=True)
 def user_login(request):
     """
     User login with JWT tokens
@@ -438,17 +408,14 @@ def token_refresh(request):
 
         # Use JWT service to refresh token
         from .services.jwt_service import JWTTokenService
+        # Rotate the refresh token
+        token_data = JWTTokenService.rotate_refresh_token(refresh_token, request.user, request)
 
-        token_data = JWTTokenService.refresh_access_token(refresh_token, request)
-
-        print("Token refresh successful")
-        return Response(
-            {
-                "access": token_data["access_token"],
-                "refresh": refresh_token,  # Keep the same refresh token
-            },
-            status=status.HTTP_200_OK,
-        )
+        print("Token refresh successful with rotation")
+        return Response({
+            'access': token_data['access_token'],
+            'refresh': token_data['refresh_token']
+        }, status=status.HTTP_200_OK)
     except Exception as e:
         print(f"Token refresh error: {str(e)}")
         print(f"Error type: {type(e).__name__}")
@@ -1785,7 +1752,7 @@ def approve_user(request, user_id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(["GET"])
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def check_approval_status(request):
     """
@@ -1798,82 +1765,67 @@ def check_approval_status(request):
         user = request.user
     else:
         # If not authenticated, try to get user by email or user_id from query params
-        email = request.query_params.get("email")
-        user_id = request.query_params.get("user_id")
+        email = request.query_params.get('email')
+        user_id = request.query_params.get('user_id')
 
         if email:
             try:
                 user = User.objects.get(email=email)
             except User.DoesNotExist:
-                return Response(
-                    {
-                        "error": "User not found",
-                        "approval_status": "unknown",
-                        "can_login": False,
-                        "message": "User with this email does not exist.",
-                    },
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+                return Response({
+                    'error': 'User not found',
+                    'approval_status': 'unknown',
+                    'can_login': False,
+                    'message': 'User with this email does not exist.'
+                }, status=status.HTTP_404_NOT_FOUND)
         elif user_id:
             try:
                 user = User.objects.get(user_id=user_id)
             except User.DoesNotExist:
-                return Response(
-                    {
-                        "error": "User not found",
-                        "approval_status": "unknown",
-                        "can_login": False,
-                        "message": "User with this ID does not exist.",
-                    },
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+                return Response({
+                    'error': 'User not found',
+                    'approval_status': 'unknown',
+                    'can_login': False,
+                    'message': 'User with this ID does not exist.'
+                }, status=status.HTTP_404_NOT_FOUND)
         else:
-            return Response(
-                {
-                    "error": "Authentication required",
-                    "approval_status": "unknown",
-                    "can_login": False,
-                    "message": "Please log in or provide email/user_id to check approval status.",
-                },
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
+            return Response({
+                'error': 'Authentication required',
+                'approval_status': 'unknown',
+                'can_login': False,
+                'message': 'Please log in or provide email/user_id to check approval status.'
+            }, status=status.HTTP_401_UNAUTHORIZED)
 
     # Check approval status based on user role
-    if user.role in ["cook", "Cook", "delivery_agent", "DeliveryAgent"]:
-        return Response(
-            {
-                "user_id": user.user_id,
-                "email": user.email,
-                "name": user.name,
-                "role": user.role,
-                "approval_status": user.approval_status,
-                "approval_status_display": getattr(
-                    user, "get_approval_status_display", lambda: "Unknown"
-                )(),
-                "approval_notes": user.approval_notes,
-                "approved_at": user.approved_at,
-                "can_login": user.can_login(),
-                "message": user.get_approval_message(),
-            },
-            status=status.HTTP_200_OK,
-        )
+    if user.role in ['cook', 'Cook', 'delivery_agent', 'DeliveryAgent']:
+        return Response({
+            'user_id': user.user_id,
+            'email': user.email,
+            'name': user.name,
+            'role': user.role,
+            'approval_status': user.approval_status,
+            'approval_status_display': user.get_approval_status_display(),
+            'approval_notes': user.approval_notes,
+            'approved_at': user.approved_at,
+            'can_login': user.can_login(),
+            'message': user.get_approval_message()
+        }, status=status.HTTP_200_OK)
     else:
-        return Response(
-            {
-                "user_id": user.user_id,
-                "email": user.email,
-                "name": user.name,
-                "role": user.role,
-                "approval_status": "approved",
-                "approval_status_display": "Approved",
-                "can_login": True,
-                "message": "Your account is ready to use.",
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response({
+            'user_id': user.user_id,
+            'email': user.email,
+            'name': user.name,
+            'role': user.role,
+            'approval_status': 'approved',
+            'approval_status_display': 'Approved',
+            'can_login': True,
+            'message': 'Your account is ready to use.'
+        }, status=status.HTTP_200_OK)
 
 
-@api_view(["POST"])
+
+
+@api_view(['POST'])
 @permission_classes([AllowAny])
 def clear_all_tokens(request):
     """
@@ -2340,7 +2292,25 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
 
     except Exception as e:
         print(f"Cloudinary access error: {str(e)}")
-        return Response(
-            {"error": f"Failed to access Cloudinary file: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        return Response({'error': f'Failed to access Cloudinary file: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def get_jwt_token_location(request):
+    """
+    Determine where the JWT token is stored: in headers or cookies
+    """
+    # Check for Authorization header
+    auth_header = request.headers.get('Authorization')
+    if auth_header:
+        # Authorization: Bearer <token>
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            return 'headers', token
+
+    # Check for cookies
+    cookies = request.COOKIES
+    for key, value in cookies.items():
+        if key == 'refresh' or key == 'access':
+            return 'cookies', value
+
+    return None, None

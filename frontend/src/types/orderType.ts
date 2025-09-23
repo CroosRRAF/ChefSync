@@ -15,7 +15,8 @@ export interface Order {
     | 'delivered'
     | 'cancelled'
     | 'refunded';
-  delivery_fee?: number; // Add this line
+  delivery_fee?: number;
+  delivery_instructions?: string;
   total_amount: number;
   created_at: string;
   updated_at: string;

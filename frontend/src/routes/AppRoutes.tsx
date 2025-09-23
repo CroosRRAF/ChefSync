@@ -63,8 +63,8 @@ import Settings from '@/pages/admin/Settings';
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
-  return clientId && 
-         clientId !== 'your-google-client-id' && 
+  return clientId &&
+         clientId !== 'your-google-client-id' &&
          clientId !== 'YOUR_NEW_GOOGLE_CLIENT_ID_HERE' &&
          clientId !== '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com' &&
          clientId.includes('.apps.googleusercontent.com');
@@ -77,10 +77,10 @@ interface ProtectedRouteProps {
   requireAuth?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  allowedRoles = [], 
-  requireAuth = true 
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  allowedRoles = [],
+  requireAuth = true
 }) => {
   const { isAuthenticated, user, isLoading } = useAuth();
   const { approvalStatus, isLoading: isCheckingApproval, canAccessDashboard } = useApprovalStatus();
@@ -112,7 +112,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         console.error('Error parsing pending user data:', error);
       }
     }
-    
+
     // Check approval status from API
     if (approvalStatus && !canAccessDashboard) {
       return <Navigate to="/approval-status" replace />;
@@ -122,7 +122,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (allowedRoles.length > 0 && user && !allowedRoles.map(role => role.toLowerCase()).includes(user.role.toLowerCase())) {
     // Debug: Log role mismatch
     console.log('Role mismatch - User role:', user.role, 'Allowed roles:', allowedRoles);
-    
+
     // Redirect based on user role
     switch (user.role.toLowerCase()) {
       case 'customer':
@@ -149,7 +149,7 @@ const InnerRoutes: React.FC = () => {
   // Get default route based on user role
   const getDefaultRoute = () => {
     if (!isAuthenticated || !user) return '/';
-    
+
     switch (user.role.toLowerCase()) {
       case 'customer':
         return '/'; // Customers go to home page after login
@@ -170,8 +170,8 @@ const InnerRoutes: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={
-          isAuthenticated && user && user.role.toLowerCase() !== 'customer' ? 
-            <Navigate to={getDefaultRoute()} replace /> : 
+          isAuthenticated && user && user.role.toLowerCase() !== 'customer' ?
+            <Navigate to={getDefaultRoute()} replace /> :
             <>
               {isAuthenticated && user && user.role.toLowerCase() === 'customer' ? <CustomerHomeNavbar /> : <Navbar />}
               <Home />
@@ -195,11 +195,11 @@ const InnerRoutes: React.FC = () => {
             <Contact />
           </>
         } />
-        
+
         {/* Authentication Routes */}
         <Route path="/auth/login" element={
           <ProtectedRoute requireAuth={false}>
-            {isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : 
+            {isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> :
               <>
                 <Navbar />
                 <Login />
@@ -209,7 +209,7 @@ const InnerRoutes: React.FC = () => {
         } />
         <Route path="/auth/register" element={
           <ProtectedRoute requireAuth={false}>
-            {isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : 
+            {isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> :
               <>
                 <Navbar />
                 <Register />
@@ -242,7 +242,7 @@ const InnerRoutes: React.FC = () => {
             <ApprovalStatusPage />
           </ProtectedRoute>
         } />
-        
+
         {/* Profile Route - removed old generic profile route, now using role-specific profiles */}
 
         {/* General Dashboard Route - Redirects to role-specific dashboard */}

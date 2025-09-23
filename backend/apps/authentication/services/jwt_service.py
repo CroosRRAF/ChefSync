@@ -241,7 +241,7 @@ class JWTTokenService:
         return {"access_token": str(access)}
 
     @classmethod
-    def revoke_token(cls, token: str, token_type: str = "refresh") -> bool:
+    def revoke_token(cls, token: str, token_type: str = 'refresh') -> bool:
         """
         Revoke a token
         Only refresh tokens can be revoked (access tokens are stateless)
@@ -253,13 +253,14 @@ class JWTTokenService:
         Returns:
             True if token was revoked, False otherwise
         """
-        if token_type != "refresh":
+        if token_type != 'refresh':
             return False  # Access tokens are stateless, cannot be revoked individually
 
         try:
             token_hash = cls.generate_token_hash(token)
             token_record = JWTToken.objects.get(
-                token_hash=token_hash, token_type="refresh"
+                token_hash=token_hash,
+                token_type='refresh'
             )
             token_record.revoke()
             return True
