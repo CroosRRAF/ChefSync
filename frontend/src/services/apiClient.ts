@@ -7,10 +7,6 @@ const apiClient = axios.create({
 });
 // ✅ Attach token automatically
 apiClient.interceptors.request.use((config) => {
-  const chefsync_token = localStorage.getItem('chefsync_token');
-  if (chefsync_token) {
-    config.headers.Authorization = `Bearer ${chefsync_token}`;
-  }
   const access_token = localStorage.getItem('access_token');
   if (access_token) {
     config.headers.Authorization = `Bearer ${access_token}`;

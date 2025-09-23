@@ -58,7 +58,7 @@ import AdminAnalytics from '@/pages/admin/Analytics';
 import AdminSettings from '@/pages/admin/Settings';
 import AdminProfile from '@/pages/admin/Profile';
 import AdminReports from '@/pages/admin/Reports';
-import UnifiedApprovals from '@/pages/admin/UnifiedApprovals';
+import Approvals from '@/pages/admin/Approvals';
 import FoodManagement from '@/pages/admin/FoodManagement';
 import AdminNotifications from '@/pages/admin/Notifications';
 import Communications from '@/pages/admin/Communications';
@@ -450,7 +450,7 @@ const InnerRoutes: React.FC = () => {
         <Route path="/admin/approvals" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <UnifiedApprovals />
+              <Approvals />
             </AdminLayout>
           </ProtectedRoute>
         } />

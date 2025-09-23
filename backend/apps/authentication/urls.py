@@ -67,4 +67,10 @@ urlpatterns = [
     path('approval-status/', views.check_approval_status, name='check_approval_status'),
     path('check-user-status/', views.check_user_status, name='check_user_status'),
     path('check-email-availability/', views.check_email_availability, name='check_email_availability'),
+    
+    # Referral System
+    path('referral/create-token/', views.create_referral_token, name='create_referral_token'),
+    path('referral/stats/', views.get_referral_stats, name='get_referral_stats'),
+    path('referral/tokens/', views.get_referral_tokens, name='get_referral_tokens'),
+    path('referral/validate/', views.validate_referral_token, name='validate_referral_token'),
 ]

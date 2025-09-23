@@ -69,6 +69,9 @@ const DeliveryDashboard: React.FC = () => {
   const activeDeliveries = dashboard.active_deliveries;
   const completedToday = dashboard.completed_today;
   const totalEarnings = dashboard.todays_earnings;
+  const pendingPickups = availableOrders.filter((o) =>
+    ["ready", "pending"].includes(o.status)
+  ).length;
 
   useEffect(() => {
     fetchDashboardData();
@@ -109,9 +112,6 @@ const DeliveryDashboard: React.FC = () => {
   }
 };
 
-  const pendingPickups = orders.filter((o) =>
-    ["ready", "pending"].includes(o.status)
-  ).length;
   const fetchRecentDeliveries = async () => {
     try {
       const deliveryHistory = await getDeliveryHistory();
