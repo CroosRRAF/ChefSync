@@ -3,12 +3,13 @@ export interface User {
   email: string;
   name: string;
   phone?: string;
-  role: 'customer' | 'cook' | 'delivery_agent' | 'admin';
+  role: "customer" | "cook" | "delivery_agent" | "admin";
   avatar?: string;
   isEmailVerified: boolean;
   createdAt: string;
   updatedAt: string;
   address?: string;
+  last_login?: string;
 }
 
 export interface AuthState {
@@ -29,7 +30,7 @@ export interface RegisterData {
   phone_no: string;
   password: string;
   confirm_password: string;
-  role: User['role'];
+  role: User["role"];
   address?: string;
 }
 
@@ -59,13 +60,14 @@ export interface BackendUser {
   email: string;
   phone_no?: string;
   address?: string;
-  role: 'customer' | 'cook' | 'delivery_agent' | 'admin';
+  role: "customer" | "cook" | "delivery_agent" | "admin";
   role_display: string;
   profile_image?: string;
   email_verified: boolean;
   created_at: string;
   updated_at: string;
   profile_data?: any;
+  last_login?: string;
 }
 
 // API response interfaces

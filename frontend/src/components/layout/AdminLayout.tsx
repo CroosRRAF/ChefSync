@@ -81,52 +81,52 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
       label: "Dashboard",
       href: "/admin/dashboard",
       icon: LayoutDashboard,
-      description: "Overview and key metrics",
+      description: "Overview, AI summary, and activity feed",
     },
     {
-      label: "User Management",
+      label: "Users",
       href: "/admin/users",
       icon: Users,
-      description: "Manage users and permissions",
+      description: "Manage chefs and customers",
     },
     {
-      label: "Order Management",
+      label: "Orders",
       href: "/admin/orders",
       icon: ShoppingCart,
       badge: 5,
-      description: "Track and manage orders",
+      description: "Live queue, assignments, and timeline",
     },
     {
-      label: "Food Management",
+      label: "Menu & Inventory",
       href: "/admin/foods",
       icon: ChefHat,
-      description: "Manage food items and menu",
+      description: "Global menu, AI suggestions, stock alerts",
     },
     {
-      label: "System Analytics",
+      label: "Analytics & Reports",
       href: "/admin/analytics",
       icon: BarChart3,
-      description: "View detailed analytics",
+      description: "Visual reports, AI insights, exports",
     },
     {
-      label: "Complaints & Feedback",
+      label: "Complaints & Support",
       href: "/admin/complaints",
       icon: MessageSquare,
       badge: 2,
-      description: "Handle customer feedback",
+      description: "Ticketing system with AI categorization",
     },
     {
       label: "Notifications",
       href: "/admin/notifications",
       icon: Bell,
       badge: 3,
-      description: "Send and manage notifications",
+      description: "Broadcasts and prioritization",
     },
     {
-      label: "Settings",
+      label: "System & Settings",
       href: "/admin/settings",
       icon: Settings,
-      description: "System configuration",
+      description: "Health dashboard and configuration",
     },
   ];
 
@@ -310,6 +310,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
                           </span>
                           <span className="truncate text-xs text-muted-foreground">
                             {user?.email || "admin@chefsync.com"}
+                          </span>
+                          <span className="truncate text-xs text-muted-foreground">
+                            Last login:{" "}
+                            {user?.last_login
+                              ? new Date(user.last_login).toLocaleString()
+                              : "Never"}
                           </span>
                         </div>
                       </div>

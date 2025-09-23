@@ -161,6 +161,7 @@ export function AuthProvider({
           isEmailVerified: response.email_verified,
           createdAt: response.created_at,
           updatedAt: response.updated_at,
+          last_login: response.last_login,
         };
         dispatch({ type: "SET_USER", payload: { user, token } });
       }
@@ -185,6 +186,7 @@ export function AuthProvider({
         isEmailVerified: response.user.email_verified,
         createdAt: response.user.created_at,
         updatedAt: response.user.updated_at,
+        last_login: response.user.last_login,
       };
 
       // Add a small delay before state update to ensure clean state
@@ -269,8 +271,9 @@ export function AuthProvider({
     if (!data?.access || !data?.user) return;
 
     // Persist tokens
-    localStorage.setItem('access_token', data.access);
-    if (data.refresh) localStorage.setItem('chefsync_refresh_token', data.refresh);
+    localStorage.setItem("access_token", data.access);
+    if (data.refresh)
+      localStorage.setItem("chefsync_refresh_token", data.refresh);
 
     const frontendUser: User = {
       id: data.user.user_id,
@@ -282,6 +285,7 @@ export function AuthProvider({
       isEmailVerified: data.user.email_verified,
       createdAt: data.user.created_at,
       updatedAt: data.user.updated_at,
+      last_login: data.user.last_login,
     };
 
     dispatch({
