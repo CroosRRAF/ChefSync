@@ -178,6 +178,7 @@ class User(AbstractUser):
         help_text="Total referral rewards used",
     )
 
+=========
 
     # Referral system fields
     referral_code = models.CharField(max_length=20, unique=True, blank=True, null=True, help_text="User's unique referral code")
@@ -187,6 +188,7 @@ class User(AbstractUser):
     referral_rewards_earned = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Total referral rewards earned")
     referral_rewards_used = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Total referral rewards used")
 
+>>>>>>>>> Temporary merge branch 2
     # Override username field to use email
     username = models.CharField(max_length=150, unique=True, blank=True, null=True)
 
@@ -302,9 +304,11 @@ class User(AbstractUser):
         if self.role in ["cook", "Cook", "delivery_agent", "DeliveryAgent"]:
             return self.approval_status == "approved"
 
+=========
         if self.role in ['cook', 'Cook', 'delivery_agent', 'DeliveryAgent']:
             return self.approval_status == 'approved'
 
+>>>>>>>>> Temporary merge branch 2
         # Admins can always login (handle both cases)
         if self.role in ["Admin", "admin"]:
             return True
@@ -741,8 +745,10 @@ class JWTToken(models.Model):
     issued_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
 
+=========
     expires_at = models.DateTimeField(null=True, blank=True, help_text="Expiration time of the token")
 
+>>>>>>>>> Temporary merge branch 2
     # Security tracking
     is_revoked = models.BooleanField(default=False, help_text="Indicates if the token has been revoked")
     is_blacklisted = models.BooleanField(default=False)
@@ -812,14 +818,15 @@ class JWTToken(models.Model):
         now = timezone.now()
         is_valid = (
             not self.is_revoked and not self.is_blacklisted and now < self.expires_at
-        is_valid = (
+=========
             not self.is_revoked and
             not self.is_blacklisted and
             now < self.expires_at
+>>>>>>>>> Temporary merge branch 2
         )
 
         # For referral tokens, also check usage count
-        if self.token_type == "referral":
+        if self.token_type == 'referral':
             is_valid = is_valid and self.usage_count < self.max_uses
 
         return is_valid

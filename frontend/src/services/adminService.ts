@@ -240,7 +240,7 @@ class AdminService {
       const response = await apiClient.get(`${this.baseUrl}/dashboard/stats/`);
       return response.data;
     } catch (error: any) {
-      console.error('Error fetching dashboard stats:', error);
+      console.error("Error fetching dashboard stats:", error);
       if (error.response?.status === 401) {
         throw new Error('Authentication required. Please log in again.');
       } else if (error.response?.status === 403) {
@@ -560,174 +560,31 @@ class AdminService {
     } = {}
   ): Promise<OrderListResponse> {
     try {
-      const response = await apiClient.get(
-        `${this.baseUrl}/orders/list_orders/`,
-        {
-          params: {
-            page: params.page || 1,
-            limit: params.limit || 25,
-            search: params.search || "",
-            status: params.status || "",
-            payment_status: params.payment_status || "",
-            sort_by: params.sort_by || "created_at",
-            sort_order: params.sort_order || "desc",
-          },
+      const response = await apiClient.get(`${this.baseUrl}/orders/list_orders/`, {
+        params: {
+          page: params.page || 1,
+          limit: params.limit || 25,
+          search: params.search || '',
+          status: params.status || '',
+          payment_status: params.payment_status || '',
+          sort_by: params.sort_by || 'created_at',
+          sort_order: params.sort_order || 'desc'
         }
-      );
+      });
       return response.data;
     } catch (error) {
-      console.error("Error fetching orders:", error);
-      throw new Error("Failed to fetch orders");
+      console.error('Error fetching orders:', error);
+      throw new Error('Failed to fetch orders');
     }
   }
 
-  async getOrderDetails(orderId: number): Promise<{
-    id: number;
-    order_number: string;
-    customer_name: string;
-    customer_email: string;
-    status: string;
-    total_amount: number;
-    created_at: string;
-    updated_at: string;
-    payment_status: string;
-    items_count: number;
-    items: Array<{
-      id: number;
-      food_name: string;
-      quantity: number;
-      price: number;
-      total: number;
-    }>;
-  }> {
+  async getOrderDetails(orderId: number): Promise<any> {
     try {
-      const response = await apiClient.get(
-        `${this.baseUrl}/orders/${orderId}/details/`
-      );
+      const response = await apiClient.get(`${this.baseUrl}/orders/${orderId}/details/`);
       return response.data;
     } catch (error) {
-      console.error("Error fetching order details:", error);
-      throw new Error("Failed to fetch order details");
-    }
-  }
-
-  async updateOrderStatus(
-    orderId: number,
-    status: string
-  ): Promise<{
-    message: string;
-    order: {
-      id: number;
-      order_number: string;
-      status: string;
-      updated_at: string;
-    };
-  }> {
-    try {
-      const response = await apiClient.patch(
-        `${this.baseUrl}/orders/${orderId}/update_status/`,
-        {
-          status,
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error updating order status:", error);
-      throw new Error("Failed to update order status");
-    }
-  }
-
-  async assignChef(
-    orderId: number,
-    chefId: number
-  ): Promise<{
-    message: string;
-    order: {
-      id: number;
-      order_number: string;
-      chef: {
-        id: number;
-        name: string;
-        email: string;
-      };
-    };
-  }> {
-    try {
-      const response = await apiClient.patch(
-        `${this.baseUrl}/orders/${orderId}/assign_chef/`,
-        {
-          chef_id: chefId,
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error assigning chef:", error);
-      throw new Error("Failed to assign chef");
-    }
-  }
-
-  async assignDeliveryPartner(
-    orderId: number,
-    partnerId: number
-  ): Promise<{
-    message: string;
-    order: {
-      id: number;
-      order_number: string;
-      delivery_partner: {
-        id: number;
-        name: string;
-        email: string;
-      };
-    };
-  }> {
-    try {
-      const response = await apiClient.patch(
-        `${this.baseUrl}/orders/${orderId}/assign_delivery_partner/`,
-        {
-          partner_id: partnerId,
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error assigning delivery partner:", error);
-      throw new Error("Failed to assign delivery partner");
-    }
-  }
-
-  async getAvailableChefs(): Promise<
-    Array<{
-      id: number;
-      name: string;
-      email: string;
-    }>
-  > {
-    try {
-      const response = await apiClient.get(
-        `${this.baseUrl}/orders/available_chefs/`
-      );
-      return response.data.chefs || [];
-    } catch (error) {
-      console.error("Error fetching available chefs:", error);
-      throw new Error("Failed to fetch available chefs");
-    }
-  }
-
-  async getAvailableDeliveryPartners(): Promise<
-    Array<{
-      id: number;
-      name: string;
-      email: string;
-    }>
-  > {
-    try {
-      const response = await apiClient.get(
-        `${this.baseUrl}/orders/available_delivery_partners/`
-      );
-      return response.data.partners || [];
-    } catch (error) {
-      console.error("Error fetching available delivery partners:", error);
-      throw new Error("Failed to fetch available delivery partners");
+      console.error('Error fetching order details:', error);
+      throw new Error('Failed to fetch order details');
     }
   }
 
@@ -784,34 +641,11 @@ class AdminService {
 
   async markAllNotificationsRead(): Promise<{ message: string }> {
     try {
-      const response = await apiClient.patch(
-        `${this.baseUrl}/notifications/mark_all_read/`
-      );
+      const response = await apiClient.patch(`${this.baseUrl}/notifications/mark_all_read/`);
       return response.data;
     } catch (error) {
-      console.error("Error marking all notifications as read:", error);
-      throw new Error("Failed to mark all notifications as read");
-    }
-  }
-
-  async createNotification(data: {
-    title: string;
-    message: string;
-    notification_type: string;
-    priority?: string;
-    target_audience?: string;
-    send_email?: boolean;
-    send_sms?: boolean;
-  }): Promise<AdminNotification> {
-    try {
-      const response = await apiClient.post(
-        `${this.baseUrl}/notifications/`,
-        data
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error creating notification:", error);
-      throw new Error("Failed to create notification");
+      console.error('Error marking all notifications as read:', error);
+      throw new Error('Failed to mark all notifications as read');
     }
   }
 

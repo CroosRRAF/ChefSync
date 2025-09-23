@@ -82,6 +82,7 @@ from google.oauth2 import id_token
 def user_registration(request):
     """
     User registration with email verification and referral token support
+    User registration with email verification and referral token support
     """
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
@@ -1756,6 +1757,7 @@ def approve_user(request, user_id):
 @permission_classes([AllowAny])
 def check_approval_status(request):
     """
+    Check the approval status of the current user or by email/user_id
     Check the approval status of the current user or by email/user_id
     """
     user = None
