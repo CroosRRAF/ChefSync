@@ -34,11 +34,6 @@ class Order(models.Model):
         ('wallet', 'Digital Wallet'),
     ]
     
-    ORDER_TYPE_CHOICES = [
-        ('regular', 'Regular Order'),
-        ('bulk', 'Bulk Order'),
-    ]
-    
     # Order Identification
     order_number = models.CharField(max_length=50, unique=True, db_index=True)
     
@@ -49,19 +44,11 @@ class Order(models.Model):
         settings.AUTH_USER_MODEL, 
         on_delete=models.SET_NULL, 
         null=True, 
-        blank=True, 
+        blank=True,
         related_name='delivery_orders'
     )
     
-    # Order Type and Multi-Chef Assignment
-    order_type = models.CharField(max_length=10, choices=ORDER_TYPE_CHOICES, default='regular', db_index=True)
-    assigned_chefs = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        through='OrderChefAssignment',
-        related_name='assigned_orders',
-        blank=True,
-        help_text='Multiple chefs can be assigned to bulk orders'
-    )    # Order Status
+    # Order Status
     status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default='cart', db_index=True)
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, null=True, blank=True)
@@ -98,11 +85,6 @@ class Order(models.Model):
     def save(self, *args, **kwargs):
         if not self.order_number:
             self.order_number = self.generate_order_number()
-        
-        # Auto-determine order type based on quantity if not already set
-        if self.pk:  # Only for existing orders with items
-            self.auto_assign_order_type()
-            
         super().save(*args, **kwargs)
     
     def generate_order_number(self):
@@ -120,38 +102,6 @@ class Order(models.Model):
     @property
     def can_be_cancelled(self):
         return self.status in ['cart', 'pending', 'confirmed']
-    
-    @property
-    def is_bulk_order(self):
-        """Check if order qualifies as bulk (>5 total items)"""
-        return self.total_items > 5
-    
-    @property
-    def needs_chef_assignment(self):
-        """Check if bulk order needs chef assignment"""
-        return self.order_type == 'bulk' and self.status == 'confirmed'
-    
-    def auto_assign_order_type(self):
-        """Automatically determine and set order type based on quantity"""
-        if self.total_items > 5:
-            self.order_type = 'bulk'
-        else:
-            self.order_type = 'regular'
-        
-    def assign_chefs_for_bulk_order(self, chef_list):
-        """Assign multiple chefs to a bulk order"""
-        if self.order_type != 'bulk':
-            return False
-            
-        items_per_chef = max(1, self.total_items // len(chef_list))
-        
-        for chef in chef_list:
-            assignment, created = OrderChefAssignment.objects.get_or_create(
-                order=self,
-                chef=chef,
-                defaults={'assigned_items_count': items_per_chef}
-            )
-        return True
     
     def __str__(self):
         return f"Order {self.order_number} - {self.customer.username}"
@@ -299,33 +249,3 @@ class DeliveryReview(models.Model):
     class Meta:
         db_table = 'DeliveryReview'
         ordering = ['-created_at']
-
-
-class OrderChefAssignment(models.Model):
-    """Through model for multi-chef assignment to bulk orders"""
-    
-    ASSIGNMENT_STATUS_CHOICES = [
-        ('assigned', 'Assigned'),
-        ('accepted', 'Accepted'),
-        ('in_progress', 'In Progress'),
-        ('completed', 'Completed'),
-        ('declined', 'Declined'),
-    ]
-    
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='chef_assignments')
-    chef = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='order_assignments')
-    status = models.CharField(max_length=15, choices=ASSIGNMENT_STATUS_CHOICES, default='assigned')
-    assigned_items_count = models.PositiveIntegerField(default=0, help_text='Number of items assigned to this chef')
-    notes = models.TextField(blank=True, help_text='Assignment specific notes')
-    
-    assigned_at = models.DateTimeField(auto_now_add=True)
-    accepted_at = models.DateTimeField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    
-    def __str__(self):
-        return f"Order {self.order.order_number} - Chef {self.chef.username} ({self.status})"
-    
-    class Meta:
-        db_table = 'order_chef_assignments'
-        unique_together = ['order', 'chef']
-        ordering = ['-assigned_at']

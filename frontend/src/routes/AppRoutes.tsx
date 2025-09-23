@@ -47,7 +47,7 @@ import CookDashboard from '@/pages/cook/Dashboard';
 import CookBulkOrders from '@/pages/cook/BulkOrders';
 import CookHome from '@/pages/cook/Home';
 import CookMenu from '@/pages/cook/MenuNew';
-import CookOrders from '@/pages/cook/Orders';
+import CookOrders from '@/pages/cook/Order';
 import CookNotifications from '@/pages/cook/Notifications';
 import CookProfile from '@/pages/cook/Profile';
 import CookSettings from '@/pages/cook/Settings';
