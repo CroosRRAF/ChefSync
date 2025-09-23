@@ -1,21 +1,29 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/context/AuthContext';
-import { useUserStore } from '@/store/userStore';
-import { 
-  Truck, 
-  Save, 
-  Camera, 
-  Star, 
-  Award, 
-  Clock, 
-  Users, 
+import React, { useState } from "react";
+import "../../styles/delivery-theme.css";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/context/AuthContext";
+import { useUserStore } from "@/store/userStore";
+import DeliveryLayout from "@/components/delivery/DeliveryLayout";
+import {
+  Truck,
+  Save,
+  Camera,
+  Star,
+  Award,
+  Clock,
+  Users,
   MapPin,
   Phone,
   Mail,
@@ -26,55 +34,73 @@ import {
   Route,
   Zap,
   Shield,
-  Car
-} from 'lucide-react';
+  Car,
+} from "lucide-react";
 
 const DeliveryProfile: React.FC = () => {
   const { user } = useAuth();
   const { updateUser } = useUserStore();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    address: user?.address || '',
-    bio: 'Professional delivery driver with 5+ years of experience. Committed to providing fast, safe, and reliable delivery services with excellent customer satisfaction.',
-    vehicleType: 'Car',
-    vehicleModel: 'Honda Civic',
-    licensePlate: 'ABC123',
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
+    address: user?.address || "",
+    bio: "Professional delivery driver with 5+ years of experience. Committed to providing fast, safe, and reliable delivery services with excellent customer satisfaction.",
+    vehicleType: "Car",
+    vehicleModel: "Honda Civic",
+    licensePlate: "ABC123",
     vehicleCapacity: 5,
-    deliveryAreas: ['Downtown', 'West Side', 'University District', 'East End'],
-    experience: '5 years',
+    deliveryAreas: ["Downtown", "West Side", "University District", "East End"],
+    experience: "5 years",
     rating: 4.9,
     totalDeliveries: 2847,
-    certifications: ['Valid Driver License', 'Food Safety Certified', 'Defensive Driving Course'],
+    certifications: [
+      "Valid Driver License",
+      "Food Safety Certified",
+      "Defensive Driving Course",
+    ],
     workingHours: {
-      start: '08:00',
-      end: '18:00',
-      days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      start: "08:00",
+      end: "18:00",
+      days: [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+      ],
     },
     insuranceInfo: {
-      provider: 'State Farm',
-      policyNumber: 'SF-123456789',
-      expiryDate: '2024-12-31'
-    }
+      provider: "State Farm",
+      policyNumber: "SF-123456789",
+      expiryDate: "2024-12-31",
+    },
   });
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
-  const handleNestedInputChange = (parent: string, field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [parent]: {
-        ...prev[parent as keyof typeof prev],
-        [field]: value
-      }
-    }));
+  const handleNestedInputChange = (
+    parent: string,
+    field: string,
+    value: string
+  ) => {
+    setFormData((prev) => {
+      const parentObj = prev[parent as keyof typeof prev] as any;
+      return {
+        ...prev,
+        [parent]: {
+          ...parentObj,
+          [field]: value,
+        },
+      };
+    });
   };
 
   const handleSave = async () => {
@@ -83,66 +109,87 @@ const DeliveryProfile: React.FC = () => {
       await updateUser(formData);
       setIsEditing(false);
     } catch (error) {
-      console.error('Failed to update profile:', error);
+      console.error("Failed to update profile:", error);
     }
   };
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your profile...</p>
+      <DeliveryLayout>
+        <div className="text-center py-12 theme-animate-scale-in">
+          <div
+            className="rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center"
+            style={{
+              background: "rgba(46, 204, 113, 0.1)",
+              border: "2px solid rgba(46, 204, 113, 0.2)",
+            }}
+          >
+            <div
+              className="animate-spin rounded-full h-10 w-10 border-b-2"
+              style={{ borderColor: "var(--primary-emerald)" }}
+            ></div>
+          </div>
+          <h3
+            className="text-xl font-semibold mb-2"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Loading your profile...
+          </h3>
+          <p style={{ color: "var(--text-cool-grey)" }}>
+            Please wait while we fetch your information
+          </p>
         </div>
-      </div>
+      </DeliveryLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Driver Profile</h1>
-              <p className="text-gray-600 mt-2">Manage your professional delivery profile</p>
-            </div>
-            <Button
-              onClick={() => setIsEditing(!isEditing)}
-              variant={isEditing ? "outline" : "default"}
-              className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              {isEditing ? 'Cancel' : 'Edit Profile'}
-            </Button>
-          </div>
+    <DeliveryLayout
+      title="Driver Profile"
+      description="Manage your professional delivery profile and preferences"
+    >
+      <div className="space-y-8">
+        {/* Header Actions */}
+        <div className="flex justify-end">
+          <Button
+            onClick={() => setIsEditing(!isEditing)}
+            variant={isEditing ? "outline" : "default"}
+            className="theme-button-primary"
+            size="lg"
+          >
+            <Edit className="h-5 w-5 mr-2" />
+            {isEditing ? "Cancel Edit" : "Edit Profile"}
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Profile Overview */}
           <div className="lg:col-span-1 space-y-6">
             {/* Profile Card */}
-            <Card className="border-none shadow-md">
-              <CardHeader className="text-center">
+            <Card className="group hover:shadow-card transition-all duration-300 border-none shadow-lg bg-gradient-to-br from-white to-blue-50/30">
+              <CardHeader className="text-center pb-6">
                 <div className="relative inline-block">
-                  <Avatar className="h-32 w-32 mx-auto ring-4 ring-blue-500/20">
+                  <Avatar className="h-36 w-36 mx-auto ring-4 ring-primary/20 group-hover:ring-primary/40 transition-all duration-300 shadow-xl">
                     <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className="bg-blue-500 text-white font-bold text-3xl">
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white font-bold text-4xl">
                       {user.name.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   {isEditing && (
                     <Button
                       size="sm"
-                      className="absolute bottom-0 right-0 rounded-full h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600"
+                      className="absolute bottom-2 right-2 rounded-full h-10 w-10 p-0 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg transform hover:scale-110 transition-all duration-300"
                     >
-                      <Camera className="h-4 w-4" />
+                      <Camera className="h-5 w-5" />
                     </Button>
                   )}
                 </div>
-                <CardTitle className="text-xl mt-4">{user.name}</CardTitle>
-                <CardDescription className="text-blue-600 font-medium">Delivery Expert</CardDescription>
+                <CardTitle className="text-2xl mt-6 text-gray-900">
+                  {user.name}
+                </CardTitle>
+                <CardDescription className="text-primary font-semibold text-lg bg-primary/10 px-4 py-2 rounded-full inline-block mt-2">
+                  🚚 Delivery Expert
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-center space-x-2">
@@ -150,14 +197,18 @@ const DeliveryProfile: React.FC = () => {
                   <span className="font-semibold">{formData.rating}</span>
                   <span className="text-gray-500">(4.9/5.0)</span>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4 text-center">
                   <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">{formData.totalDeliveries}</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {formData.totalDeliveries}
+                    </p>
                     <p className="text-sm text-gray-600">Deliveries</p>
                   </div>
                   <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">{formData.experience}</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {formData.experience}
+                    </p>
                     <p className="text-sm text-gray-600">Experience</p>
                   </div>
                 </div>
@@ -165,7 +216,9 @@ const DeliveryProfile: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2 text-sm">
                     <Phone className="h-4 w-4 text-gray-400" />
-                    <span className="text-gray-600">{formData.phone || 'Not provided'}</span>
+                    <span className="text-gray-600">
+                      {formData.phone || "Not provided"}
+                    </span>
                   </div>
                   <div className="flex items-center space-x-2 text-sm">
                     <Mail className="h-4 w-4 text-gray-400" />
@@ -174,9 +227,10 @@ const DeliveryProfile: React.FC = () => {
                   <div className="flex items-center space-x-2 text-sm">
                     <Calendar className="h-4 w-4 text-gray-400" />
                     <span className="text-gray-600">
-                      Joined {new Date(user.createdAt).toLocaleDateString('en-US', {
-                        month: 'long',
-                        year: 'numeric'
+                      Joined{" "}
+                      {new Date(user.createdAt).toLocaleDateString("en-US", {
+                        month: "long",
+                        year: "numeric",
                       })}
                     </span>
                   </div>
@@ -196,19 +250,27 @@ const DeliveryProfile: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Type</span>
-                    <span className="text-sm font-medium">{formData.vehicleType}</span>
+                    <span className="text-sm font-medium">
+                      {formData.vehicleType}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Model</span>
-                    <span className="text-sm font-medium">{formData.vehicleModel}</span>
+                    <span className="text-sm font-medium">
+                      {formData.vehicleModel}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">License Plate</span>
-                    <span className="text-sm font-medium">{formData.licensePlate}</span>
+                    <span className="text-sm font-medium">
+                      {formData.licensePlate}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Capacity</span>
-                    <span className="text-sm font-medium">{formData.vehicleCapacity} orders</span>
+                    <span className="text-sm font-medium">
+                      {formData.vehicleCapacity} orders
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -231,14 +293,19 @@ const DeliveryProfile: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                
+
                 <div className="pt-4 border-t">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">On-time Delivery</span>
+                    <span className="text-sm font-medium">
+                      On-time Delivery
+                    </span>
                     <span className="text-sm font-bold text-blue-600">96%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '96%' }}></div>
+                    <div
+                      className="bg-blue-500 h-2 rounded-full"
+                      style={{ width: "96%" }}
+                    ></div>
                   </div>
                 </div>
               </CardContent>
@@ -254,7 +321,9 @@ const DeliveryProfile: React.FC = () => {
                   <Users className="h-5 w-5 text-blue-600" />
                   <span>Basic Information</span>
                 </CardTitle>
-                <CardDescription>Your personal and contact details</CardDescription>
+                <CardDescription>
+                  Your personal and contact details
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -263,7 +332,9 @@ const DeliveryProfile: React.FC = () => {
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("name", e.target.value)
+                      }
                       disabled={!isEditing}
                       className="mt-1"
                     />
@@ -274,7 +345,9 @@ const DeliveryProfile: React.FC = () => {
                       id="email"
                       type="email"
                       value={formData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("email", e.target.value)
+                      }
                       disabled={!isEditing}
                       className="mt-1"
                     />
@@ -286,7 +359,9 @@ const DeliveryProfile: React.FC = () => {
                     <Input
                       id="phone"
                       value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("phone", e.target.value)
+                      }
                       disabled={!isEditing}
                       className="mt-1"
                     />
@@ -296,7 +371,9 @@ const DeliveryProfile: React.FC = () => {
                     <Input
                       id="experience"
                       value={formData.experience}
-                      onChange={(e) => handleInputChange('experience', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("experience", e.target.value)
+                      }
                       disabled={!isEditing}
                       className="mt-1"
                     />
@@ -307,7 +384,9 @@ const DeliveryProfile: React.FC = () => {
                   <Input
                     id="address"
                     value={formData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange("address", e.target.value)
+                    }
                     disabled={!isEditing}
                     className="mt-1"
                   />
@@ -317,7 +396,7 @@ const DeliveryProfile: React.FC = () => {
                   <Textarea
                     id="bio"
                     value={formData.bio}
-                    onChange={(e) => handleInputChange('bio', e.target.value)}
+                    onChange={(e) => handleInputChange("bio", e.target.value)}
                     disabled={!isEditing}
                     className="mt-1"
                     rows={3}
@@ -333,7 +412,9 @@ const DeliveryProfile: React.FC = () => {
                   <Truck className="h-5 w-5 text-blue-600" />
                   <span>Vehicle Details</span>
                 </CardTitle>
-                <CardDescription>Information about your delivery vehicle</CardDescription>
+                <CardDescription>
+                  Information about your delivery vehicle
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -342,7 +423,9 @@ const DeliveryProfile: React.FC = () => {
                     <select
                       id="vehicle-type"
                       value={formData.vehicleType}
-                      onChange={(e) => handleInputChange('vehicleType', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("vehicleType", e.target.value)
+                      }
                       disabled={!isEditing}
                       className="w-full mt-1 p-2 border rounded-md"
                     >
@@ -357,7 +440,9 @@ const DeliveryProfile: React.FC = () => {
                     <Input
                       id="vehicle-model"
                       value={formData.vehicleModel}
-                      onChange={(e) => handleInputChange('vehicleModel', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("vehicleModel", e.target.value)
+                      }
                       disabled={!isEditing}
                       className="mt-1"
                     />
@@ -369,7 +454,9 @@ const DeliveryProfile: React.FC = () => {
                     <Input
                       id="license-plate"
                       value={formData.licensePlate}
-                      onChange={(e) => handleInputChange('licensePlate', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("licensePlate", e.target.value)
+                      }
                       disabled={!isEditing}
                       className="mt-1"
                     />
@@ -380,7 +467,9 @@ const DeliveryProfile: React.FC = () => {
                       id="vehicle-capacity"
                       type="number"
                       value={formData.vehicleCapacity}
-                      onChange={(e) => handleInputChange('vehicleCapacity', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("vehicleCapacity", e.target.value)
+                      }
                       disabled={!isEditing}
                       className="mt-1"
                       min="1"
@@ -398,12 +487,18 @@ const DeliveryProfile: React.FC = () => {
                   <MapPin className="h-5 w-5 text-blue-600" />
                   <span>Delivery Areas</span>
                 </CardTitle>
-                <CardDescription>Areas where you provide delivery services</CardDescription>
+                <CardDescription>
+                  Areas where you provide delivery services
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
                   {formData.deliveryAreas.map((area, index) => (
-                    <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-800">
+                    <Badge
+                      key={index}
+                      variant="secondary"
+                      className="bg-blue-100 text-blue-800"
+                    >
                       {area}
                     </Badge>
                   ))}
@@ -436,11 +531,19 @@ const DeliveryProfile: React.FC = () => {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="insurance-provider">Insurance Provider</Label>
+                    <Label htmlFor="insurance-provider">
+                      Insurance Provider
+                    </Label>
                     <Input
                       id="insurance-provider"
                       value={formData.insuranceInfo.provider}
-                      onChange={(e) => handleNestedInputChange('insuranceInfo', 'provider', e.target.value)}
+                      onChange={(e) =>
+                        handleNestedInputChange(
+                          "insuranceInfo",
+                          "provider",
+                          e.target.value
+                        )
+                      }
                       disabled={!isEditing}
                       className="mt-1"
                     />
@@ -450,7 +553,13 @@ const DeliveryProfile: React.FC = () => {
                     <Input
                       id="policy-number"
                       value={formData.insuranceInfo.policyNumber}
-                      onChange={(e) => handleNestedInputChange('insuranceInfo', 'policyNumber', e.target.value)}
+                      onChange={(e) =>
+                        handleNestedInputChange(
+                          "insuranceInfo",
+                          "policyNumber",
+                          e.target.value
+                        )
+                      }
                       disabled={!isEditing}
                       className="mt-1"
                     />
@@ -462,7 +571,13 @@ const DeliveryProfile: React.FC = () => {
                     id="expiry-date"
                     type="date"
                     value={formData.insuranceInfo.expiryDate}
-                    onChange={(e) => handleNestedInputChange('insuranceInfo', 'expiryDate', e.target.value)}
+                    onChange={(e) =>
+                      handleNestedInputChange(
+                        "insuranceInfo",
+                        "expiryDate",
+                        e.target.value
+                      )
+                    }
                     disabled={!isEditing}
                     className="mt-1"
                   />
@@ -477,7 +592,9 @@ const DeliveryProfile: React.FC = () => {
                   <Clock className="h-5 w-5 text-blue-600" />
                   <span>Working Schedule</span>
                 </CardTitle>
-                <CardDescription>Your preferred working hours and availability</CardDescription>
+                <CardDescription>
+                  Your preferred working hours and availability
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -505,7 +622,15 @@ const DeliveryProfile: React.FC = () => {
                 <div>
                   <Label>Working Days</Label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                    {[
+                      "Monday",
+                      "Tuesday",
+                      "Wednesday",
+                      "Thursday",
+                      "Friday",
+                      "Saturday",
+                      "Sunday",
+                    ].map((day) => (
                       <div key={day} className="flex items-center space-x-2">
                         <input
                           type="checkbox"
@@ -514,7 +639,9 @@ const DeliveryProfile: React.FC = () => {
                           disabled={!isEditing}
                           className="rounded"
                         />
-                        <Label htmlFor={day.toLowerCase()} className="text-sm">{day}</Label>
+                        <Label htmlFor={day.toLowerCase()} className="text-sm">
+                          {day}
+                        </Label>
                       </div>
                     ))}
                   </div>
@@ -528,8 +655,12 @@ const DeliveryProfile: React.FC = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold text-gray-900">Save Changes</h3>
-                      <p className="text-sm text-gray-600">Update your profile information</p>
+                      <h3 className="font-semibold text-gray-900">
+                        Save Changes
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Update your profile information
+                      </p>
                     </div>
                     <Button
                       onClick={handleSave}
@@ -545,7 +676,7 @@ const DeliveryProfile: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </DeliveryLayout>
   );
 };
 

@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import './styles/delivery-theme.css';
+
 /* ChefSync Design System - Food-inspired color palette and animations */
 
 @layer base {

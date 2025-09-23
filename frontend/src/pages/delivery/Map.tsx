@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import "../../styles/delivery-theme.css";
 import {
   Card,
   CardContent,
@@ -38,7 +39,7 @@ import {
   AlertCircle,
   Zap,
 } from "lucide-react";
-import type { Order } from "../../types/order";
+import type { Order } from "../../types/orderType";
 
 interface Location {
   lat: number;
@@ -318,36 +319,53 @@ const DeliveryMap: React.FC = () => {
       title="Delivery Map"
       description="Track your deliveries and optimize routes in real-time"
     >
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Controls */}
-        <div className="flex space-x-2">
-          <Button
-            onClick={requestLocationPermission}
-            variant="outline"
-            disabled={trackingEnabled}
-          >
-            <Target
-              className={`h-4 w-4 mr-2 ${
-                trackingEnabled ? "text-green-500" : ""
+        <div className="bg-white rounded-xl p-6 shadow-lg border-none">
+          <div className="flex flex-wrap gap-4">
+            <Button
+              onClick={requestLocationPermission}
+              variant="outline"
+              disabled={trackingEnabled}
+              className={`transform hover:scale-105 transition-all duration-300 ${
+                trackingEnabled
+                  ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                  : "hover:bg-primary hover:text-primary-foreground"
               }`}
-            />
-            {trackingEnabled ? "Tracking Active" : "Enable Tracking"}
-          </Button>
-          <Button onClick={handleOptimizeRoute} disabled={orders.length < 2}>
-            <Route className="h-4 w-4 mr-2" />
-            Optimize Route
-          </Button>
-          <Button onClick={fetchOrders} variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+            >
+              <Target
+                className={`h-4 w-4 mr-2 ${
+                  trackingEnabled ? "text-green-500 animate-pulse" : ""
+                }`}
+              />
+              {trackingEnabled ? "🟢 Tracking Active" : "Enable GPS Tracking"}
+            </Button>
+            <Button
+              onClick={handleOptimizeRoute}
+              disabled={orders.length < 2}
+              className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:transform-none"
+            >
+              <Route className="h-4 w-4 mr-2" />
+              Optimize Route
+            </Button>
+            <Button
+              onClick={fetchOrders}
+              variant="outline"
+              className="hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transform hover:scale-105 transition-all duration-300"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh Orders
+            </Button>
+          </div>
         </div>
 
         {/* Location Status */}
         {locationError && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-xl p-6 shadow-md">
             <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+              <div className="bg-red-500 rounded-full p-2 mr-4">
+                <AlertCircle className="h-5 w-5 text-white" />
+              </div>
               <span className="text-red-700">{locationError}</span>
             </div>
           </div>

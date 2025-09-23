@@ -1,0 +1,207 @@
+/* ChefSync Delivery Theme Colors */
+:root {
+  /* Primary Colors */
+  --primary-emerald: #2ECC71;
+  --header-navy: #1A237E;
+  --background-off-white: #FAFAFA;
+  --text-cool-grey: #90A4AE;
+  --text-primary: #212121;
+  
+  /* Status Colors */
+  --status-success: #43A047;
+  --status-warning: #FDD835;
+  --status-info: #42A5F5;
+  --status-error: #E53935;
+  
+  /* Gradient Variations */
+  --primary-gradient: linear-gradient(135deg, #2ECC71 0%, #27AE60 100%);
+  --navy-gradient: linear-gradient(135deg, #1A237E 0%, #283593 100%);
+  --success-gradient: linear-gradient(135deg, #43A047 0%, #388E3C 100%);
+  --info-gradient: linear-gradient(135deg, #42A5F5 0%, #1976D2 100%);
+  --warning-gradient: linear-gradient(135deg, #FDD835 0%, #F57F17 100%);
+  --error-gradient: linear-gradient(135deg, #E53935 0%, #C62828 100%);
+  
+  /* Background Gradients */
+  --bg-primary: linear-gradient(135deg, #FAFAFA 0%, #F5F5F5 100%);
+  --bg-card: linear-gradient(135deg, #FFFFFF 0%, #FAFAFA 50%);
+  
+  /* Shadow Colors */
+  --shadow-light: rgba(26, 35, 126, 0.1);
+  --shadow-medium: rgba(26, 35, 126, 0.15);
+  --shadow-heavy: rgba(26, 35, 126, 0.25);
+}
+
+/* Force application of theme colors */
+* {
+  color-scheme: light;
+}
+
+html, body {
+  background-color: var(--background-off-white) !important;
+}
+
+/* Ensure consistent backgrounds */
+.min-h-screen {
+  background: var(--background-off-white) !important;
+}
+
+/* Custom Classes */
+.theme-primary {
+  background: var(--primary-emerald);
+  color: white;
+}
+
+.theme-primary-gradient {
+  background: var(--primary-gradient);
+  color: white;
+}
+
+.theme-navy {
+  background: var(--header-navy);
+  color: white;
+}
+
+.theme-navy-gradient {
+  background: var(--navy-gradient);
+  color: white;
+}
+
+.theme-bg-primary {
+  background: var(--background-off-white);
+}
+
+.theme-bg-card {
+  background: var(--bg-card);
+}
+
+.theme-text-primary {
+  color: var(--text-primary);
+}
+
+.theme-text-secondary {
+  color: var(--text-cool-grey);
+}
+
+.theme-shadow-card {
+  box-shadow: 0 4px 20px var(--shadow-light);
+}
+
+.theme-shadow-card:hover {
+  box-shadow: 0 8px 40px var(--shadow-medium);
+}
+
+/* Status Classes */
+.theme-status-success {
+  background: var(--status-success);
+  color: white;
+}
+
+.theme-status-warning {
+  background: var(--status-warning);
+  color: var(--text-primary);
+}
+
+.theme-status-info {
+  background: var(--status-info);
+  color: white;
+}
+
+.theme-status-error {
+  background: var(--status-error);
+  color: white;
+}
+
+.theme-status-success-bg {
+  background: rgba(67, 160, 71, 0.1);
+  color: var(--status-success);
+  border: 1px solid rgba(67, 160, 71, 0.2);
+}
+
+.theme-status-warning-bg {
+  background: rgba(253, 216, 53, 0.1);
+  color: #F57F17;
+  border: 1px solid rgba(253, 216, 53, 0.3);
+}
+
+.theme-status-info-bg {
+  background: rgba(66, 165, 245, 0.1);
+  color: var(--status-info);
+  border: 1px solid rgba(66, 165, 245, 0.2);
+}
+
+.theme-status-error-bg {
+  background: rgba(229, 57, 53, 0.1);
+  color: var(--status-error);
+  border: 1px solid rgba(229, 57, 53, 0.2);
+}
+
+/* Tab Styling */
+.theme-tab-trigger[data-state="active"] {
+  background: var(--primary-gradient) !important;
+  color: white !important;
+}
+
+/* Card hover effects */
+.theme-card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(0);
+  box-shadow: 0 4px 20px var(--shadow-light);
+}
+
+.theme-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 40px var(--shadow-medium);
+}
+
+/* Animation utilities */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.theme-animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.theme-animate-scale-in {
+  animation: scaleIn 0.4s ease-out;
+}
+
+/* Professional button styles */
+.theme-button-primary {
+  background: var(--primary-gradient);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(46, 204, 113, 0.3);
+}
+
+.theme-button-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(46, 204, 113, 0.4);
+}
+
+.theme-button-primary:active {
+  transform: translateY(0);
+  transition-duration: 0.1s;
+}
