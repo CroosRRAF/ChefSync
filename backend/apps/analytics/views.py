@@ -1,16 +1,18 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.db.models import Count, Sum, Avg
 from django.utils import timezone
 from datetime import timedelta
-from .models import SystemSettings, SystemNotification, SystemAuditLog, SystemMaintenance
+from .models import SystemSettings, SystemNotification, SystemAuditLog, SystemMaintenance, Activity, Notification
 from .serializers import (
     SystemSettingsSerializer, SystemNotificationSerializer, 
     SystemAuditLogSerializer, SystemMaintenanceSerializer,
     DashboardStatsSerializer
 )
+from apps.orders.models import Order
+from apps.food.models import FoodReview
 
 
 class DashboardViewSet(viewsets.ViewSet):
@@ -35,6 +37,7 @@ class DashboardViewSet(viewsets.ViewSet):
         # User statistics
         total_users = User.objects.count()
         active_users = User.objects.filter(is_active=True).count()
+        new_users_today = User.objects.filter(date_joined__date=today).count()
         new_users_this_week = User.objects.filter(date_joined__gte=week_ago).count()
         new_users_this_month = User.objects.filter(date_joined__gte=month_ago).count()
         
@@ -172,3 +175,70 @@ class SystemMaintenanceViewSet(viewsets.ModelViewSet):
         if status_filter:
             return self.queryset.filter(status=status_filter)
         return self.queryset
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def chef_dashboard(request):
+    """Return dashboard stats for logged-in chef"""
+    chef = request.user
+    if chef.role != "chef":
+        return Response({"error": "Not authorized"}, status=403)
+
+    # Active & Completed
+    active_orders = Order.objects.filter(chef=chef, status__in=["pending", "in_progress"]).count()
+    completed_orders = Order.objects.filter(chef=chef, status="completed").count()
+
+    # Bulk Orders
+    bulk_orders = Order.objects.filter(chef=chef, order_type="bulk").count()
+
+    # Recent Reviews
+    reviews = FoodReview.objects.filter(order__chef=chef).order_by("-created_at")[:6]
+    recent_reviews = [
+        {
+            "rating": r.rating,
+            "comment": r.comment,
+            "customer": r.order.customer.username,
+            "created_at": r.created_at,
+        }
+        for r in reviews
+    ]
+
+    # Recent Activity
+    activities = Activity.objects.filter(chef=chef).order_by("-created_at")[:6]
+    recent_activity = [
+        {
+            "action": a.action,
+            "order_id": a.order.id if a.order else None,
+            "created_at": a.created_at,
+        }
+        for a in activities
+    ]
+
+    # Notifications
+    notifications = Notification.objects.filter(user=chef).order_by("-created_at")[:6]
+    notif_data = [
+        {
+            "title": n.title,
+            "type": n.type,
+            "message": n.message,
+            "is_read": n.is_read,
+            "created_at": n.created_at,
+        }
+        for n in notifications
+    ]
+
+    # Busy/Free status
+    busy_status = "free"
+    if active_orders > 5 or Order.objects.filter(chef=chef, status="pending").count() > 5:
+        busy_status = "busy"
+
+    return Response({
+        "active_orders": active_orders,
+        "completed_orders": completed_orders,
+        "bulk_orders": bulk_orders,
+        "recent_reviews": recent_reviews,
+        "recent_activity": recent_activity,
+        "notifications": notif_data,
+        "status": busy_status,
+    })

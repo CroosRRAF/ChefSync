@@ -45,11 +45,14 @@ import DeliverySettings from '@/pages/delivery/Settings';
 import DeliveryProfile from '@/pages/delivery/Profile';
 
 import CookDashboard from '@/pages/cook/Dashboard';
-import CookKitchen from '@/pages/cook/Kitchen';
-import CookOrders from '@/pages/cook/Orders';
-import CookSchedule from '@/pages/cook/Schedule';
-import CookSettings from '@/pages/cook/Settings';
+import CookBulkOrders from '@/pages/cook/BulkOrders';
+import CookHome from '@/pages/cook/Home';
+import CookMenu from '@/pages/cook/MenuNew';
+import CookOrders from '@/pages/cook/Order';
+import CookNotifications from '@/pages/cook/Notifications';
 import CookProfile from '@/pages/cook/Profile';
+import CookSettings from '@/pages/cook/Settings';
+import CookLayout from '@/components/layout/CookLayout';
 
 // Admin pages
 import ModernDashboard from '@/pages/admin/ModernDashboard';
@@ -305,42 +308,24 @@ const InnerRoutes: React.FC = () => {
           </ProtectedRoute>
         } />
 
+
         {/* Cook Routes */}
-        <Route path="/cook" element={
-          <ProtectedRoute allowedRoles={['cook']}>
-            <Navigate to="/cook/dashboard" replace />
-          </ProtectedRoute>
-        } />
-        <Route path="/cook/dashboard" element={
-          <ProtectedRoute allowedRoles={['cook']}>
-            <CookDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/cook/kitchen" element={
-          <ProtectedRoute allowedRoles={['cook']}>
-            <CookKitchen />
-          </ProtectedRoute>
-        } />
-        <Route path="/cook/orders" element={
-          <ProtectedRoute allowedRoles={['cook']}>
-            <CookOrders />
-          </ProtectedRoute>
-        } />
-        <Route path="/cook/schedule" element={
-          <ProtectedRoute allowedRoles={['cook']}>
-            <CookSchedule />
-          </ProtectedRoute>
-        } />
-        <Route path="/cook/settings" element={
-          <ProtectedRoute allowedRoles={['cook']}>
-            <CookSettings />
-          </ProtectedRoute>
-        } />
-        <Route path="/cook/profile" element={
-          <ProtectedRoute allowedRoles={['cook']}>
-            <CookProfile />
-          </ProtectedRoute>
-        } />
+<Route path="/cook" element={
+  <ProtectedRoute allowedRoles={['cook']}>
+    <CookLayout />
+  </ProtectedRoute>
+}>
+  <Route index element={<Navigate to="dashboard" replace />} />
+  <Route path="dashboard" element={<CookDashboard />} />
+  <Route path="bulk-orders" element={<CookBulkOrders />} />
+  <Route path="home" element={<CookHome />} />
+  <Route path="menu" element={<CookMenu />} />
+  <Route path="orders" element={<CookOrders />} />
+  <Route path="notifications" element={<CookNotifications />} />
+  <Route path="profile" element={<CookProfile />} />
+  <Route path="settings" element={<CookSettings />} />
+</Route>
+
 
         {/* Delivery Agent Routes */}
         <Route path="/delivery" element={

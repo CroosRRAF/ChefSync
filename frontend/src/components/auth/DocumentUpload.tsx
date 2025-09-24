@@ -65,6 +65,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
   // Fetch document types from API
   useEffect(() => {
+    console.log('DocumentUpload component mounted with role:', role);
     const fetchDocumentTypes = async () => {
       try {
         const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
@@ -77,9 +78,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
         if (response.ok) {
           const data = await response.json();
+          console.log('Fetched document types:', data);
           setDocumentTypes(data);
         } else {
-          console.error('Failed to fetch document types');
+          console.error('Failed to fetch document types:', response.status, response.statusText);
           toast({
             title: "Error",
             description: "Failed to load document types. Please try again.",
@@ -331,6 +333,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       // Get user email from localStorage or props
       const userEmail = localStorage.getItem('registration_email') || '';
       
+      console.log('User email found in localStorage:', userEmail);
+      
       if (!userEmail) {
         console.error('No registration email found in localStorage');
         console.log('Available localStorage keys:', Object.keys(localStorage));
@@ -543,8 +547,20 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {documentTypes.map((docType) => {
+          {isLoadingTypes ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Loading document types...</span>
+            </div>
+          ) : documentTypes.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No document types found for your role.</p>
+              <p className="text-sm text-muted-foreground mt-2">Please contact support if you believe this is an error.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {documentTypes.map((docType) => {
               const isUploaded = uploadedDocumentTypes.has(docType.id);
               const uploadedFilesForType = uploadedFiles.filter(f => f.documentType.id === docType.id && f.status === 'success');
               
@@ -584,7 +600,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 </Button>
               );
             })}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
