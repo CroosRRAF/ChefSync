@@ -1,0 +1,178 @@
+# Chef Menu Management System - Documentation
+
+## Overview
+The Chef Menu Management system allows chefs to create, manage, and maintain their food items with pricing and availability controls.
+
+## Features
+
+### 1. Menu Items Display
+- Grid-based layout showing all menu items
+- Visual status indicators for availability and approval status
+- Real-time display of ratings, reviews, and order counts
+- Price information with different sizes and preparation times
+
+### 2. Search and Filter Functionality
+- **Search Bar**: Located at the top right of the menu page
+- **Filter Capabilities**: Search by food name, category, or description
+- **Real-time Results**: Instant filtering as you type
+- **Clear Search**: Button to reset search filters
+- **Empty State**: Helpful messages when no results match search terms
+
+### 3. Add New Food Items
+- **Intelligent Food Search**: Search existing foods when adding new items
+- **Two Modes**: 
+  - Create entirely new food items
+  - Add price variants to existing food items
+- **Form Sections**:
+  - Food Name (with autocomplete search)
+  - New Food Information (category, description, ingredients, dietary options)
+  - Pricing Information (price, size, preparation time)
+- **Visual Feedback**: Loading states and success/error messages
+
+### 4. Availability Management
+- **Quick Toggle Buttons**: Direct activate/deactivate buttons on each menu card
+- **Edit Dialog**: Detailed availability editing through modal dialog
+- **Visual Status**: Clear indicators showing current availability status
+- **Bulk Actions**: Easy management of multiple items
+
+### 5. Menu Item Management
+- **Edit Functionality**: Update availability and other food settings
+- **Delete Functionality**: Remove food items with confirmation dialog
+- **Real-time Updates**: Changes reflect immediately without page refresh
+
+## Technical Implementation
+
+### State Management
+- `menuItems`: Complete list of chef's food items
+- `filteredMenuItems`: Filtered results based on search terms
+- `menuSearchTerm`: Current search query
+- `isSubmitting`: Loading state for form submissions
+
+### API Endpoints Used
+- `GET /api/food/chef/foods/` - Fetch chef's menu items
+- `GET /api/food/chef/foods/search/?q={query}` - Search existing foods
+- `POST /api/food/chef/foods/` - Create new food items
+- `POST /api/food/chef/prices/` - Add price variants
+- `PATCH /api/food/chef/foods/{id}/` - Update food availability
+- `DELETE /api/food/chef/foods/{id}/` - Delete food items
+
+### Key Functions
+- `loadMenuItems()`: Fetches and displays menu items
+- `handleMenuSearch(searchTerm)`: Filters menu items by search term
+- `handleAddFood()`: Creates new food items or price variants
+- `handleEditFood()`: Updates food availability
+- `handleDeleteFood()`: Removes food items
+
+## User Experience Improvements
+
+### Form Visibility
+- **Responsive Layout**: Proper spacing and mobile-friendly design
+- **Clear Sections**: Organized form sections with headers
+- **Visual Hierarchy**: Better typography and spacing
+- **Improved Dialog**: Larger modal with better scrolling
+
+### Error Handling
+- **Detailed Error Messages**: Specific feedback for different error types
+- **Network Error Detection**: Separate handling for connectivity issues
+- **Validation Messages**: Client-side validation with helpful messages
+- **Success Feedback**: Clear confirmation when actions succeed
+
+### Loading States
+- **Spinner Indicators**: Visual feedback during form submissions
+- **Disabled Controls**: Prevent multiple submissions
+- **Progress Feedback**: "Creating..." and "Adding..." text during operations
+
+## Status Indicators
+
+### Availability Status
+- **Green Badge with Eye Icon**: Available for orders
+- **Red Badge with Eye-Off Icon**: Currently unavailable
+
+### Approval Status
+- **Green Badge**: Approved items (ready for customer orders)
+- **Yellow Badge**: Pending approval from administrators
+- **Red Badge**: Rejected items (need revision)
+
+## Data Structure
+
+### Food Item Object
+```json
+{
+  "food_id": "number",
+  "name": "string",
+  "description": "string",
+  "category": "string",
+  "image_url": "string (optional)",
+  "status": "Approved|Pending|Rejected",
+  "is_available": "boolean",
+  "prices": [
+    {
+      "price_id": "number",
+      "size": "Small|Medium|Large",
+      "price": "number",
+      "preparation_time": "number (minutes)"
+    }
+  ],
+  "chef_name": "string",
+  "rating_average": "number",
+  "total_reviews": "number",
+  "total_orders": "number"
+}
+```
+
+## Usage Instructions
+
+### Adding a New Food Item
+1. Click "Add Food Item" button
+2. Start typing food name in the search field
+3. If food exists, select from dropdown to add price variant
+4. If creating new food, fill in all required fields (marked with *)
+5. Set pricing information
+6. Click "Create Food Item" or "Add Price Variant"
+
+### Managing Availability
+1. **Quick Toggle**: Click "Activate" or "Deactivate" button on menu card
+2. **Edit Dialog**: Click "Edit" button for detailed options
+3. Changes take effect immediately
+
+### Searching Menu Items
+1. Use search bar at the top of the page
+2. Type food name, category, or description keywords
+3. Results filter in real-time
+4. Click "Clear Search" to see all items
+
+## Error Resolution
+
+### Common Issues
+- **"Error updating availability"**: Check network connection and authentication
+- **"Please enter required fields"**: Ensure all mandatory fields (marked *) are filled
+- **"Food not displaying"**: Refresh the page or check approval status
+- **"Search not working"**: Clear search term and try again
+
+### Best Practices
+- Always fill required fields when creating new food items
+- Use descriptive names and categories for better searchability
+- Set realistic preparation times for customer expectations
+- Regularly review and update availability status
+- Use high-quality images for better customer appeal
+
+## Recent Improvements (Current Version)
+
+### Added Features
+✅ Search and filter functionality for menu items
+✅ Improved error handling for availability updates
+✅ Enhanced form layout with better visibility
+✅ Real-time display updates for newly added items
+✅ Quick toggle buttons for availability management
+✅ Loading states and better user feedback
+✅ Responsive design improvements
+
+### Fixed Issues
+✅ Search filter functionality not working
+✅ Edit function errors when updating availability
+✅ Form elements hard to see (especially second element)
+✅ Newly added items not displaying immediately
+✅ Poor error messages and feedback
+
+## File Location
+Frontend component: `frontend/src/pages/cook/MenuNew.tsx`

@@ -2,6 +2,9 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
+from apps.authentication.models import User
+from apps.orders.models import Order
+
 
 class SystemSettings(models.Model):
     """System-wide configuration settings"""
@@ -214,3 +217,41 @@ class PlatformConfiguration(models.Model):
     
     def __str__(self):
         return f"{self.name} ({self.config_type})"
+    
+
+# chef Activity
+class Activity(models.Model):
+    chef = models.ForeignKey(User, on_delete=models.CASCADE, related_name="activities", limit_choices_to={"role": "chef"})
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, null=True, blank=True)
+    action = models.CharField(max_length=200)  # e.g., "Accepted Order", "Declined Order", "Sent Collaboration Request"
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.chef.username} - {self.action}"
+
+
+# User-specific notifications
+class Notification(models.Model):
+    """User-specific notifications"""
+    
+    NOTIFICATION_TYPES = [
+        ('info', 'Information'),
+        ('success', 'Success'),
+        ('warning', 'Warning'),
+        ('error', 'Error'),
+        ('order', 'Order Update'),
+        ('system', 'System'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES, default='info')
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.title}"
+    
+    class Meta:
+        ordering = ['-created_at']

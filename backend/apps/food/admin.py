@@ -19,9 +19,27 @@ class FoodCategoryAdmin(admin.ModelAdmin):
 @admin.register(Food)
 class FoodAdmin(admin.ModelAdmin):
     list_display = ['name', 'status', 'chef', 'admin', 'is_available', 'created_at']
-    list_filter = ['status', 'is_available', 'is_featured', 'created_at']
-    search_fields = ['name', 'chef__name', 'admin__name']
+    list_filter = ['status', 'is_available', 'is_featured', 'created_at', 'chef']
+    search_fields = ['name', 'chef__username', 'admin__username', 'description']
     readonly_fields = ['food_id', 'created_at', 'updated_at']
+    list_editable = ['status', 'is_available']
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # Show pending items first for admin attention
+        return qs.order_by('-status', '-created_at')
+    
+    actions = ['approve_foods', 'reject_foods']
+    
+    def approve_foods(self, request, queryset):
+        updated = queryset.update(status='Approved', admin=request.user)
+        self.message_user(request, f'{updated} food item(s) approved successfully.')
+    approve_foods.short_description = "Approve selected food items"
+    
+    def reject_foods(self, request, queryset):
+        updated = queryset.update(status='Rejected', admin=request.user)
+        self.message_user(request, f'{updated} food item(s) rejected.')
+    reject_foods.short_description = "Reject selected food items"
 
 
 @admin.register(FoodImage)

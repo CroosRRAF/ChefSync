@@ -24,7 +24,7 @@ const getSecureToken = (): string | null => {
 
 const getRefreshToken = (): string | null => {
   try {
-    return localStorage.getItem('chefsync_refresh_token');
+    return localStorage.getItem('refresh_token');
   } catch (error) {
     console.error('Error accessing refresh token from localStorage:', error);
     return null;
@@ -41,7 +41,7 @@ const setSecureToken = (token: string): void => {
 
 const setRefreshToken = (token: string): void => {
   try {
-    localStorage.setItem('chefsync_refresh_token', token);
+    localStorage.setItem('refresh_token', token);
   } catch (error) {
     console.error('Error setting refresh token in localStorage:', error);
   }
