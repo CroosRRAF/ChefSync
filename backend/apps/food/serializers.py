@@ -102,19 +102,49 @@ class FoodSerializer(serializers.ModelSerializer):
     class Meta:
         model = Food
         fields = [
-<<<<<<< HEAD
-            "food_id", "name", "description", "category", "image", "image_url",
-            "status", "preparation_time", "chef", "chef_name", "chef_rating",
-            "prices", "ingredients", "is_vegetarian", "is_vegan", "is_available",
-            "spice_level", "rating_average", "total_reviews", "total_orders",
-            "created_at", "updated_at"
+            'food_id', 'name', 'description', 'category', 'food_category', 'category_name', 'cuisine_name',
+            'is_available', 'is_featured', 'preparation_time', 'calories_per_serving', 'ingredients',
+            'allergens', 'nutritional_info', 'is_vegetarian', 'is_vegan', 'is_gluten_free', 'spice_level',
+            'rating_average', 'total_reviews', 'total_orders', 'images', 'primary_image', 'available_cooks_count',
+            'image_url', 'thumbnail_url', 'status', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at'
         ]
         read_only_fields = ['food_id', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at']
-
+    
+    def get_primary_image(self, obj):
+        """Return the primary image URL"""
+        primary_img = obj.images.filter(is_primary=True).first()
+        if primary_img:
+            return primary_img.optimized_url
+        # Fallback to first image
+        first_img = obj.images.first()
+        if first_img:
+            return first_img.optimized_url
+        return None
+    
     def get_image_url(self, obj):
-        if obj.image:
+        """Get primary image URL for compatibility"""
+        primary_image = self.get_primary_image(obj)
+        if primary_image:
+            return primary_image
+        # Fallback to old image field if exists
+        if hasattr(obj, 'image') and obj.image:
             return obj.image.url if hasattr(obj.image, 'url') else str(obj.image)
         return None
+    
+    def get_thumbnail_url(self, obj):
+        """Get thumbnail version of the primary image"""
+        primary_img = obj.images.filter(is_primary=True).first()
+        if primary_img:
+            return primary_img.thumbnail
+        # Fallback to first image thumbnail
+        first_img = obj.images.first()
+        if first_img:
+            return first_img.thumbnail
+        return None
+    
+    def get_available_cooks_count(self, obj):
+        """Get count of cooks who have prices for this food"""
+        return obj.prices.values('cook').distinct().count()
 
     def create(self, validated_data):
         # Set status to pending and assign current user as chef
@@ -202,40 +232,6 @@ class ChefFoodCreateSerializer(serializers.ModelSerializer):
             print(f"DEBUG: Final processed ingredients: {data['ingredients']} (type: {type(data['ingredients'])})")
         
         return data
-=======
-            'food_id', 'name', 'description', 'category', 'food_category', 'category_name', 'cuisine_name',
-            'is_available', 'is_featured', 'preparation_time', 'calories_per_serving', 'ingredients',
-            'allergens', 'nutritional_info', 'is_vegetarian', 'is_vegan', 'is_gluten_free', 'spice_level',
-            'rating_average', 'total_reviews', 'total_orders', 'images', 'primary_image', 'available_cooks_count',
-            'image_url', 'thumbnail_url', 'created_at', 'updated_at'
-        ]
-    
-    def get_primary_image(self, obj):
-        """Return the primary image URL"""
-        primary_img = obj.images.filter(is_primary=True).first()
-        if primary_img:
-            return primary_img.optimized_url
-        # Fallback to first image
-        first_img = obj.images.first()
-        if first_img:
-            return first_img.optimized_url
-        return None
-    
-    def get_image_url(self, obj):
-        """Get primary image URL for compatibility"""
-        return self.get_primary_image(obj)
-    
-    def get_thumbnail_url(self, obj):
-        """Get thumbnail version of the primary image"""
-        primary_img = obj.images.filter(is_primary=True).first()
-        if primary_img:
-            return primary_img.thumbnail
-        # Fallback to first image thumbnail
-        first_img = obj.images.first()
-        if first_img:
-            return first_img.thumbnail
-        return None
->>>>>>> 308351d (Menu page updated)
     
     def create(self, validated_data):
         # Debug logging to see what ingredients we received
@@ -271,41 +267,15 @@ class ChefFoodCreateSerializer(serializers.ModelSerializer):
 
 
 class FoodReviewSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.username', read_only=True)
+    
     class Meta:
         model = FoodReview
-<<<<<<< HEAD
-        fields = '__all__'
-=======
         fields = [
             'review_id', 'rating', 'comment', 'customer', 'customer_name', 'taste_rating',
             'presentation_rating', 'value_rating', 'is_verified_purchase', 'helpful_votes',
             'created_at', 'updated_at'
         ]
-
-
-class FoodPriceSerializer(serializers.ModelSerializer):
-    food_name = serializers.CharField(source='food.name', read_only=True)
-    cook_name = serializers.CharField(source='cook.name', read_only=True)
-    cook_rating = serializers.SerializerMethodField()
-    image_data_url = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = FoodPrice
-        fields = [
-            'price_id', 'size', 'price', 'image_url', 'image_data_url', 'food', 'food_name', 'cook', 'cook_name',
-            'cook_rating', 'created_at', 'updated_at'
-        ]
-    
-    def get_cook_rating(self, obj):
-        # You might want to calculate this from reviews
-        return getattr(obj.cook, 'rating', 4.5)
-    
-    def get_image_data_url(self, obj):
-        """Convert image_url blob to proper data URL if needed"""
-        if obj.image_url:
-            return convert_image_with_proper_mime_type(obj.image_url)
-        return None
->>>>>>> 308351d (Menu page updated)
 
 
 class OfferSerializer(serializers.ModelSerializer):
