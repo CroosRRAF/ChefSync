@@ -1,27 +1,99 @@
 from rest_framework import serializers
-from apps.food.models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
+from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer, FoodImage
+from .utils import convert_image_with_proper_mime_type, get_thumbnail_url
 
 
 class CuisineSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = Cuisine
-        fields = '__all__'
+        fields = ['id', 'name', 'description', 'image', 'image_url', 'thumbnail_url', 'is_active', 'sort_order']
+    
+    def get_image_url(self, obj):
+        """Convert blob/base64 image to proper data URL or return optimized Cloudinary URL"""
+        return convert_image_with_proper_mime_type(obj.image)
+    
+    def get_thumbnail_url(self, obj):
+        """Get thumbnail version of the image"""
+        image_url = convert_image_with_proper_mime_type(obj.image)
+        return get_thumbnail_url(image_url, width=200, height=200)
 
 
 class FoodCategorySerializer(serializers.ModelSerializer):
+    cuisine_name = serializers.CharField(source='cuisine.name', read_only=True)
+    image_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = FoodCategory
-        fields = '__all__'
+        fields = ['id', 'name', 'cuisine', 'cuisine_name', 'description', 'image', 'image_url', 'thumbnail_url', 'is_active', 'sort_order']
+    
+    def get_image_url(self, obj):
+        """Convert blob/base64 image to proper data URL or return optimized Cloudinary URL"""
+        return convert_image_with_proper_mime_type(obj.image)
+    
+    def get_thumbnail_url(self, obj):
+        """Get thumbnail version of the image"""
+        image_url = convert_image_with_proper_mime_type(obj.image)
+        return get_thumbnail_url(image_url, width=200, height=200)
+
+
+class FoodImageSerializer(serializers.ModelSerializer):
+    optimized_url = serializers.ReadOnlyField()
+    thumbnail = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = FoodImage
+        fields = [
+            'id', 'image_url', 'thumbnail_url', 'cloudinary_public_id', 'caption', 
+            'is_primary', 'sort_order', 'alt_text', 'optimized_url', 'thumbnail',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def create(self, validated_data):
+        """Create new FoodImage with Cloudinary URL"""
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        """Update FoodImage"""
+        return super().update(instance, validated_data)
 
 
 class FoodPriceSerializer(serializers.ModelSerializer):
+    food_name = serializers.CharField(source='food.name', read_only=True)
+    cook_name = serializers.CharField(source='cook.name', read_only=True)
+    cook_rating = serializers.SerializerMethodField()
+    image_data_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = FoodPrice
-        fields = ['price_id', 'size', 'price', 'preparation_time', 'image_url', 'food', 'cook', 'created_at', 'updated_at']
+        fields = [
+            'price_id', 'size', 'price', 'preparation_time', 'image_url', 'image_data_url', 'food', 'food_name', 'cook', 'cook_name',
+            'cook_rating', 'created_at', 'updated_at'
+        ]
         read_only_fields = ['price_id', 'created_at', 'updated_at']
+    
+    def get_cook_rating(self, obj):
+        # You might want to calculate this from reviews
+        return getattr(obj.cook, 'rating', 4.5)
+    
+    def get_image_data_url(self, obj):
+        """Convert image_url blob to proper data URL if needed"""
+        if obj.image_url:
+            return convert_image_with_proper_mime_type(obj.image_url)
+        return None
 
 
 class FoodSerializer(serializers.ModelSerializer):
+    images = FoodImageSerializer(many=True, read_only=True)
+    primary_image = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source='food_category.name', read_only=True)
+    cuisine_name = serializers.CharField(source='food_category.cuisine.name', read_only=True)
+    available_cooks_count = serializers.SerializerMethodField()
     chef_name = serializers.CharField(source="chef.username", read_only=True)
     chef_rating = serializers.DecimalField(source="chef.chef_profile.rating_average", max_digits=3, decimal_places=2, read_only=True)
     prices = FoodPriceSerializer(many=True, read_only=True)
@@ -30,6 +102,7 @@ class FoodSerializer(serializers.ModelSerializer):
     class Meta:
         model = Food
         fields = [
+<<<<<<< HEAD
             "food_id", "name", "description", "category", "image", "image_url",
             "status", "preparation_time", "chef", "chef_name", "chef_rating",
             "prices", "ingredients", "is_vegetarian", "is_vegan", "is_available",
@@ -129,6 +202,40 @@ class ChefFoodCreateSerializer(serializers.ModelSerializer):
             print(f"DEBUG: Final processed ingredients: {data['ingredients']} (type: {type(data['ingredients'])})")
         
         return data
+=======
+            'food_id', 'name', 'description', 'category', 'food_category', 'category_name', 'cuisine_name',
+            'is_available', 'is_featured', 'preparation_time', 'calories_per_serving', 'ingredients',
+            'allergens', 'nutritional_info', 'is_vegetarian', 'is_vegan', 'is_gluten_free', 'spice_level',
+            'rating_average', 'total_reviews', 'total_orders', 'images', 'primary_image', 'available_cooks_count',
+            'image_url', 'thumbnail_url', 'created_at', 'updated_at'
+        ]
+    
+    def get_primary_image(self, obj):
+        """Return the primary image URL"""
+        primary_img = obj.images.filter(is_primary=True).first()
+        if primary_img:
+            return primary_img.optimized_url
+        # Fallback to first image
+        first_img = obj.images.first()
+        if first_img:
+            return first_img.optimized_url
+        return None
+    
+    def get_image_url(self, obj):
+        """Get primary image URL for compatibility"""
+        return self.get_primary_image(obj)
+    
+    def get_thumbnail_url(self, obj):
+        """Get thumbnail version of the primary image"""
+        primary_img = obj.images.filter(is_primary=True).first()
+        if primary_img:
+            return primary_img.thumbnail
+        # Fallback to first image thumbnail
+        first_img = obj.images.first()
+        if first_img:
+            return first_img.thumbnail
+        return None
+>>>>>>> 308351d (Menu page updated)
     
     def create(self, validated_data):
         # Debug logging to see what ingredients we received
@@ -166,7 +273,39 @@ class ChefFoodCreateSerializer(serializers.ModelSerializer):
 class FoodReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = FoodReview
+<<<<<<< HEAD
         fields = '__all__'
+=======
+        fields = [
+            'review_id', 'rating', 'comment', 'customer', 'customer_name', 'taste_rating',
+            'presentation_rating', 'value_rating', 'is_verified_purchase', 'helpful_votes',
+            'created_at', 'updated_at'
+        ]
+
+
+class FoodPriceSerializer(serializers.ModelSerializer):
+    food_name = serializers.CharField(source='food.name', read_only=True)
+    cook_name = serializers.CharField(source='cook.name', read_only=True)
+    cook_rating = serializers.SerializerMethodField()
+    image_data_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = FoodPrice
+        fields = [
+            'price_id', 'size', 'price', 'image_url', 'image_data_url', 'food', 'food_name', 'cook', 'cook_name',
+            'cook_rating', 'created_at', 'updated_at'
+        ]
+    
+    def get_cook_rating(self, obj):
+        # You might want to calculate this from reviews
+        return getattr(obj.cook, 'rating', 4.5)
+    
+    def get_image_data_url(self, obj):
+        """Convert image_url blob to proper data URL if needed"""
+        if obj.image_url:
+            return convert_image_with_proper_mime_type(obj.image_url)
+        return None
+>>>>>>> 308351d (Menu page updated)
 
 
 class OfferSerializer(serializers.ModelSerializer):

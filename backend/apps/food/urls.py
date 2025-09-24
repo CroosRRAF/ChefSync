@@ -11,6 +11,7 @@ router.register(r'cuisines', views.CuisineViewSet, basename='cuisines')
 router.register(r'categories', views.FoodCategoryViewSet, basename='categories')
 router.register(r'reviews', views.FoodReviewViewSet, basename='reviews')
 router.register(r'offers', views.OfferViewSet, basename='offers')
+router.register(r'images', views.FoodImageViewSet, basename='images')
 
 urlpatterns = [
     # Include all router URLs
@@ -21,4 +22,7 @@ urlpatterns = [
     
     # Simple test endpoint
     path('test/', views.food_list, name='food-list'),
+    
+    # Image upload endpoint
+    path('upload-image/', views.upload_image, name='upload-image'),
 ]
