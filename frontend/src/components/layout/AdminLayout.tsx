@@ -1,5 +1,4 @@
 import NotificationCenter from "@/components/admin/NotificationCenter";
-import { SearchResults } from "@/components/admin/SearchResults";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -405,16 +404,37 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
                       searchLoading ||
                       searchError) && (
                       <div className="absolute top-full mt-2 w-96 z-50">
-                        <SearchResults
-                          results={searchResults}
-                          loading={searchLoading}
-                          error={searchError}
-                          onSelect={() => {
-                            setSearchOpen(false);
-                            setSearchQuery("");
-                            setSearchResults([]);
-                          }}
-                        />
+                        <div className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
+                          {searchLoading && (
+                            <div className="text-sm text-gray-500">
+                              Searching...
+                            </div>
+                          )}
+                          {searchError && (
+                            <div className="text-sm text-red-500">
+                              {searchError}
+                            </div>
+                          )}
+                          {searchResults.length > 0 && (
+                            <div className="space-y-2">
+                              {searchResults
+                                .slice(0, 5)
+                                .map((result, index) => (
+                                  <div
+                                    key={index}
+                                    className="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer"
+                                  >
+                                    <div className="text-sm font-medium">
+                                      {result.title || result.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {result.type || "Result"}
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

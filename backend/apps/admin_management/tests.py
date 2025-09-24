@@ -80,7 +80,7 @@ class AdminDashboardViewSetTestCase(APITestCase):
         self.assertIn("total_users", response.data)
         self.assertIn("total_orders", response.data)
         self.assertIn("total_revenue", response.data)
-        self.assertIn("pending_approvals", response.data)
+        self.assertIn("pending_chef_approvals", response.data)
 
     def test_recent_orders_endpoint(self):
         """Test recent orders endpoint"""
@@ -251,8 +251,7 @@ class AdminOrderManagementViewSetTestCase(APITestCase):
         self.admin_user = User.objects.create_superuser(
             email="admin@test.com",
             password="admin123",
-            first_name="Admin",
-            last_name="User",
+            name="Admin User",
             role="admin",
         )
 
@@ -578,8 +577,7 @@ class AdminActivityLogViewSetTestCase(APITestCase):
         self.admin_user = User.objects.create_superuser(
             email="admin@test.com",
             password="admin123",
-            first_name="Admin",
-            last_name="User",
+            name="Admin User",
             role="admin",
         )
 

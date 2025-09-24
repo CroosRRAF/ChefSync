@@ -1,10 +1,8 @@
 import InteractiveChart from "@/components/admin/InteractiveChart";
-import SystemAlerts from "@/components/admin/SystemAlerts";
 import { UnifiedStatsCard } from "@/components/admin/UnifiedStatsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import {
@@ -17,11 +15,8 @@ import { formatCurrency } from "@/utils/numberUtils";
 import {
   Activity,
   BarChart3,
-  Bell,
-  CheckCircle2,
   Clock,
   DollarSign,
-  MessageSquare,
   RefreshCw,
   ShoppingCart,
   Users,
@@ -44,7 +39,9 @@ const Dashboard: React.FC = () => {
   const [recentActivities, setRecentActivities] = useState<AdminActivityLog[]>(
     []
   );
-  const [activeTab, setActiveTab] = useState("overview");
+  const [weeklyPerformance, setWeeklyPerformance] = useState<any>(null);
+  const [revenueTrend, setRevenueTrend] = useState<any>(null);
+  const [growthAnalytics, setGrowthAnalytics] = useState<any>(null);
 
   // Fetch dashboard data
   const fetchDashboardData = useCallback(async () => {
@@ -53,15 +50,28 @@ const Dashboard: React.FC = () => {
       setError(null);
 
       // Fetch all dashboard data in parallel
-      const [statsData, ordersData, activitiesData] = await Promise.all([
+      const [
+        statsData,
+        ordersData,
+        activitiesData,
+        weeklyPerformanceData,
+        revenueTrendData,
+        growthAnalyticsData,
+      ] = await Promise.all([
         adminService.getDashboardStats(),
         adminService.getRecentOrders(5),
         adminService.getRecentActivities(5),
+        adminService.getWeeklyPerformance(30),
+        adminService.getRevenueTrend(30),
+        adminService.getGrowthAnalytics(30),
       ]);
 
       setStats(statsData);
       setRecentOrders(ordersData);
       setRecentActivities(activitiesData);
+      setWeeklyPerformance(weeklyPerformanceData);
+      setRevenueTrend(revenueTrendData);
+      setGrowthAnalytics(growthAnalyticsData);
       setLastRefresh(new Date());
     } catch (err) {
       console.error("Dashboard API Error:", err);
@@ -125,27 +135,12 @@ const Dashboard: React.FC = () => {
     navigate(route);
   };
 
-  // Stats cards data with modern color theme
-  const statsCards = [
+  // Stats cards data for new design
+  const kpiCards = [
     {
-      title: "Total Users",
-      value: stats?.total_users || 0,
-      subtitle: `${stats?.active_users || 0} active`,
-      icon: <Users />,
-      trend: stats?.user_growth
-        ? {
-            value: stats.user_growth,
-            isPositive: stats.user_growth >= 0,
-            period: "vs last week",
-          }
-        : undefined,
-      color: "blue" as const,
-      onClick: () => handleCardClick("/admin/users"),
-    },
-    {
-      title: "Total Orders",
-      value: stats?.total_orders || 0,
-      subtitle: `${stats?.orders_today || 0} today`,
+      title: "Orders Today",
+      value: stats?.orders_today || 0,
+      subtitle: `${stats?.orders_this_week || 0} this week`,
       icon: <ShoppingCart />,
       trend: stats?.order_growth
         ? {
@@ -154,8 +149,7 @@ const Dashboard: React.FC = () => {
             period: "vs last week",
           }
         : undefined,
-      color: "purple" as const,
-      onClick: () => handleCardClick("/admin/orders"),
+      color: "blue" as const,
     },
     {
       title: "Total Revenue",
@@ -170,15 +164,20 @@ const Dashboard: React.FC = () => {
           }
         : undefined,
       color: "green" as const,
-      onClick: () => handleCardClick("/admin/analytics"),
     },
     {
-      title: "System Health",
-      value: `${stats?.system_health_score || 0}%`,
-      subtitle: `${stats?.active_sessions || 0} active sessions`,
-      icon: <Activity />,
-      color: "green" as const,
-      onClick: () => setActiveTab("system"),
+      title: "Active Chefs",
+      value: stats?.active_chefs || 0,
+      subtitle: `${stats?.total_chefs || 0} total`,
+      icon: <Users />,
+      trend: stats?.chef_growth
+        ? {
+            value: stats.chef_growth,
+            isPositive: stats.chef_growth >= 0,
+            period: "vs last week",
+          }
+        : undefined,
+      color: "purple" as const,
     },
     {
       title: "Pending Approvals",
@@ -188,111 +187,7 @@ const Dashboard: React.FC = () => {
       subtitle: "Awaiting review",
       icon: <Clock />,
       color: "yellow" as const,
-      onClick: () => handleCardClick("/admin/users"),
     },
-    {
-      title: "Unread Notifications",
-      value: stats?.unread_notifications || 0,
-      subtitle: "Require attention",
-      icon: <Bell />,
-      color: "red" as const,
-      onClick: () => handleCardClick("/admin/notifications"),
-    },
-    {
-      title: "Platform Status",
-      value: "Operational",
-      subtitle: "All systems running",
-      icon: <CheckCircle2 />,
-      color: "green" as const,
-      onClick: () => setActiveTab("activity"),
-    },
-  ];
-
-  // Quick actions data with modern color theme
-  const quickActions = [
-    {
-      title: "User Management",
-      description: "Manage users, roles, and permissions",
-      icon: Users,
-      iconColor: "text-primary dark:text-primary-light",
-      bgColor:
-        "bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 border-primary/20 dark:border-primary/30",
-      path: "/admin/users",
-      badge: stats?.total_users ? `${stats.total_users} users` : null,
-    },
-    {
-      title: "Order Management",
-      description: "Track and manage orders",
-      icon: ShoppingCart,
-      iconColor: "text-success dark:text-success-light",
-      bgColor:
-        "bg-gradient-to-br from-success/10 to-success/5 dark:from-success/20 dark:to-success/10 border-success/20 dark:border-success/30",
-      path: "/admin/orders",
-      badge: stats?.orders_today ? `${stats.orders_today} today` : null,
-    },
-    {
-      title: "Analytics",
-      description: "View detailed analytics and insights",
-      icon: BarChart3,
-      iconColor: "text-accent dark:text-accent-light",
-      bgColor:
-        "bg-gradient-to-br from-accent/10 to-accent/5 dark:from-accent/20 dark:to-accent/10 border-accent/20 dark:border-accent/30",
-      path: "/admin/analytics",
-      badge: "View insights",
-    },
-    {
-      title: "Complaints",
-      description: "Manage complaints and feedback",
-      icon: MessageSquare,
-      iconColor: "text-warning dark:text-warning-light",
-      bgColor:
-        "bg-gradient-to-br from-warning/10 to-warning/5 dark:from-warning/20 dark:to-warning/10 border-warning/20 dark:border-warning/30",
-      path: "/admin/complaints",
-      badge: stats?.unread_notifications
-        ? `${stats.unread_notifications} unread`
-        : null,
-    },
-    {
-      title: "Notifications",
-      description: "Send and manage notifications",
-      icon: Bell,
-      iconColor: "text-info dark:text-info-light",
-      bgColor:
-        "bg-gradient-to-br from-info/10 to-info/5 dark:from-info/20 dark:to-info/10 border-info/20 dark:border-info/30",
-      path: "/admin/notifications",
-      badge: undefined,
-    },
-  ];
-
-  // Chart data for analytics
-  const weeklyPerformanceData = [
-    { name: "Mon", value: 120, users: 120, orders: 45, revenue: 2400 },
-    { name: "Tue", value: 132, users: 132, orders: 52, revenue: 2800 },
-    { name: "Wed", value: 101, users: 101, orders: 38, revenue: 2100 },
-    { name: "Thu", value: 134, users: 134, orders: 48, revenue: 2600 },
-    { name: "Fri", value: 190, users: 190, orders: 72, revenue: 3800 },
-    { name: "Sat", value: 230, users: 230, orders: 85, revenue: 4200 },
-    { name: "Sun", value: 210, users: 210, orders: 78, revenue: 3900 },
-  ];
-
-  const revenueData = [
-    { name: "Mon", value: 2400 },
-    { name: "Tue", value: 2800 },
-    { name: "Wed", value: 2100 },
-    { name: "Thu", value: 2600 },
-    { name: "Fri", value: 3800 },
-    { name: "Sat", value: 4200 },
-    { name: "Sun", value: 3900 },
-  ];
-
-  const userGrowthData = [
-    { name: "Mon", value: 120 },
-    { name: "Tue", value: 132 },
-    { name: "Wed", value: 101 },
-    { name: "Thu", value: 134 },
-    { name: "Fri", value: 190 },
-    { name: "Sat", value: 230 },
-    { name: "Sun", value: 210 },
   ];
 
   if (loading && !stats) {
@@ -408,255 +303,202 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Dashboard Tabs */}
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="w-full"
-          >
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="analytics">Analytics</TabsTrigger>
-              <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-            </TabsList>
-
-            {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-8">
-              {/* Key Metrics */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-                {statsCards.map((card, index) => (
-                  <UnifiedStatsCard
-                    key={index}
-                    title={card.title}
-                    value={card.value}
-                    subtitle={card.subtitle}
-                    icon={card.icon}
-                    trend={card.trend}
-                    color={card.color}
-                    onClick={card.onClick}
-                    variant="advanced"
-                    isLoading={refreshing}
-                  />
-                ))}
-              </div>
-
-              {/* Quick Actions */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold bg-gradient-to-r from-foreground to-muted-foreground dark:from-foreground dark:to-muted-foreground bg-clip-text text-transparent">
-                    Quick Actions
-                  </h2>
-                  <Badge
-                    variant="secondary"
-                    className="text-xs bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground border-border dark:border-border"
-                  >
-                    {quickActions.length} Actions Available
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-                  {quickActions.map((action, index) => (
-                    <Card
-                      key={index}
-                      className={`${action.bgColor} border hover:shadow-xl hover:shadow-primary/10 dark:hover:shadow-primary/5 transition-all duration-300 cursor-pointer group hover:-translate-y-1`}
-                      onClick={() => handleCardClick(action.path)}
-                    >
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between mb-4">
-                          <div
-                            className={`w-12 h-12 rounded-xl ${action.bgColor} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm`}
-                          >
-                            <action.icon
-                              className={`h-6 w-6 ${action.iconColor}`}
-                            />
-                          </div>
-                          {action.badge && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs border-border dark:border-border"
-                            >
-                              {action.badge}
-                            </Badge>
-                          )}
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-2 group-hover:text-primary dark:group-hover:text-primary-light transition-colors duration-200">
-                          {action.title}
-                        </h3>
-                        <p className="text-muted-foreground dark:text-muted-foreground text-sm mb-3">
-                          {action.description}
-                        </p>
-                        <div className="flex items-center text-xs text-muted-foreground dark:text-muted-foreground font-medium">
-                          <span>Click to manage</span>
-                          <CheckCircle2 className="h-3 w-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recent Orders & Activities */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Recent Orders */}
-                <Card className="bg-card/70 dark:bg-card/70 backdrop-blur-sm border-border dark:border-border shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
-                      <ShoppingCart className="h-5 w-5 text-primary dark:text-primary-light" />
-                      Recent Orders
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {recentOrders.slice(0, 5).map((order) => (
-                        <div
-                          key={order.id}
-                          className="flex items-center justify-between p-3 rounded-lg bg-muted dark:bg-muted"
-                        >
-                          <div>
-                            <p className="font-medium text-sm">
-                              {order.order_number}
-                            </p>
-                            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-                              {order.customer_name}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-sm">
-                              {formatCurrency(order.total_amount)}
-                            </p>
-                            <Badge
-                              variant={
-                                order.status === "completed"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                              className="text-xs"
-                            >
-                              {order.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => handleCardClick("/admin/orders")}
-                      >
-                        View All Orders
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Recent Activities */}
-                <Card className="bg-card/70 dark:bg-card/70 backdrop-blur-sm border-border dark:border-border shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
-                      <Activity className="h-5 w-5 text-accent dark:text-accent-light" />
-                      Recent Activities
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {recentActivities.slice(0, 5).map((activity) => (
-                        <div
-                          key={activity.id}
-                          className="flex items-start gap-3 p-3 rounded-lg bg-muted dark:bg-muted"
-                        >
-                          <div className="w-2 h-2 rounded-full bg-primary dark:bg-primary-light mt-2"></div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">
-                              {activity.description}
-                            </p>
-                            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-                              {activity.admin_name} • {activity.time_ago}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => handleCardClick("/admin/analytics")}
-                      >
-                        View All Activities
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-            {/* Analytics Tab */}
-            <TabsContent value="analytics" className="space-y-8">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <InteractiveChart
-                  title="Weekly Performance"
-                  data={weeklyPerformanceData}
-                  type="line"
-                  height={300}
-                  colors={["#3B82F6", "#10B981", "#F59E0B"]}
-                />
-                <InteractiveChart
-                  title="Revenue Trends"
-                  data={revenueData}
-                  type="area"
-                  height={300}
-                  colors={["#10B981"]}
-                />
-              </div>
-              <InteractiveChart
-                title="User Growth"
-                data={userGrowthData}
-                type="bar"
-                height={300}
-                colors={["#8B5CF6", "#F97316"]}
+          {/* Top KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            {kpiCards.map((card, index) => (
+              <UnifiedStatsCard
+                key={index}
+                title={card.title}
+                value={card.value}
+                subtitle={card.subtitle}
+                icon={card.icon}
+                trend={card.trend}
+                color={card.color}
+                variant="advanced"
+                isLoading={refreshing}
               />
-            </TabsContent>
+            ))}
+          </div>
 
-            {/* Activity Tab */}
-            <TabsContent value="activity" className="space-y-8">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="bg-card/70 dark:bg-card/70 backdrop-blur-sm border-border dark:border-border shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
-                      <Activity className="h-5 w-5 text-primary dark:text-primary-light" />
-                      Recent Admin Activities
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {recentActivities.map((activity) => (
-                        <div
-                          key={activity.id}
-                          className="flex items-start gap-3 p-4 rounded-lg border border-border dark:border-border"
-                        >
-                          <div className="w-3 h-3 rounded-full bg-primary dark:bg-primary-light mt-1"></div>
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">
-                              {activity.description}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-muted-foreground dark:text-muted-foreground">
-                                {activity.admin_name}
-                              </span>
-                              <span className="text-xs text-muted-foreground dark:text-muted-foreground">
-                                •
-                              </span>
-                              <span className="text-xs text-muted-foreground dark:text-muted-foreground">
-                                {activity.time_ago}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+          {/* Quick Trends */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold bg-gradient-to-r from-foreground to-muted-foreground dark:from-foreground dark:to-muted-foreground bg-clip-text text-transparent">
+              Quick Trends
+            </h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="bg-card/70 dark:bg-card/70 backdrop-blur-sm border-border dark:border-border shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
+                    <BarChart3 className="h-5 w-5 text-primary dark:text-primary-light" />
+                    Sales Trend
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {revenueTrend ? (
+                    <InteractiveChart
+                      title=""
+                      data={revenueTrend.data}
+                      type="bar"
+                      height={200}
+                      showLegend={false}
+                    />
+                  ) : (
+                    <div className="h-32 flex items-center justify-center text-muted-foreground">
+                      Loading revenue data...
                     </div>
-                  </CardContent>
-                </Card>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="bg-card/70 dark:bg-card/70 backdrop-blur-sm border-border dark:border-border shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
+                    <Users className="h-5 w-5 text-accent dark:text-accent-light" />
+                    Growth Analytics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {growthAnalytics ? (
+                    <InteractiveChart
+                      title=""
+                      data={growthAnalytics.data}
+                      type="area"
+                      height={200}
+                      showLegend={true}
+                    />
+                  ) : (
+                    <div className="h-32 flex items-center justify-center text-muted-foreground">
+                      Loading growth data...
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
 
-                <SystemAlerts />
+          {/* AI Summary Widget */}
+          <Card className="bg-gradient-to-r from-primary/5 to-accent/5 dark:from-primary/10 dark:to-accent/10 border-primary/20 dark:border-primary/30 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
+                <Activity className="h-5 w-5 text-primary dark:text-primary-light" />
+                Here's what's happening today
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <p className="text-muted-foreground dark:text-muted-foreground">
+                  {stats ? (
+                    <>
+                      Today, you have{" "}
+                      <strong>{stats.orders_today} orders</strong> placed,
+                      generating{" "}
+                      <strong>{formatCurrency(stats.revenue_today)}</strong> in
+                      revenue.{" "}
+                      {stats.pending_chef_approvals > 0 && (
+                        <>
+                          There are{" "}
+                          <strong>
+                            {stats.pending_chef_approvals} chef approvals
+                          </strong>{" "}
+                          pending review.{" "}
+                        </>
+                      )}
+                      System health is at{" "}
+                      <strong>{stats.system_health_score}%</strong> with{" "}
+                      <strong>{stats.active_sessions} active sessions</strong>.
+                    </>
+                  ) : (
+                    "Loading today's summary..."
+                  )}
+                </p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
+                  <RefreshCw className="h-4 w-4" />
+                  <span>
+                    Updated{" "}
+                    {lastRefresh
+                      ? lastRefresh.toLocaleTimeString()
+                      : "just now"}
+                  </span>
+                </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Recent Activity Feed */}
+          <Card className="bg-card/70 dark:bg-card/70 backdrop-blur-sm border-border dark:border-border shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
+                <Activity className="h-5 w-5 text-accent dark:text-accent-light" />
+                Recent Activity Feed
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentActivities.slice(0, 10).map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="flex items-start gap-3 p-4 rounded-lg border border-border dark:border-border hover:bg-muted dark:hover:bg-muted transition-colors"
+                  >
+                    <div className="w-3 h-3 rounded-full bg-primary dark:bg-primary-light mt-1"></div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm text-foreground dark:text-foreground">
+                        {activity.description}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+                          {activity.admin_name}
+                        </span>
+                        <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+                          •
+                        </span>
+                        <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+                          {activity.time_ago}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {recentOrders.slice(0, 5).map((order) => (
+                  <div
+                    key={`order-${order.id}`}
+                    className="flex items-start gap-3 p-4 rounded-lg border border-border dark:border-border hover:bg-muted dark:hover:bg-muted transition-colors"
+                  >
+                    <div className="w-3 h-3 rounded-full bg-success dark:bg-success-light mt-1"></div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm text-foreground dark:text-foreground">
+                        New order #{order.order_number} from{" "}
+                        {order.customer_name}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+                          {formatCurrency(order.total_amount)}
+                        </span>
+                        <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+                          •
+                        </span>
+                        <Badge
+                          variant={
+                            order.status === "delivered"
+                              ? "default"
+                              : "secondary"
+                          }
+                          className="text-xs"
+                        >
+                          {order.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleCardClick("/admin/analytics")}
+                >
+                  View All Activities
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

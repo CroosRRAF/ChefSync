@@ -1,35 +1,31 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
+import { adminService, type AdminNotification } from "@/services/adminService";
 import {
+  AlertTriangle,
   Bell,
   BellRing,
   Check,
   CheckCheck,
-  X,
-  MoreHorizontal,
-  Settings,
-  Filter,
-  Archive,
-  Trash2,
-  AlertTriangle,
-  Info,
   CheckCircle,
+  Info,
+  MoreHorizontal,
+  RefreshCw,
+  Settings,
   XCircle,
-  RefreshCw
-} from 'lucide-react';
-import { adminService, type AdminNotification } from '@/services/adminService';
-import { useAuth } from '@/context/AuthContext';
-import { useTheme } from '@/context/ThemeContext';
+} from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 interface NotificationCenterProps {
   className?: string;
@@ -38,74 +34,88 @@ interface NotificationCenterProps {
   refreshInterval?: number;
 }
 
-type NotificationFilter = 'all' | 'unread' | 'high' | 'medium' | 'low';
+type NotificationFilter = "all" | "unread" | "high" | "medium" | "low";
 
 const NotificationCenter: React.FC<NotificationCenterProps> = ({
-  className = '',
+  className = "",
   maxNotifications = 50,
   autoRefresh = true,
-  refreshInterval = 30000 // 30 seconds
+  refreshInterval = 30000, // 30 seconds
 }) => {
   const { user } = useAuth();
   const { theme } = useTheme();
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<NotificationFilter>('all');
+  const [filter, setFilter] = useState<NotificationFilter>("all");
   const [isOpen, setIsOpen] = useState(false);
 
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== "admin") {
       setNotifications([]);
       setLoading(false);
       return;
     }
-    
+
     try {
       setLoading(true);
       setError(null);
       const response = await adminService.getNotifications({
-        is_active: true
+        is_active: true,
       });
-      
-      // Handle paginated response
-      if (response && typeof response === 'object' && 'results' in response) {
-        const notificationsArray = response.results;
-        
+
+      // Handle normalized response format: { notifications: [...] }
+      if (
+        response &&
+        typeof response === "object" &&
+        "notifications" in response
+      ) {
+        const notificationsArray = response.notifications;
+
         if (Array.isArray(notificationsArray)) {
           // Sort by creation date (newest first) and limit to maxNotifications
-          const sortedNotifications = [...notificationsArray].sort((a, b) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          ).slice(0, maxNotifications);
-          
+          const sortedNotifications = [...notificationsArray]
+            .sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime()
+            )
+            .slice(0, maxNotifications);
+
           setNotifications(sortedNotifications);
         } else {
-          console.error('Results is not an array:', notificationsArray);
-          setError('Failed to load notifications: Invalid data format');
+          console.error("Notifications is not an array:", notificationsArray);
+          setError("Failed to load notifications: Invalid data format");
           setNotifications([]);
         }
       } else {
-        console.error('Unexpected API response format:', response);
-        setError('Failed to load notifications: Invalid response format');
+        console.error("Unexpected API response format:", response);
+        setError("Failed to load notifications: Invalid response format");
         setNotifications([]);
       }
     } catch (err: any) {
-      console.error('Error fetching notifications:', err);
-      
+      console.error("Error fetching notifications:", err);
+
       // Handle authentication errors gracefully
-      if (err?.response?.status === 401 || err?.code === 'token_not_valid') {
-        console.warn('NotificationCenter: Authentication required - user may need to log in');
+      if (err?.response?.status === 401 || err?.code === "token_not_valid") {
+        console.warn(
+          "NotificationCenter: Authentication required - user may need to log in"
+        );
         // Don't show error for auth issues, just set empty notifications
         setNotifications([]);
         setError(null);
       } else if (err?.response?.status === 403) {
-        console.warn('NotificationCenter: User does not have admin permissions');
+        console.warn(
+          "NotificationCenter: User does not have admin permissions"
+        );
         setNotifications([]);
         setError(null);
       } else {
         // Show error for other issues
-        setError(err instanceof Error ? err.message : 'Failed to fetch notifications');
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch notifications"
+        );
         setNotifications([]);
       }
     } finally {
@@ -117,15 +127,15 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const markAsRead = useCallback(async (notificationId: number) => {
     try {
       await adminService.markNotificationRead(notificationId);
-      setNotifications(prev => 
-        prev.map(notif => 
-          notif.id === notificationId 
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          notif.id === notificationId
             ? { ...notif, is_read: true, read_at: new Date().toISOString() }
             : notif
         )
       );
     } catch (err) {
-      console.error('Failed to mark notification as read:', err);
+      console.error("Failed to mark notification as read:", err);
     }
   }, []);
 
@@ -133,90 +143,130 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const markAllAsRead = useCallback(async () => {
     try {
       await adminService.markAllNotificationsRead();
-      setNotifications(prev => 
-        prev.map(notif => ({ 
-          ...notif, 
-          is_read: true, 
-          read_at: new Date().toISOString() 
+      setNotifications((prev) =>
+        prev.map((notif) => ({
+          ...notif,
+          is_read: true,
+          read_at: new Date().toISOString(),
         }))
       );
     } catch (err) {
-      console.error('Failed to mark all notifications as read:', err);
+      console.error("Failed to mark all notifications as read:", err);
     }
   }, []);
 
   // Get notification icon
-  const getNotificationIcon = useCallback((type: string, priority: string, theme: 'light' | 'dark') => {
-    const iconClass = "h-4 w-4";
-    
-    if (priority === 'high') {
-      return <AlertTriangle className={iconClass} style={{
-        color: theme === 'light' ? '#EF4444' : '#F87171'
-      }} />;
-    }
-    
-    switch (type) {
-      case 'system':
-        return <Settings className={iconClass} style={{
-          color: theme === 'light' ? '#3B82F6' : '#60A5FA'
-        }} />;
-      case 'user':
-        return <Info className={iconClass} style={{
-          color: theme === 'light' ? '#10B981' : '#34D399'
-        }} />;
-      case 'order':
-        return <CheckCircle className={iconClass} style={{
-          color: theme === 'light' ? '#7C3AED' : '#A78BFA'
-        }} />;
-      case 'error':
-        return <XCircle className={iconClass} style={{
-          color: theme === 'light' ? '#EF4444' : '#F87171'
-        }} />;
-      default:
-        return <Info className={iconClass} style={{
-          color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-        }} />;
-    }
-  }, []);
+  const getNotificationIcon = useCallback(
+    (type: string, priority: string, theme: "light" | "dark") => {
+      const iconClass = "h-4 w-4";
+
+      if (priority === "high") {
+        return (
+          <AlertTriangle
+            className={iconClass}
+            style={{
+              color: theme === "light" ? "#EF4444" : "#F87171",
+            }}
+          />
+        );
+      }
+
+      switch (type) {
+        case "system":
+          return (
+            <Settings
+              className={iconClass}
+              style={{
+                color: theme === "light" ? "#3B82F6" : "#60A5FA",
+              }}
+            />
+          );
+        case "user":
+          return (
+            <Info
+              className={iconClass}
+              style={{
+                color: theme === "light" ? "#10B981" : "#34D399",
+              }}
+            />
+          );
+        case "order":
+          return (
+            <CheckCircle
+              className={iconClass}
+              style={{
+                color: theme === "light" ? "#7C3AED" : "#A78BFA",
+              }}
+            />
+          );
+        case "error":
+          return (
+            <XCircle
+              className={iconClass}
+              style={{
+                color: theme === "light" ? "#EF4444" : "#F87171",
+              }}
+            />
+          );
+        default:
+          return (
+            <Info
+              className={iconClass}
+              style={{
+                color: theme === "light" ? "#6B7280" : "#9CA3AF",
+              }}
+            />
+          );
+      }
+    },
+    []
+  );
 
   // Get priority color
-  const getPriorityColor = useCallback((priority: string, theme: 'light' | 'dark') => {
-    switch (priority) {
-      case 'high':
-        return {
-          backgroundColor: theme === 'light' ? '#FEF2F2' : 'rgba(239, 68, 68, 0.15)',
-          color: theme === 'light' ? '#EF4444' : '#F87171'
-        };
-      case 'medium':
-        return {
-          backgroundColor: theme === 'light' ? '#FFFBEB' : 'rgba(245, 158, 11, 0.15)',
-          color: theme === 'light' ? '#FACC15' : '#FCD34D'
-        };
-      case 'low':
-        return {
-          backgroundColor: theme === 'light' ? '#ECFDF5' : 'rgba(16, 185, 129, 0.15)',
-          color: theme === 'light' ? '#10B981' : '#34D399'
-        };
-      default:
-        return {
-          backgroundColor: theme === 'light' ? '#F9FAFB' : 'rgba(107, 114, 128, 0.15)',
-          color: theme === 'light' ? '#6B7280' : '#9CA3AF'
-        };
-    }
-  }, []);
+  const getPriorityColor = useCallback(
+    (priority: string, theme: "light" | "dark") => {
+      switch (priority) {
+        case "high":
+          return {
+            backgroundColor:
+              theme === "light" ? "#FEF2F2" : "rgba(239, 68, 68, 0.15)",
+            color: theme === "light" ? "#EF4444" : "#F87171",
+          };
+        case "medium":
+          return {
+            backgroundColor:
+              theme === "light" ? "#FFFBEB" : "rgba(245, 158, 11, 0.15)",
+            color: theme === "light" ? "#FACC15" : "#FCD34D",
+          };
+        case "low":
+          return {
+            backgroundColor:
+              theme === "light" ? "#ECFDF5" : "rgba(16, 185, 129, 0.15)",
+            color: theme === "light" ? "#10B981" : "#34D399",
+          };
+        default:
+          return {
+            backgroundColor:
+              theme === "light" ? "#F9FAFB" : "rgba(107, 114, 128, 0.15)",
+            color: theme === "light" ? "#6B7280" : "#9CA3AF",
+          };
+      }
+    },
+    []
+  );
 
   // Filter notifications
   const filteredNotifications = useMemo(() => {
-    return notifications.filter(notification => {
+    return notifications.filter((notification) => {
       switch (filter) {
-        case 'unread':
+        case "unread":
           return !notification.is_read;
-        case 'high':
-          return notification.priority === 'high';
-        case 'medium':
-          return notification.priority === 'medium';
-        case 'low':
-          return notification.priority === 'low';
+        case "high":
+          return notification.priority === "high";
+        case "medium":
+          return notification.priority === "medium";
+        case "low":
+          return notification.priority === "low";
         default:
           return true;
       }
@@ -225,7 +275,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   // Get unread count
   const unreadCount = useMemo(() => {
-    return notifications.filter(n => !n.is_read).length;
+    return notifications.filter((n) => !n.is_read).length;
   }, [notifications]);
 
   // Auto refresh effect
@@ -235,7 +285,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
       const interval = setInterval(fetchNotifications, refreshInterval);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, refreshInterval, fetchNotifications, user?.id]);  // Manual refresh
+  }, [autoRefresh, refreshInterval, fetchNotifications, user?.id]); // Manual refresh
   const handleRefresh = () => {
     fetchNotifications();
   };
@@ -256,16 +306,16 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
               <Bell className="h-4 w-4" />
             )}
             {unreadCount > 0 && (
-              <Badge 
-                variant="destructive" 
+              <Badge
+                variant="destructive"
                 className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
               >
-                {unreadCount > 99 ? '99+' : unreadCount}
+                {unreadCount > 99 ? "99+" : unreadCount}
               </Badge>
             )}
           </Button>
         </DropdownMenuTrigger>
-        
+
         <DropdownMenuContent align="end" className="w-80 p-0">
           <Card className="border-0 shadow-lg">
             <CardHeader className="pb-3">
@@ -278,7 +328,9 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     onClick={handleRefresh}
                     disabled={loading}
                   >
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    <RefreshCw
+                      className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                    />
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -300,19 +352,19 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   </DropdownMenu>
                 </div>
               </div>
-              
+
               {/* Filter Tabs */}
               <div className="flex space-x-1">
                 {[
-                  { key: 'all', label: 'All' },
-                  { key: 'unread', label: 'Unread' },
-                  { key: 'high', label: 'High' },
-                  { key: 'medium', label: 'Medium' },
-                  { key: 'low', label: 'Low' }
+                  { key: "all", label: "All" },
+                  { key: "unread", label: "Unread" },
+                  { key: "high", label: "High" },
+                  { key: "medium", label: "Medium" },
+                  { key: "low", label: "Low" },
                 ].map((tab) => (
                   <Button
                     key={tab.key}
-                    variant={filter === tab.key ? 'default' : 'ghost'}
+                    variant={filter === tab.key ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setFilter(tab.key as NotificationFilter)}
                     className="text-xs"
@@ -322,14 +374,14 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 ))}
               </div>
             </CardHeader>
-            
+
             <CardContent className="p-0">
               {error ? (
                 <div className="p-4 text-center text-red-500">
                   <div className="text-sm">{error}</div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={handleRefresh}
                     className="mt-2"
                   >
@@ -342,7 +394,9 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     <div className="p-8 text-center text-gray-500">
                       <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <div className="text-sm">
-                        {filter === 'all' ? 'No notifications' : `No ${filter} notifications`}
+                        {filter === "all"
+                          ? "No notifications"
+                          : `No ${filter} notifications`}
                       </div>
                     </div>
                   ) : (
@@ -352,49 +406,69 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           key={notification.id}
                           className="p-4 border-b hover:opacity-90 transition-colors"
                           style={{
-                            borderBottomColor: theme === 'light' ? '#E5E7EB' : '#374151',
-                            backgroundColor: !notification.is_read 
-                              ? (theme === 'light' ? '#EBF4FF' : 'rgba(59, 130, 246, 0.1)') 
-                              : 'transparent'
+                            borderBottomColor:
+                              theme === "light" ? "#E5E7EB" : "#374151",
+                            backgroundColor: !notification.is_read
+                              ? theme === "light"
+                                ? "#EBF4FF"
+                                : "rgba(59, 130, 246, 0.1)"
+                              : "transparent",
                           }}
                         >
                           <div className="flex items-start space-x-3">
                             <div className="flex-shrink-0 mt-1">
-                              {getNotificationIcon(notification.notification_type, notification.priority, theme)}
+                              {getNotificationIcon(
+                                notification.notification_type,
+                                notification.priority,
+                                theme
+                              )}
                             </div>
-                            
+
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between mb-1">
-                                <h4 className={`text-sm font-medium ${
-                                  !notification.is_read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
-                                }`}>
+                                <h4
+                                  className={`text-sm font-medium ${
+                                    !notification.is_read
+                                      ? "text-gray-900 dark:text-white"
+                                      : "text-gray-700 dark:text-gray-300"
+                                  }`}
+                                >
                                   {notification.title}
                                 </h4>
                                 <div className="flex items-center space-x-2">
-                                  <Badge 
-                                    variant="secondary" 
+                                  <Badge
+                                    variant="secondary"
                                     className="text-xs"
-                                    style={getPriorityColor(notification.priority, theme)}
+                                    style={getPriorityColor(
+                                      notification.priority,
+                                      theme
+                                    )}
                                   >
                                     {notification.priority}
                                   </Badge>
                                   {!notification.is_read && (
-                                    <div className="w-2 h-2 rounded-full" style={{
-                                      backgroundColor: theme === 'light' ? '#2563EB' : '#3B82F6'
-                                    }}></div>
+                                    <div
+                                      className="w-2 h-2 rounded-full"
+                                      style={{
+                                        backgroundColor:
+                                          theme === "light"
+                                            ? "#2563EB"
+                                            : "#3B82F6",
+                                      }}
+                                    ></div>
                                   )}
                                 </div>
                               </div>
-                              
+
                               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                                 {notification.message}
                               </p>
-                              
+
                               <div className="flex items-center justify-between">
                                 <span className="text-xs text-gray-500">
                                   {notification.time_ago}
                                 </span>
-                                
+
                                 {!notification.is_read && (
                                   <Button
                                     variant="ghost"

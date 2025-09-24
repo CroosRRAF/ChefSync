@@ -1,16 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Filter, Search, MoreHorizontal, ChevronDown, ArrowUpDown, RefreshCw, Eye, Info, ChevronLeft, ChevronRight } from 'lucide-react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +24,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -26,50 +39,62 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { toast } from '@/components/ui/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PaginationWrapper } from '@/components/ui/pagination-wrapper';
-import { Checkbox } from '@/components/ui/checkbox';
-import FoodForm from '@/components/admin/food/FoodForm';
-import CuisineForm from '@/components/admin/food/CuisineForm';
-import CategoryForm from '@/components/admin/food/CategoryForm';
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from '@/components/ui/dialog';
-import { Pagination } from '@/components/ui/pagination';
-import { useNavigate } from 'react-router-dom';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Separator } from '@/components/ui/separator';
-import { Food, Cuisine, FoodCategory } from '@/types/food';
-import { fetchFoods, fetchCuisines, fetchFoodCategories, fetchFood } from '@/services/foodService';
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/components/ui/use-toast";
+import {
+  fetchCuisines,
+  fetchFood,
+  fetchFoodCategories,
+  fetchFoods,
+} from "@/services/foodService";
+import { Cuisine, Food, FoodCategory } from "@/types/food";
+import {
+  ArrowUpDown,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Filter,
+  Info,
+  MoreHorizontal,
+  Plus,
+  RefreshCw,
+  Search,
+} from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const FoodManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('foods');
+  const [activeTab, setActiveTab] = useState("foods");
   const [foods, setFoods] = useState<Food[]>([]);
   const [cuisines, setCuisines] = useState<Cuisine[]>([]);
   const [categories, setCategories] = useState<FoodCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showFoodForm, setShowFoodForm] = useState(false);
   const [showCuisineForm, setShowCuisineForm] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
-  
+
   // Preview and detail view states
   const [showFoodDetail, setShowFoodDetail] = useState(false);
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
   const [foodDetailLoading, setFoodDetailLoading] = useState(false);
   const [foodDetails, setFoodDetails] = useState<Food | null>(null);
-  
+
   // Cuisine and category preview states
   const [showCuisineDetail, setShowCuisineDetail] = useState(false);
   const [selectedCuisine, setSelectedCuisine] = useState<Cuisine | null>(null);
   const [showCategoryDetail, setShowCategoryDetail] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<FoodCategory | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<FoodCategory | null>(
+    null
+  );
 
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     loadData();
   }, [activeTab, currentPage, searchTerm]);
@@ -78,28 +103,37 @@ const FoodManagement: React.FC = () => {
     setLoading(true);
     try {
       switch (activeTab) {
-        case 'foods':
-          const foodData = await fetchFoods({ page: currentPage, search: searchTerm });
+        case "foods":
+          const foodData = await fetchFoods({
+            page: currentPage,
+            search: searchTerm,
+          });
           setFoods(foodData.results || []);
           setTotalPages(Math.ceil(foodData.count / 10));
           break;
-        case 'cuisines':
-          const cuisineData = await fetchCuisines({ page: currentPage, search: searchTerm });
+        case "cuisines":
+          const cuisineData = await fetchCuisines({
+            page: currentPage,
+            search: searchTerm,
+          });
           setCuisines(cuisineData.results || []);
           setTotalPages(Math.ceil(cuisineData.count / 10));
           break;
-        case 'categories':
-          const categoryData = await fetchFoodCategories({ page: currentPage, search: searchTerm });
+        case "categories":
+          const categoryData = await fetchFoodCategories({
+            page: currentPage,
+            search: searchTerm,
+          });
           setCategories(categoryData.results || []);
           setTotalPages(Math.ceil(categoryData.count / 10));
           break;
       }
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error("Error loading data:", error);
       toast({
-        title: 'Error',
-        description: 'Failed to load data. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to load data. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -109,13 +143,13 @@ const FoodManagement: React.FC = () => {
   const handleAddNew = () => {
     setEditItem(null);
     switch (activeTab) {
-      case 'foods':
+      case "foods":
         setShowFoodForm(true);
         break;
-      case 'cuisines':
+      case "cuisines":
         setShowCuisineForm(true);
         break;
-      case 'categories':
+      case "categories":
         setShowCategoryForm(true);
         break;
     }
@@ -124,13 +158,13 @@ const FoodManagement: React.FC = () => {
   const handleEdit = (item: any) => {
     setEditItem(item);
     switch (activeTab) {
-      case 'foods':
+      case "foods":
         setShowFoodForm(true);
         break;
-      case 'cuisines':
+      case "cuisines":
         setShowCuisineForm(true);
         break;
-      case 'categories':
+      case "categories":
         setShowCategoryForm(true);
         break;
     }
@@ -156,15 +190,15 @@ const FoodManagement: React.FC = () => {
       setFoodDetailLoading(true);
       setShowFoodDetail(true);
       setFoodDetails(null); // Reset details while loading
-      
+
       const details = await fetchFood(food.id);
       setFoodDetails(details);
     } catch (err) {
-      console.error('Failed to fetch food details:', err);
+      console.error("Failed to fetch food details:", err);
       toast({
-        title: 'Error',
-        description: 'Failed to fetch food details',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to fetch food details",
+        variant: "destructive",
       });
       setFoodDetails(null); // Ensure foodDetails is null on error
     } finally {
@@ -240,7 +274,11 @@ const FoodManagement: React.FC = () => {
                 <TableCell className="font-medium">
                   <HoverCard>
                     <HoverCardTrigger asChild>
-                      <Button variant="link" className="p-0" onClick={() => handleFoodDetail(food)}>
+                      <Button
+                        variant="link"
+                        className="p-0"
+                        onClick={() => handleFoodDetail(food)}
+                      >
                         {food.name}
                       </Button>
                     </HoverCardTrigger>
@@ -248,7 +286,7 @@ const FoodManagement: React.FC = () => {
                       <div className="flex justify-between space-x-4">
                         {food.images && food.images.length > 0 ? (
                           <div className="w-16 h-16 rounded-md overflow-hidden">
-                            <img 
+                            <img
                               src={food.images[0].image}
                               alt={food.name}
                               className="h-full w-full object-cover"
@@ -262,17 +300,32 @@ const FoodManagement: React.FC = () => {
                         <div className="space-y-1 flex-1">
                           <h4 className="text-sm font-semibold">{food.name}</h4>
                           <p className="text-xs text-muted-foreground line-clamp-2">
-                            {food.description || 'No description available'}
+                            {food.description || "No description available"}
                           </p>
                           <div className="flex gap-2 flex-wrap">
                             {food.is_vegetarian && (
-                              <Badge variant="outline" className="text-green-600 bg-green-50">Vegetarian</Badge>
+                              <Badge
+                                variant="outline"
+                                className="text-green-600 bg-green-50"
+                              >
+                                Vegetarian
+                              </Badge>
                             )}
                             {food.is_vegan && (
-                              <Badge variant="outline" className="text-green-700 bg-green-50">Vegan</Badge>
+                              <Badge
+                                variant="outline"
+                                className="text-green-700 bg-green-50"
+                              >
+                                Vegan
+                              </Badge>
                             )}
                             {food.is_gluten_free && (
-                              <Badge variant="outline" className="text-amber-600 bg-amber-50">Gluten-Free</Badge>
+                              <Badge
+                                variant="outline"
+                                className="text-amber-600 bg-amber-50"
+                              >
+                                Gluten-Free
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -280,32 +333,55 @@ const FoodManagement: React.FC = () => {
                       <Separator className="my-2" />
                       <div className="grid grid-cols-2 gap-1 text-xs">
                         <div className="text-muted-foreground">Price:</div>
-                        <div className="font-medium">${typeof food.price === 'number' ? food.price.toFixed(2) : parseFloat(food.price).toFixed(2)}</div>
-                        
+                        <div className="font-medium">
+                          $
+                          {typeof food.price === "number"
+                            ? food.price.toFixed(2)
+                            : parseFloat(food.price).toFixed(2)}
+                        </div>
+
                         <div className="text-muted-foreground">Category:</div>
-                        <div>{food.category_name || 'Uncategorized'}</div>
-                        
+                        <div>{food.category_name || "Uncategorized"}</div>
+
                         <div className="text-muted-foreground">Cuisine:</div>
-                        <div>{food.cuisine_name || 'N/A'}</div>
-                        
+                        <div>{food.cuisine_name || "N/A"}</div>
+
                         <div className="text-muted-foreground">Prep Time:</div>
                         <div>{food.preparation_time} mins</div>
-                        
+
                         <div className="text-muted-foreground">Rating:</div>
-                        <div>{typeof food.rating_average === 'number' ? food.rating_average.toFixed(1) : parseFloat(String(food.rating_average)).toFixed(1)} ⭐ ({food.total_reviews} reviews)</div>
+                        <div>
+                          {typeof food.rating_average === "number"
+                            ? food.rating_average.toFixed(1)
+                            : parseFloat(String(food.rating_average)).toFixed(
+                                1
+                              )}{" "}
+                          ⭐ ({food.total_reviews} reviews)
+                        </div>
                       </div>
-                      <Button size="sm" className="w-full mt-3" onClick={() => handleFoodDetail(food)}>
+                      <Button
+                        size="sm"
+                        className="w-full mt-3"
+                        onClick={() => handleFoodDetail(food)}
+                      >
                         View Details
                       </Button>
                     </HoverCardContent>
                   </HoverCard>
                 </TableCell>
-                <TableCell>{food.category_name || 'Uncategorized'}</TableCell>
-                <TableCell>{food.cuisine_name || 'N/A'}</TableCell>
-                <TableCell>${typeof food.price === 'number' ? food.price.toFixed(2) : parseFloat(food.price).toFixed(2)}</TableCell>
+                <TableCell>{food.category_name || "Uncategorized"}</TableCell>
+                <TableCell>{food.cuisine_name || "N/A"}</TableCell>
                 <TableCell>
-                  <Badge variant={food.is_available ? "default" : "destructive"}>
-                    {food.is_available ? 'Available' : 'Unavailable'}
+                  $
+                  {typeof food.price === "number"
+                    ? food.price.toFixed(2)
+                    : parseFloat(food.price).toFixed(2)}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={food.is_available ? "default" : "destructive"}
+                  >
+                    {food.is_available ? "Available" : "Unavailable"}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -329,7 +405,9 @@ const FoodManagement: React.FC = () => {
                         <DropdownMenuItem onClick={() => handleEdit(food)}>
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleFoodDetail(food)}>
+                        <DropdownMenuItem
+                          onClick={() => handleFoodDetail(food)}
+                        >
                           View Details
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -406,7 +484,11 @@ const FoodManagement: React.FC = () => {
                 <TableCell className="font-medium">
                   <HoverCard>
                     <HoverCardTrigger asChild>
-                      <Button variant="link" className="p-0" onClick={() => handleCuisineDetail(cuisine)}>
+                      <Button
+                        variant="link"
+                        className="p-0"
+                        onClick={() => handleCuisineDetail(cuisine)}
+                      >
                         {cuisine.name}
                       </Button>
                     </HoverCardTrigger>
@@ -414,7 +496,7 @@ const FoodManagement: React.FC = () => {
                       <div className="flex justify-between space-x-4">
                         {cuisine.image ? (
                           <div className="w-16 h-16 rounded-md overflow-hidden">
-                            <img 
+                            <img
                               src={cuisine.image}
                               alt={cuisine.name}
                               className="h-full w-full object-cover"
@@ -426,9 +508,11 @@ const FoodManagement: React.FC = () => {
                           </div>
                         )}
                         <div className="space-y-1 flex-1">
-                          <h4 className="text-sm font-semibold">{cuisine.name}</h4>
+                          <h4 className="text-sm font-semibold">
+                            {cuisine.name}
+                          </h4>
                           <p className="text-xs text-muted-foreground line-clamp-3">
-                            {cuisine.description || 'No description available'}
+                            {cuisine.description || "No description available"}
                           </p>
                         </div>
                       </div>
@@ -436,26 +520,37 @@ const FoodManagement: React.FC = () => {
                       <div className="grid grid-cols-2 gap-1 text-xs">
                         <div className="text-muted-foreground">Status:</div>
                         <div>
-                          <Badge variant={cuisine.is_active ? "default" : "destructive"} className="text-xs">
-                            {cuisine.is_active ? 'Active' : 'Inactive'}
+                          <Badge
+                            variant={
+                              cuisine.is_active ? "default" : "destructive"
+                            }
+                            className="text-xs"
+                          >
+                            {cuisine.is_active ? "Active" : "Inactive"}
                           </Badge>
                         </div>
-                        
+
                         <div className="text-muted-foreground">Sort Order:</div>
                         <div>{cuisine.sort_order}</div>
                       </div>
-                      <Button size="sm" className="w-full mt-3" onClick={() => handleCuisineDetail(cuisine)}>
+                      <Button
+                        size="sm"
+                        className="w-full mt-3"
+                        onClick={() => handleCuisineDetail(cuisine)}
+                      >
                         View Details
                       </Button>
                     </HoverCardContent>
                   </HoverCard>
                 </TableCell>
                 <TableCell className="max-w-[300px] truncate">
-                  {cuisine.description || 'No description'}
+                  {cuisine.description || "No description"}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={cuisine.is_active ? "default" : "destructive"}>
-                    {cuisine.is_active ? 'Active' : 'Inactive'}
+                  <Badge
+                    variant={cuisine.is_active ? "default" : "destructive"}
+                  >
+                    {cuisine.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -479,7 +574,9 @@ const FoodManagement: React.FC = () => {
                         <DropdownMenuItem onClick={() => handleEdit(cuisine)}>
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleCuisineDetail(cuisine)}>
+                        <DropdownMenuItem
+                          onClick={() => handleCuisineDetail(cuisine)}
+                        >
                           View Details
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -557,7 +654,11 @@ const FoodManagement: React.FC = () => {
                 <TableCell className="font-medium">
                   <HoverCard>
                     <HoverCardTrigger asChild>
-                      <Button variant="link" className="p-0" onClick={() => handleCategoryDetail(category)}>
+                      <Button
+                        variant="link"
+                        className="p-0"
+                        onClick={() => handleCategoryDetail(category)}
+                      >
                         {category.name}
                       </Button>
                     </HoverCardTrigger>
@@ -565,7 +666,7 @@ const FoodManagement: React.FC = () => {
                       <div className="flex justify-between space-x-4">
                         {category.image ? (
                           <div className="w-16 h-16 rounded-md overflow-hidden">
-                            <img 
+                            <img
                               src={category.image}
                               alt={category.name}
                               className="h-full w-full object-cover"
@@ -577,40 +678,53 @@ const FoodManagement: React.FC = () => {
                           </div>
                         )}
                         <div className="space-y-1 flex-1">
-                          <h4 className="text-sm font-semibold">{category.name}</h4>
+                          <h4 className="text-sm font-semibold">
+                            {category.name}
+                          </h4>
                           <p className="text-xs text-muted-foreground line-clamp-3">
-                            {category.description || 'No description available'}
+                            {category.description || "No description available"}
                           </p>
                         </div>
                       </div>
                       <Separator className="my-2" />
                       <div className="grid grid-cols-2 gap-1 text-xs">
                         <div className="text-muted-foreground">Cuisine:</div>
-                        <div>{category.cuisine_name || 'N/A'}</div>
-                        
+                        <div>{category.cuisine_name || "N/A"}</div>
+
                         <div className="text-muted-foreground">Status:</div>
                         <div>
-                          <Badge variant={category.is_active ? "default" : "destructive"} className="text-xs">
-                            {category.is_active ? 'Active' : 'Inactive'}
+                          <Badge
+                            variant={
+                              category.is_active ? "default" : "destructive"
+                            }
+                            className="text-xs"
+                          >
+                            {category.is_active ? "Active" : "Inactive"}
                           </Badge>
                         </div>
-                        
+
                         <div className="text-muted-foreground">Sort Order:</div>
                         <div>{category.sort_order}</div>
                       </div>
-                      <Button size="sm" className="w-full mt-3" onClick={() => handleCategoryDetail(category)}>
+                      <Button
+                        size="sm"
+                        className="w-full mt-3"
+                        onClick={() => handleCategoryDetail(category)}
+                      >
                         View Details
                       </Button>
                     </HoverCardContent>
                   </HoverCard>
                 </TableCell>
-                <TableCell>{category.cuisine_name || 'N/A'}</TableCell>
+                <TableCell>{category.cuisine_name || "N/A"}</TableCell>
                 <TableCell className="max-w-[300px] truncate">
-                  {category.description || 'No description'}
+                  {category.description || "No description"}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={category.is_active ? "default" : "destructive"}>
-                    {category.is_active ? 'Active' : 'Inactive'}
+                  <Badge
+                    variant={category.is_active ? "default" : "destructive"}
+                  >
+                    {category.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -634,7 +748,9 @@ const FoodManagement: React.FC = () => {
                         <DropdownMenuItem onClick={() => handleEdit(category)}>
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleCategoryDetail(category)}>
+                        <DropdownMenuItem
+                          onClick={() => handleCategoryDetail(category)}
+                        >
                           View Details
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -677,7 +793,11 @@ const FoodManagement: React.FC = () => {
         </Button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <TabsList className="mb-4 md:mb-0">
             <TabsTrigger value="foods">Food Items</TabsTrigger>
@@ -710,33 +830,38 @@ const FoodManagement: React.FC = () => {
                 Manage all food items available in your restaurant
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              {renderFoodsTable()}
-            </CardContent>
+            <CardContent className="p-0">{renderFoodsTable()}</CardContent>
             <CardFooter className="flex items-center justify-between p-4">
               <div className="text-sm text-muted-foreground">
-                {foods.length > 0 && `Showing ${foods.length} of ${foods.length * totalPages} items`}
+                {foods.length > 0 &&
+                  `Showing ${foods.length} of ${
+                    foods.length * totalPages
+                  } items`}
               </div>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    currentPage > 1 && setCurrentPage(currentPage - 1)
+                  }
                   disabled={currentPage === 1}
                   className="h-8 w-8 p-0"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   <span className="sr-only">Previous page</span>
                 </Button>
-                
+
                 <span className="text-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </span>
-                
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    currentPage < totalPages && setCurrentPage(currentPage + 1)
+                  }
                   disabled={currentPage === totalPages}
                   className="h-8 w-8 p-0"
                 >
@@ -756,33 +881,38 @@ const FoodManagement: React.FC = () => {
                 Manage different types of cuisines
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              {renderCuisinesTable()}
-            </CardContent>
+            <CardContent className="p-0">{renderCuisinesTable()}</CardContent>
             <CardFooter className="flex items-center justify-between p-4">
               <div className="text-sm text-muted-foreground">
-                {cuisines.length > 0 && `Showing ${cuisines.length} of ${cuisines.length * totalPages} items`}
+                {cuisines.length > 0 &&
+                  `Showing ${cuisines.length} of ${
+                    cuisines.length * totalPages
+                  } items`}
               </div>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    currentPage > 1 && setCurrentPage(currentPage - 1)
+                  }
                   disabled={currentPage === 1}
                   className="h-8 w-8 p-0"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   <span className="sr-only">Previous page</span>
                 </Button>
-                
+
                 <span className="text-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </span>
-                
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    currentPage < totalPages && setCurrentPage(currentPage + 1)
+                  }
                   disabled={currentPage === totalPages}
                   className="h-8 w-8 p-0"
                 >
@@ -802,33 +932,38 @@ const FoodManagement: React.FC = () => {
                 Manage food categories within cuisines
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              {renderCategoriesTable()}
-            </CardContent>
+            <CardContent className="p-0">{renderCategoriesTable()}</CardContent>
             <CardFooter className="flex items-center justify-between p-4">
               <div className="text-sm text-muted-foreground">
-                {categories.length > 0 && `Showing ${categories.length} of ${categories.length * totalPages} items`}
+                {categories.length > 0 &&
+                  `Showing ${categories.length} of ${
+                    categories.length * totalPages
+                  } items`}
               </div>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    currentPage > 1 && setCurrentPage(currentPage - 1)
+                  }
                   disabled={currentPage === 1}
                   className="h-8 w-8 p-0"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   <span className="sr-only">Previous page</span>
                 </Button>
-                
+
                 <span className="text-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </span>
-                
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    currentPage < totalPages && setCurrentPage(currentPage + 1)
+                  }
                   disabled={currentPage === totalPages}
                   className="h-8 w-8 p-0"
                 >
@@ -844,45 +979,58 @@ const FoodManagement: React.FC = () => {
       {/* Food Form Dialog */}
       <Dialog open={showFoodForm} onOpenChange={setShowFoodForm}>
         <DialogContent className="max-w-4xl">
-          <DialogTitle>{editItem ? 'Edit Food Item' : 'Add New Food Item'}</DialogTitle>
+          <DialogTitle>
+            {editItem ? "Edit Food Item" : "Add New Food Item"}
+          </DialogTitle>
           <DialogDescription>
-            Fill in the details to {editItem ? 'update' : 'create'} a food item
+            Fill in the details to {editItem ? "update" : "create"} a food item
           </DialogDescription>
-          <FoodForm 
-            food={editItem} 
-            onSubmit={handleFormSubmit} 
-            onCancel={() => setShowFoodForm(false)} 
-          />
+          <div className="p-8 text-center">
+            <Info className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Food Form</h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Food management functionality is under development.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Cuisine Form Dialog */}
       <Dialog open={showCuisineForm} onOpenChange={setShowCuisineForm}>
         <DialogContent>
-          <DialogTitle>{editItem ? 'Edit Cuisine' : 'Add New Cuisine'}</DialogTitle>
+          <DialogTitle>
+            {editItem ? "Edit Cuisine" : "Add New Cuisine"}
+          </DialogTitle>
           <DialogDescription>
-            Fill in the details to {editItem ? 'update' : 'create'} a cuisine
+            Fill in the details to {editItem ? "update" : "create"} a cuisine
           </DialogDescription>
-          <CuisineForm 
-            cuisine={editItem} 
-            onSubmit={handleFormSubmit} 
-            onCancel={() => setShowCuisineForm(false)} 
-          />
+          <div className="p-8 text-center">
+            <Info className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Cuisine Form</h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Cuisine management functionality is under development.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Category Form Dialog */}
       <Dialog open={showCategoryForm} onOpenChange={setShowCategoryForm}>
         <DialogContent>
-          <DialogTitle>{editItem ? 'Edit Category' : 'Add New Category'}</DialogTitle>
+          <DialogTitle>
+            {editItem ? "Edit Category" : "Add New Category"}
+          </DialogTitle>
           <DialogDescription>
-            Fill in the details to {editItem ? 'update' : 'create'} a food category
+            Fill in the details to {editItem ? "update" : "create"} a food
+            category
           </DialogDescription>
-          <CategoryForm 
-            category={editItem} 
-            onSubmit={handleFormSubmit} 
-            onCancel={() => setShowCategoryForm(false)} 
-          />
+          <div className="p-8 text-center">
+            <Info className="h-12 w-12 text-purple-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Category Form</h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Category management functionality is under development.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -894,7 +1042,7 @@ const FoodManagement: React.FC = () => {
               {foodDetailLoading ? (
                 <RefreshCw className="h-5 w-5 animate-spin" />
               ) : (
-                <span>{selectedFood?.name || 'Food Details'}</span>
+                <span>{selectedFood?.name || "Food Details"}</span>
               )}
             </DialogTitle>
             <DialogDescription>
@@ -919,17 +1067,22 @@ const FoodManagement: React.FC = () => {
                     {foodDetails.images && foodDetails.images.length > 0 ? (
                       <div className="grid grid-cols-2 gap-2">
                         {foodDetails.images.map((image, index) => (
-                          <div 
-                            key={index} 
-                            className={`relative rounded-md overflow-hidden ${index === 0 ? 'col-span-2 h-48' : 'h-24'}`}
+                          <div
+                            key={index}
+                            className={`relative rounded-md overflow-hidden ${
+                              index === 0 ? "col-span-2 h-48" : "h-24"
+                            }`}
                           >
-                            <img 
-                              src={image.image} 
-                              alt={`${foodDetails.name} image ${index + 1}`} 
+                            <img
+                              src={image.image}
+                              alt={`${foodDetails.name} image ${index + 1}`}
                               className="w-full h-full object-cover"
                             />
                             {image.is_primary && (
-                              <Badge variant="default" className="absolute top-2 right-2">
+                              <Badge
+                                variant="default"
+                                className="absolute top-2 right-2"
+                              >
                                 Primary
                               </Badge>
                             )}
@@ -948,33 +1101,58 @@ const FoodManagement: React.FC = () => {
                 <div className="space-y-4">
                   <Card>
                     <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-lg">Basic Information</CardTitle>
+                      <CardTitle className="text-lg">
+                        Basic Information
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4">
                       <div className="grid grid-cols-2 gap-y-3">
                         <div className="text-sm font-medium">Price:</div>
-                        <div>${typeof foodDetails.price === 'number' ? foodDetails.price.toFixed(2) : parseFloat(foodDetails.price).toFixed(2)}</div>
-                        
+                        <div>
+                          $
+                          {typeof foodDetails.price === "number"
+                            ? foodDetails.price.toFixed(2)
+                            : parseFloat(foodDetails.price).toFixed(2)}
+                        </div>
+
                         <div className="text-sm font-medium">Category:</div>
-                        <div>{foodDetails.category_name || 'Uncategorized'}</div>
-                        
+                        <div>
+                          {foodDetails.category_name || "Uncategorized"}
+                        </div>
+
                         <div className="text-sm font-medium">Cuisine:</div>
-                        <div>{foodDetails.cuisine_name || 'N/A'}</div>
-                        
-                        <div className="text-sm font-medium">Preparation Time:</div>
+                        <div>{foodDetails.cuisine_name || "N/A"}</div>
+
+                        <div className="text-sm font-medium">
+                          Preparation Time:
+                        </div>
                         <div>{foodDetails.preparation_time} mins</div>
 
                         <div className="text-sm font-medium">Availability:</div>
                         <div>
-                          <Badge variant={foodDetails.is_available ? "default" : "destructive"}>
-                            {foodDetails.is_available ? 'Available' : 'Unavailable'}
+                          <Badge
+                            variant={
+                              foodDetails.is_available
+                                ? "default"
+                                : "destructive"
+                            }
+                          >
+                            {foodDetails.is_available
+                              ? "Available"
+                              : "Unavailable"}
                           </Badge>
                         </div>
-                        
+
                         <div className="text-sm font-medium">Featured:</div>
                         <div>
-                          <Badge variant={foodDetails.is_featured ? "default" : "outline"}>
-                            {foodDetails.is_featured ? 'Featured' : 'Not Featured'}
+                          <Badge
+                            variant={
+                              foodDetails.is_featured ? "default" : "outline"
+                            }
+                          >
+                            {foodDetails.is_featured
+                              ? "Featured"
+                              : "Not Featured"}
                           </Badge>
                         </div>
                       </div>
@@ -983,32 +1161,58 @@ const FoodManagement: React.FC = () => {
 
                   <Card>
                     <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-lg">Dietary Information</CardTitle>
+                      <CardTitle className="text-lg">
+                        Dietary Information
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4">
                       <div className="flex flex-wrap gap-2">
                         {foodDetails.is_vegetarian && (
-                          <Badge variant="outline" className="text-green-600 bg-green-50">Vegetarian</Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-green-600 bg-green-50"
+                          >
+                            Vegetarian
+                          </Badge>
                         )}
                         {foodDetails.is_vegan && (
-                          <Badge variant="outline" className="text-green-700 bg-green-50">Vegan</Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-green-700 bg-green-50"
+                          >
+                            Vegan
+                          </Badge>
                         )}
                         {foodDetails.is_gluten_free && (
-                          <Badge variant="outline" className="text-amber-600 bg-amber-50">Gluten-Free</Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-amber-600 bg-amber-50"
+                          >
+                            Gluten-Free
+                          </Badge>
                         )}
                       </div>
-                      
+
                       {foodDetails.spice_level && (
                         <div className="mt-3">
-                          <p className="text-sm font-medium mb-1">Spice Level:</p>
-                          <Badge variant="outline" className={`
-                            ${foodDetails.spice_level === 'mild' ? 'text-green-600 bg-green-50' : 
-                              foodDetails.spice_level === 'medium' ? 'text-yellow-600 bg-yellow-50' :
-                              foodDetails.spice_level === 'hot' ? 'text-orange-600 bg-orange-50' :
-                              'text-red-600 bg-red-50'
+                          <p className="text-sm font-medium mb-1">
+                            Spice Level:
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className={`
+                            ${
+                              foodDetails.spice_level === "mild"
+                                ? "text-green-600 bg-green-50"
+                                : foodDetails.spice_level === "medium"
+                                ? "text-yellow-600 bg-yellow-50"
+                                : foodDetails.spice_level === "hot"
+                                ? "text-orange-600 bg-orange-50"
+                                : "text-red-600 bg-red-50"
                             }
-                          `}>
-                            {foodDetails.spice_level.replace('_', ' ')}
+                          `}
+                          >
+                            {foodDetails.spice_level.replace("_", " ")}
                           </Badge>
                         </div>
                       )}
@@ -1016,14 +1220,16 @@ const FoodManagement: React.FC = () => {
                   </Card>
                 </div>
               </div>
-              
+
               {/* Description */}
               <Card>
                 <CardHeader className="p-4 pb-2">
                   <CardTitle className="text-lg">Description</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <p className="text-sm">{foodDetails.description || 'No description available.'}</p>
+                  <p className="text-sm">
+                    {foodDetails.description || "No description available."}
+                  </p>
                 </CardContent>
               </Card>
 
@@ -1034,14 +1240,19 @@ const FoodManagement: React.FC = () => {
                     <CardTitle className="text-lg">Ingredients</CardTitle>
                   </CardHeader>
                   <CardContent className="p-4">
-                    {foodDetails.ingredients && foodDetails.ingredients.length > 0 ? (
+                    {foodDetails.ingredients &&
+                    foodDetails.ingredients.length > 0 ? (
                       <ul className="list-disc list-inside space-y-1">
                         {foodDetails.ingredients.map((ingredient, index) => (
-                          <li key={index} className="text-sm">{ingredient}</li>
+                          <li key={index} className="text-sm">
+                            {ingredient}
+                          </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No ingredients listed.</p>
+                      <p className="text-sm text-muted-foreground">
+                        No ingredients listed.
+                      </p>
                     )}
                   </CardContent>
                 </Card>
@@ -1051,16 +1262,23 @@ const FoodManagement: React.FC = () => {
                     <CardTitle className="text-lg">Allergens</CardTitle>
                   </CardHeader>
                   <CardContent className="p-4">
-                    {foodDetails.allergens && foodDetails.allergens.length > 0 ? (
+                    {foodDetails.allergens &&
+                    foodDetails.allergens.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {foodDetails.allergens.map((allergen, index) => (
-                          <Badge key={index} variant="outline" className="text-red-600 bg-red-50">
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="text-red-600 bg-red-50"
+                          >
                             {allergen}
                           </Badge>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No allergens listed.</p>
+                      <p className="text-sm text-muted-foreground">
+                        No allergens listed.
+                      </p>
                     )}
                   </CardContent>
                 </Card>
@@ -1074,21 +1292,39 @@ const FoodManagement: React.FC = () => {
                 <CardContent className="p-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-2xl font-bold">{typeof foodDetails.rating_average === 'number' ? foodDetails.rating_average.toFixed(1) : '0.0'}</div>
-                      <div className="text-xs text-muted-foreground">Average Rating</div>
+                      <div className="text-2xl font-bold">
+                        {typeof foodDetails.rating_average === "number"
+                          ? foodDetails.rating_average.toFixed(1)
+                          : "0.0"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Average Rating
+                      </div>
                     </div>
                     <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-2xl font-bold">{foodDetails.total_reviews}</div>
-                      <div className="text-xs text-muted-foreground">Total Reviews</div>
+                      <div className="text-2xl font-bold">
+                        {foodDetails.total_reviews}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Total Reviews
+                      </div>
                     </div>
                     <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-2xl font-bold">{foodDetails.total_orders}</div>
-                      <div className="text-xs text-muted-foreground">Total Orders</div>
+                      <div className="text-2xl font-bold">
+                        {foodDetails.total_orders}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Total Orders
+                      </div>
                     </div>
                     {foodDetails.calories_per_serving && (
                       <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <div className="text-2xl font-bold">{foodDetails.calories_per_serving}</div>
-                        <div className="text-xs text-muted-foreground">Calories/Serving</div>
+                        <div className="text-2xl font-bold">
+                          {foodDetails.calories_per_serving}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Calories/Serving
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1105,9 +1341,7 @@ const FoodManagement: React.FC = () => {
             <Button variant="outline" onClick={() => handleEdit(selectedFood)}>
               Edit Food Item
             </Button>
-            <Button onClick={() => setShowFoodDetail(false)}>
-              Close
-            </Button>
+            <Button onClick={() => setShowFoodDetail(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1120,12 +1354,16 @@ const FoodManagement: React.FC = () => {
               {selectedCuisine ? (
                 <>
                   <span>{selectedCuisine.name}</span>
-                  <Badge variant={selectedCuisine.is_active ? "default" : "destructive"}>
-                    {selectedCuisine.is_active ? 'Active' : 'Inactive'}
+                  <Badge
+                    variant={
+                      selectedCuisine.is_active ? "default" : "destructive"
+                    }
+                  >
+                    {selectedCuisine.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </>
               ) : (
-                'Cuisine Details'
+                "Cuisine Details"
               )}
             </DialogTitle>
             <DialogDescription>
@@ -1144,9 +1382,9 @@ const FoodManagement: React.FC = () => {
                   <CardContent className="p-4">
                     {selectedCuisine.image ? (
                       <div className="relative rounded-md overflow-hidden h-48">
-                        <img 
-                          src={selectedCuisine.image} 
-                          alt={selectedCuisine.name} 
+                        <img
+                          src={selectedCuisine.image}
+                          alt={selectedCuisine.name}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -1168,22 +1406,33 @@ const FoodManagement: React.FC = () => {
                       <div className="grid grid-cols-2 gap-2">
                         <div className="text-sm font-medium">Name:</div>
                         <div className="text-sm">{selectedCuisine.name}</div>
-                        
+
                         <div className="text-sm font-medium">Status:</div>
                         <div>
-                          <Badge variant={selectedCuisine.is_active ? "default" : "destructive"}>
-                            {selectedCuisine.is_active ? 'Active' : 'Inactive'}
+                          <Badge
+                            variant={
+                              selectedCuisine.is_active
+                                ? "default"
+                                : "destructive"
+                            }
+                          >
+                            {selectedCuisine.is_active ? "Active" : "Inactive"}
                           </Badge>
                         </div>
-                        
+
                         <div className="text-sm font-medium">Sort Order:</div>
-                        <div className="text-sm">{selectedCuisine.sort_order || 'N/A'}</div>
+                        <div className="text-sm">
+                          {selectedCuisine.sort_order || "N/A"}
+                        </div>
                       </div>
-                      
+
                       <div>
-                        <h4 className="text-sm font-medium mb-1">Description:</h4>
+                        <h4 className="text-sm font-medium mb-1">
+                          Description:
+                        </h4>
                         <p className="text-sm text-muted-foreground">
-                          {selectedCuisine.description || 'No description available'}
+                          {selectedCuisine.description ||
+                            "No description available"}
                         </p>
                       </div>
                     </div>
@@ -1194,12 +1443,13 @@ const FoodManagement: React.FC = () => {
           )}
 
           <DialogFooter className="flex justify-between">
-            <Button variant="outline" onClick={() => handleEdit(selectedCuisine)}>
+            <Button
+              variant="outline"
+              onClick={() => handleEdit(selectedCuisine)}
+            >
               Edit Cuisine
             </Button>
-            <Button onClick={() => setShowCuisineDetail(false)}>
-              Close
-            </Button>
+            <Button onClick={() => setShowCuisineDetail(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1212,12 +1462,16 @@ const FoodManagement: React.FC = () => {
               {selectedCategory ? (
                 <>
                   <span>{selectedCategory.name}</span>
-                  <Badge variant={selectedCategory.is_active ? "default" : "destructive"}>
-                    {selectedCategory.is_active ? 'Active' : 'Inactive'}
+                  <Badge
+                    variant={
+                      selectedCategory.is_active ? "default" : "destructive"
+                    }
+                  >
+                    {selectedCategory.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </>
               ) : (
-                'Category Details'
+                "Category Details"
               )}
             </DialogTitle>
             <DialogDescription>
@@ -1236,9 +1490,9 @@ const FoodManagement: React.FC = () => {
                   <CardContent className="p-4">
                     {selectedCategory.image ? (
                       <div className="relative rounded-md overflow-hidden h-48">
-                        <img 
-                          src={selectedCategory.image} 
-                          alt={selectedCategory.name} 
+                        <img
+                          src={selectedCategory.image}
+                          alt={selectedCategory.name}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -1260,25 +1514,38 @@ const FoodManagement: React.FC = () => {
                       <div className="grid grid-cols-2 gap-2">
                         <div className="text-sm font-medium">Name:</div>
                         <div className="text-sm">{selectedCategory.name}</div>
-                        
+
                         <div className="text-sm font-medium">Cuisine:</div>
-                        <div className="text-sm">{selectedCategory.cuisine_name || 'N/A'}</div>
-                        
+                        <div className="text-sm">
+                          {selectedCategory.cuisine_name || "N/A"}
+                        </div>
+
                         <div className="text-sm font-medium">Status:</div>
                         <div>
-                          <Badge variant={selectedCategory.is_active ? "default" : "destructive"}>
-                            {selectedCategory.is_active ? 'Active' : 'Inactive'}
+                          <Badge
+                            variant={
+                              selectedCategory.is_active
+                                ? "default"
+                                : "destructive"
+                            }
+                          >
+                            {selectedCategory.is_active ? "Active" : "Inactive"}
                           </Badge>
                         </div>
-                        
+
                         <div className="text-sm font-medium">Sort Order:</div>
-                        <div className="text-sm">{selectedCategory.sort_order || 'N/A'}</div>
+                        <div className="text-sm">
+                          {selectedCategory.sort_order || "N/A"}
+                        </div>
                       </div>
-                      
+
                       <div>
-                        <h4 className="text-sm font-medium mb-1">Description:</h4>
+                        <h4 className="text-sm font-medium mb-1">
+                          Description:
+                        </h4>
                         <p className="text-sm text-muted-foreground">
-                          {selectedCategory.description || 'No description available'}
+                          {selectedCategory.description ||
+                            "No description available"}
                         </p>
                       </div>
                     </div>
@@ -1289,12 +1556,13 @@ const FoodManagement: React.FC = () => {
           )}
 
           <DialogFooter className="flex justify-between">
-            <Button variant="outline" onClick={() => handleEdit(selectedCategory)}>
+            <Button
+              variant="outline"
+              onClick={() => handleEdit(selectedCategory)}
+            >
               Edit Category
             </Button>
-            <Button onClick={() => setShowCategoryDetail(false)}>
-              Close
-            </Button>
+            <Button onClick={() => setShowCategoryDetail(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

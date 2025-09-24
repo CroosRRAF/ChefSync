@@ -451,7 +451,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 )
                 .extra(select={"date": "DATE(date_joined)"})
                 .values("date")
-                .annotate(new_users=Count("id"))
+                .annotate(new_users=Count("user_id"))
                 .order_by("date")
             )
 
@@ -1518,9 +1518,11 @@ class AdminNotificationViewSet(viewsets.ModelViewSet):
             return AdminNotification.objects.none()
 
     def list(self, request, *args, **kwargs):
-        """Override list to add error handling"""
+        """Override list to return notifications in an object format"""
         try:
-            return super().list(request, *args, **kwargs)
+            queryset = self.get_queryset()
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({"notifications": serializer.data})
         except Exception as e:
             print(f"Error in AdminNotificationViewSet.list: {e}")
             import traceback

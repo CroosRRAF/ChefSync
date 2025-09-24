@@ -242,13 +242,17 @@ class AdminService {
     } catch (error: any) {
       console.error("Error fetching dashboard stats:", error);
       if (error.response?.status === 401) {
-        throw new Error('Authentication required. Please log in again.');
+        throw new Error("Authentication required. Please log in again.");
       } else if (error.response?.status === 403) {
-        throw new Error('You do not have permission to access admin dashboard.');
+        throw new Error(
+          "You do not have permission to access admin dashboard."
+        );
       } else if (error.response?.status === 404) {
-        throw new Error('Admin dashboard endpoint not found. Please check if the backend server is running.');
+        throw new Error(
+          "Admin dashboard endpoint not found. Please check if the backend server is running."
+        );
       }
-      throw new Error('Failed to fetch dashboard statistics');
+      throw new Error("Failed to fetch dashboard statistics");
     }
   }
 
@@ -316,6 +320,264 @@ class AdminService {
     } catch (error) {
       console.error("Error fetching recent orders:", error);
       throw new Error("Failed to fetch recent orders");
+    }
+  }
+
+  async getNotifications(
+    params: {
+      limit?: number;
+      is_read?: boolean;
+      type?: string;
+      priority?: string;
+      is_active?: boolean;
+    } = {}
+  ): Promise<{ notifications: AdminNotification[] }> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/notifications/`, {
+        params: {
+          limit: params.limit || 10,
+          is_read: params.is_read,
+          type: params.type,
+          priority: params.priority,
+          is_active: params.is_active,
+        },
+      });
+
+      // Normalize response to always return { notifications: [...] } format
+      let notifications: AdminNotification[] = [];
+
+      if (response.data && typeof response.data === "object") {
+        if (
+          "notifications" in response.data &&
+          Array.isArray(response.data.notifications)
+        ) {
+          notifications = response.data.notifications;
+        } else if (Array.isArray(response.data)) {
+          // Handle legacy array format
+          notifications = response.data;
+        } else if (
+          "results" in response.data &&
+          Array.isArray(response.data.results)
+        ) {
+          // Handle paginated format
+          notifications = response.data.results;
+        }
+      }
+
+      return { notifications };
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      // Return empty notifications object on error
+      return { notifications: [] };
+    }
+  }
+
+  async markNotificationRead(notificationId: number): Promise<void> {
+    try {
+      await apiClient.patch(
+        `${this.baseUrl}/notifications/${notificationId}/mark_read/`
+      );
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      throw new Error("Failed to mark notification as read");
+    }
+  }
+
+  async markAllNotificationsRead(): Promise<{ message: string }> {
+    try {
+      const response = await apiClient.patch(
+        `${this.baseUrl}/notifications/mark_all_read/`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      throw new Error("Failed to mark all notifications as read");
+    }
+  }
+
+  async getRevenueTrends(): Promise<{
+    revenue_trends: Array<{ name: string; value: number }>;
+    total_revenue?: number;
+  }> {
+    try {
+      const response = await apiClient.get(
+        `${this.baseUrl}/dashboard/revenue_trends/`
+      );
+
+      // Normalize response to always return object format
+      let trends: Array<{ name: string; value: number }> = [];
+
+      if (Array.isArray(response.data)) {
+        trends = response.data;
+      } else if (
+        response.data &&
+        typeof response.data === "object" &&
+        "data" in response.data
+      ) {
+        // Handle chart format
+        const chartData = response.data.data;
+        if (
+          chartData &&
+          Array.isArray(chartData.datasets) &&
+          chartData.datasets.length > 0
+        ) {
+          const dataset = chartData.datasets[0];
+          if (Array.isArray(dataset.data) && Array.isArray(chartData.labels)) {
+            trends = chartData.labels.map((label: string, index: number) => ({
+              name: label,
+              value: dataset.data[index] || 0,
+            }));
+          }
+        }
+      }
+
+      return {
+        revenue_trends: trends,
+        total_revenue:
+          response.data?.total_revenue ||
+          trends.reduce((sum, item) => sum + (item.value || 0), 0),
+      };
+    } catch (error) {
+      console.error("Error fetching revenue trends:", error);
+      // Return default structure on error
+      return {
+        revenue_trends: [],
+        total_revenue: 0,
+      };
+    }
+  }
+
+  async getUserGrowthTrends(): Promise<{
+    user_growth_trends: Array<{ name: string; value: number }>;
+    total_new_users?: number;
+  }> {
+    try {
+      const response = await apiClient.get(
+        `${this.baseUrl}/dashboard/user_growth_trends/`
+      );
+
+      // Normalize response to always return object format
+      let trends: Array<{ name: string; value: number }> = [];
+
+      if (Array.isArray(response.data)) {
+        trends = response.data;
+      } else if (
+        response.data &&
+        typeof response.data === "object" &&
+        "data" in response.data
+      ) {
+        // Handle chart format
+        const chartData = response.data.data;
+        if (
+          chartData &&
+          Array.isArray(chartData.datasets) &&
+          chartData.datasets.length > 0
+        ) {
+          const dataset = chartData.datasets[0];
+          if (Array.isArray(dataset.data) && Array.isArray(chartData.labels)) {
+            trends = chartData.labels.map((label: string, index: number) => ({
+              name: label,
+              value: dataset.data[index] || 0,
+            }));
+          }
+        }
+      }
+
+      return {
+        user_growth_trends: trends,
+        total_new_users:
+          response.data?.total_new_users ||
+          trends.reduce((sum, item) => sum + (item.value || 0), 0),
+      };
+    } catch (error) {
+      console.error("Error fetching user growth trends:", error);
+      // Return default structure on error
+      return {
+        user_growth_trends: [],
+        total_new_users: 0,
+      };
+    }
+  }
+
+  // New Analytics Endpoints for Dashboard Migration
+  async getWeeklyPerformance(days: number = 30): Promise<{
+    chart_type: string;
+    title: string;
+    data: {
+      labels: string[];
+      datasets: Array<{
+        data: number[];
+        backgroundColor: string[];
+        borderWidth: number;
+      }>;
+    };
+    total_orders: number;
+  }> {
+    try {
+      const response = await apiClient.get(
+        `${this.baseUrl}/dashboard/weekly_performance/`,
+        { params: { days } }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching weekly performance:", error);
+      throw new Error("Failed to fetch weekly performance");
+    }
+  }
+
+  async getRevenueTrend(days: number = 30): Promise<{
+    chart_type: string;
+    title: string;
+    data: {
+      labels: string[];
+      datasets: Array<{
+        label: string;
+        data: number[];
+        backgroundColor: string;
+        borderColor: string;
+        borderWidth: number;
+      }>;
+    };
+    total_revenue: number;
+  }> {
+    try {
+      const response = await apiClient.get(
+        `${this.baseUrl}/dashboard/revenue_trend/`,
+        { params: { days } }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching revenue trend:", error);
+      throw new Error("Failed to fetch revenue trend");
+    }
+  }
+
+  async getGrowthAnalytics(days: number = 30): Promise<{
+    chart_type: string;
+    title: string;
+    data: {
+      labels: string[];
+      datasets: Array<{
+        label: string;
+        data: number[];
+        backgroundColor: string;
+        borderColor: string;
+        borderWidth: number;
+        fill: boolean;
+      }>;
+    };
+    total_new_users: number;
+    total_new_orders: number;
+  }> {
+    try {
+      const response = await apiClient.get(
+        `${this.baseUrl}/dashboard/growth_analytics/`,
+        { params: { days } }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching growth analytics:", error);
+      throw new Error("Failed to fetch growth analytics");
     }
   }
 
@@ -444,286 +706,6 @@ class AdminService {
     } catch (error) {
       console.error("Error fetching user details:", error);
       throw new Error("Failed to fetch user details");
-    }
-  }
-
-  // Approval Management
-  async getPendingApprovals(role: 'cook' | 'delivery_agent'): Promise<{
-    users: Array<{
-      id: number;
-      name: string;
-      email: string;
-      role: string;
-      phone_no: string;
-      address: string;
-      created_at: string;
-      approval_status: string;
-      documents: Array<{
-        id: number;
-        file_name: string;
-        document_type: string;
-        uploaded_at: string;
-        file_url: string;
-      }>;
-    }>;
-    count: number;
-  }> {
-    try {
-      const response = await apiClient.get(`${this.baseUrl}/users/pending_approvals/`, {
-        params: { role }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching pending approvals:', error);
-      throw new Error('Failed to fetch pending approvals');
-    }
-  }
-
-  async approveUser(userId: number, action: 'approve' | 'reject', notes: string = ''): Promise<{
-    message: string;
-    user: {
-      id: number;
-      name: string;
-      email: string;
-      role: string;
-      approval_status: string;
-    };
-  }> {
-    try {
-      const response = await apiClient.post(`${this.baseUrl}/users/${userId}/approve_user/`, {
-        action,
-        notes
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error approving user:', error);
-      throw new Error(`Failed to ${action} user`);
-    }
-  }
-
-  async updateUser(
-    userId: number,
-    data: {
-      name?: string;
-      phone_no?: string;
-      address?: string;
-      role?: string;
-      is_active?: boolean;
-    }
-  ): Promise<{ message: string; user: AdminUser }> {
-    try {
-      const response = await apiClient.patch(
-        `${this.baseUrl}/users/${userId}/update_user/`,
-        data
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error updating user:", error);
-      throw new Error("Failed to update user");
-    }
-  }
-
-  async exportUsers(
-    params: {
-      role?: string;
-      status?: string;
-    } = {}
-  ): Promise<Blob> {
-    try {
-      const response = await apiClient.get(
-        `${this.baseUrl}/users/export_users/`,
-        {
-          params: {
-            role: params.role,
-            status: params.status,
-          },
-          responseType: "blob",
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error exporting users:", error);
-      throw new Error("Failed to export users");
-    }
-  }
-
-  // Order Management
-  async getOrders(
-    params: {
-      page?: number;
-      limit?: number;
-      search?: string;
-      status?: string;
-      payment_status?: string;
-      sort_by?: string;
-      sort_order?: string;
-    } = {}
-  ): Promise<OrderListResponse> {
-    try {
-      const response = await apiClient.get(`${this.baseUrl}/orders/list_orders/`, {
-        params: {
-          page: params.page || 1,
-          limit: params.limit || 25,
-          search: params.search || '',
-          status: params.status || '',
-          payment_status: params.payment_status || '',
-          sort_by: params.sort_by || 'created_at',
-          sort_order: params.sort_order || 'desc'
-        }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-      throw new Error('Failed to fetch orders');
-    }
-  }
-
-  async getOrderDetails(orderId: number): Promise<any> {
-    try {
-      const response = await apiClient.get(`${this.baseUrl}/orders/${orderId}/details/`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching order details:', error);
-      throw new Error('Failed to fetch order details');
-    }
-  }
-
-  // Notifications
-  async getNotifications(
-    params: {
-      is_read?: boolean;
-      type?: string;
-      priority?: string;
-      is_active?: boolean;
-    } = {}
-  ): Promise<{
-    count: number;
-    next: string | null;
-    previous: string | null;
-    results: AdminNotification[];
-  }> {
-    try {
-      const response = await apiClient.get(`${this.baseUrl}/notifications/`, {
-        params: {
-          is_read: params.is_read,
-          type: params.type,
-          priority: params.priority,
-          is_active: params.is_active,
-        },
-      });
-
-      // Since pagination is disabled, always return as paginated format for consistency
-      return {
-        count: response.data.length,
-        next: null,
-        previous: null,
-        results: response.data,
-      };
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-      throw new Error("Failed to fetch notifications");
-    }
-  }
-
-  async markNotificationRead(
-    notificationId: number
-  ): Promise<AdminNotification> {
-    try {
-      const response = await apiClient.patch(
-        `${this.baseUrl}/notifications/${notificationId}/mark_read/`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error marking notification as read:", error);
-      throw new Error("Failed to mark notification as read");
-    }
-  }
-
-  async markAllNotificationsRead(): Promise<{ message: string }> {
-    try {
-      const response = await apiClient.patch(`${this.baseUrl}/notifications/mark_all_read/`);
-      return response.data;
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-      throw new Error('Failed to mark all notifications as read');
-    }
-  }
-
-  async getUnreadNotificationCount(): Promise<{ unread_count: number }> {
-    try {
-      const response = await apiClient.get(
-        `${this.baseUrl}/notifications/unread_count/`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching unread notification count:", error);
-      throw new Error("Failed to fetch unread notification count");
-    }
-  }
-
-  // System Settings
-  async getSystemSettings(
-    params: {
-      category?: string;
-      is_public?: boolean;
-    } = {}
-  ): Promise<SystemSetting[]> {
-    try {
-      const response = await apiClient.get(`${this.baseUrl}/settings/`, {
-        params: {
-          category: params.category,
-          is_public: params.is_public,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching system settings:", error);
-      throw new Error("Failed to fetch system settings");
-    }
-  }
-
-  async updateSystemSetting(
-    key: string,
-    value: string
-  ): Promise<SystemSetting> {
-    try {
-      const response = await apiClient.patch(
-        `${this.baseUrl}/settings/${key}/`,
-        {
-          value,
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error updating system setting:", error);
-      throw new Error("Failed to update system setting");
-    }
-  }
-
-  // Activity Logs
-  async getActivityLogs(
-    params: {
-      admin?: number;
-      action?: string;
-      resource_type?: string;
-      start_date?: string;
-      end_date?: string;
-    } = {}
-  ): Promise<AdminActivityLog[]> {
-    try {
-      const response = await apiClient.get(`${this.baseUrl}/activity-logs/`, {
-        params: {
-          admin: params.admin,
-          action: params.action,
-          resource_type: params.resource_type,
-          start_date: params.start_date,
-          end_date: params.end_date,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching activity logs:", error);
-      throw new Error("Failed to fetch activity logs");
     }
   }
 
