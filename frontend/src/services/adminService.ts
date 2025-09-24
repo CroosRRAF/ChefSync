@@ -581,6 +581,79 @@ class AdminService {
     }
   }
 
+  async getOrdersTrend(days: number = 30): Promise<{
+    chart_type: string;
+    title: string;
+    data: {
+      labels: string[];
+      datasets: Array<{
+        label: string;
+        data: number[];
+        backgroundColor: string;
+        borderColor: string;
+        borderWidth: number;
+      }>;
+    };
+    total_orders: number;
+  }> {
+    try {
+      const response = await apiClient.get(
+        `${this.baseUrl}/dashboard/orders_trend/`,
+        { params: { days } }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching orders trend:", error);
+      throw new Error("Failed to fetch orders trend");
+    }
+  }
+
+  async getTopPerformingChefs(limit: number = 10): Promise<{
+    chefs: Array<{
+      id: number;
+      name: string;
+      email: string;
+      total_orders: number;
+      total_revenue: number;
+      rating: number;
+      status: string;
+    }>;
+  }> {
+    try {
+      const response = await apiClient.get(
+        `${this.baseUrl}/dashboard/top_performing_chefs/`,
+        { params: { limit } }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching top performing chefs:", error);
+      throw new Error("Failed to fetch top performing chefs");
+    }
+  }
+
+  async getTopPerformingFoodItems(limit: number = 10): Promise<{
+    food_items: Array<{
+      id: number;
+      name: string;
+      category: string;
+      total_orders: number;
+      total_revenue: number;
+      rating: number;
+      status: string;
+    }>;
+  }> {
+    try {
+      const response = await apiClient.get(
+        `${this.baseUrl}/dashboard/top_performing_food_items/`,
+        { params: { limit } }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching top performing food items:", error);
+      throw new Error("Failed to fetch top performing food items");
+    }
+  }
+
   // User Management
   async getUsers(
     params: {

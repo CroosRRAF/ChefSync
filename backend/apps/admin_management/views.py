@@ -5,7 +5,7 @@ from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 try:
@@ -522,6 +522,184 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response(
                 {"error": f"Failed to fetch growth analytics: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    def orders_trend(self, request):
+        """Get orders trend data for line chart (last 30 days)"""
+        try:
+            # Get date range (default 30 days)
+            days = int(request.query_params.get("days", 30))
+            end_date = timezone.now()
+            start_date = end_date - timedelta(days=days)
+
+            from apps.orders.models import Order
+
+            # Get daily order count data
+            order_data = (
+                Order.objects.filter(
+                    created_at__gte=start_date, created_at__lte=end_date
+                )
+                .extra(select={"date": "DATE(created_at)"})
+                .values("date")
+                .annotate(order_count=Count("id"))
+                .order_by("date")
+            )
+
+            # Prepare line chart data
+            labels = []
+            data = []
+
+            # Fill in missing dates with zero orders
+            current_date = start_date.date()
+            end_date_only = end_date.date()
+
+            order_dict = {item["date"]: item["order_count"] for item in order_data}
+
+            while current_date <= end_date_only:
+                date_str = current_date.strftime("%Y-%m-%d")
+                labels.append(current_date.strftime("%b %d"))
+                data.append(order_dict.get(date_str, 0))
+                current_date += timedelta(days=1)
+
+            chart_data = {
+                "labels": labels,
+                "datasets": [
+                    {
+                        "label": "Orders",
+                        "data": data,
+                        "borderColor": "#3B82F6",
+                        "backgroundColor": "rgba(59, 130, 246, 0.1)",
+                        "borderWidth": 2,
+                        "fill": True,
+                        "tension": 0.4,
+                    }
+                ],
+            }
+
+            return Response(
+                {
+                    "chart_type": "line",
+                    "title": f"Daily Orders Trend (Last {days} Days)",
+                    "data": chart_data,
+                    "total_orders": sum(data),
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to fetch orders trend: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    def top_performing_chefs(self, request):
+        """Get top performing chefs based on orders and revenue"""
+        try:
+            # Get limit (default 10)
+            limit = int(request.query_params.get("limit", 10))
+            if limit > 50:  # Cap at 50
+                limit = 50
+
+            from apps.orders.models import Order
+            from apps.users.models import ChefProfile
+
+            # Get chefs with their performance metrics
+            top_chefs = (
+                Order.objects.filter(
+                    payment_status="paid", chef__isnull=False, chef__is_active=True
+                )
+                .values("chef__user_id", "chef__name", "chef__email")
+                .annotate(
+                    total_orders=Count("id"),
+                    total_revenue=Sum("total_amount"),
+                    avg_rating=Avg("chef__chef_profile__rating_average"),
+                )
+                .order_by("-total_orders")[:limit]
+            )
+
+            # Prepare response data
+            chefs_data = []
+            for chef in top_chefs:
+                chefs_data.append(
+                    {
+                        "id": chef["chef__user_id"],
+                        "name": chef["chef__name"] or "Unknown Chef",
+                        "email": chef["chef__email"],
+                        "total_orders": chef["total_orders"],
+                        "total_revenue": float(chef["total_revenue"] or 0),
+                        "avg_rating": float(chef["avg_rating"] or 0),
+                    }
+                )
+
+            return Response(
+                {
+                    "title": f"Top {len(chefs_data)} Performing Chefs",
+                    "chefs": chefs_data,
+                    "total_chefs": len(chefs_data),
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to fetch top performing chefs: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    def top_performing_food_items(self, request):
+        """Get top performing food items based on orders and revenue"""
+        try:
+            # Get limit (default 10)
+            limit = int(request.query_params.get("limit", 10))
+            if limit > 50:  # Cap at 50
+                limit = 50
+
+            from apps.food.models import Food
+            from apps.orders.models import OrderItem
+
+            # Get food items with their performance metrics
+            top_foods = (
+                OrderItem.objects.filter(
+                    order__payment_status="paid", price__food__is_available=True
+                )
+                .values("price__food", "price__food__name", "price__food__category")
+                .annotate(
+                    total_orders=Count("order_item_id"),
+                    total_quantity=Sum("quantity"),
+                    total_revenue=Sum("total_price"),
+                    avg_rating=Avg("price__food__rating_average"),
+                )
+                .order_by("-total_orders")[:limit]
+            )
+
+            # Prepare response data
+            foods_data = []
+            for food in top_foods:
+                foods_data.append(
+                    {
+                        "id": food["price__food"],
+                        "name": food["price__food__name"],
+                        "category": food["price__food__category"] or "Uncategorized",
+                        "total_orders": food["total_orders"],
+                        "total_quantity": food["total_quantity"],
+                        "total_revenue": float(food["total_revenue"] or 0),
+                        "avg_rating": float(food["avg_rating"] or 0),
+                    }
+                )
+
+            return Response(
+                {
+                    "title": f"Top {len(foods_data)} Performing Food Items",
+                    "food_items": foods_data,
+                    "total_items": len(foods_data),
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to fetch top performing food items: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

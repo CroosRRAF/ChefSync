@@ -1,30 +1,13 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  TrendingUp,
-  TrendingDown,
-  MoreHorizontal,
-  RefreshCw,
-  Info,
-  BarChart3,
-  Activity,
-  ArrowUpRight,
-  ArrowDownRight
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from "@/components/ui/tooltip";
+import { Activity, Info, RefreshCw } from "lucide-react";
+import React, { useState } from "react";
 
 // Unified interface for stats cards
 export interface UnifiedStatsCardProps {
@@ -46,7 +29,7 @@ export interface UnifiedStatsCardProps {
   };
 
   // Color variants for advanced styling
-  color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple' | 'indigo';
+  color?: "blue" | "green" | "yellow" | "red" | "purple" | "indigo";
 
   // Interactive features
   isLoading?: boolean;
@@ -60,53 +43,59 @@ export interface UnifiedStatsCardProps {
 
   // Styling
   className?: string;
-  variant?: 'basic' | 'advanced'; // Controls feature set
+  variant?: "basic" | "advanced"; // Controls feature set
 }
 
 // Color variants for consistent theming
 const colorVariants = {
   blue: {
-    bg: 'bg-primary/10 dark:bg-primary/20',
-    icon: 'text-primary dark:text-primary-light',
-    border: 'border-primary/20 dark:border-primary/30',
-    accent: 'bg-primary',
-    trend: 'text-primary dark:text-primary-light'
+    bg: "bg-primary/10 dark:bg-primary/20",
+    icon: "text-primary dark:text-primary-light",
+    border: "border-primary/20 dark:border-primary/30",
+    hoverBorder: "hover:border-primary/50",
+    accent: "bg-primary",
+    trend: "text-primary dark:text-primary-light",
   },
   green: {
-    bg: 'bg-success/10 dark:bg-success/20',
-    icon: 'text-success dark:text-success-light',
-    border: 'border-success/20 dark:border-success/30',
-    accent: 'bg-success',
-    trend: 'text-success dark:text-success-light'
+    bg: "bg-success/10 dark:bg-success/20",
+    icon: "text-success dark:text-success-light",
+    border: "border-success/20 dark:border-success/30",
+    hoverBorder: "hover:border-success/50",
+    accent: "bg-success",
+    trend: "text-success dark:text-success-light",
   },
   yellow: {
-    bg: 'bg-warning/10 dark:bg-warning/20',
-    icon: 'text-warning dark:text-warning-light',
-    border: 'border-warning/20 dark:border-warning/30',
-    accent: 'bg-warning',
-    trend: 'text-warning dark:text-warning-light'
+    bg: "bg-warning/10 dark:bg-warning/20",
+    icon: "text-warning dark:text-warning-light",
+    border: "border-warning/20 dark:border-warning/30",
+    hoverBorder: "hover:border-warning/50",
+    accent: "bg-warning",
+    trend: "text-warning dark:text-warning-light",
   },
   red: {
-    bg: 'bg-error/10 dark:bg-error/20',
-    icon: 'text-error dark:text-error-light',
-    border: 'border-error/20 dark:border-error/30',
-    accent: 'bg-error',
-    trend: 'text-error dark:text-error-light'
+    bg: "bg-error/10 dark:bg-error/20",
+    icon: "text-error dark:text-error-light",
+    border: "border-error/20 dark:border-error/30",
+    hoverBorder: "hover:border-error/50",
+    accent: "bg-error",
+    trend: "text-error dark:text-error-light",
   },
   purple: {
-    bg: 'bg-accent/10 dark:bg-accent/20',
-    icon: 'text-accent dark:text-accent-light',
-    border: 'border-accent/20 dark:border-accent/30',
-    accent: 'bg-accent',
-    trend: 'text-accent dark:text-accent-light'
+    bg: "bg-accent/10 dark:bg-accent/20",
+    icon: "text-accent dark:text-accent-light",
+    border: "border-accent/20 dark:border-accent/30",
+    hoverBorder: "hover:border-accent/50",
+    accent: "bg-accent",
+    trend: "text-accent dark:text-accent-light",
   },
   indigo: {
-    bg: 'bg-info/10 dark:bg-info/20',
-    icon: 'text-info dark:text-info-light',
-    border: 'border-info/20 dark:border-info/30',
-    accent: 'bg-info',
-    trend: 'text-info dark:text-info-light'
-  }
+    bg: "bg-info/10 dark:bg-info/20",
+    icon: "text-info dark:text-info-light",
+    border: "border-info/20 dark:border-info/30",
+    hoverBorder: "hover:border-info/50",
+    accent: "bg-info",
+    trend: "text-info dark:text-info-light",
+  },
 };
 
 export const UnifiedStatsCard: React.FC<UnifiedStatsCardProps> = ({
@@ -114,18 +103,18 @@ export const UnifiedStatsCard: React.FC<UnifiedStatsCardProps> = ({
   value,
   subtitle,
   icon,
-  iconColor = 'text-gray-600',
-  iconBgColor = 'bg-gray-100',
+  iconColor = "text-gray-600",
+  iconBgColor = "bg-gray-100",
   trend,
-  color = 'blue',
+  color = "blue",
   isLoading = false,
   onRefresh,
   onViewDetails,
   onClick,
   showChart = false,
   chartData = [],
-  className = '',
-  variant = 'advanced'
+  className = "",
+  variant = "advanced",
 }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const colors = colorVariants[color];
@@ -144,7 +133,7 @@ export const UnifiedStatsCard: React.FC<UnifiedStatsCardProps> = ({
 
   // Format value for display
   const formatValue = (val: string | number): string => {
-    if (typeof val === 'number') {
+    if (typeof val === "number") {
       if (val >= 1000000) {
         return `${(val / 1000000).toFixed(1)}M`;
       } else if (val >= 1000) {
@@ -159,52 +148,20 @@ export const UnifiedStatsCard: React.FC<UnifiedStatsCardProps> = ({
   const renderIcon = () => {
     if (!icon) return null;
 
-    if (typeof icon === 'string') {
+    if (typeof icon === "string") {
       // Boxicon string
       return <i className={`${icon} text-xl ${iconColor}`} />;
     } else {
       // React component (Lucide)
       return React.cloneElement(icon as React.ReactElement, {
-        className: `h-5 w-5 ${iconColor}`
+        className: `h-5 w-5 ${iconColor}`,
       });
     }
   };
 
-  // Get trend display
+  // Get trend display - REMOVED as per user request
   const getTrendDisplay = () => {
-    if (!trend) return null;
-
-    const TrendIcon = trend.isPositive ? TrendingUp : TrendingDown;
-    const ArrowIcon = trend.isPositive ? ArrowUpRight : ArrowDownRight;
-
-    if (variant === 'basic') {
-      return (
-        <div className="flex items-center mt-2">
-          <span className={`text-xs font-medium ${
-            trend.isPositive ? 'text-green-600' : 'text-red-600'
-          }`}>
-            {trend.isPositive ? '+' : ''}{trend.value}%
-          </span>
-          <i className={`bx ${trend.isPositive ? 'bx-trending-up' : 'bx-trending-down'} ml-1 text-xs ${
-            trend.isPositive ? 'text-green-600' : 'text-red-600'
-          }`}></i>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex items-center space-x-1">
-        <TrendIcon className={`h-4 w-4 ${trend.isPositive ? 'text-green-500' : 'text-red-500'}`} />
-        <span className={`text-sm font-medium ${trend.isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {Math.abs(trend.value)}%
-        </span>
-        {trend.period && (
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {trend.period}
-          </span>
-        )}
-      </div>
-    );
+    return null; // No trend display
   };
 
   // Loading skeleton
@@ -226,10 +183,12 @@ export const UnifiedStatsCard: React.FC<UnifiedStatsCardProps> = ({
   }
 
   // Basic variant (backward compatible)
-  if (variant === 'basic') {
+  if (variant === "basic") {
     return (
       <div
-        className={`bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow ${onClick ? 'cursor-pointer' : ''} ${className}`}
+        className={`bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow ${
+          onClick ? "cursor-pointer" : ""
+        } ${className}`}
         onClick={onClick}
       >
         <div className="flex items-center justify-between">
@@ -248,7 +207,9 @@ export const UnifiedStatsCard: React.FC<UnifiedStatsCardProps> = ({
             {getTrendDisplay()}
           </div>
           {icon && (
-            <div className={`flex-shrink-0 w-12 h-12 rounded-full ${iconBgColor} flex items-center justify-center`}>
+            <div
+              className={`flex-shrink-0 w-12 h-12 rounded-full ${iconBgColor} flex items-center justify-center`}
+            >
               {renderIcon()}
             </div>
           )}
@@ -260,19 +221,26 @@ export const UnifiedStatsCard: React.FC<UnifiedStatsCardProps> = ({
   // Advanced variant
   return (
     <TooltipProvider>
-      <Card className={`${className} hover:shadow-lg transition-all duration-200 group ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>
+      <Card
+        className={`${className} hover:shadow-xl transition-all duration-300 group ${
+          onClick
+            ? "cursor-pointer hover:scale-[1.02] hover:-translate-y-1"
+            : ""
+        } border-2 ${colors.border} ${colors.hoverBorder} hover:shadow-lg`}
+        onClick={onClick}
+      >
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <CardTitle className="text-sm font-semibold text-gray-700 dark:text-gray-300 group-hover:text-primary transition-colors">
                 {title}
               </CardTitle>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                  <Info className="h-3 w-3 text-gray-400 hover:text-primary cursor-help opacity-0 group-hover:opacity-100 transition-opacity" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Click to view detailed information</p>
+                  <p>Click to navigate to detailed view</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -283,55 +251,32 @@ export const UnifiedStatsCard: React.FC<UnifiedStatsCardProps> = ({
                   size="sm"
                   onClick={handleRefresh}
                   disabled={isRefreshing}
-                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10"
                 >
-                  <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <RefreshCw
+                    className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`}
+                  />
                 </Button>
               )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <MoreHorizontal className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {onViewDetails && (
-                    <DropdownMenuItem onClick={onViewDetails}>
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      View Details
-                    </DropdownMenuItem>
-                  )}
-                  {onRefresh && (
-                    <DropdownMenuItem onClick={handleRefresh} disabled={isRefreshing}>
-                      <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                      Refresh
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
               {icon && (
-                <div className={`p-2 rounded-lg ${colors.bg} ${colors.border} border`}>
-                  <div className={colors.icon}>
-                    {renderIcon()}
-                  </div>
+                <div
+                  className={`p-3 rounded-xl ${colors.bg} ${colors.border} border-2 group-hover:scale-110 transition-transform duration-300 shadow-lg`}
+                >
+                  <div className={colors.icon}>{renderIcon()}</div>
                 </div>
               )}
-              <div>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="space-y-1">
+                <div className="text-3xl font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">
                   {formatValue(value)}
                 </div>
                 {subtitle && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
                     {subtitle}
                   </div>
                 )}
@@ -343,12 +288,14 @@ export const UnifiedStatsCard: React.FC<UnifiedStatsCardProps> = ({
           {showChart && chartData.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">Recent Trend</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Recent Trend
+                </span>
                 <Activity className="h-3 w-3 text-gray-400" />
               </div>
               <div className="flex items-end space-x-1 h-8">
                 {chartData.map((item, index) => {
-                  const maxValue = Math.max(...chartData.map(d => d.value));
+                  const maxValue = Math.max(...chartData.map((d) => d.value));
                   const height = (item.value / maxValue) * 100;
                   return (
                     <div
