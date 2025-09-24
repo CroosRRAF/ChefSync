@@ -1,6 +1,5 @@
 // src/pages/delivery/Dashboard.tsx
 import React, { useState, useEffect } from "react";
-import "../../styles/delivery-theme.css";
 import {
   Card,
   CardContent,

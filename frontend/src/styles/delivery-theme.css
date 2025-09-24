@@ -1,3 +1,21 @@
+/*
+ * ChefSync Delivery Theme - Scoped Styles
+ * 
+ * This theme is scoped to elements with the 'delivery-theme' class to prevent
+ * interference with other parts of the application.
+ * 
+ * Usage:
+ * 1. Wrap your delivery components with the 'delivery-theme' class
+ * 2. Use theme classes like 'theme-button-primary', 'theme-card-hover', etc.
+ * 
+ * Example:
+ * <div className="delivery-theme">
+ *   <button className="theme-button-primary">Delivery Button</button>
+ * </div>
+ * 
+ * The DeliveryLayout component automatically applies this wrapper.
+ */
+
 /* ChefSync Delivery Theme Colors */
 :root {
   /* Primary Colors */
@@ -31,124 +49,124 @@
   --shadow-heavy: rgba(26, 35, 126, 0.25);
 }
 
-/* Force application of theme colors */
-* {
+/* Scope styles to delivery pages only */
+.delivery-theme * {
   color-scheme: light;
 }
 
-html, body {
+.delivery-theme {
   background-color: var(--background-off-white) !important;
 }
 
-/* Ensure consistent backgrounds */
-.min-h-screen {
+/* Ensure delivery pages have consistent backgrounds */
+.delivery-theme .min-h-screen {
   background: var(--background-off-white) !important;
 }
 
-/* Custom Classes */
-.theme-primary {
+/* Custom Classes - Scoped to delivery pages */
+.delivery-theme .theme-primary {
   background: var(--primary-emerald);
   color: white;
 }
 
-.theme-primary-gradient {
+.delivery-theme .theme-primary-gradient {
   background: var(--primary-gradient);
   color: white;
 }
 
-.theme-navy {
+.delivery-theme .theme-navy {
   background: var(--header-navy);
   color: white;
 }
 
-.theme-navy-gradient {
+.delivery-theme .theme-navy-gradient {
   background: var(--navy-gradient);
   color: white;
 }
 
-.theme-bg-primary {
+.delivery-theme .theme-bg-primary {
   background: var(--background-off-white);
 }
 
-.theme-bg-card {
+.delivery-theme .theme-bg-card {
   background: var(--bg-card);
 }
 
-.theme-text-primary {
+.delivery-theme .theme-text-primary {
   color: var(--text-primary);
 }
 
-.theme-text-secondary {
+.delivery-theme .theme-text-secondary {
   color: var(--text-cool-grey);
 }
 
-.theme-shadow-card {
+.delivery-theme .theme-shadow-card {
   box-shadow: 0 4px 20px var(--shadow-light);
 }
 
-.theme-shadow-card:hover {
+.delivery-theme .theme-shadow-card:hover {
   box-shadow: 0 8px 40px var(--shadow-medium);
 }
 
-/* Status Classes */
-.theme-status-success {
+/* Status Classes - Scoped to delivery pages */
+.delivery-theme .theme-status-success {
   background: var(--status-success);
   color: white;
 }
 
-.theme-status-warning {
+.delivery-theme .theme-status-warning {
   background: var(--status-warning);
   color: var(--text-primary);
 }
 
-.theme-status-info {
+.delivery-theme .theme-status-info {
   background: var(--status-info);
   color: white;
 }
 
-.theme-status-error {
+.delivery-theme .theme-status-error {
   background: var(--status-error);
   color: white;
 }
 
-.theme-status-success-bg {
+.delivery-theme .theme-status-success-bg {
   background: rgba(67, 160, 71, 0.1);
   color: var(--status-success);
   border: 1px solid rgba(67, 160, 71, 0.2);
 }
 
-.theme-status-warning-bg {
+.delivery-theme .theme-status-warning-bg {
   background: rgba(253, 216, 53, 0.1);
   color: #F57F17;
   border: 1px solid rgba(253, 216, 53, 0.3);
 }
 
-.theme-status-info-bg {
+.delivery-theme .theme-status-info-bg {
   background: rgba(66, 165, 245, 0.1);
   color: var(--status-info);
   border: 1px solid rgba(66, 165, 245, 0.2);
 }
 
-.theme-status-error-bg {
+.delivery-theme .theme-status-error-bg {
   background: rgba(229, 57, 53, 0.1);
   color: var(--status-error);
   border: 1px solid rgba(229, 57, 53, 0.2);
 }
 
-/* Tab Styling */
-.theme-tab-trigger[data-state="active"] {
+/* Tab Styling - Scoped to delivery pages */
+.delivery-theme .theme-tab-trigger[data-state="active"] {
   background: var(--primary-gradient) !important;
   color: white !important;
 }
 
-/* Card hover effects */
-.theme-card-hover {
+/* Card hover effects - Scoped to delivery pages */
+.delivery-theme .theme-card-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   transform: translateY(0);
   box-shadow: 0 4px 20px var(--shadow-light);
 }
 
-.theme-card-hover:hover {
+.delivery-theme .theme-card-hover:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 40px var(--shadow-medium);
 }
@@ -176,16 +194,16 @@ html, body {
   }
 }
 
-.theme-animate-fade-in-up {
+.delivery-theme .theme-animate-fade-in-up {
   animation: fadeInUp 0.6s ease-out;
 }
 
-.theme-animate-scale-in {
+.delivery-theme .theme-animate-scale-in {
   animation: scaleIn 0.4s ease-out;
 }
 
-/* Professional button styles */
-.theme-button-primary {
+/* Professional button styles - Scoped to delivery pages */
+.delivery-theme .theme-button-primary {
   background: var(--primary-gradient);
   color: white;
   border: none;
@@ -196,12 +214,12 @@ html, body {
   box-shadow: 0 4px 20px rgba(46, 204, 113, 0.3);
 }
 
-.theme-button-primary:hover {
+.delivery-theme .theme-button-primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 30px rgba(46, 204, 113, 0.4);
 }
 
-.theme-button-primary:active {
+.delivery-theme .theme-button-primary:active {
   transform: translateY(0);
   transition-duration: 0.1s;
 }

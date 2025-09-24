@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from "react";
-import "../../styles/delivery-theme.css";
 import {
   Card,
   CardContent,
