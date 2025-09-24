@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
+from apps.food.models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
 
 
 class CuisineSerializer(serializers.ModelSerializer):
@@ -55,6 +55,26 @@ class ChefFoodPriceSerializer(serializers.ModelSerializer):
     class Meta:
         model = FoodPrice
         fields = ['price', 'size', 'preparation_time', 'food']
+    
+    def validate(self, data):
+        """Check for duplicate price entries"""
+        user = self.context['request'].user
+        food = data.get('food')
+        size = data.get('size')
+        
+        # Check if a price already exists for this combination
+        existing_price = FoodPrice.objects.filter(
+            food=food,
+            size=size,
+            cook=user
+        ).first()
+        
+        if existing_price:
+            raise serializers.ValidationError({
+                'non_field_errors': [f'You already have a {size} price for this food item. Please update the existing price instead.']
+            })
+        
+        return data
         
     def create(self, validated_data):
         validated_data['cook'] = self.context['request'].user
@@ -76,17 +96,45 @@ class ChefFoodCreateSerializer(serializers.ModelSerializer):
             'price', 'size', 'preparation_time'
         ]
     
-    def validate_ingredients(self, value):
-        """Convert string ingredients to list format"""
-        if isinstance(value, str):
-            ingredients_list = [ingredient.strip() for ingredient in value.split(',') if ingredient.strip()]
-            return ingredients_list
-        elif isinstance(value, list):
-            return value
-        else:
-            return []
+    def validate(self, data):
+        """Add debug logging for all validation data"""
+        print(f"DEBUG: Full validation data received: {data}")
+        print(f"DEBUG: Data types: {[(k, type(v)) for k, v in data.items()]}")
+        
+        # Ensure ingredients is properly processed
+        if 'ingredients' in data:
+            ingredients = data['ingredients']
+            print(f"DEBUG: Raw ingredients: {ingredients} (type: {type(ingredients)})")
+            
+            # Force proper conversion to list for JSONField
+            if isinstance(ingredients, str):
+                ingredients = ingredients.strip()
+                if ingredients:
+                    try:
+                        import json
+                        # Try parsing as JSON first
+                        parsed = json.loads(ingredients)
+                        if isinstance(parsed, list):
+                            data['ingredients'] = [str(item).strip() for item in parsed if str(item).strip()]
+                        else:
+                            data['ingredients'] = [str(parsed).strip()] if str(parsed).strip() else []
+                    except (json.JSONDecodeError, ValueError):
+                        # Fall back to comma-separated parsing
+                        data['ingredients'] = [item.strip() for item in ingredients.split(',') if item.strip()]
+                else:
+                    data['ingredients'] = []
+            elif not isinstance(ingredients, list):
+                data['ingredients'] = []
+            
+            print(f"DEBUG: Final processed ingredients: {data['ingredients']} (type: {type(data['ingredients'])})")
+        
+        return data
     
     def create(self, validated_data):
+        # Debug logging to see what ingredients we received
+        print(f"DEBUG: Creating food with validated_data ingredients: {validated_data.get('ingredients')}")
+        print(f"DEBUG: Ingredients type: {type(validated_data.get('ingredients'))}")
+        
         # Extract price data
         price = validated_data.pop('price')
         size = validated_data.pop('size', 'Medium')

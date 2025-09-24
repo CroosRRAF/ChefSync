@@ -307,22 +307,24 @@ const InnerRoutes: React.FC = () => {
           </ProtectedRoute>
         } />
 
+
         {/* Cook Routes */}
-        <Route path="/cook" element={
-          <ProtectedRoute allowedRoles={['cook']}>
-            <CookLayout />
-          </ProtectedRoute>
-        }>
-          <Route index element={<Navigate to="/cook/dashboard" replace />} />
-          <Route path="dashboard" element={<CookDashboard />} />
-          <Route path="bulk-orders" element={<CookBulkOrders />} />
-          <Route path="home" element={<CookHome />} />
-          <Route path="menu" element={<CookMenu />} />
-          <Route path="orders" element={<CookOrders />} />
-          <Route path="notifications" element={<CookNotifications />} />
-          <Route path="profile" element={<CookProfile />} />
-          <Route path="settings" element={<CookSettings />} />
-        </Route>
+<Route path="/cook" element={
+  <ProtectedRoute allowedRoles={['cook']}>
+    <CookLayout />
+  </ProtectedRoute>
+}>
+  <Route index element={<Navigate to="dashboard" replace />} />
+  <Route path="dashboard" element={<CookDashboard />} />
+  <Route path="bulk-orders" element={<CookBulkOrders />} />
+  <Route path="home" element={<CookHome />} />
+  <Route path="menu" element={<CookMenu />} />
+  <Route path="orders" element={<CookOrders />} />
+  <Route path="notifications" element={<CookNotifications />} />
+  <Route path="profile" element={<CookProfile />} />
+  <Route path="settings" element={<CookSettings />} />
+</Route>
+
 
         {/* Delivery Agent Routes */}
         <Route path="/delivery" element={

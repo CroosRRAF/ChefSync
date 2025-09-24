@@ -14,4 +14,9 @@ router.register(r'bulk', BulkOrderManagementViewSet, basename='bulk-orders')
 
 urlpatterns = [
     path('', include(router.urls)),
+    
+    # Chef Dashboard API endpoints
+    path('chef/dashboard/stats/', views.chef_dashboard_stats, name='chef-dashboard-stats'),
+    path('chef/reviews/recent/', views.chef_recent_reviews, name='chef-recent-reviews'),
+    path('chef/activity/recent/', views.chef_recent_activity, name='chef-recent-activity'),
 ]
