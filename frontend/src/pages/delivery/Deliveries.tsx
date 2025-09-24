@@ -172,15 +172,15 @@ const DeliveryDeliveries: React.FC = () => {
   const getStatusColor = (status: Order["status"]) => {
     switch (status) {
       case "ready":
-        return "bg-yellow-100 text-yellow-800";
+        return "theme-status-warning-bg";
       case "out_for_delivery":
-        return "bg-blue-100 text-blue-800";
+        return "theme-status-info-bg";
       case "in_transit":
-        return "bg-purple-100 text-purple-800";
+        return "theme-status-info-bg";
       case "delivered":
-        return "bg-green-100 text-green-800";
+        return "theme-status-success-bg";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 theme-text-secondary";
     }
   };
 
@@ -214,10 +214,27 @@ const DeliveryDeliveries: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading deliveries...</span>
-      </div>
+      <DeliveryLayout
+        title="My Deliveries"
+        description="Manage your assigned orders and delivery workflow"
+      >
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="theme-bg-card rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center theme-shadow-card">
+              <RefreshCw
+                className="h-8 w-8 animate-spin"
+                style={{ color: "var(--primary-emerald)" }}
+              />
+            </div>
+            <p className="text-lg font-medium theme-text-primary">
+              Loading deliveries...
+            </p>
+            <p className="theme-text-secondary">
+              Please wait while we fetch your orders
+            </p>
+          </div>
+        </div>
+      </DeliveryLayout>
     );
   }
 
@@ -228,75 +245,133 @@ const DeliveryDeliveries: React.FC = () => {
     >
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <Button onClick={fetchDeliveries} variant="outline">
+          <Button
+            onClick={fetchDeliveries}
+            variant="outline"
+            className="theme-primary hover:theme-primary-gradient transition-colors duration-300 border-2"
+            style={{
+              borderColor: "var(--primary-emerald)",
+              color: "var(--primary-emerald)",
+            }}
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
         </div>
 
         {orders.length === 0 ? (
-          <Card>
-            <CardContent className="p-6 text-center">
-              <Truck className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-medium mb-2">
+          <Card className="border-none theme-shadow-card theme-bg-card">
+            <CardContent className="p-12 text-center">
+              <div
+                className="rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center"
+                style={{ background: "var(--status-info)", opacity: 0.1 }}
+              >
+                <Truck
+                  className="h-10 w-10"
+                  style={{ color: "var(--status-info)" }}
+                />
+              </div>
+              <h3 className="text-xl font-semibold mb-3 theme-text-primary">
                 No deliveries assigned
               </h3>
-              <p className="text-gray-500">
-                Check back later for new delivery assignments.
+              <p className="theme-text-secondary max-w-md mx-auto">
+                Check back later for new delivery assignments. New orders will
+                appear here when they're ready for pickup.
               </p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4">
-            {orders.map((order) => (
+          <div className="grid gap-6">
+            {orders.map((order, index) => (
               <Card
                 key={order.id}
-                className="hover:shadow-md transition-shadow"
+                className="group border-none theme-card-hover theme-animate-fade-in-up"
+                style={{
+                  background: "var(--bg-card)",
+                  animationDelay: `${index * 0.1}s`,
+                }}
               >
-                <CardHeader>
+                <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="text-lg">
-                        Order #{order.order_number}
+                      <CardTitle
+                        className="text-xl font-bold flex items-center space-x-2"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        <span>Order #{order.order_number}</span>
                       </CardTitle>
-                      <CardDescription>
+                      <CardDescription
+                        className="mt-1 flex items-center"
+                        style={{ color: "var(--text-cool-grey)" }}
+                      >
+                        <User className="h-4 w-4 mr-1" />
                         Customer: {order.customer?.name || "N/A"}
                       </CardDescription>
                     </div>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status.replace("_", " ").toUpperCase()}
-                    </Badge>
+                    <div className="transform group-hover:scale-105 transition-transform duration-300">
+                      <Badge
+                        className={`${getStatusColor(
+                          order.status
+                        )} font-semibold px-3 py-1 text-xs`}
+                      >
+                        {order.status.replace("_", " ").toUpperCase()}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {/* Customer Info */}
-                    <div className="flex items-start space-x-3">
-                      <User className="h-5 w-5 text-gray-400 mt-0.5" />
-                      <div>
-                        <p className="font-medium">
-                          {order.customer?.name || "N/A"}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {order.customer?.phone || "No phone"}
-                        </p>
+                    <div
+                      className="rounded-lg p-4"
+                      style={{
+                        background: "rgba(66, 165, 245, 0.1)",
+                        border: "1px solid rgba(66, 165, 245, 0.2)",
+                      }}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div
+                          className="rounded-full p-2"
+                          style={{ background: "var(--status-info)" }}
+                        >
+                          <User className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">
+                            {order.customer?.name || "N/A"}
+                          </p>
+                          <p className="text-sm text-gray-700 flex items-center mt-1">
+                            <Phone className="h-3 w-3 mr-1" />
+                            {order.customer?.phone || "No phone"}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
                     {/* Delivery Address */}
-                    <div className="flex items-start space-x-3">
-                      <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
-                      <div>
-                        <p className="font-medium">Delivery Address</p>
-                        <p className="text-sm text-gray-600">
-                          {order.delivery_address}
-                        </p>
-                        {order.delivery_instructions && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            <span className="font-medium">Instructions:</span>{" "}
-                            {order.delivery_instructions}
+                    <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4">
+                      <div className="flex items-start space-x-3">
+                        <div className="bg-green-500 rounded-full p-2">
+                          <MapPin className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900 mb-2">
+                            Delivery Address
                           </p>
-                        )}
+                          <p className="text-sm text-gray-700 leading-relaxed">
+                            {order.delivery_address}
+                          </p>
+                          {order.delivery_instructions && (
+                            <div className="mt-3 p-3 bg-white rounded-md border-l-4 border-green-400">
+                              <p className="text-sm text-gray-700">
+                                <span className="font-semibold text-gray-900">
+                                  Instructions:
+                                </span>{" "}
+                                {order.delivery_instructions}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -312,80 +387,97 @@ const DeliveryDeliveries: React.FC = () => {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2 pt-4">
-                      {/* Status Update Button */}
-                      {getNextStatus(order.status) && (
-                        <Button
-                          onClick={() =>
-                            handleStatusUpdate(
-                              order.id,
-                              getNextStatus(order.status)!
-                            )
-                          }
-                          className="flex items-center space-x-2"
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                          <span>{getStatusAction(order.status)}</span>
-                        </Button>
-                      )}
+                    <div className="theme-bg-primary rounded-lg p-4">
+                      <div className="flex flex-wrap gap-3">
+                        {/* Status Update Button */}
+                        {getNextStatus(order.status) && (
+                          <Button
+                            onClick={() =>
+                              handleStatusUpdate(
+                                order.id,
+                                getNextStatus(order.status)!
+                              )
+                            }
+                            className="theme-primary-gradient text-white hover:opacity-90 transform hover:scale-105 transition-all duration-300"
+                            size="lg"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            <span>{getStatusAction(order.status)}</span>
+                          </Button>
+                        )}
 
-                      {/* Navigation Button */}
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          const address = encodeURIComponent(
-                            order.delivery_address
-                          );
-                          window.open(
-                            `https://www.google.com/maps/dir/?api=1&destination=${address}`,
-                            "_blank"
-                          );
-                        }}
-                      >
-                        <Navigation className="h-4 w-4 mr-2" />
-                        Navigate
-                      </Button>
-
-                      {/* Call Customer Button */}
-                      {order.customer?.phone && (
+                        {/* Navigation Button */}
                         <Button
                           variant="outline"
-                          onClick={() =>
-                            window.open(`tel:${order.customer.phone}`, "_self")
-                          }
+                          onClick={() => {
+                            const address = encodeURIComponent(
+                              order.delivery_address
+                            );
+                            window.open(
+                              `https://www.google.com/maps/dir/?api=1&destination=${address}`,
+                              "_blank"
+                            );
+                          }}
+                          className="border-2 transform hover:scale-105 transition-all duration-300"
+                          style={{
+                            borderColor: "var(--status-info)",
+                            color: "var(--status-info)",
+                          }}
                         >
-                          <Phone className="h-4 w-4 mr-2" />
-                          Call
+                          <Navigation className="h-4 w-4 mr-2" />
+                          Navigate
                         </Button>
-                      )}
 
-                      {/* Chat Button */}
-                      <Button
-                        variant="outline"
-                        onClick={() => handleOpenChat(order)}
-                      >
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Chat
-                      </Button>
+                        {/* Call Customer Button */}
+                        {order.customer?.phone && (
+                          <Button
+                            variant="outline"
+                            onClick={() =>
+                              window.open(
+                                `tel:${order.customer.phone}`,
+                                "_self"
+                              )
+                            }
+                            className="hover:bg-green-50 hover:border-green-300 hover:text-green-700 transform hover:scale-105 transition-all duration-300"
+                          >
+                            <Phone className="h-4 w-4 mr-2" />
+                            Call
+                          </Button>
+                        )}
 
-                      {/* Report Issue Button */}
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setShowIssueReport(true);
-                        }}
-                      >
-                        <AlertTriangle className="h-4 w-4 mr-2" />
-                        Report Issue
-                      </Button>
+                        {/* Chat Button */}
+                        <Button
+                          variant="outline"
+                          onClick={() => handleOpenChat(order)}
+                          className="hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transform hover:scale-105 transition-all duration-300"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Chat
+                        </Button>
+
+                        {/* Report Issue Button */}
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setShowIssueReport(true);
+                          }}
+                          className="hover:bg-red-50 hover:border-red-300 hover:text-red-700 transform hover:scale-105 transition-all duration-300"
+                        >
+                          <AlertTriangle className="h-4 w-4 mr-2" />
+                          Report Issue
+                        </Button>
+                      </div>
                     </div>
 
                     {/* Progress Timeline */}
-                    <div className="pt-4 border-t">
-                      <div className="flex items-center justify-between text-xs text-gray-500">
+                    <div className="pt-6 border-t border-gray-200">
+                      <h4 className="font-semibold text-gray-900 mb-4">
+                        Delivery Progress
+                      </h4>
+                      <div className="flex items-center justify-between text-xs">
                         <div
-                          className={`flex flex-col items-center ${
+                          className={`flex flex-col items-center transition-colors duration-300 ${
                             [
                               "ready",
                               "out_for_delivery",
@@ -393,79 +485,115 @@ const DeliveryDeliveries: React.FC = () => {
                               "delivered",
                             ].includes(order.status)
                               ? "text-green-600"
-                              : ""
+                              : "text-gray-400"
                           }`}
                         >
                           <div
-                            className={`w-3 h-3 rounded-full ${
+                            className={`w-4 h-4 rounded-full border-2 transition-colors duration-300 ${
                               [
                                 "ready",
                                 "out_for_delivery",
                                 "in_transit",
                                 "delivered",
                               ].includes(order.status)
-                                ? "bg-green-600"
-                                : "bg-gray-300"
+                                ? "bg-green-500 border-green-500"
+                                : "bg-gray-200 border-gray-300"
                             }`}
                           ></div>
-                          <span className="mt-1">Ready</span>
+                          <span className="mt-2 font-medium">Ready</span>
+                        </div>
+
+                        <div className="flex-1 h-0.5 mx-2 bg-gray-200">
+                          <div
+                            className={`h-full transition-all duration-500 ${
+                              [
+                                "out_for_delivery",
+                                "in_transit",
+                                "delivered",
+                              ].includes(order.status)
+                                ? "bg-green-500"
+                                : "bg-gray-200"
+                            }`}
+                          ></div>
                         </div>
 
                         <div
-                          className={`flex flex-col items-center ${
+                          className={`flex flex-col items-center transition-colors duration-300 ${
                             [
                               "out_for_delivery",
                               "in_transit",
                               "delivered",
                             ].includes(order.status)
                               ? "text-green-600"
-                              : ""
+                              : "text-gray-400"
                           }`}
                         >
                           <div
-                            className={`w-3 h-3 rounded-full ${
+                            className={`w-4 h-4 rounded-full border-2 transition-colors duration-300 ${
                               [
                                 "out_for_delivery",
                                 "in_transit",
                                 "delivered",
                               ].includes(order.status)
-                                ? "bg-green-600"
-                                : "bg-gray-300"
+                                ? "bg-green-500 border-green-500"
+                                : "bg-gray-200 border-gray-300"
                             }`}
                           ></div>
-                          <span className="mt-1">Picked Up</span>
+                          <span className="mt-2 font-medium">Picked Up</span>
+                        </div>
+
+                        <div className="flex-1 h-0.5 mx-2 bg-gray-200">
+                          <div
+                            className={`h-full transition-all duration-500 ${
+                              ["in_transit", "delivered"].includes(order.status)
+                                ? "bg-green-500"
+                                : "bg-gray-200"
+                            }`}
+                          ></div>
                         </div>
 
                         <div
-                          className={`flex flex-col items-center ${
+                          className={`flex flex-col items-center transition-colors duration-300 ${
                             ["in_transit", "delivered"].includes(order.status)
                               ? "text-green-600"
-                              : ""
+                              : "text-gray-400"
                           }`}
                         >
                           <div
-                            className={`w-3 h-3 rounded-full ${
+                            className={`w-4 h-4 rounded-full border-2 transition-colors duration-300 ${
                               ["in_transit", "delivered"].includes(order.status)
-                                ? "bg-green-600"
-                                : "bg-gray-300"
+                                ? "bg-green-500 border-green-500"
+                                : "bg-gray-200 border-gray-300"
                             }`}
                           ></div>
-                          <span className="mt-1">In Transit</span>
+                          <span className="mt-2 font-medium">In Transit</span>
+                        </div>
+
+                        <div className="flex-1 h-0.5 mx-2 bg-gray-200">
+                          <div
+                            className={`h-full transition-all duration-500 ${
+                              order.status === "delivered"
+                                ? "bg-green-500"
+                                : "bg-gray-200"
+                            }`}
+                          ></div>
                         </div>
 
                         <div
-                          className={`flex flex-col items-center ${
-                            order.status === "delivered" ? "text-green-600" : ""
+                          className={`flex flex-col items-center transition-colors duration-300 ${
+                            order.status === "delivered"
+                              ? "text-green-600"
+                              : "text-gray-400"
                           }`}
                         >
                           <div
-                            className={`w-3 h-3 rounded-full ${
+                            className={`w-4 h-4 rounded-full border-2 transition-colors duration-300 ${
                               order.status === "delivered"
-                                ? "bg-green-600"
-                                : "bg-gray-300"
+                                ? "bg-green-500 border-green-500"
+                                : "bg-gray-200 border-gray-300"
                             }`}
                           ></div>
-                          <span className="mt-1">Delivered</span>
+                          <span className="mt-2 font-medium">Delivered</span>
                         </div>
                       </div>
                     </div>

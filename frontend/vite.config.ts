@@ -35,4 +35,7 @@ export default defineConfig(({ mode }: { mode: string }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    exclude: ["delivery-theme.css"]  // Exclude custom CSS from dependency optimization
+  }
 }));
