@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { CartProvider } from '@/context/CartContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useApprovalStatus } from '@/hooks/useApprovalStatus';
 
@@ -475,13 +476,15 @@ const AppRoutes: React.FC = () => {
       }}
     >
       <AuthProvider>
-        {isValidClientId ? (
-          <GoogleOAuthProvider clientId={googleClientId}>
+        <CartProvider>
+          {isValidClientId ? (
+            <GoogleOAuthProvider clientId={googleClientId}>
+              <InnerRoutes />
+            </GoogleOAuthProvider>
+          ) : (
             <InnerRoutes />
-          </GoogleOAuthProvider>
-        ) : (
-          <InnerRoutes />
-        )}
+          )}
+        </CartProvider>
       </AuthProvider>
     </BrowserRouter>
   );

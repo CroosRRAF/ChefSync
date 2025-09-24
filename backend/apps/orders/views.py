@@ -128,3 +128,61 @@ class CartItemViewSet(viewsets.ModelViewSet):
     queryset = CartItem.objects.all()
     serializer_class = CartItemSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return CartItem.objects.filter(customer=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def add_to_cart(self, request):
+        """Add item to cart"""
+        try:
+            price_id = request.data.get('price_id')
+            quantity = int(request.data.get('quantity', 1))
+            
+            if not price_id:
+                return Response({"error": "price_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get the FoodPrice object
+            from apps.food.models import FoodPrice
+            try:
+                price = FoodPrice.objects.get(price_id=price_id)
+            except FoodPrice.DoesNotExist:
+                return Response({"error": "Invalid price_id"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if item already exists in cart
+            cart_item, created = CartItem.objects.get_or_create(
+                customer=request.user,
+                price=price,
+                defaults={'quantity': quantity}
+            )
+            
+            if not created:
+                cart_item.quantity += quantity
+                cart_item.save()
+            
+            return Response({
+                "message": "Item added to cart successfully",
+                "cart_item": CartItemSerializer(cart_item).data
+            })
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'])
+    def cart_summary(self, request):
+        """Get cart summary for the user"""
+        cart_items = self.get_queryset()
+        total_items = sum(item.quantity for item in cart_items)
+        total_value = sum(item.total_price for item in cart_items)
+        
+        return Response({
+            "total_items": total_items,
+            "total_value": float(total_value),
+            "cart_items": CartItemSerializer(cart_items, many=True).data
+        })
+
+    @action(detail=False, methods=['delete'])
+    def clear_cart(self, request):
+        """Clear all items from cart"""
+        self.get_queryset().delete()
+        return Response({"message": "Cart cleared successfully"})
