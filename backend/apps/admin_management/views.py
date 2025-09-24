@@ -146,6 +146,16 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             active_foods = Food.objects.filter(is_available=True).count()
             pending_food_approvals = Food.objects.filter(is_available=False).count()
 
+            # Pending chef approvals (cooks only)
+            pending_chef_approvals = User.objects.filter(
+                role="Cook", approval_status="pending"
+            ).count()
+
+            # Pending user approvals (cooks and delivery agents)
+            pending_user_approvals = User.objects.filter(
+                role__in=["Cook", "DeliveryAgent"], approval_status="pending"
+            ).count()
+
             # System statistics
             system_health_score = self._calculate_system_health()
             active_sessions = self._get_active_sessions()
@@ -163,7 +173,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 "user_growth": round(user_growth, 2),
                 "total_chefs": total_chefs,
                 "active_chefs": active_chefs,
-                "pending_chef_approvals": pending_chef_approvals,
+                "pending_chef_approvals": pending_chef_approvals,  # Chef approvals (cooks only)
                 "chef_growth": 0,  # Calculate based on chef registrations
                 "total_orders": total_orders,
                 "orders_today": orders_today,
@@ -178,6 +188,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 "total_foods": total_foods,
                 "active_foods": active_foods,
                 "pending_food_approvals": pending_food_approvals,
+                "pending_user_approvals": pending_user_approvals,  # Add separate field for user approvals
                 "system_health_score": system_health_score,
                 "active_sessions": active_sessions,
                 "unread_notifications": unread_notifications,

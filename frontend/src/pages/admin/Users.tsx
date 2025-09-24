@@ -1,20 +1,24 @@
+import { AdvancedStatsCard } from "@/components/admin/UnifiedStatsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { adminService, type AdminUser } from "@/services/adminService";
 import {
   AlertTriangle,
   Calendar,
   CheckCircle,
-  Clock,
-  DollarSign,
+  ChefHat,
   Download,
   Eye,
   FileText,
   Filter,
   RefreshCw,
   Search,
+  ShieldCheck,
+  ShieldX,
+  Star,
   Trash2,
   UserCheck,
   Users,
@@ -29,6 +33,8 @@ const EnhancedUserManagement: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [chefs, setChefs] = useState<AdminUser[]>([]);
+  const [customers, setCustomers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({
@@ -51,14 +57,50 @@ const EnhancedUserManagement: React.FC = () => {
     status: "",
   });
 
+  // Bulk selection state
+  const [selectedChefs, setSelectedChefs] = useState<number[]>([]);
+  const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+
   // Approval state
-  const [activeTab, setActiveTab] = useState("users");
+  const [activeTab, setActiveTab] = useState("chefs");
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [selectedApprovalUser, setSelectedApprovalUser] = useState<any>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
 
-  // Fetch users
+  // Fetch users by role
+  const fetchUsersByRole = useCallback(
+    async (role: string, page = 1, search = "", status = "") => {
+      if (!user) return;
+
+      try {
+        const response = await adminService.getUsers({
+          page,
+          limit: pagination.limit,
+          search,
+          role,
+          status,
+          sort_by: "date_joined",
+          sort_order: "desc",
+        });
+
+        if (role === "cook") {
+          setChefs(response.users);
+        } else if (role === "customer") {
+          setCustomers(response.users);
+        }
+
+        return response;
+      } catch (err) {
+        console.error(`Error fetching ${role}s:`, err);
+        throw err;
+      }
+    },
+    [user, pagination.limit]
+  );
+
+  // Fetch all users (for stats)
   const fetchUsers = useCallback(
     async (page = 1, search = "", role = "", status = "") => {
       if (!user) return;
@@ -90,8 +132,23 @@ const EnhancedUserManagement: React.FC = () => {
 
   // Initial fetch
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        // Load chefs and customers separately
+        await Promise.all([
+          fetchUsersByRole("cook"),
+          fetchUsersByRole("customer"),
+          fetchPendingApprovals(),
+        ]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [fetchUsersByRole]);
 
   // Enhanced search with debouncing
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(
@@ -410,225 +467,110 @@ const EnhancedUserManagement: React.FC = () => {
     }
   };
 
-  // Fetch approvals when tab changes
-  useEffect(() => {
-    if (activeTab === "approvals") {
-      fetchPendingApprovals();
+  // Bulk action handlers
+  const handleBulkChefAction = async (action: string) => {
+    if (selectedChefs.length === 0) return;
+
+    try {
+      setBulkActionLoading(true);
+
+      switch (action) {
+        case "activate":
+          await adminService.bulkActivateUsers(selectedChefs);
+          break;
+        case "deactivate":
+          await adminService.bulkDeactivateUsers(selectedChefs);
+          break;
+        case "delete":
+          await adminService.bulkDeleteUsers(selectedChefs);
+          break;
+        case "approve":
+          // Bulk approve pending chefs
+          for (const chefId of selectedChefs) {
+            await adminService.approveUser(chefId, "approve");
+          }
+          break;
+      }
+
+      // Refresh data
+      await fetchUsersByRole("cook");
+      setSelectedChefs([]);
+      alert(`${action} completed for ${selectedChefs.length} chef(s)`);
+    } catch (err) {
+      console.error("Bulk action failed:", err);
+      alert(`Failed to ${action} chefs`);
+    } finally {
+      setBulkActionLoading(false);
     }
-  }, [activeTab, fetchPendingApprovals]);
+  };
+
+  const handleBulkCustomerAction = async (action: string) => {
+    if (selectedCustomers.length === 0) return;
+
+    try {
+      setBulkActionLoading(true);
+
+      switch (action) {
+        case "activate":
+          await adminService.bulkActivateUsers(selectedCustomers);
+          break;
+        case "deactivate":
+          await adminService.bulkDeactivateUsers(selectedCustomers);
+          break;
+        case "delete":
+          await adminService.bulkDeleteUsers(selectedCustomers);
+          break;
+      }
+
+      // Refresh data
+      await fetchUsersByRole("customer");
+      setSelectedCustomers([]);
+      alert(`${action} completed for ${selectedCustomers.length} customer(s)`);
+    } catch (err) {
+      console.error("Bulk action failed:", err);
+      alert(`Failed to ${action} customers`);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  // Handle tab changes
+  useEffect(() => {
+    if (activeTab === "chefs") {
+      fetchUsersByRole("cook");
+    } else if (activeTab === "customers") {
+      fetchUsersByRole("customer");
+    }
+  }, [activeTab, fetchUsersByRole]);
 
   // Get user stats
   const userStats = {
-    total: pagination.total,
-    active: users.filter((u) => u.is_active).length,
-    inactive: users.filter((u) => !u.is_active).length,
-    newThisWeek: users.filter((u) => {
+    totalChefs: chefs.length,
+    activeChefs: chefs.filter((c) => c.is_active).length,
+    pendingChefs: pendingApprovals.filter((u) => u.role === "cook").length,
+    totalCustomers: customers.length,
+    activeCustomers: customers.filter((c) => c.is_active).length,
+    newChefsThisWeek: chefs.filter((c) => {
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
-      return new Date(u.date_joined) > weekAgo;
+      return new Date(c.date_joined) > weekAgo;
     }).length,
-    // Calculate role counts from all users (not filtered)
-    adminCount: users.filter((u) => u.role === "admin").length,
-    cookCount: users.filter((u) => u.role === "cook").length,
-    customerCount: users.filter((u) => u.role === "customer").length,
-    deliveryCount: users.filter((u) => u.role === "delivery_agent").length,
+    newCustomersThisWeek: customers.filter((c) => {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return new Date(c.date_joined) > weekAgo;
+    }).length,
   };
 
   // Table columns
   const columns = [
-    {
-      key: "name",
-      title: "Name",
-      sortable: true,
-      render: (value: string, row: AdminUser) => (
-        <div
-          className="flex items-center space-x-3 cursor-pointer p-2 rounded transition-all duration-200 relative group hover:bg-gray-50 dark:hover:bg-gray-800"
-          onMouseEnter={(e) => handleUserPreview(row, e)}
-          onMouseLeave={() => {
-            // Delay hiding to allow mouse to move to preview
-            setTimeout(() => {
-              if (!showPreview) return; // Already hidden
-              setShowPreview(false);
-              setPreviewUser(null);
-            }, 150);
-          }}
-          onClick={() => handleUserDetail(row)}
-        >
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700">
-            {value.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <div
-              className="font-medium transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400"
-              style={{
-                color: theme === "dark" ? "#F9FAFB" : "#111827",
-              }}
-            >
-              {value}
-            </div>
-            <div
-              className="text-sm"
-              style={{
-                color: theme === "dark" ? "#9CA3AF" : "#6B7280",
-              }}
-            >
-              {row.email}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "role",
-      title: "Role",
-      sortable: true,
-      render: (value: string) => (
-        <Badge
-          variant="secondary"
-          className={`text-xs ${
-            value === "admin"
-              ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
-              : value === "cook"
-              ? "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800"
-              : value === "delivery_agent"
-              ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800"
-              : "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
-          }`}
-        >
-          {value === "delivery_agent"
-            ? "Delivery"
-            : value.charAt(0).toUpperCase() + value.slice(1)}
-        </Badge>
-      ),
-    },
-    {
-      key: "is_active",
-      title: "Status",
-      sortable: true,
-      render: (value: boolean) => (
-        <div className="flex items-center space-x-2">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              value ? "bg-green-500" : "bg-red-500"
-            }`}
-          ></div>
-          <Badge
-            variant="secondary"
-            className={`text-xs ${
-              value
-                ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
-                : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
-            }`}
-          >
-            {value ? "Active" : "Inactive"}
-          </Badge>
-        </div>
-      ),
-    },
-    {
-      key: "total_orders",
-      title: "Orders",
-      sortable: true,
-      align: "center" as const,
-      render: (value: number) => (
-        <span className="font-medium text-gray-900 dark:text-gray-100">
-          {value}
-        </span>
-      ),
-    },
-    {
-      key: "total_spent",
-      title: "Total Spent",
-      sortable: true,
-      align: "right" as const,
-      render: (value: number) => (
-        <span className="font-medium text-gray-900 dark:text-gray-100">
-          ${value.toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      key: "last_login",
-      title: "Last Login",
-      sortable: true,
-      render: (value: string | null) => (
-        <span className="text-sm text-gray-500 dark:text-gray-400">
-          {value ? new Date(value).toLocaleDateString() : "Never"}
-        </span>
-      ),
-    },
-    {
-      key: "actions",
-      title: "Actions",
-      render: (value: any, row: AdminUser) => (
-        <div className="flex items-center space-x-1">
-          {/* Approval actions for pending users */}
-          {(row.role === "cook" || row.role === "delivery_agent") &&
-            !row.is_active && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleUserApproval(row, "approve");
-                  }}
-                  className="h-8 w-8 p-0 hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400"
-                  title="Approve User"
-                >
-                  <UserCheck className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleUserApproval(row, "reject");
-                  }}
-                  className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
-                  title="Reject User"
-                >
-                  <UserX className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-
-          {/* Standard actions */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleUserUpdate(row.id, { is_active: !row.is_active });
-            }}
-            className={`h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-              row.is_active
-                ? "text-red-600 dark:text-red-400"
-                : "text-green-600 dark:text-green-400"
-            }`}
-            title={row.is_active ? "Deactivate User" : "Activate User"}
-          >
-            {row.is_active ? (
-              <UserX className="h-4 w-4" />
-            ) : (
-              <UserCheck className="h-4 w-4" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleUserDetail(row);
-            }}
-            className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-            title="View Details"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
+    { key: "name", title: "Name", sortable: true },
+    { key: "role", title: "Role", sortable: true },
+    { key: "is_active", title: "Status", sortable: true },
+    { key: "total_orders", title: "Orders", sortable: true },
+    { key: "total_spent", title: "Total Spent", sortable: true },
+    { key: "last_login", title: "Last Login", sortable: true },
+    { key: "actions", title: "Actions" },
   ];
 
   // Filter options
@@ -731,48 +673,323 @@ const EnhancedUserManagement: React.FC = () => {
         className="space-y-6"
       >
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="approvals" className="relative">
-            Approvals
-            {pendingApprovals.length > 0 && (
+          <TabsTrigger value="chefs" className="relative">
+            <ChefHat className="h-4 w-4 mr-2" />
+            Chefs
+            {userStats.pendingChefs > 0 && (
               <Badge
                 variant="destructive"
                 className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
               >
-                {pendingApprovals.length}
+                {userStats.pendingChefs}
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="customers">
+            <Users className="h-4 w-4 mr-2" />
+            Customers
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users" className="space-y-6">
+        <TabsContent value="chefs" className="space-y-6">
+          {/* Bulk Actions Bar */}
+          {selectedChefs.length > 0 && (
+            <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm font-medium">
+                      {selectedChefs.length} chef
+                      {selectedChefs.length > 1 ? "s" : ""} selected
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedChefs([])}
+                    >
+                      Clear Selection
+                    </Button>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleBulkChefAction("activate")}
+                      disabled={bulkActionLoading}
+                    >
+                      <UserCheck className="h-4 w-4 mr-1" />
+                      Activate
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleBulkChefAction("deactivate")}
+                      disabled={bulkActionLoading}
+                    >
+                      <UserX className="h-4 w-4 mr-1" />
+                      Deactivate
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleBulkChefAction("approve")}
+                      disabled={bulkActionLoading}
+                      className="border-green-500 text-green-600 hover:bg-green-50"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Approve All
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Chefs Table */}
+          <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border-gray-200 dark:border-gray-700">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle
+                    className="text-xl font-semibold flex items-center"
+                    style={{
+                      color: theme === "dark" ? "#F9FAFB" : "#111827",
+                    }}
+                  >
+                    <ChefHat className="h-5 w-5 mr-2 text-yellow-600 dark:text-yellow-400" />
+                    All Chefs
+                  </CardTitle>
+                  <p
+                    className="text-sm mt-1"
+                    style={{
+                      color: theme === "dark" ? "#9CA3AF" : "#6B7280",
+                    }}
+                  >
+                    Manage chefs, approve applications, and monitor performance
+                    • {chefs.length} total chefs
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge variant="secondary" className="text-xs">
+                    Page {pagination.page} of {pagination.pages}
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin mr-2" />
+                  <span>Loading chefs...</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          <Checkbox
+                            checked={
+                              selectedChefs.length === chefs.length &&
+                              chefs.length > 0
+                            }
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedChefs(chefs.map((c) => c.id));
+                              } else {
+                                setSelectedChefs([]);
+                              }
+                            }}
+                          />
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Chef
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Status
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Rating
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Orders
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Revenue
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chefs.map((chef) => (
+                        <tr
+                          key={chef.id}
+                          className="border-b hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                          onClick={() => handleUserDetail(chef)}
+                        >
+                          <td className="py-3 px-4">
+                            <Checkbox
+                              checked={selectedChefs.includes(chef.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedChefs((prev) => [
+                                    ...prev,
+                                    chef.id,
+                                  ]);
+                                } else {
+                                  setSelectedChefs((prev) =>
+                                    prev.filter((id) => id !== chef.id)
+                                  );
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm bg-gradient-to-br from-yellow-500 to-orange-600">
+                                {chef.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="font-medium">{chef.name}</div>
+                                <div className="text-sm text-gray-500">
+                                  {chef.email}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center space-x-2">
+                              <div
+                                className={`w-2 h-2 rounded-full ${
+                                  chef.is_active
+                                    ? "bg-green-500"
+                                    : "bg-yellow-500"
+                                }`}
+                              ></div>
+                              <Badge variant="secondary">
+                                {chef.is_active ? "Active" : "Pending"}
+                              </Badge>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center space-x-1">
+                              <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                              <span className="font-medium">4.5</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-medium">
+                              {chef.total_orders}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-medium">
+                              ${chef.total_spent.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center space-x-1">
+                              {!chef.is_active && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUserApproval(chef, "approve");
+                                    }}
+                                    className="h-8 w-8 p-0 hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400"
+                                    title="Approve Chef"
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUserApproval(chef, "reject");
+                                    }}
+                                    className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+                                    title="Reject Chef"
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUserDetail(chef);
+                                }}
+                                className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {chefs.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No chefs found
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="customers" className="space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <AdvancedStatsCard
-              title="Total Users"
-              value={userStats.total}
-              subtitle={`${userStats.active} active`}
-              icon={<Users className="h-6 w-6" />}
-              color="blue"
-              onRefresh={() => fetchUsers()}
+              title="Total Chefs"
+              value={userStats.totalChefs}
+              subtitle={`${userStats.activeChefs} active`}
+              icon={<ChefHat className="h-6 w-6" />}
+              color="yellow"
+              onRefresh={() => fetchUsersByRole("cook")}
             />
 
             <AdvancedStatsCard
-              title="Active Users"
-              value={userStats.active}
-              subtitle={`${userStats.inactive} inactive`}
+              title="Active Chefs"
+              value={userStats.activeChefs}
+              subtitle={`${userStats.pendingChefs} pending approval`}
               icon={<UserCheck className="h-6 w-6" />}
               color="green"
-              onRefresh={() => fetchUsers()}
+              onRefresh={() => fetchUsersByRole("cook")}
+            />
+
+            <AdvancedStatsCard
+              title="Total Customers"
+              value={userStats.totalCustomers}
+              subtitle={`${userStats.activeCustomers} active`}
+              icon={<Users className="h-6 w-6" />}
+              color="blue"
+              onRefresh={() => fetchUsersByRole("customer")}
             />
 
             <AdvancedStatsCard
               title="New This Week"
-              value={userStats.newThisWeek}
-              subtitle="Recent registrations"
+              value={
+                userStats.newChefsThisWeek + userStats.newCustomersThisWeek
+              }
+              subtitle={`${userStats.newChefsThisWeek} chefs, ${userStats.newCustomersThisWeek} customers`}
               icon={<Calendar className="h-6 w-6" />}
               color="purple"
-              onRefresh={() => fetchUsers()}
+              onRefresh={() => {
+                fetchUsersByRole("cook");
+                fetchUsersByRole("customer");
+              }}
             />
           </div>
 
@@ -811,68 +1028,121 @@ const EnhancedUserManagement: React.FC = () => {
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Quick Filters:
                 </span>
-                <Button
-                  variant={filters.role === "" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleFilterChange("role", "")}
-                >
-                  All Users ({userStats.total})
-                </Button>
-                <Button
-                  variant={filters.role === "admin" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() =>
-                    handleFilterChange(
-                      "role",
-                      filters.role === "admin" ? "" : "admin"
-                    )
-                  }
-                >
-                  Admins ({userStats.adminCount})
-                </Button>
-                <Button
-                  variant={filters.role === "cook" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() =>
-                    handleFilterChange(
-                      "role",
-                      filters.role === "cook" ? "" : "cook"
-                    )
-                  }
-                >
-                  Cooks ({userStats.cookCount})
-                </Button>
-                <Button
-                  variant={filters.role === "customer" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() =>
-                    handleFilterChange(
-                      "role",
-                      filters.role === "customer" ? "" : "customer"
-                    )
-                  }
-                >
-                  Customers ({userStats.customerCount})
-                </Button>
-                <Button
-                  variant={
-                    filters.role === "delivery_agent" ? "default" : "outline"
-                  }
-                  size="sm"
-                  onClick={() =>
-                    handleFilterChange(
-                      "role",
-                      filters.role === "delivery_agent" ? "" : "delivery_agent"
-                    )
-                  }
-                >
-                  Delivery ({userStats.deliveryCount})
-                </Button>
+                {activeTab === "chefs" ? (
+                  <>
+                    <Button
+                      variant={filters.status === "" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleFilterChange("status", "")}
+                    >
+                      All Chefs ({userStats.totalChefs})
+                    </Button>
+                    <Button
+                      variant={
+                        filters.status === "active" ? "default" : "outline"
+                      }
+                      size="sm"
+                      onClick={() => handleFilterChange("status", "active")}
+                    >
+                      Active ({userStats.activeChefs})
+                    </Button>
+                    <Button
+                      variant={
+                        filters.status === "inactive" ? "default" : "outline"
+                      }
+                      size="sm"
+                      onClick={() => handleFilterChange("status", "inactive")}
+                    >
+                      Pending Approval ({userStats.pendingChefs})
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant={filters.status === "" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleFilterChange("status", "")}
+                    >
+                      All Customers ({userStats.totalCustomers})
+                    </Button>
+                    <Button
+                      variant={
+                        filters.status === "active" ? "default" : "outline"
+                      }
+                      size="sm"
+                      onClick={() => handleFilterChange("status", "active")}
+                    >
+                      Active ({userStats.activeCustomers})
+                    </Button>
+                    <Button
+                      variant={
+                        filters.status === "inactive" ? "default" : "outline"
+                      }
+                      size="sm"
+                      onClick={() => handleFilterChange("status", "inactive")}
+                    >
+                      Inactive (
+                      {userStats.totalCustomers - userStats.activeCustomers})
+                    </Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
+          {/* Bulk Actions Bar */}
+          {selectedCustomers.length > 0 && (
+            <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm font-medium">
+                      {selectedCustomers.length} customer
+                      {selectedCustomers.length > 1 ? "s" : ""} selected
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedCustomers([])}
+                    >
+                      Clear Selection
+                    </Button>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleBulkCustomerAction("activate")}
+                      disabled={bulkActionLoading}
+                    >
+                      <UserCheck className="h-4 w-4 mr-1" />
+                      Activate
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleBulkCustomerAction("deactivate")}
+                      disabled={bulkActionLoading}
+                    >
+                      <UserX className="h-4 w-4 mr-1" />
+                      Deactivate
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleBulkCustomerAction("block")}
+                      disabled={bulkActionLoading}
+                      className="border-red-500 text-red-600 hover:bg-red-50"
+                    >
+                      <ShieldX className="h-4 w-4 mr-1" />
+                      Block
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Main Content */}
+          {/* Customers Table */}
           <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border-gray-200 dark:border-gray-700">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
@@ -884,7 +1154,7 @@ const EnhancedUserManagement: React.FC = () => {
                     }}
                   >
                     <Users className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
-                    All Users
+                    All Customers
                   </CardTitle>
                   <p
                     className="text-sm mt-1"
@@ -892,8 +1162,8 @@ const EnhancedUserManagement: React.FC = () => {
                       color: theme === "dark" ? "#9CA3AF" : "#6B7280",
                     }}
                   >
-                    Manage all users across your platform • {pagination.total}{" "}
-                    total users
+                    Manage customers, view order history, and monitor activity •{" "}
+                    {customers.length} total customers
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -904,993 +1174,183 @@ const EnhancedUserManagement: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <AdvancedDataTable
-                title=""
-                data={users}
-                columns={columns}
-                searchable
-                filterable
-                sortable
-                selectable
-                bulkActions={bulkActions}
-                filters={filterOptions}
-                loading={loading}
-                error={error}
-                onExport={handleExport}
-                currentPage={pagination.page}
-                totalPages={pagination.pages}
-                totalItems={pagination.total}
-                pageSize={pagination.limit}
-                showPagination
-                onPageChange={(page) =>
-                  fetchUsers(page, filters.search, filters.role, filters.status)
-                }
-                onRowClick={(row) => handleUserDetail(row)}
-              />
-            </CardContent>
-          </Card>
-
-          {/* User Preview Popup */}
-          {showPreview && previewUser && (
-            <div
-              className="fixed z-[9999] pointer-events-auto animate-in fade-in-0 zoom-in-95 duration-200"
-              style={{
-                left: `${previewPosition.x}px`,
-                top: `${previewPosition.y}px`,
-                transform: previewAbove
-                  ? "translate(-50%, -100%)"
-                  : "translate(-50%, 0%)",
-              }}
-              onMouseEnter={() => setShowPreview(true)}
-              onMouseLeave={handlePreviewClose}
-            >
-              <div className="border rounded-xl shadow-2xl p-4 w-80 backdrop-blur-sm bg-white/98 dark:bg-gray-800/98 border-gray-200 dark:border-gray-700">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700">
-                    {previewUser.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3
-                      className="font-semibold truncate"
-                      style={{
-                        color: theme === "dark" ? "#F9FAFB" : "#111827",
-                      }}
-                    >
-                      {previewUser.name}
-                    </h3>
-                    <p
-                      className="text-sm truncate"
-                      style={{
-                        color: theme === "dark" ? "#9CA3AF" : "#6B7280",
-                      }}
-                    >
-                      {previewUser.email}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                  <div className="flex items-center space-x-2">
-                    <span
-                      className="font-medium"
-                      style={{
-                        color: theme === "dark" ? "#D1D5DB" : "#374151",
-                      }}
-                    >
-                      Role:
-                    </span>
-                    <Badge
-                      variant="secondary"
-                      style={{
-                        backgroundColor:
-                          previewUser.role === "admin"
-                            ? theme === "dark"
-                              ? "#7F1D1D"
-                              : "#FEF2F2"
-                            : previewUser.role === "cook"
-                            ? theme === "dark"
-                              ? "#92400E"
-                              : "#FFFBEB"
-                            : previewUser.role === "delivery_agent"
-                            ? theme === "dark"
-                              ? "#1E3A8A"
-                              : "#EFF6FF"
-                            : theme === "dark"
-                            ? "#14532D"
-                            : "#F0FDF4",
-                        color:
-                          previewUser.role === "admin"
-                            ? theme === "dark"
-                              ? "#FCA5A5"
-                              : "#DC2626"
-                            : previewUser.role === "cook"
-                            ? theme === "dark"
-                              ? "#FBBF24"
-                              : "#D97706"
-                            : previewUser.role === "delivery_agent"
-                            ? theme === "dark"
-                              ? "#3B82F6"
-                              : "#2563EB"
-                            : theme === "dark"
-                            ? "#22C55E"
-                            : "#16A34A",
-                      }}
-                      className="text-xs"
-                    >
-                      {previewUser.role === "delivery_agent"
-                        ? "Delivery"
-                        : previewUser.role.charAt(0).toUpperCase() +
-                          previewUser.role.slice(1)}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span
-                      className="font-medium"
-                      style={{
-                        color: theme === "dark" ? "#D1D5DB" : "#374151",
-                      }}
-                    >
-                      Status:
-                    </span>
-                    <div className="flex items-center space-x-1">
-                      <div
-                        className="w-2 h-2 rounded-full"
-                        style={{
-                          backgroundColor: previewUser.is_active
-                            ? "#22C55E"
-                            : "#EF4444",
-                        }}
-                      ></div>
-                      <Badge
-                        variant="secondary"
-                        style={{
-                          backgroundColor: previewUser.is_active
-                            ? theme === "dark"
-                              ? "#14532D"
-                              : "#F0FDF4"
-                            : theme === "dark"
-                            ? "#7F1D1D"
-                            : "#FEF2F2",
-                          color: previewUser.is_active
-                            ? theme === "dark"
-                              ? "#22C55E"
-                              : "#16A34A"
-                            : theme === "dark"
-                            ? "#FCA5A5"
-                            : "#DC2626",
-                        }}
-                        className="text-xs"
-                      >
-                        {previewUser.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span
-                      className="font-medium"
-                      style={{
-                        color: theme === "dark" ? "#D1D5DB" : "#374151",
-                      }}
-                    >
-                      Orders:
-                    </span>
-                    <span
-                      className="ml-2 font-semibold"
-                      style={{
-                        color: theme === "dark" ? "#F9FAFB" : "#111827",
-                      }}
-                    >
-                      {previewUser.total_orders}
-                    </span>
-                  </div>
-                  <div>
-                    <span
-                      className="font-medium"
-                      style={{
-                        color: theme === "dark" ? "#D1D5DB" : "#374151",
-                      }}
-                    >
-                      Spent:
-                    </span>
-                    <span
-                      className="ml-2 font-semibold"
-                      style={{
-                        color: theme === "dark" ? "#F9FAFB" : "#111827",
-                      }}
-                    >
-                      ${previewUser.total_spent.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  className="mt-4 pt-3 border-t"
-                  style={{
-                    borderColor: theme === "dark" ? "#374151" : "#E5E7EB",
-                  }}
-                >
-                  <div
-                    className="flex items-center justify-between text-xs"
-                    style={{
-                      color: theme === "dark" ? "#9CA3AF" : "#6B7280",
-                    }}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>
-                        Joined:{" "}
-                        {new Date(previewUser.date_joined).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <span>
-                        Last Login:{" "}
-                        {previewUser.last_login
-                          ? new Date(
-                              previewUser.last_login
-                            ).toLocaleDateString()
-                          : "Never"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* User Detail Modal */}
-          {showUserDetail && selectedUser && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div
-                className="rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-                style={{
-                  backgroundColor: theme === "dark" ? "#1F2937" : "#FFFFFF",
-                }}
-              >
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2
-                      className="text-2xl font-bold"
-                      style={{
-                        color: theme === "dark" ? "#F9FAFB" : "#111827",
-                      }}
-                    >
-                      User Details
-                    </h2>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          userDetails &&
-                          handleUserUpdate(userDetails.id, {
-                            is_active: !userDetails.is_active,
-                          })
-                        }
-                        disabled={!userDetails || userDetailLoading}
-                      >
-                        {userDetails?.is_active ? (
-                          <>
-                            <UserX className="h-4 w-4 mr-1" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <UserCheck className="h-4 w-4 mr-1" />
-                            Activate
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setShowUserDetail(false);
-                          setSelectedUser(null);
-                          setUserDetails(null);
-                        }}
-                      >
-                        ✕
-                      </Button>
-                    </div>
-                  </div>
-
-                  {userDetailLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <RefreshCw
-                        className="h-8 w-8 animate-spin"
-                        style={{
-                          color: theme === "dark" ? "#3B82F6" : "#2563EB",
-                        }}
-                      />
-                      <span
-                        className="ml-2"
-                        style={{
-                          color: theme === "dark" ? "#9CA3AF" : "#6B7280",
-                        }}
-                      >
-                        Loading user details...
-                      </span>
-                    </div>
-                  ) : userDetails ? (
-                    <div className="space-y-6">
-                      {/* User Info */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="flex items-center">
-                              <UserCheck className="h-5 w-5 mr-2" />
-                              Basic Information
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            <div className="flex items-center space-x-3">
-                              <div
-                                className="w-12 h-12 rounded-full flex items-center justify-center"
-                                style={{
-                                  backgroundColor:
-                                    theme === "dark" ? "#374151" : "#E5E7EB",
-                                }}
-                              >
-                                <Users
-                                  className="h-6 w-6"
-                                  style={{
-                                    color:
-                                      theme === "dark" ? "#9CA3AF" : "#6B7280",
-                                  }}
-                                />
-                              </div>
-                              <div>
-                                <h3
-                                  className="font-semibold text-lg"
-                                  style={{
-                                    color:
-                                      theme === "dark" ? "#F9FAFB" : "#111827",
-                                  }}
-                                >
-                                  {userDetails?.name || "Loading..."}
-                                </h3>
-                                <p
-                                  style={{
-                                    color:
-                                      theme === "dark" ? "#9CA3AF" : "#6B7280",
-                                  }}
-                                >
-                                  {userDetails?.email || "Loading..."}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="font-medium">Role:</span>
-                                <select
-                                  value={userDetails?.role || ""}
-                                  onChange={(e) =>
-                                    userDetails &&
-                                    handleUserUpdate(userDetails.id, {
-                                      role: e.target.value,
-                                    })
-                                  }
-                                  className="ml-2 px-2 py-1 border rounded text-sm"
-                                  style={{
-                                    backgroundColor:
-                                      theme === "dark" ? "#1F2937" : "#FFFFFF",
-                                    borderColor:
-                                      theme === "dark" ? "#374151" : "#D1D5DB",
-                                    color:
-                                      theme === "dark" ? "#F9FAFB" : "#111827",
-                                  }}
-                                  disabled={!userDetails || userDetailLoading}
-                                >
-                                  <option value="customer">Customer</option>
-                                  <option value="cook">Cook</option>
-                                  <option value="delivery_agent">
-                                    Delivery Agent
-                                  </option>
-                                  <option value="admin">Admin</option>
-                                </select>
-                              </div>
-                              <div>
-                                <span className="font-medium">Status:</span>
-                                <Button
-                                  variant={
-                                    userDetails?.is_active
-                                      ? "default"
-                                      : "destructive"
-                                  }
-                                  size="sm"
-                                  className="ml-2"
-                                  onClick={() =>
-                                    userDetails &&
-                                    handleUserUpdate(userDetails.id, {
-                                      is_active: !userDetails.is_active,
-                                    })
-                                  }
-                                  disabled={!userDetails || userDetailLoading}
-                                >
-                                  {userDetails?.is_active ? (
-                                    <>
-                                      <UserX className="h-4 w-4 mr-1" />
-                                      Deactivate
-                                    </>
-                                  ) : (
-                                    <>
-                                      <UserCheck className="h-4 w-4 mr-1" />
-                                      Activate
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-                              <div>
-                                <span className="font-medium">Phone:</span>
-                                <input
-                                  type="text"
-                                  value={userDetails?.phone_no || ""}
-                                  onChange={(e) =>
-                                    setUserDetails(
-                                      userDetails
-                                        ? {
-                                            ...userDetails,
-                                            phone_no: e.target.value,
-                                          }
-                                        : null
-                                    )
-                                  }
-                                  onBlur={(e) =>
-                                    userDetails &&
-                                    handleUserUpdate(userDetails.id, {
-                                      phone_no: e.target.value,
-                                    })
-                                  }
-                                  className="ml-2 px-2 py-1 border rounded text-sm w-32"
-                                  style={{
-                                    backgroundColor:
-                                      theme === "dark" ? "#1F2937" : "#FFFFFF",
-                                    borderColor:
-                                      theme === "dark" ? "#374151" : "#D1D5DB",
-                                    color:
-                                      theme === "dark" ? "#F9FAFB" : "#111827",
-                                  }}
-                                  placeholder="Phone number"
-                                  disabled={!userDetails || userDetailLoading}
-                                />
-                              </div>
-                              <div>
-                                <span className="font-medium">Address:</span>
-                                <input
-                                  type="text"
-                                  value={userDetails?.address || ""}
-                                  onChange={(e) =>
-                                    setUserDetails(
-                                      userDetails
-                                        ? {
-                                            ...userDetails,
-                                            address: e.target.value,
-                                          }
-                                        : null
-                                    )
-                                  }
-                                  onBlur={(e) =>
-                                    userDetails &&
-                                    handleUserUpdate(userDetails.id, {
-                                      address: e.target.value,
-                                    })
-                                  }
-                                  className="ml-2 px-2 py-1 border rounded text-sm w-32"
-                                  style={{
-                                    backgroundColor:
-                                      theme === "dark" ? "#1F2937" : "#FFFFFF",
-                                    borderColor:
-                                      theme === "dark" ? "#374151" : "#D1D5DB",
-                                    color:
-                                      theme === "dark" ? "#F9FAFB" : "#111827",
-                                  }}
-                                  placeholder="Address"
-                                  disabled={!userDetails || userDetailLoading}
-                                />
-                              </div>
-                              <div>
-                                <span className="font-medium">Joined:</span>
-                                <span className="ml-2 text-gray-600">
-                                  {userDetails?.date_joined
-                                    ? new Date(
-                                        userDetails.date_joined
-                                      ).toLocaleDateString()
-                                    : "N/A"}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="font-medium">Last Login:</span>
-                                <span className="ml-2 text-gray-600">
-                                  {userDetails?.last_login
-                                    ? new Date(
-                                        userDetails.last_login
-                                      ).toLocaleDateString()
-                                    : "Never"}
-                                </span>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="flex items-center">
-                              <DollarSign className="h-5 w-5 mr-2" />
-                              Statistics
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div
-                                className="text-center p-4 rounded-lg"
-                                style={{
-                                  backgroundColor:
-                                    theme === "dark" ? "#1E3A8A" : "#EFF6FF",
-                                }}
-                              >
-                                <div
-                                  className="text-2xl font-bold"
-                                  style={{
-                                    color:
-                                      theme === "dark" ? "#3B82F6" : "#2563EB",
-                                  }}
-                                >
-                                  {userDetails?.statistics?.total_orders || 0}
-                                </div>
-                                <div
-                                  className="text-sm"
-                                  style={{
-                                    color:
-                                      theme === "dark" ? "#9CA3AF" : "#6B7280",
-                                  }}
-                                >
-                                  Total Orders
-                                </div>
-                              </div>
-                              <div
-                                className="text-center p-4 rounded-lg"
-                                style={{
-                                  backgroundColor:
-                                    theme === "dark" ? "#14532D" : "#F0FDF4",
-                                }}
-                              >
-                                <div
-                                  className="text-2xl font-bold"
-                                  style={{
-                                    color:
-                                      theme === "dark" ? "#22C55E" : "#16A34A",
-                                  }}
-                                >
-                                  $
-                                  {userDetails?.statistics?.total_spent?.toFixed(
-                                    2
-                                  ) || "0.00"}
-                                </div>
-                                <div
-                                  className="text-sm"
-                                  style={{
-                                    color:
-                                      theme === "dark" ? "#9CA3AF" : "#6B7280",
-                                  }}
-                                >
-                                  Total Spent
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      {/* Recent Orders */}
-                      {userDetails?.recent_orders &&
-                        userDetails.recent_orders.length > 0 && (
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Recent Orders</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="space-y-3">
-                                {userDetails.recent_orders.map((order: any) => (
-                                  <div
-                                    key={order.id}
-                                    className="flex items-center justify-between p-3 border rounded-lg"
-                                    style={{
-                                      borderColor:
-                                        theme === "dark"
-                                          ? "#374151"
-                                          : "#E5E7EB",
-                                    }}
-                                  >
-                                    <div>
-                                      <div
-                                        className="font-medium"
-                                        style={{
-                                          color:
-                                            theme === "dark"
-                                              ? "#F9FAFB"
-                                              : "#111827",
-                                        }}
-                                      >
-                                        Order #{order.order_number}
-                                      </div>
-                                      <div
-                                        className="text-sm"
-                                        style={{
-                                          color:
-                                            theme === "dark"
-                                              ? "#9CA3AF"
-                                              : "#6B7280",
-                                        }}
-                                      >
-                                        {new Date(
-                                          order.created_at
-                                        ).toLocaleDateString()}
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div
-                                        className="font-medium"
-                                        style={{
-                                          color:
-                                            theme === "dark"
-                                              ? "#F9FAFB"
-                                              : "#111827",
-                                        }}
-                                      >
-                                        ${order.total_amount}
-                                      </div>
-                                      <Badge
-                                        variant="secondary"
-                                        style={{
-                                          backgroundColor:
-                                            order.status === "delivered"
-                                              ? theme === "dark"
-                                                ? "#14532D"
-                                                : "#F0FDF4"
-                                              : order.status === "cancelled"
-                                              ? theme === "dark"
-                                                ? "#7F1D1D"
-                                                : "#FEF2F2"
-                                              : theme === "dark"
-                                              ? "#1F2937"
-                                              : "#F3F4F6",
-                                          color:
-                                            order.status === "delivered"
-                                              ? theme === "dark"
-                                                ? "#22C55E"
-                                                : "#16A34A"
-                                              : order.status === "cancelled"
-                                              ? theme === "dark"
-                                                ? "#FCA5A5"
-                                                : "#DC2626"
-                                              : theme === "dark"
-                                              ? "#D1D5DB"
-                                              : "#374151",
-                                        }}
-                                      >
-                                        {order.status}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        )}
-
-                      {/* Activity Logs */}
-                      {userDetails?.activity_logs &&
-                        userDetails.activity_logs.length > 0 && (
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>Recent Activity</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="space-y-3">
-                                {userDetails.activity_logs.map((log: any) => (
-                                  <div
-                                    key={log.id}
-                                    className="flex items-start space-x-3 p-3 border rounded-lg"
-                                    style={{
-                                      borderColor:
-                                        theme === "dark"
-                                          ? "#374151"
-                                          : "#E5E7EB",
-                                    }}
-                                  >
-                                    <div
-                                      className="w-2 h-2 rounded-full mt-2"
-                                      style={{
-                                        backgroundColor:
-                                          theme === "dark"
-                                            ? "#3B82F6"
-                                            : "#2563EB",
-                                      }}
-                                    ></div>
-                                    <div className="flex-1">
-                                      <div
-                                        className="font-medium"
-                                        style={{
-                                          color:
-                                            theme === "dark"
-                                              ? "#F9FAFB"
-                                              : "#111827",
-                                        }}
-                                      >
-                                        {log.action}
-                                      </div>
-                                      <div
-                                        className="text-sm"
-                                        style={{
-                                          color:
-                                            theme === "dark"
-                                              ? "#9CA3AF"
-                                              : "#6B7280",
-                                        }}
-                                      >
-                                        {log.description}
-                                      </div>
-                                      <div
-                                        className="text-xs mt-1"
-                                        style={{
-                                          color:
-                                            theme === "dark"
-                                              ? "#6B7280"
-                                              : "#9CA3AF",
-                                        }}
-                                      >
-                                        {new Date(
-                                          log.timestamp
-                                        ).toLocaleString()}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        )}
-                    </div>
-                  ) : (
-                    <div
-                      className="text-center py-8"
-                      style={{
-                        color: theme === "dark" ? "#9CA3AF" : "#6B7280",
-                      }}
-                    >
-                      Failed to load user details
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="approvals" className="space-y-6">
-          {/* Approvals Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2
-                className="text-xl font-semibold"
-                style={{
-                  color: theme === "dark" ? "#F9FAFB" : "#111827",
-                }}
-              >
-                Pending Approvals
-              </h2>
-              <p
-                className="mt-1"
-                style={{
-                  color: theme === "dark" ? "#9CA3AF" : "#6B7280",
-                }}
-              >
-                Review and approve new cooks and delivery agents.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              onClick={fetchPendingApprovals}
-              disabled={approvalLoading}
-            >
-              <RefreshCw
-                className={`h-4 w-4 mr-2 ${
-                  approvalLoading ? "animate-spin" : ""
-                }`}
-              />
-              Refresh
-            </Button>
-          </div>
-
-          {/* Approvals Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <AdvancedStatsCard
-              title="Pending Cooks"
-              value={
-                pendingApprovals.filter((user) => user.role === "cook").length
-              }
-              subtitle="Awaiting approval"
-              icon={<Users className="h-6 w-6" />}
-              color="yellow"
-              onRefresh={fetchPendingApprovals}
-            />
-
-            <AdvancedStatsCard
-              title="Pending Delivery Agents"
-              value={
-                pendingApprovals.filter(
-                  (user) => user.role === "delivery_agent"
-                ).length
-              }
-              subtitle="Awaiting approval"
-              icon={<Users className="h-6 w-6" />}
-              color="blue"
-              onRefresh={fetchPendingApprovals}
-            />
-
-            <AdvancedStatsCard
-              title="Total Pending"
-              value={pendingApprovals.length}
-              subtitle="All roles"
-              icon={<Clock className="h-6 w-6" />}
-              color="purple"
-              onRefresh={fetchPendingApprovals}
-            />
-          </div>
-
-          {/* Approvals List */}
-          <Card
-            className="shadow-sm border-0"
-            style={{
-              background:
-                theme === "dark"
-                  ? "linear-gradient(135deg, #1F2937 0%, #111827 100%)"
-                  : "linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 100%)",
-              borderColor: theme === "dark" ? "#374151" : "#E5E7EB",
-            }}
-          >
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl font-semibold flex items-center text-gray-900 dark:text-gray-100">
-                    <Clock
-                      className="h-5 w-5 mr-2"
-                      style={{
-                        color: theme === "dark" ? "#F59E0B" : "#D97706",
-                      }}
-                    />
-                    Pending Approvals
-                  </CardTitle>
-                  <p className="text-sm mt-1 text-gray-600 dark:text-gray-400">
-                    {pendingApprovals.length} users waiting for approval
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {approvalLoading ? (
+              {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <RefreshCw className="h-8 w-8 animate-spin mr-2" />
-                  <span>Loading pending approvals...</span>
-                </div>
-              ) : pendingApprovals.length === 0 ? (
-                <div className="text-center py-8">
-                  <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
-                  <h3 className="text-lg font-medium mb-2">
-                    No pending approvals
-                  </h3>
-                  <p className="text-muted-foreground">
-                    All user applications have been reviewed.
-                  </p>
+                  <span>Loading customers...</span>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {pendingApprovals.map((user) => (
-                    <Card key={user.user_id} className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div
-                            className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold"
-                            style={{
-                              background:
-                                user.role === "cook"
-                                  ? "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)"
-                                  : "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          <Checkbox
+                            checked={
+                              selectedCustomers.length === customers.length &&
+                              customers.length > 0
+                            }
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedCustomers(
+                                  customers.map((c) => c.id)
+                                );
+                              } else {
+                                setSelectedCustomers([]);
+                              }
                             }}
-                          >
-                            {user.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <h3 className="font-semibold">{user.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {user.email}
-                            </p>
-                            <div className="flex items-center space-x-2 mt-1">
-                              <Badge variant="secondary">
-                                {user.role === "delivery_agent"
-                                  ? "Delivery Agent"
-                                  : user.role.charAt(0).toUpperCase() +
-                                    user.role.slice(1)}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                Applied{" "}
-                                {new Date(user.created_at).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleApprovalUserDetail(user)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View Details
-                          </Button>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() =>
-                              handleApprovalAction(user.user_id, "approve")
-                            }
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() =>
-                              handleApprovalAction(user.user_id, "reject")
-                            }
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Documents Preview */}
-                      {user.documents && user.documents.length > 0 && (
-                        <div className="mt-4 pt-4 border-t">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <FileText className="h-4 w-4" />
-                            <span className="text-sm font-medium">
-                              Submitted Documents ({user.documents.length})
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {user.documents
-                              .slice(0, 4)
-                              .map((doc: any, index: number) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center space-x-2 p-2 bg-muted rounded"
-                                >
-                                  <FileText className="h-4 w-4" />
-                                  <span className="text-sm truncate">
-                                    {doc.document_type.name}
-                                  </span>
-                                </div>
-                              ))}
-                            {user.documents.length > 4 && (
-                              <div className="flex items-center space-x-2 p-2 bg-muted rounded">
-                                <span className="text-sm text-muted-foreground">
-                                  +{user.documents.length - 4} more documents
-                                </span>
+                          />
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Customer
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Status
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Orders
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Total Spent
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Last Order
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customers.map((customer) => (
+                        <tr
+                          key={customer.id}
+                          className="border-b hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                          onClick={() => handleUserDetail(customer)}
+                        >
+                          <td className="py-3 px-4">
+                            <Checkbox
+                              checked={selectedCustomers.includes(customer.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedCustomers((prev) => [
+                                    ...prev,
+                                    customer.id,
+                                  ]);
+                                } else {
+                                  setSelectedCustomers((prev) =>
+                                    prev.filter((id) => id !== customer.id)
+                                  );
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm bg-gradient-to-br from-blue-500 to-purple-600">
+                                {customer.name.charAt(0).toUpperCase()}
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </Card>
-                  ))}
+                              <div>
+                                <div className="font-medium">
+                                  {customer.name}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {customer.email}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center space-x-2">
+                              <div
+                                className={`w-2 h-2 rounded-full ${
+                                  customer.is_active
+                                    ? "bg-green-500"
+                                    : "bg-red-500"
+                                }`}
+                              ></div>
+                              <Badge variant="secondary">
+                                {customer.is_active ? "Active" : "Blocked"}
+                              </Badge>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-medium">
+                              {customer.total_orders}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-medium">
+                              ${customer.total_spent.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-sm text-gray-500">
+                              {customer.last_login
+                                ? new Date(
+                                    customer.last_login
+                                  ).toLocaleDateString()
+                                : "Never"}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center space-x-1">
+                              {!customer.is_active && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUserUpdate(customer.id, {
+                                      is_active: true,
+                                    });
+                                  }}
+                                  className="h-8 w-8 p-0 hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400"
+                                  title="Unblock Customer"
+                                >
+                                  <ShieldCheck className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {customer.is_active && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUserUpdate(customer.id, {
+                                      is_active: false,
+                                    });
+                                  }}
+                                  className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+                                  title="Block Customer"
+                                >
+                                  <ShieldX className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUserDetail(customer);
+                                }}
+                                className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {customers.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No customers found
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

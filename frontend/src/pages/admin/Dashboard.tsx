@@ -11,6 +11,7 @@ import {
   type AdminOrder,
   type DashboardStats,
 } from "@/services/adminService";
+import { transformBackendChartData } from "@/utils/chartUtils";
 import { formatCurrency } from "@/utils/numberUtils";
 import {
   Activity,
@@ -117,11 +118,19 @@ const Dashboard: React.FC = () => {
   // Stats cards data for new design
   const kpiCards = [
     {
-      title: "Pending Approvals",
+      title: "Pending Chef Approvals",
+      value: stats?.pending_chef_approvals || 0,
+      subtitle: "Cooks awaiting review",
+      icon: <ChefHat />,
+      color: "red" as const,
+      route: "/admin/users",
+    },
+    {
+      title: "Pending Delivery Agent Approvals",
       value:
-        (stats?.pending_chef_approvals || 0) +
-        (stats?.pending_food_approvals || 0),
-      subtitle: "Awaiting review",
+        (stats?.pending_user_approvals || 0) -
+        (stats?.pending_chef_approvals || 0),
+      subtitle: "Delivery agents awaiting review",
       icon: <Clock />,
       color: "yellow" as const,
       route: "/admin/users",
@@ -328,7 +337,7 @@ const Dashboard: React.FC = () => {
                   ) : revenueTrend ? (
                     <InteractiveChart
                       title=""
-                      data={revenueTrend.data}
+                      data={transformBackendChartData(revenueTrend)}
                       type="bar"
                       height={200}
                       showLegend={false}
@@ -355,7 +364,7 @@ const Dashboard: React.FC = () => {
                   ) : growthAnalytics ? (
                     <InteractiveChart
                       title=""
-                      data={growthAnalytics.data}
+                      data={transformBackendChartData(growthAnalytics)}
                       type="area"
                       height={200}
                       showLegend={true}
@@ -382,7 +391,7 @@ const Dashboard: React.FC = () => {
                   ) : ordersTrend ? (
                     <InteractiveChart
                       title=""
-                      data={ordersTrend.data}
+                      data={transformBackendChartData(ordersTrend)}
                       type="line"
                       height={200}
                       showLegend={false}
@@ -409,7 +418,7 @@ const Dashboard: React.FC = () => {
                   ) : weeklyPerformance ? (
                     <InteractiveChart
                       title=""
-                      data={weeklyPerformance.data}
+                      data={transformBackendChartData(weeklyPerformance)}
                       type="bar"
                       height={200}
                       showLegend={false}

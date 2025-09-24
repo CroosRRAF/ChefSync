@@ -178,7 +178,7 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
             />
             {showLegend && <Legend />}
             {Object.keys(data[0] || {})
-              .filter((key) => key !== "name")
+              .filter((key) => key !== "name" && key !== "value")
               .map((key, index) => (
                 <Line
                   key={key}
@@ -219,7 +219,7 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
             />
             {showLegend && <Legend />}
             {Object.keys(data[0] || {})
-              .filter((key) => key !== "name")
+              .filter((key) => key !== "name" && key !== "value")
               .map((key, index) => (
                 <Area
                   key={key}
@@ -252,7 +252,7 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
             />
             {showLegend && <Legend />}
             {Object.keys(data[0] || {})
-              .filter((key) => key !== "name")
+              .filter((key) => key !== "name" && key !== "value")
               .map((key, index) => (
                 <Bar
                   key={key}

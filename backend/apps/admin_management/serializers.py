@@ -320,6 +320,7 @@ class DashboardStatsSerializer(serializers.Serializer):
     total_foods = serializers.IntegerField()
     active_foods = serializers.IntegerField()
     pending_food_approvals = serializers.IntegerField()
+    pending_user_approvals = serializers.IntegerField()
 
     # System Statistics
     system_health_score = serializers.FloatField()
