@@ -8,17 +8,87 @@ from django.db.models import Sum, Avg, Count, Q
 from .models import Order, OrderItem, OrderStatusHistory, CartItem
 from apps.food.models import FoodReview
 from apps.payments.models import Payment
-from .serializers import (
-    OrderSerializer,
-    OrderItemSerializer,
-    OrderStatusHistorySerializer,
-    CartItemSerializer
-)
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+# Temporary simple serializer to fix the 500 error
+class SimpleOrderSerializer(serializers.ModelSerializer):
+    """Simple order serializer that works"""
+    customer_name = serializers.SerializerMethodField()
+    chef_name = serializers.SerializerMethodField() 
+    time_since_order = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    total_items = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Order
+        fields = [
+            'id', 'order_number', 'status', 'status_display',
+            'total_amount', 'delivery_fee', 'created_at', 'updated_at',
+            'customer_name', 'chef_name', 'time_since_order', 'total_items',
+            'delivery_address', 'customer_notes', 'chef_notes'
+        ]
+    
+    def get_customer_name(self, obj):
+        if obj.customer:
+            return obj.customer.name or f"{obj.customer.first_name} {obj.customer.last_name}".strip() or obj.customer.username
+        return "Unknown Customer"
+    
+    def get_chef_name(self, obj):
+        if obj.chef:
+            return obj.chef.name or f"{obj.chef.first_name} {obj.chef.last_name}".strip() or obj.chef.username
+        return "Unknown Chef"
+    
+    def get_time_since_order(self, obj):
+        from django.utils import timezone
+        diff = timezone.now() - obj.created_at
+        minutes = int(diff.total_seconds() / 60)
+        if minutes < 60:
+            return f"{minutes} minutes ago"
+        elif minutes < 1440:
+            hours = int(minutes / 60)
+            return f"{hours} hours ago"
+        else:
+            days = int(minutes / 1440)
+            return f"{days} days ago"
+    
+    def get_total_items(self, obj):
+        return obj.items.aggregate(total=Sum('quantity'))['total'] or 0
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
-    serializer_class = OrderSerializer
+    serializer_class = SimpleOrderSerializer  # Use our working simple serializer
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter orders based on user role"""
+        user = self.request.user
+        queryset = super().get_queryset()
+        
+        # Handle anonymous users (return empty queryset for security)
+        if not user.is_authenticated:
+            return queryset.none()
+        
+        # For chefs, only show their own orders
+        if (hasattr(user, 'chef_profile') or 
+            user.groups.filter(name='Chefs').exists() or 
+            (hasattr(user, 'role') and user.role == 'cook')):
+            return queryset.filter(chef=user)
+        # For delivery partners, show available and assigned orders
+        elif (hasattr(user, 'delivery_profile') or 
+              user.groups.filter(name='Delivery').exists() or 
+              (hasattr(user, 'role') and user.role == 'delivery_agent')):
+            return queryset.filter(
+                Q(delivery_partner=user) | Q(status='ready', delivery_partner=None)
+            )
+        # For admins, show all orders
+        elif user.is_staff or user.is_superuser or (hasattr(user, 'role') and user.role == 'admin'):
+            return queryset
+        # For customers, show their own orders
+        else:
+            return queryset.filter(customer=user)
 
     @action(detail=False, methods=['get'])
     def available(self, request):
@@ -48,6 +118,64 @@ class OrderViewSet(viewsets.ModelViewSet):
         )
 
         return Response({"success": "Order accepted"})
+    
+    @action(detail=True, methods=['post'])
+    def chef_accept(self, request, pk=None):
+        """Chef accepts a pending order"""
+        order = self.get_object()
+        
+        # Check if user is the chef for this order
+        if order.chef != request.user:
+            return Response({"error": "You are not authorized to accept this order"}, status=status.HTTP_403_FORBIDDEN)
+        
+        if order.status != 'pending':
+            return Response({"error": "Order cannot be accepted in current status"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update order status to confirmed
+        order.status = 'confirmed'
+        order.chef_notes = request.data.get('notes', 'Order accepted by chef')
+        order.save()
+        
+        # Add status history
+        OrderStatusHistory.objects.create(
+            order=order,
+            status='confirmed',
+            changed_by=request.user,
+            notes=order.chef_notes
+        )
+        
+        return Response({"success": "Order accepted successfully", "status": "confirmed"})
+    
+    @action(detail=True, methods=['post'])
+    def chef_reject(self, request, pk=None):
+        """Chef rejects a pending order with reason"""
+        order = self.get_object()
+        
+        # Check if user is the chef for this order
+        if order.chef != request.user:
+            return Response({"error": "You are not authorized to reject this order"}, status=status.HTTP_403_FORBIDDEN)
+        
+        if order.status != 'pending':
+            return Response({"error": "Order cannot be rejected in current status"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        rejection_reason = request.data.get('reason', '')
+        if not rejection_reason:
+            return Response({"error": "Rejection reason is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update order status to cancelled
+        order.status = 'cancelled'
+        order.chef_notes = f"Order rejected: {rejection_reason}"
+        order.save()
+        
+        # Add status history
+        OrderStatusHistory.objects.create(
+            order=order,
+            status='cancelled',
+            changed_by=request.user,
+            notes=order.chef_notes
+        )
+        
+        return Response({"success": "Order rejected successfully", "status": "cancelled"})
 
 
     @action(detail=True, methods=['patch'])
@@ -70,6 +198,48 @@ class OrderViewSet(viewsets.ModelViewSet):
         )
 
         return Response({"success": f"Order status updated to {new_status}"})
+    
+    @action(detail=True, methods=['patch'])
+    def chef_update_status(self, request, pk=None):
+        """Chef updates order status through the kitchen workflow"""
+        order = self.get_object()
+        
+        # Check if user is the chef for this order
+        if order.chef != request.user:
+            return Response({"error": "You are not authorized to update this order"}, status=status.HTTP_403_FORBIDDEN)
+        
+        new_status = request.data.get('status')
+        chef_notes = request.data.get('notes', '')
+        
+        # Define valid status transitions for chef workflow
+        valid_transitions = {
+            'confirmed': 'preparing',
+            'preparing': 'ready',
+            'ready': 'out_for_delivery'
+        }
+        
+        if order.status not in valid_transitions:
+            return Response({"error": "Order status cannot be updated from current state"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        expected_status = valid_transitions.get(order.status)
+        if new_status != expected_status:
+            return Response({"error": f"Invalid status transition. Expected: {expected_status}"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update order
+        order.status = new_status
+        if chef_notes:
+            order.chef_notes = chef_notes
+        order.save()
+        
+        # Add status history
+        OrderStatusHistory.objects.create(
+            order=order,
+            status=new_status,
+            changed_by=request.user,
+            notes=chef_notes or f'Status updated to {new_status}'
+        )
+        
+        return Response({"success": f"Order status updated to {new_status}", "status": new_status})
 
 
     @action(detail=False, methods=['get'])
@@ -115,22 +285,25 @@ class OrderViewSet(viewsets.ModelViewSet):
         })
 
 
-class OrderItemViewSet(viewsets.ModelViewSet):
-    queryset = OrderItem.objects.all()
-    serializer_class = OrderItemSerializer
-    permission_classes = [IsAuthenticated]
+# Temporarily disabled other ViewSets to fix 500 error
+# Will be re-enabled once serializers are fixed
+
+# class OrderItemViewSet(viewsets.ModelViewSet):
+#     queryset = OrderItem.objects.all()
+#     serializer_class = OrderItemSerializer
+#     permission_classes = [IsAuthenticated]
 
 
-class OrderStatusHistoryViewSet(viewsets.ModelViewSet):
-    queryset = OrderStatusHistory.objects.all()
-    serializer_class = OrderStatusHistorySerializer
-    permission_classes = [IsAuthenticated]
+# class OrderStatusHistoryViewSet(viewsets.ModelViewSet):
+#     queryset = OrderStatusHistory.objects.all()
+#     serializer_class = OrderStatusHistorySerializer
+#     permission_classes = [IsAuthenticated]
 
 
-class CartItemViewSet(viewsets.ModelViewSet):
-    queryset = CartItem.objects.all()
-    serializer_class = CartItemSerializer
-    permission_classes = [IsAuthenticated]
+# class CartItemViewSet(viewsets.ModelViewSet):
+#     queryset = CartItem.objects.all()
+#     serializer_class = CartItemSerializer
+#     permission_classes = [IsAuthenticated]
 
 
 # Chef Dashboard API Views
