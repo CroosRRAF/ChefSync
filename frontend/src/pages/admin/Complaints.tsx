@@ -88,6 +88,41 @@ const AdminComplaints: React.FC = () => {
   const [responseText, setResponseText] = useState("");
   const [sendingResponse, setSendingResponse] = useState(false);
 
+  // Filter communications based on filters - moved early to avoid initialization issues
+  const filteredCommunications = useMemo(() => {
+    // Safety check to ensure communications is an array
+    if (!Array.isArray(communications)) {
+      return [];
+    }
+
+    let filtered = communications;
+
+    // Apply filters
+    if (searchTerm) {
+      filtered = filtered.filter(comm =>
+        comm.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        comm.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        comm.reference_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        comm.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        comm.user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(comm => comm.status === statusFilter);
+    }
+
+    if (priorityFilter !== "all") {
+      filtered = filtered.filter(comm => comm.priority === priorityFilter);
+    }
+
+    if (typeFilter !== "all") {
+      filtered = filtered.filter(comm => comm.communication_type === typeFilter);
+    }
+
+    return filtered;
+  }, [communications, searchTerm, statusFilter, priorityFilter, typeFilter]);
+
   // Calculate derived stats
   const totalCommunications = stats?.total || 0;
   const pendingReview = stats?.by_status.find((status) => status.status === "pending")?.count || 0;
@@ -120,35 +155,19 @@ const AdminComplaints: React.FC = () => {
     }
   }, [user]);
 
-  // Filter communications based on filters
-  const filteredCommunications = useMemo(() => {
-    let filtered = communications;
+  // Safety check to ensure component is properly initialized
+  if (!user) {
+    return null;
+  }
 
-    // Apply filters
-    if (searchTerm) {
-      filtered = filtered.filter(comm =>
-        comm.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        comm.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        comm.reference_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        comm.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        comm.user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(comm => comm.status === statusFilter);
-    }
-
-    if (priorityFilter !== "all") {
-      filtered = filtered.filter(comm => comm.priority === priorityFilter);
-    }
-
-    if (typeFilter !== "all") {
-      filtered = filtered.filter(comm => comm.communication_type === typeFilter);
-    }
-
-    return filtered;
-  }, [communications, searchTerm, statusFilter, priorityFilter, typeFilter]);
+  // Additional safety check to prevent rendering before data is ready
+  if (loading && communications.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   // Handle response submission
   const handleSubmitResponse = async () => {

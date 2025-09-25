@@ -1,5 +1,6 @@
 import { toast } from "@/components/ui/use-toast";
 import axios, { AxiosError } from "axios";
+import { Communication } from "@/types/communication";
 
 // Use Vite dev proxy by default to avoid protocol mismatches in development.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -94,33 +95,6 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-export interface Communication {
-  id: number;
-  reference_number: string;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  communication_type:
-    | "feedback"
-    | "complaint"
-    | "suggestion"
-    | "inquiry"
-    | "other";
-  subject: string;
-  message: string;
-  status: "pending" | "in_progress" | "resolved" | "closed";
-  priority: "low" | "medium" | "high" | "urgent";
-  rating?: number; // Only for feedback type
-  order_id?: number; // Only for complaint type
-  attachments?: string[];
-  created_at: string;
-  updated_at: string;
-  responses?: CommunicationResponse[];
-  metadata?: Record<string, any>;
-}
 
 export interface CommunicationResponse {
   id: number;

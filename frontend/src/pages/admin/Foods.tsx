@@ -171,6 +171,29 @@ const FoodManagement: React.FC = () => {
     }
   };
 
+  const loadCategoriesAndCuisines = async () => {
+    try {
+      // Load categories if not already loaded
+      if (categories.length === 0) {
+        const categoryData = await fetchFoodCategories({ page: 1, search: '' });
+        setCategories(categoryData.results || []);
+      }
+      
+      // Load cuisines if not already loaded
+      if (cuisines.length === 0) {
+        const cuisineData = await fetchCuisines({ page: 1, search: '' });
+        setCuisines(cuisineData.results || []);
+      }
+    } catch (error) {
+      console.error("Error loading categories and cuisines:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load categories and cuisines. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleAddNew = () => {
     setEditItem(null);
     setFormErrors({});
@@ -203,6 +226,10 @@ const FoodManagement: React.FC = () => {
     
     switch (activeTab) {
       case "foods":
+        // Load categories and cuisines if not already loaded
+        if (categories.length === 0 || cuisines.length === 0) {
+          loadCategoriesAndCuisines();
+        }
         setShowFoodForm(true);
         break;
       case "cuisines":
@@ -218,6 +245,10 @@ const FoodManagement: React.FC = () => {
     setEditItem(item);
     switch (activeTab) {
       case "foods":
+        // Load categories and cuisines if not already loaded
+        if (categories.length === 0 || cuisines.length === 0) {
+          loadCategoriesAndCuisines();
+        }
         setFoodFormData({
           name: item.name || '',
           description: item.description || '',
@@ -315,132 +346,169 @@ const FoodManagement: React.FC = () => {
     try {
       if (activeTab === 'foods' && validateFoodForm()) {
         // Handle food form submission
-        const formData = new FormData();
-        Object.entries(foodFormData).forEach(([key, value]) => {
-          if (value !== null && value !== '') {
-            formData.append(key, value.toString());
-          }
-        });
+        const foodData = {
+          name: foodFormData.name,
+          description: foodFormData.description,
+          food_category: parseInt(foodFormData.category),
+          is_vegetarian: foodFormData.is_vegetarian,
+          is_vegan: foodFormData.is_vegan,
+          is_gluten_free: foodFormData.is_gluten_free,
+          is_available: foodFormData.is_available,
+          preparation_time: foodFormData.preparation_time ? parseInt(foodFormData.preparation_time) : null,
+          calories_per_serving: foodFormData.calories_per_serving ? parseInt(foodFormData.calories_per_serving) : null,
+          allergens: foodFormData.allergens ? foodFormData.allergens.split(',').map(a => a.trim()) : []
+        };
         
+        let response;
         if (editItem) {
           // Update existing food
-          await fetch(`/api/food/foods/${editItem.id}/`, {
+          response = await fetch(`/api/food/foods/${editItem.id}/`, {
             method: 'PATCH',
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+              'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(foodData)
           });
         } else {
           // Create new food
-          await fetch('/api/food/foods/', {
+          response = await fetch('/api/food/foods/', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+              'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(foodData)
           });
+        }
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to save food item');
         }
         
         toast({
           title: "Success",
           description: `Food item ${editItem ? 'updated' : 'created'} successfully`,
         });
+        
+        // Reset form and close dialog
+        setShowFoodForm(false);
+        setEditItem(null);
+        setFormErrors({});
+        setFoodFormData({
+          name: '',
+          description: '',
+          category: '',
+          cuisine: '',
+          is_vegetarian: false,
+          is_vegan: false,
+          is_gluten_free: false,
+          is_available: true,
+          preparation_time: '',
+          calories_per_serving: '',
+          allergens: ''
+        });
+        loadData();
       } else if (activeTab === 'cuisines' && validateCuisineForm()) {
         // Handle cuisine form submission
-        const formData = new FormData();
-        Object.entries(cuisineFormData).forEach(([key, value]) => {
-          if (value !== null && value !== '') {
-            formData.append(key, value.toString());
-          }
-        });
+        const cuisineData = {
+          name: cuisineFormData.name,
+          description: cuisineFormData.description
+        };
         
+        let response;
         if (editItem) {
-          await fetch(`/api/food/cuisines/${editItem.id}/`, {
+          response = await fetch(`/api/food/cuisines/${editItem.id}/`, {
             method: 'PATCH',
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+              'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(cuisineData)
           });
         } else {
-          await fetch('/api/food/cuisines/', {
+          response = await fetch('/api/food/cuisines/', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+              'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(cuisineData)
           });
+        }
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to save cuisine');
         }
         
         toast({
           title: "Success",
           description: `Cuisine ${editItem ? 'updated' : 'created'} successfully`,
         });
+        
+        // Reset form and close dialog
+        setShowCuisineForm(false);
+        setEditItem(null);
+        setFormErrors({});
+        setCuisineFormData({
+          name: '',
+          description: '',
+          image: null
+        });
+        loadData();
       } else if (activeTab === 'categories' && validateCategoryForm()) {
         // Handle category form submission
-        const formData = new FormData();
-        Object.entries(categoryFormData).forEach(([key, value]) => {
-          if (value !== null && value !== '') {
-            formData.append(key, value.toString());
-          }
-        });
+        const categoryData = {
+          name: categoryFormData.name,
+          description: categoryFormData.description,
+          cuisine: parseInt(categoryFormData.cuisine)
+        };
         
+        let response;
         if (editItem) {
-          await fetch(`/api/food/categories/${editItem.id}/`, {
+          response = await fetch(`/api/food/categories/${editItem.id}/`, {
             method: 'PATCH',
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+              'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(categoryData)
           });
         } else {
-          await fetch('/api/food/categories/', {
+          response = await fetch('/api/food/categories/', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+              'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(categoryData)
           });
+        }
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to save category');
         }
         
         toast({
           title: "Success",
           description: `Category ${editItem ? 'updated' : 'created'} successfully`,
         });
+        
+        // Reset form and close dialog
+        setShowCategoryForm(false);
+        setEditItem(null);
+        setFormErrors({});
+        setCategoryFormData({
+          name: '',
+          description: '',
+          cuisine: '',
+          image: null
+        });
+        loadData();
       }
-      
-      // Reset forms and close dialogs
-      setShowFoodForm(false);
-      setShowCuisineForm(false);
-      setShowCategoryForm(false);
-      setEditItem(null);
-      setFormErrors({});
-      setFoodFormData({
-        name: '',
-        description: '',
-        category: '',
-        cuisine: '',
-        is_vegetarian: false,
-        is_vegan: false,
-        is_gluten_free: false,
-        is_available: true,
-        preparation_time: '',
-        calories_per_serving: '',
-        allergens: ''
-      });
-      setCuisineFormData({
-        name: '',
-        description: '',
-        image: null
-      });
-      setCategoryFormData({
-        name: '',
-        description: '',
-        cuisine: '',
-        image: null
-      });
-      loadData();
     } catch (error) {
       console.error('Form submission error:', error);
       toast({

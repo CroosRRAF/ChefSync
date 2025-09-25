@@ -48,7 +48,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCommunicationStats } from "@/hooks/useCommunicationStats";
-import { communicationService, type Communication, type CommunicationResponse } from "@/services/communicationService";
+import { communicationService } from "@/services/communicationService";
+import { type Communication, type CommunicationResponse } from "@/types/communication";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -115,12 +116,80 @@ const AdminCommunications: React.FC = () => {
   const [dateRange, setDateRange] = useState<string>("all");
   const [assignedFilter, setAssignedFilter] = useState<string>("all");
 
+  // Filter communications based on filters - moved after all state declarations
+  const filteredCommunications = useMemo(() => {
+    // Safety check to ensure communications is an array
+    if (!Array.isArray(communications)) {
+      return [];
+    }
+
+    let filtered = communications;
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(comm =>
+        comm.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        comm.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        comm.reference_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        comm.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        comm.user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(comm => comm.status === statusFilter);
+    }
+
+    // Apply priority filter
+    if (priorityFilter !== "all") {
+      filtered = filtered.filter(comm => comm.priority === priorityFilter);
+    }
+
+    // Apply type filter
+    if (typeFilter !== "all") {
+      filtered = filtered.filter(comm => comm.communication_type === typeFilter);
+    }
+
+    // Apply date range filter
+    if (dateRange !== "all") {
+      const now = new Date();
+      let dateFilter;
+
+      switch (dateRange) {
+        case "today":
+          dateFilter = { start: startOfDay(now), end: endOfDay(now) };
+          break;
+        case "week":
+          dateFilter = { start: subDays(now, 7), end: now };
+          break;
+        case "month":
+          dateFilter = { start: subDays(now, 30), end: now };
+          break;
+        default:
+          dateFilter = null;
+      }
+
+      if (dateFilter) {
+        filtered = filtered.filter(comm => {
+          const commDate = new Date(comm.created_at);
+          return isWithinInterval(commDate, dateFilter);
+        });
+      }
+    }
+
+    return filtered;
+  }, [communications, searchTerm, statusFilter, priorityFilter, typeFilter, dateRange]);
+
   // Response dialog state
   const [responseDialog, setResponseDialog] = useState(false);
   const [responseText, setResponseText] = useState("");
   const [sendingResponse, setSendingResponse] = useState(false);
   const [sendNotification, setSendNotification] = useState(true);
   const [sendEmail, setSendEmail] = useState(true);
+
+  // View details dialog state
+  const [viewDetailsDialog, setViewDetailsDialog] = useState(false);
 
   // Bulk actions state
   const [showBulkActions, setShowBulkActions] = useState(false);
@@ -336,7 +405,10 @@ const AdminCommunications: React.FC = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => setSelectedCommunication(communication)}>
+                          <DropdownMenuItem onClick={() => {
+                            setSelectedCommunication(communication);
+                            setViewDetailsDialog(true);
+                          }}>
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
@@ -469,7 +541,10 @@ const AdminCommunications: React.FC = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setSelectedCommunication(communication)}>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedCommunication(communication);
+                              setViewDetailsDialog(true);
+                            }}>
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
@@ -625,65 +700,6 @@ const AdminCommunications: React.FC = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [viewMode, loadCommunications, handleSelectAll]);
 
-  // Filter communications based on filters
-  const filteredCommunications = useMemo(() => {
-    let filtered = communications;
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(comm =>
-        comm.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        comm.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        comm.reference_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        comm.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        comm.user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Apply status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(comm => comm.status === statusFilter);
-    }
-
-    // Apply priority filter
-    if (priorityFilter !== "all") {
-      filtered = filtered.filter(comm => comm.priority === priorityFilter);
-    }
-
-    // Apply type filter
-    if (typeFilter !== "all") {
-      filtered = filtered.filter(comm => comm.communication_type === typeFilter);
-    }
-
-    // Apply date range filter
-    if (dateRange !== "all") {
-      const now = new Date();
-      let dateFilter;
-
-      switch (dateRange) {
-        case "today":
-          dateFilter = { start: startOfDay(now), end: endOfDay(now) };
-          break;
-        case "week":
-          dateFilter = { start: subDays(now, 7), end: now };
-          break;
-        case "month":
-          dateFilter = { start: subDays(now, 30), end: now };
-          break;
-        default:
-          dateFilter = null;
-      }
-
-      if (dateFilter) {
-        filtered = filtered.filter(comm => {
-          const commDate = new Date(comm.created_at);
-          return isWithinInterval(commDate, dateFilter);
-        });
-      }
-    }
-
-    return filtered;
-  }, [communications, searchTerm, statusFilter, priorityFilter, typeFilter, dateRange]);
 
   // Handle response submission
   const handleSubmitResponse = async () => {
@@ -1036,6 +1052,174 @@ const AdminCommunications: React.FC = () => {
           </Tabs>
         </div>
       )}
+
+      {/* View Details Dialog */}
+      <Dialog open={viewDetailsDialog} onOpenChange={setViewDetailsDialog}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Communication Details</DialogTitle>
+            <DialogDescription>
+              View details for {selectedCommunication?.reference_number}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCommunication && (
+            <div className="space-y-6">
+              {/* Header Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-lg">{selectedCommunication.subject}</h3>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={getStatusBadgeVariant(selectedCommunication.status)}>
+                      {selectedCommunication.status.replace('_', ' ').toUpperCase()}
+                    </Badge>
+                    <Badge variant="outline">
+                      {selectedCommunication.priority.toUpperCase()}
+                    </Badge>
+                    <Badge variant="secondary">
+                      {selectedCommunication.communication_type.toUpperCase()}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="text-right text-sm text-muted-foreground">
+                  <p>Reference: {selectedCommunication.reference_number}</p>
+                  <p>Created: {new Date(selectedCommunication.created_at).toLocaleString()}</p>
+                  {selectedCommunication.updated_at && (
+                    <p>Updated: {new Date(selectedCommunication.updated_at).toLocaleString()}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* User Information */}
+              <div className="bg-muted p-4 rounded-lg">
+                <h4 className="font-semibold mb-2">User Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p><strong>Name:</strong> {selectedCommunication.user.name}</p>
+                    <p><strong>Email:</strong> {selectedCommunication.user.email}</p>
+                  </div>
+                  <div>
+                    <p><strong>User ID:</strong> {selectedCommunication.user.id}</p>
+                    {selectedCommunication.assigned_to_name && (
+                      <p><strong>Assigned To:</strong> {selectedCommunication.assigned_to_name}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Message Content */}
+              <div className="bg-muted p-4 rounded-lg">
+                <h4 className="font-semibold mb-2">Message</h4>
+                <p className="whitespace-pre-wrap">{selectedCommunication.message}</p>
+              </div>
+
+              {/* Additional Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Communication Details</h4>
+                  <div className="space-y-1 text-sm">
+                    <p><strong>Type:</strong> {selectedCommunication.communication_type}</p>
+                    <p><strong>Status:</strong> {selectedCommunication.status}</p>
+                    <p><strong>Priority:</strong> {selectedCommunication.priority}</p>
+                    <p><strong>Is Read:</strong> {selectedCommunication.is_read ? 'Yes' : 'No'}</p>
+                    {selectedCommunication.rating && (
+                      <p><strong>Rating:</strong> {selectedCommunication.rating}/5</p>
+                    )}
+                    {selectedCommunication.order_id && (
+                      <p><strong>Order ID:</strong> {selectedCommunication.order_id}</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Timestamps</h4>
+                  <div className="space-y-1 text-sm">
+                    <p><strong>Created:</strong> {new Date(selectedCommunication.created_at).toLocaleString()}</p>
+                    {selectedCommunication.updated_at && (
+                      <p><strong>Last Updated:</strong> {new Date(selectedCommunication.updated_at).toLocaleString()}</p>
+                    )}
+                    {selectedCommunication.read_at && (
+                      <p><strong>Read At:</strong> {new Date(selectedCommunication.read_at).toLocaleString()}</p>
+                    )}
+                    {selectedCommunication.resolved_at && (
+                      <p><strong>Resolved At:</strong> {new Date(selectedCommunication.resolved_at).toLocaleString()}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tags and Categories */}
+              {(selectedCommunication.tags?.length > 0 || selectedCommunication.categories?.length > 0) && (
+                <div className="space-y-4">
+                  {selectedCommunication.tags?.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Tags</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCommunication.tags.map((tag: any) => (
+                          <Badge key={tag.id} variant="outline" style={{ backgroundColor: tag.color + '20', borderColor: tag.color }}>
+                            {tag.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedCommunication.categories?.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Categories</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCommunication.categories.map((category: any) => (
+                          <Badge key={category.id} variant="secondary">
+                            {category.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Responses */}
+              {selectedCommunication.responses?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">Responses ({selectedCommunication.responses.length})</h4>
+                  <div className="space-y-3">
+                    {selectedCommunication.responses.map((response: any) => (
+                      <div key={response.id} className="bg-muted p-3 rounded-lg">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-medium">{response.responder?.name || 'Unknown'}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(response.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                          {response.is_resolution && (
+                            <Badge variant="default">Resolution</Badge>
+                          )}
+                        </div>
+                        <p className="whitespace-pre-wrap">{response.response}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDetailsDialog(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setViewDetailsDialog(false);
+              setResponseDialog(true);
+            }}>
+              <Reply className="h-4 w-4 mr-2" />
+              Send Response
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Response Dialog */}
       <Dialog open={responseDialog} onOpenChange={setResponseDialog}>

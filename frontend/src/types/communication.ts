@@ -9,10 +9,13 @@ export interface Communication {
   message: string;
   status: 'pending' | 'in_progress' | 'resolved' | 'closed';
   priority: 'low' | 'medium' | 'high' | 'urgent';
+  rating?: number;
+  order_id?: number;
   is_read: boolean;
   read_at: string | null;
   is_archived: boolean;
   assigned_to: User | null;
+  assigned_to_name: string | null;
   resolution_notes: string;
   created_at: string;
   updated_at: string;

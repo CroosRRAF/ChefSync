@@ -64,8 +64,8 @@ class CommunicationResponseSerializer(serializers.ModelSerializer):
 class CommunicationSerializer(serializers.ModelSerializer):
     responses = CommunicationResponseSerializer(many=True, read_only=True)
     attachments = serializers.SerializerMethodField()
-    tags = CommunicationTagSerializer(many=True, read_only=True, source='tag_relations')
-    categories = CommunicationCategorySerializer(many=True, read_only=True, source='category_relations')
+    tags = serializers.SerializerMethodField()
+    categories = serializers.SerializerMethodField()
     user = serializers.SerializerMethodField()
     assigned_to_name = serializers.SerializerMethodField()
     
@@ -78,17 +78,33 @@ class CommunicationSerializer(serializers.ModelSerializer):
         )
     
     def get_user(self, obj):
-        return {
-            'id': obj.user.user_id,
-            'name': obj.user.name,
-            'email': obj.user.email
-        } if obj.user else None
+        if obj.user and hasattr(obj.user, 'user_id') and hasattr(obj.user, 'name') and hasattr(obj.user, 'email'):
+            return {
+                'id': obj.user.user_id,
+                'name': obj.user.name,
+                'email': obj.user.email
+            }
+        return None
     
     def get_assigned_to_name(self, obj):
-        return obj.assigned_to.name if obj.assigned_to else None
+        return obj.assigned_to.name if obj.assigned_to and hasattr(obj.assigned_to, 'name') else None
     
     def get_attachments(self, obj):
-        return [attachment.file.url for attachment in obj.attachments.all()]
+        return [attachment.file.url for attachment in obj.attachments.all() if attachment.file]
+    
+    def get_tags(self, obj):
+        return [{
+            'id': relation.tag.id,
+            'name': relation.tag.name,
+            'color': relation.tag.color
+        } for relation in obj.tag_relations.select_related('tag') if relation.tag and hasattr(relation.tag, 'id') and hasattr(relation.tag, 'name') and hasattr(relation.tag, 'color')]
+    
+    def get_categories(self, obj):
+        return [{
+            'id': relation.category.id,
+            'name': relation.category.name,
+            'description': relation.category.description
+        } for relation in obj.category_relations.select_related('category') if relation.category and hasattr(relation.category, 'id') and hasattr(relation.category, 'name')]
 
 
 class CommunicationListSerializer(serializers.ModelSerializer):
@@ -108,21 +124,23 @@ class CommunicationListSerializer(serializers.ModelSerializer):
         )
     
     def get_user(self, obj):
-        return {
-            'id': obj.user.user_id,
-            'name': obj.user.name,
-            'email': obj.user.email
-        } if obj.user else None
+        if obj.user and hasattr(obj.user, 'user_id') and hasattr(obj.user, 'name') and hasattr(obj.user, 'email'):
+            return {
+                'id': obj.user.user_id,
+                'name': obj.user.name,
+                'email': obj.user.email
+            }
+        return None
     
     def get_assigned_to_name(self, obj):
-        return obj.assigned_to.name if obj.assigned_to else None
+        return obj.assigned_to.name if obj.assigned_to and hasattr(obj.assigned_to, 'name') else None
     
     def get_tags(self, obj):
         return [{
             'id': relation.tag.id,
             'name': relation.tag.name,
             'color': relation.tag.color
-        } for relation in obj.tag_relations.select_related('tag')]
+        } for relation in obj.tag_relations.select_related('tag') if relation.tag and hasattr(relation.tag, 'id') and hasattr(relation.tag, 'name') and hasattr(relation.tag, 'color')]
     
     def get_response_count(self, obj):
         return obj.responses.count()
