@@ -136,8 +136,59 @@ const AllOrdersPage: React.FC = () => {
 
   const handleAcceptOrder = async (orderId: number, order: Order) => {
     setAcceptingOrder(orderId);
+
+    // Get current location for distance checking
+    const getCurrentPosition = (): Promise<GeolocationPosition> => {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation not supported"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000,
+        });
+      });
+    };
+
     try {
-      await acceptOrder(orderId);
+      let agentLocation = null;
+
+      // Try to get current location
+      try {
+        const position = await getCurrentPosition();
+        agentLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+      } catch (locationError) {
+        console.warn("Could not get current location:", locationError);
+      }
+
+      const acceptResult = await acceptOrder(
+        orderId,
+        agentLocation || undefined
+      );
+
+      // Check if there's a distance warning
+      if (
+        "warning" in acceptResult &&
+        acceptResult.warning &&
+        acceptResult.distance
+      ) {
+        const confirmAccept = window.confirm(
+          `${acceptResult.message}\n\nDo you still want to accept this order?`
+        );
+
+        if (!confirmAccept) {
+          setAcceptingOrder(null);
+          return;
+        }
+
+        // If user confirms, accept again
+        await acceptOrder(orderId, agentLocation || undefined);
+      }
 
       // Move order from available to assigned
       setAvailableOrders((prev) => prev.filter((o) => o.id !== orderId));

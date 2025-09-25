@@ -67,16 +67,63 @@ export const getAvailableOrders = async (): Promise<Order[]> => {
   return res.data.results || res.data;
 };
 
-// 🚚 Accept an order for delivery
-export const acceptOrder = async (orderId: number): Promise<Order> => {
-  const res = await apiClient.post(`/orders/orders/${orderId}/accept/`);
+// 🚚 Accept an order for delivery with distance checking
+export const acceptOrder = async (
+  orderId: number, 
+  agentLocation?: { lat: number; lng: number },
+  chefLocation?: { lat: number; lng: number }
+): Promise<Order | { warning: string; distance: number; message: string; allow_accept: boolean }> => {
+  const requestData: any = {};
+  
+  if (agentLocation) {
+    requestData.agent_latitude = agentLocation.lat;
+    requestData.agent_longitude = agentLocation.lng;
+  }
+  
+  if (chefLocation) {
+    requestData.chef_latitude = chefLocation.lat;
+    requestData.chef_longitude = chefLocation.lng;
+  }
+  
+  const res = await apiClient.post(`/orders/orders/${orderId}/accept/`, requestData);
   return res.data;
 };
 
-// 🚚 Get Cook Details
+// 🚚 Get Cook Details with kitchen location
 export const getCookDetails = async (cookId: number): Promise<any> => {
   const res = await apiClient.get(`/auth/cook-profile/${cookId}/`);
   return res.data;
+}
+
+// 🚚 Get pickup location from order (NEW FEATURE)
+export const getPickupLocation = (order: Order): string | null => {
+  // Try to get pickup location from multiple sources
+  return order.pickup_location || 
+         order.chef?.kitchen_location || 
+         null;
+}
+
+// 🚚 Navigate to pickup location (NEW FEATURE)
+export const navigateToPickupLocation = (order: Order): boolean => {
+  const pickupLocation = getPickupLocation(order);
+  if (pickupLocation) {
+    const encodedLocation = encodeURIComponent(pickupLocation);
+    const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedLocation}`;
+    window.open(navigationUrl, '_blank');
+    return true;
+  }
+  return false;
+}
+
+// 🚚 Navigate to delivery location
+export const navigateToDeliveryLocation = (order: Order): boolean => {
+  if (order.delivery_address) {
+    const encodedAddress = encodeURIComponent(order.delivery_address);
+    const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
+    window.open(navigationUrl, '_blank');
+    return true;
+  }
+  return false;
 }
 
 // 🚚 Update order status with enhanced tracking
@@ -453,6 +500,35 @@ export const getNavigationInstructions = async (
     console.error("Failed to get navigation instructions:", error);
     throw error;
   }
+};
+
+// 🚚 Get chef location for navigation
+export const getChefLocation = async (orderId: number): Promise<{
+  chef: {
+    id: number;
+    name: string;
+    phone?: string;
+    email: string;
+    location: any;
+  };
+  order_id: number;
+  pickup_address: string;
+}> => {
+  const res = await apiClient.get(`/orders/orders/${orderId}/chef_location/`);
+  return res.data;
+};
+
+// 🚚 Mark order as picked up
+export const markOrderPickedUp = async (
+  orderId: number,
+  notes?: string,
+  pickupLocation?: { lat: number; lng: number; address?: string }
+): Promise<any> => {
+  const res = await apiClient.post(`/orders/orders/${orderId}/mark_picked_up/`, {
+    notes: notes || 'Order picked up from chef',
+    pickup_location: pickupLocation
+  });
+  return res.data;
 };
 
 // Helper function to get current location

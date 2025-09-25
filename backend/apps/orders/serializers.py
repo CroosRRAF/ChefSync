@@ -35,17 +35,48 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 
 class ChefSerializer(serializers.ModelSerializer):
-    """Serializer for chef user information"""
+    """Serializer for chef user information with kitchen location"""
     full_name = serializers.SerializerMethodField()
+    kitchen_location = serializers.SerializerMethodField()
+    specialty = serializers.SerializerMethodField()
+    availability_hours = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['user_id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'phone_no', 'name']
+        fields = ['user_id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'phone_no', 'name', 
+                 'kitchen_location', 'specialty', 'availability_hours']
         
     def get_full_name(self, obj):
         if obj.name:
             return obj.name
         return f"{obj.first_name} {obj.last_name}".strip() or obj.username
+    
+    def get_kitchen_location(self, obj):
+        """Get kitchen location from Cook profile for pickup by delivery partners"""
+        try:
+            from apps.authentication.models import Cook
+            cook_profile = Cook.objects.get(user=obj)
+            return cook_profile.kitchen_location
+        except Cook.DoesNotExist:
+            return None
+    
+    def get_specialty(self, obj):
+        """Get specialty from Cook profile"""
+        try:
+            from apps.authentication.models import Cook
+            cook_profile = Cook.objects.get(user=obj)
+            return cook_profile.specialty
+        except Cook.DoesNotExist:
+            return None
+    
+    def get_availability_hours(self, obj):
+        """Get availability hours from Cook profile"""
+        try:
+            from apps.authentication.models import Cook
+            cook_profile = Cook.objects.get(user=obj)
+            return cook_profile.availability_hours
+        except Cook.DoesNotExist:
+            return None
 
 
 class ChefProfileSerializer(serializers.ModelSerializer):
@@ -65,7 +96,7 @@ class OrderItemDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = OrderItem
-        fields = ['id', 'quantity', 'special_instructions', 'price_details', 'item_total']
+        fields = ['order_item_id', 'quantity', 'special_instructions', 'price_details', 'item_total']
         
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -96,7 +127,7 @@ class OrderListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order_number', 'status', 'status_display', 'total_amount', 
             'customer_name', 'chef_name', 'total_items', 'created_at', 
-            'time_since_order', 'delivery_address', 'order_type'
+            'time_since_order', 'delivery_address'
         ]
     
     def get_total_items(self, obj):
@@ -114,24 +145,10 @@ class OrderListSerializer(serializers.ModelSerializer):
             return f"{int(hours / 24)}d ago"
 
 
-class ChefSerializer(serializers.ModelSerializer):
-    """Serializer for chef user information"""
-    full_name = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'phone_no', 'name']
-        
-    def get_full_name(self, obj):
-        if obj.name:
-            return obj.name
-        return f"{obj.first_name} {obj.last_name}".strip() or obj.username
-
-
 class OrderDetailSerializer(serializers.ModelSerializer):
     """Comprehensive serializer for order details"""
     customer = CustomerSerializer(read_only=True)
-    chef = ChefSerializer(read_only=True)  # Changed from ChefProfileSerializer to ChefSerializer
+    chef = ChefSerializer(read_only=True)
     items = OrderItemDetailSerializer(many=True, read_only=True)
     status_history = OrderStatusHistorySerializer(many=True, read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
@@ -140,6 +157,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
     chef_name = serializers.SerializerMethodField()
     time_since_order = serializers.SerializerMethodField()
+    pickup_location = serializers.SerializerMethodField()  # For delivery partners
     
     # Computed fields
     total_items = serializers.SerializerMethodField()
@@ -150,14 +168,14 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'order_number', 'status', 'status_display', 'order_type',
+            'id', 'order_number', 'status', 'status_display',
             'total_amount', 'delivery_fee', 'tax_amount', 'discount_amount',
             'delivery_address', 'delivery_instructions', 'customer_notes', 'payment_method',
             'payment_status', 'estimated_delivery_time', 'actual_delivery_time',
             'created_at', 'updated_at', 'customer', 'chef', 'items',
             'status_history', 'total_items', 'estimated_prep_time',
             'can_edit', 'time_in_current_status', 'customer_name', 'chef_name', 
-            'time_since_order', 'customer_notes', 'chef_notes'
+            'time_since_order', 'customer_notes', 'chef_notes', 'pickup_location'
         ]
     
     def get_customer_name(self, obj):
@@ -212,6 +230,17 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         else:
             hours = int(minutes / 60)
             return f"{hours}h {minutes % 60}m"
+    
+    def get_pickup_location(self, obj):
+        """Get chef's kitchen location for delivery partner pickup"""
+        if obj.chef:
+            try:
+                from apps.authentication.models import Cook
+                cook_profile = Cook.objects.get(user=obj.chef)
+                return cook_profile.kitchen_location
+            except Cook.DoesNotExist:
+                return None
+        return None
 
 
 class CartItemSerializer(serializers.ModelSerializer):

@@ -38,6 +38,8 @@ import {
   Route,
   AlertCircle,
   Zap,
+  ExternalLink,
+  Smartphone,
   Package,
 } from "lucide-react";
 import type { Order } from "../../types/orderType";
@@ -720,6 +722,58 @@ const DeliveryMap: React.FC = () => {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Enhanced Navigation Buttons */}
+                <div className="mt-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        const encodedAddress = encodeURIComponent(
+                          selectedOrder.delivery_address
+                        );
+                        const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
+                        window.open(navigationUrl, "_blank");
+                      }}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Google Maps
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        // Quick navigation logic (e.g., open in default maps app)
+                        if (currentLocation) {
+                          const { lat, lng } = currentLocation;
+                          const quickNavUrl = `geo:${lat},${lng};u=35`;
+                          window.open(quickNavUrl, "_blank");
+                        } else {
+                          toast({
+                            variant: "destructive",
+                            title: "Location Required",
+                            description:
+                              "Please enable location access for quick navigation.",
+                          });
+                        }
+                      }}
+                    >
+                      <Smartphone className="h-3 w-3 mr-1" />
+                      Quick Nav
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleDeliveryComplete(selectedOrder.id)}
+                  >
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Mark Delivered
+                  </Button>
+                </div>
               </div>
             )}
           </DialogContent>
@@ -757,7 +811,10 @@ const DeliveryMap: React.FC = () => {
                   <Truck className="h-5 w-5 mr-2 text-blue-600" />
                   <span>Active Deliveries</span>
                 </div>
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                <Badge
+                  variant="secondary"
+                  className="bg-blue-100 text-blue-700"
+                >
                   {assignedOrders.length} active
                 </Badge>
               </CardTitle>
@@ -775,7 +832,7 @@ const DeliveryMap: React.FC = () => {
                       setSelectedOrder(order);
                       setShowOrderDetails(true);
                       // Scroll to top to see the selected order
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                     className="transform hover:scale-[1.02] transition-all duration-300"
                     style={{ animationDelay: `${index * 0.1}s` }}

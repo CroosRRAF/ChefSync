@@ -2,6 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -18,12 +25,19 @@ import {
   ArrowRight,
   Timer,
   Route,
+  ExternalLink,
+  Smartphone,
 } from "lucide-react";
 import {
   getCookDetails,
   updateOrderStatus,
   startDeliveryTracking,
+  getPickupLocation,
+  navigateToPickupLocation,
+  navigateToDeliveryLocation,
   updateDeliveryProgress,
+  markOrderPickedUp,
+  getChefLocation,
 } from "@/services/deliveryService";
 import {
   calculateDistanceHaversine,
@@ -202,10 +216,17 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
 
   const handleCompletePickup = async () => {
     try {
-      await updateOrderStatus(
+      // Use the new mark picked up service
+      await markOrderPickedUp(
         order.id,
-        "out_for_delivery",
-        currentLocation || undefined
+        "Order picked up from chef",
+        currentLocation
+          ? {
+              lat: currentLocation.lat,
+              lng: currentLocation.lng,
+              address: cookDetails?.address,
+            }
+          : undefined
       );
 
       setTracking((prev) => ({
@@ -213,17 +234,18 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
         pickup: { started: true, completed: true },
       }));
       setCurrentPhase("delivery");
-      onStatusUpdate(order.id, "out_for_delivery");
+      onStatusUpdate(order.id, "in_transit");
 
       toast({
         title: "Order Picked Up",
         description: "Order has been collected. Now proceed to delivery.",
       });
     } catch (error) {
+      console.error("Pickup completion error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update pickup status.",
+        description: "Failed to update pickup status. Please try again.",
       });
     }
   };
@@ -292,7 +314,7 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
     }
   };
 
-  const handleNavigate = (destination: "pickup" | "delivery") => {
+  const handleNavigate = async (destination: "pickup" | "delivery") => {
     if (!currentLocation) {
       toast({
         variant: "destructive",
@@ -302,15 +324,169 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
       return;
     }
 
-    const targetLocation =
-      destination === "pickup" ? pickupLocation : deliveryLocation;
-    if (!targetLocation) return;
+    try {
+      let targetAddress = "";
+      let targetLocation = null;
 
-    const navigationUrl = generateNavigationUrl(
-      targetLocation,
-      currentLocation
+      if (destination === "pickup") {
+        // NEW: Use pickup location from order data (kitchen_location)
+        targetAddress =
+          order.pickup_location ||
+          order.chef?.kitchen_location ||
+          cookDetails?.address ||
+          "Chef location not available";
+        targetLocation = pickupLocation;
+      } else {
+        // Use customer delivery address
+        targetAddress =
+          order.delivery_address || "Customer address not available";
+        targetLocation = deliveryLocation;
+      }
+
+      // If we have coordinates, use them, otherwise use address
+      if (targetLocation) {
+        const navigationUrl = generateNavigationUrl(
+          targetLocation,
+          currentLocation
+        );
+        window.open(navigationUrl, "_blank");
+      } else if (targetAddress) {
+        // Use address-based navigation
+        const encodedAddress = encodeURIComponent(targetAddress);
+        const navigationUrl = `https://www.google.com/maps/dir/?api=1&origin=${currentLocation.lat},${currentLocation.lng}&destination=${encodedAddress}`;
+        window.open(navigationUrl, "_blank");
+      }
+
+      toast({
+        title: `Navigation Started`,
+        description: `Opening directions to ${
+          destination === "pickup" ? "chef location" : "customer location"
+        }`,
+      });
+    } catch (error) {
+      console.error("Navigation error:", error);
+      toast({
+        variant: "destructive",
+        title: "Navigation Error",
+        description: "Could not start navigation. Please try again.",
+      });
+    }
+  };
+
+  // Enhanced navigation functions
+  const getPickupLocation = (order: Order) => {
+    return (
+      order.pickup_location ||
+      order.chef?.kitchen_location ||
+      "Location not available"
     );
-    window.open(navigationUrl, "_blank");
+  };
+
+  const handleGoogleNavigation = (destination: "pickup" | "delivery") => {
+    let location: string;
+    let title: string;
+
+    if (destination === "pickup") {
+      location = getPickupLocation(order);
+      title = `Chef ${order.chef?.name || "Kitchen"}`;
+    } else {
+      location = order.delivery_address || "";
+      title = `Customer ${order.customer?.name || "Location"}`;
+    }
+
+    if (location && location !== "Location not available") {
+      const encodedLocation = encodeURIComponent(location);
+      const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedLocation}`;
+      window.open(navigationUrl, "_blank");
+
+      toast({
+        title: "Navigation Started",
+        description: `Opening Google Maps for ${destination} location`,
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Location not available",
+        description: `${destination} location is not set for this order`,
+      });
+    }
+  };
+
+  // Simple integrated map component
+  const IntegratedMapView = ({
+    location,
+    title,
+  }: {
+    location: string;
+    title: string;
+  }) => {
+    const [userLocation, setUserLocation] = useState<{
+      lat: number;
+      lng: number;
+    } | null>(null);
+
+    useEffect(() => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setUserLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+          },
+          () => console.log("Could not get user location")
+        );
+      }
+    }, []);
+
+    const handleQuickDirections = () => {
+      const encodedLocation = encodeURIComponent(location);
+      const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedLocation}`;
+      window.open(navigationUrl, "_blank");
+    };
+
+    return (
+      <div className="w-full h-80 bg-gray-100 rounded-lg overflow-hidden">
+        <div className="relative w-full h-full bg-gradient-to-br from-blue-100 to-green-100 flex flex-col items-center justify-center">
+          <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 max-w-xs">
+            <div className="flex items-center gap-2 mb-2">
+              <MapPin className="h-4 w-4 text-red-500" />
+              <span className="font-medium text-sm">{title}</span>
+            </div>
+            <p className="text-xs text-gray-600">{location}</p>
+          </div>
+
+          {userLocation && (
+            <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-medium">Your Location</span>
+              </div>
+            </div>
+          )}
+
+          <div className="text-center space-y-4">
+            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center animate-bounce">
+              <MapPin className="h-5 w-5 text-white" />
+            </div>
+            <div className="bg-white/90 rounded-lg p-4 shadow-lg max-w-sm">
+              <h3 className="font-semibold mb-2">Quick Navigation</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Integrated map view for quick location reference
+              </p>
+              <Button
+                onClick={handleQuickDirections}
+                size="sm"
+                className="w-full"
+              >
+                <Route className="h-4 w-4 mr-2" />
+                Get Directions
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const pickupMetrics = calculateTripMetrics(pickupLocation);
@@ -482,14 +658,73 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
             <div className="space-y-3">
               {!tracking.pickup.started ? (
                 <div className="space-y-2">
-                  <Button
-                    onClick={() => handleNavigate("pickup")}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <Navigation className="h-4 w-4 mr-2" />
-                    Navigate to Pickup Location
-                  </Button>
+                  {/* Enhanced Navigation Options */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={() => handleGoogleNavigation("pickup")}
+                      variant="outline"
+                      className="w-full flex items-center gap-2"
+                      disabled={
+                        !getPickupLocation(order) ||
+                        getPickupLocation(order) === "Location not available"
+                      }
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      <span className="text-xs">Navigate (Google)</span>
+                    </Button>
+
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="default"
+                          className="w-full flex items-center gap-2"
+                          disabled={
+                            !getPickupLocation(order) ||
+                            getPickupLocation(order) ===
+                              "Location not available"
+                          }
+                        >
+                          <Smartphone className="h-3 w-3" />
+                          <span className="text-xs">Quick Navigate</span>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <MapPin className="h-5 w-5" />
+                            Navigate to Pickup Location
+                          </DialogTitle>
+                        </DialogHeader>
+                        <IntegratedMapView
+                          location={getPickupLocation(order)}
+                          title={`Chef ${order.chef?.name || "Kitchen"}`}
+                        />
+                        <div className="flex gap-2 mt-4">
+                          <Button
+                            onClick={() => handleGoogleNavigation("pickup")}
+                            className="flex-1"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Open in Google Maps
+                          </Button>
+                          {cookDetails?.user?.phone && (
+                            <Button variant="outline">
+                              <Phone className="h-4 w-4 mr-2" />
+                              Call Chef
+                            </Button>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+
+                  {getPickupLocation(order) &&
+                    getPickupLocation(order) !== "Location not available" && (
+                      <div className="text-xs text-center text-muted-foreground bg-green-50 dark:bg-green-900/20 p-2 rounded">
+                        📍 Pickup: {getPickupLocation(order)}
+                      </div>
+                    )}
+
                   <Button onClick={handleStartPickup} className="w-full">
                     <Package className="h-4 w-4 mr-2" />
                     Start Pickup Tracking
@@ -610,14 +845,59 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
             <div className="space-y-3">
               {!tracking.delivery.started ? (
                 <div className="space-y-2">
-                  <Button
-                    onClick={() => handleNavigate("delivery")}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <Navigation className="h-4 w-4 mr-2" />
-                    Navigate to Customer
-                  </Button>
+                  {/* Enhanced Delivery Navigation Options */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={() => handleGoogleNavigation("delivery")}
+                      variant="outline"
+                      className="w-full flex items-center gap-2"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      <span className="text-xs">Navigate (Google)</span>
+                    </Button>
+
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="default"
+                          className="w-full flex items-center gap-2"
+                        >
+                          <Smartphone className="h-3 w-3" />
+                          <span className="text-xs">Quick Navigate</span>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <MapPin className="h-5 w-5" />
+                            Navigate to Customer
+                          </DialogTitle>
+                        </DialogHeader>
+                        <IntegratedMapView
+                          location={order.delivery_address}
+                          title={`Customer ${
+                            order.customer?.name || "Location"
+                          }`}
+                        />
+                        <div className="flex gap-2 mt-4">
+                          <Button
+                            onClick={() => handleGoogleNavigation("delivery")}
+                            className="flex-1"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Open in Google Maps
+                          </Button>
+                          {order.customer?.phone && (
+                            <Button variant="outline">
+                              <Phone className="h-4 w-4 mr-2" />
+                              Call Customer
+                            </Button>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+
                   <Button onClick={handleStartDelivery} className="w-full">
                     <Truck className="h-4 w-4 mr-2" />
                     Start Delivery

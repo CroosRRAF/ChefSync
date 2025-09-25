@@ -1,8 +1,19 @@
+export interface Chef {
+  id: number;
+  name: string;
+  email: string;
+  phone_no?: string;
+  specialty?: string;
+  kitchen_location?: string; // Pickup location for delivery partners
+  availability_hours?: string;
+  rating_avg?: number;
+}
+
 export interface Order {
   id: number;
   order_number: string;
   customer: any;
-  chef: any;
+  chef: Chef; // Enhanced chef interface with pickup location
   delivery_partner?: any;
   status:
     | 'cart'
@@ -21,5 +32,6 @@ export interface Order {
   created_at: string;
   updated_at: string;
   actual_delivery_time?: string;
-  delivery_address: string;
+  delivery_address: string; // Customer delivery address
+  pickup_location?: string; // Chef's kitchen location for pickup
 }

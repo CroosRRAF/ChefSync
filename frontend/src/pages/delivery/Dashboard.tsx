@@ -18,8 +18,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import DeliveryLayout from "@/components/delivery/DeliveryLayout";
+import { DistanceWarningDialog } from "@/components/delivery/DistanceWarningDialog";
 import {
   getAvailableOrders,
   getMyAssignedOrders,
@@ -48,6 +50,7 @@ import DeliveryPhaseCard from "@/components/delivery/DeliveryPhaseCard";
 
 const DeliveryDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
   const [assignedOrders, setAssignedOrders] = useState<Order[]>([]);
@@ -57,6 +60,20 @@ const DeliveryDashboard: React.FC = () => {
   const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<DeliveryLog | null>(null);
   const [showLogDetail, setShowLogDetail] = useState(false);
+  // Distance warning dialog state
+  const [distanceWarning, setDistanceWarning] = useState<{
+    isOpen: boolean;
+    orderId: number | null;
+    distance: number;
+    message: string;
+    agentLocation: { lat: number; lng: number } | null;
+  }>({
+    isOpen: false,
+    orderId: null,
+    distance: 0,
+    message: "",
+    agentLocation: null,
+  });
   const [dashboard, setDashboard] = useState<{
     active_deliveries: number;
     completed_today: number;
@@ -163,8 +180,60 @@ const DeliveryDashboard: React.FC = () => {
 
   const handleAcceptOrder = async (orderId: number, order: Order) => {
     setAcceptingOrder(orderId);
+
+    // Get current location for distance checking
+    const getCurrentPosition = (): Promise<GeolocationPosition> => {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation not supported"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000,
+        });
+      });
+    };
+
     try {
-      await acceptOrder(orderId);
+      let agentLocation = null;
+      let chefLocation = null;
+
+      // Try to get current location
+      try {
+        const position = await getCurrentPosition();
+        agentLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+      } catch (locationError) {
+        console.warn("Could not get current location:", locationError);
+      }
+
+      // For now, we'll accept without chef location, but the backend will handle it
+      const acceptResult = await acceptOrder(
+        orderId,
+        agentLocation || undefined,
+        chefLocation
+      );
+
+      // Check if there's a distance warning
+      if (
+        "warning" in acceptResult &&
+        acceptResult.warning &&
+        acceptResult.distance
+      ) {
+        setDistanceWarning({
+          isOpen: true,
+          orderId: orderId,
+          distance: acceptResult.distance,
+          message: acceptResult.message,
+          agentLocation: agentLocation,
+        });
+        setAcceptingOrder(null);
+        return;
+      }
 
       // Remove from available orders
       setAvailableOrders((prev) => prev.filter((o) => o.id !== orderId));
@@ -185,6 +254,72 @@ const DeliveryDashboard: React.FC = () => {
     } finally {
       setAcceptingOrder(null);
     }
+  };
+
+  const handleDistanceWarningConfirm = async () => {
+    if (!distanceWarning.orderId) return;
+
+    setAcceptingOrder(distanceWarning.orderId);
+
+    try {
+      // Accept the order despite the distance warning
+      await acceptOrder(
+        distanceWarning.orderId,
+        distanceWarning.agentLocation || undefined
+      );
+
+      // Remove from available orders
+      setAvailableOrders((prev) =>
+        prev.filter((o) => o.id !== distanceWarning.orderId)
+      );
+
+      // Refresh dashboard data
+      fetchDashboardData();
+
+      // Navigate to map
+      const order = availableOrders.find(
+        (o) => o.id === distanceWarning.orderId
+      );
+      if (order) {
+        navigate("/delivery/map", {
+          state: {
+            selectedOrderId: distanceWarning.orderId,
+            orderDetails: order,
+          },
+        });
+      }
+
+      toast({
+        title: "Order Accepted",
+        description: `Order #${distanceWarning.orderId} accepted despite distance warning.`,
+      });
+    } catch (error) {
+      console.error("Failed to accept order:", error);
+      toast({
+        title: "Error",
+        description: "Failed to accept order. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAcceptingOrder(null);
+      setDistanceWarning({
+        isOpen: false,
+        orderId: null,
+        distance: 0,
+        message: "",
+        agentLocation: null,
+      });
+    }
+  };
+
+  const handleDistanceWarningCancel = () => {
+    setDistanceWarning({
+      isOpen: false,
+      orderId: null,
+      distance: 0,
+      message: "",
+      agentLocation: null,
+    });
   };
 
   const formatTime = (isoString: string) => {
@@ -888,6 +1023,15 @@ const DeliveryDashboard: React.FC = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Distance Warning Dialog */}
+        <DistanceWarningDialog
+          isOpen={distanceWarning.isOpen}
+          onClose={handleDistanceWarningCancel}
+          onConfirm={handleDistanceWarningConfirm}
+          distance={distanceWarning.distance}
+          message={distanceWarning.message}
+        />
       </div>
     </DeliveryLayout>
   );

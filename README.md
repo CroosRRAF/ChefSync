@@ -22,6 +22,7 @@ A comprehensive food delivery platform with **JWT authentication**, **Google OAu
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Python 3.11+
 - Node.js 18+
 - MySQL 8.0+
@@ -29,6 +30,7 @@ A comprehensive food delivery platform with **JWT authentication**, **Google OAu
 - **Poppler for Windows** (Required for PDF processing - see [POPPLER_INSTALLATION.md](backend/POPPLER_INSTALLATION.md))
 
 ### Backend (Django)
+
 ```bash
 cd backend
 python -m venv venv
@@ -39,15 +41,18 @@ cp env.example .env  # Configure environment variables
 python manage.py migrate
 python manage.py runserver
 ```
+
 **Server runs on:** http://127.0.0.1:8000
 
 ### Frontend (React)
+
 ```bash
 cd frontend
 npm install
 cp .env.example .env.local  # Configure environment variables
 npm run dev
 ```
+
 **App runs on:** http://localhost:8081
 
 ## 🏗️ Project Structure
@@ -98,6 +103,7 @@ ChefSync/
 ## 🔧 Setup Instructions
 
 ### 1. Clone the Repository
+
 ```bash
 git clone <your-repository-url>
 cd ChefSync
@@ -106,6 +112,7 @@ cd ChefSync
 ### 2. Backend Setup
 
 #### Create Virtual Environment
+
 ```bash
 cd backend
 python -m venv venv
@@ -114,16 +121,19 @@ venv\Scripts\activate  # Windows
 ```
 
 #### Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
 #### Configure Environment Variables
+
 ```bash
 cp env.example .env
 ```
 
 Edit `.env` file with your configuration:
+
 ```env
 # Django Settings
 SECRET_KEY=your-super-secret-key-here
@@ -156,12 +166,14 @@ CORS_ALLOWED_ORIGINS=http://localhost:8081,http://127.0.0.1:8081
 ```
 
 #### Database Setup
+
 ```bash
 python manage.py migrate
 python manage.py createsuperuser
 ```
 
 #### Run Backend Server
+
 ```bash
 python manage.py runserver
 ```
@@ -169,17 +181,20 @@ python manage.py runserver
 ### 3. Frontend Setup
 
 #### Install Dependencies
+
 ```bash
 cd frontend
 npm install
 ```
 
 #### Configure Environment Variables
+
 ```bash
 cp .env.example .env.local
 ```
 
 Edit `.env.local` file:
+
 ```env
 # API Configuration
 VITE_API_BASE_URL=http://127.0.0.1:8000/api
@@ -193,6 +208,7 @@ VITE_APP_VERSION=1.0.0
 ```
 
 #### Run Frontend Server
+
 ```bash
 npm run dev
 ```
@@ -214,12 +230,14 @@ npm run dev
 ## 🔐 Authentication System
 
 ### JWT Token Architecture
+
 - **Access Tokens**: Stateless, short-lived (15 minutes)
 - **Refresh Tokens**: Database-stored, long-lived (7 days)
 - **Automatic Refresh**: Seamless token renewal
 - **Token Revocation**: Secure logout and session management
 
 ### Authentication Flow
+
 1. **Registration**: Multi-step process with email verification
 2. **Email Verification**: OTP-based verification system
 3. **Role Selection**: Customer, Cook, or Delivery Agent
@@ -230,6 +248,7 @@ npm run dev
 8. **Logout**: Token revocation
 
 ### Role-Based Access Control
+
 - **Customer**: Food ordering and profile management (immediate access)
 - **Cook**: Kitchen management and order preparation (requires approval)
 - **Delivery Agent**: Order delivery and tracking (requires approval)
@@ -238,6 +257,7 @@ npm run dev
 ## 📱 Frontend Features
 
 ### Authentication Components
+
 - **Multi-Step Registration**: Name, email, OTP verification, role selection, document upload, password
 - **Email Verification**: OTP-based verification with beautiful HTML emails
 - **Login Form**: Email/password with validation
@@ -245,21 +265,27 @@ npm run dev
 - **Google OAuth**: Social login integration
 
 ### Dashboard System
+
 - **Customer Dashboard**: Order history, favorites, profile
 - **Cook Dashboard**: Kitchen orders, schedule, inventory
 - **Delivery Dashboard**: Delivery routes, order tracking
 - **Admin Dashboard**: Analytics, user management, approval workflows
 
 ### UI/UX Features
+
 - **Responsive Design**: Mobile-first approach
 - **Dark/Light Theme**: Theme switching capability
 - **Loading States**: Skeleton loaders and spinners
 - **Error Handling**: User-friendly error messages
 - **Form Validation**: Real-time validation with Zod
+- **Enhanced Pickup Navigation**: Dual navigation options for delivery partners
+  - **Navigate (Google)**: External Google Maps navigation with full features
+  - **Quick Navigate**: Integrated map modal with contact access and quick reference
 
 ## 🗄️ Database Models
 
 ### User Model
+
 ```python
 class User(AbstractUser):
     email = models.EmailField(unique=True)
@@ -273,6 +299,7 @@ class User(AbstractUser):
 ```
 
 ### JWT Token Model
+
 ```python
 class JWTToken(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -284,6 +311,7 @@ class JWTToken(models.Model):
 ```
 
 ### Email OTP Model
+
 ```python
 class EmailOTP(models.Model):
     email = models.EmailField()
@@ -295,6 +323,7 @@ class EmailOTP(models.Model):
 ```
 
 ### Document Models
+
 ```python
 class DocumentType(models.Model):
     name = models.CharField(max_length=100)
@@ -313,6 +342,7 @@ class UserDocument(models.Model):
 ## 🛡️ Security Features
 
 ### Authentication Security
+
 - **JWT Tokens**: Secure token-based authentication
 - **Token Blacklisting**: Revocation of compromised tokens
 - **Rate Limiting**: Protection against brute force attacks
@@ -321,6 +351,7 @@ class UserDocument(models.Model):
 - **OTP Security**: Time-limited, single-use verification codes
 
 ### API Security
+
 - **CORS Protection**: Cross-origin request security
 - **Input Validation**: Comprehensive form validation
 - **SQL Injection Protection**: Django ORM protection
@@ -328,6 +359,7 @@ class UserDocument(models.Model):
 - **CSRF Protection**: Cross-site request forgery protection
 
 ### Document Security
+
 - **Secure Storage**: Cloudinary integration with proxy access
 - **Access Control**: Role-based document visibility
 - **File Validation**: Type and size restrictions
@@ -338,6 +370,7 @@ class UserDocument(models.Model):
 ### Zustand Stores
 
 #### User Store (`frontend/src/store/userStore.ts`)
+
 ```typescript
 interface UserState {
   user: User | null;
@@ -352,6 +385,7 @@ interface UserState {
 ```
 
 #### Order Store (`frontend/src/store/orderStore.ts`)
+
 ```typescript
 interface OrderState {
   orders: Order[];
@@ -367,6 +401,7 @@ interface OrderState {
 ### React Context
 
 #### Auth Context (`frontend/src/context/AuthContext.tsx`)
+
 - Global authentication state
 - Token management
 - User session handling
@@ -374,6 +409,7 @@ interface OrderState {
 - Approval status tracking
 
 #### Theme Context (`frontend/src/context/ThemeContext.tsx`)
+
 - Dark/light theme switching
 - Theme persistence
 - System theme detection
@@ -381,6 +417,7 @@ interface OrderState {
 ## 🔧 API Endpoints
 
 ### Authentication Endpoints
+
 ```
 POST /api/auth/register/           # User registration
 POST /api/auth/login/              # User login
@@ -392,6 +429,7 @@ POST /api/auth/google/login/       # Google OAuth login
 ```
 
 ### Password Management
+
 ```
 POST /api/auth/password/reset/     # Request password reset
 POST /api/auth/password/reset/confirm/  # Confirm password reset
@@ -399,6 +437,7 @@ POST /api/auth/password/change/    # Change password
 ```
 
 ### Document Management
+
 ```
 GET  /api/auth/documents/types/           # Get document types by role
 POST /api/auth/documents/upload/          # Upload documents
@@ -408,6 +447,7 @@ POST /api/auth/documents/proxy-download/  # Proxy document download
 ```
 
 ### Admin Management
+
 ```
 GET  /api/auth/admin/pending-approvals/   # Get pending approvals
 GET  /api/auth/admin/user/<id>/           # Get user details for approval
@@ -416,6 +456,7 @@ GET  /api/auth/approval-status/           # Check user approval status
 ```
 
 ### Profile Management
+
 ```
 GET /api/auth/profile/             # Get user profile
 PUT /api/auth/profile/update/      # Update user profile
@@ -427,6 +468,7 @@ POST /api/auth/delivery-agent/create/  # Create delivery profile
 ## 🎨 UI Components
 
 ### Shadcn/UI Components
+
 - **Forms**: Input, Button, Select, Checkbox, Radio
 - **Layout**: Card, Sheet, Dialog, Drawer, Tabs
 - **Navigation**: Breadcrumb, Navigation Menu, Pagination
@@ -434,6 +476,7 @@ POST /api/auth/delivery-agent/create/  # Create delivery profile
 - **Data Display**: Table, Badge, Avatar, Separator
 
 ### Custom Components
+
 - **Auth Components**: Login, Register, ForgotPassword, DocumentUpload
 - **Layout Components**: Navbar, RoleBasedNavigation
 - **Dashboard Components**: Role-specific dashboards
@@ -441,6 +484,7 @@ POST /api/auth/delivery-agent/create/  # Create delivery profile
 - **Profile Components**: EditProfile, ProfileUpdateForm
 
 ### Styling
+
 - **Tailwind CSS**: Utility-first CSS framework
 - **Custom Themes**: Dark/light mode support
 - **Responsive Design**: Mobile-first approach
@@ -451,6 +495,7 @@ POST /api/auth/delivery-agent/create/  # Create delivery profile
 ### Document Types by Role
 
 #### Cook Documents
+
 - **Culinary Certificate**: Professional cooking certification
 - **Food Safety Certificate**: Health and safety compliance
 - **Kitchen Experience**: Work history documentation
@@ -458,6 +503,7 @@ POST /api/auth/delivery-agent/create/  # Create delivery profile
 - **Identity Verification**: Government-issued ID
 
 #### Delivery Agent Documents
+
 - **Driving License**: Valid driver's license
 - **Vehicle Registration**: Vehicle ownership/insurance
 - **Background Check**: Criminal background verification
@@ -465,6 +511,7 @@ POST /api/auth/delivery-agent/create/  # Create delivery profile
 - **Identity Verification**: Government-issued ID
 
 ### Document Upload Features
+
 - **Drag & Drop Interface**: User-friendly file upload experience
 - **File Validation**: Type and size restrictions (PDF, JPG, PNG, JPEG)
 - **PDF Processing**: Automatic PDF to image conversion with page validation
@@ -476,6 +523,7 @@ POST /api/auth/delivery-agent/create/  # Create delivery profile
 ## 👥 Admin Approval System
 
 ### Approval Workflow
+
 1. **User Registration**: Multi-step registration with document upload
 2. **Pending Status**: Cooks and Delivery Agents await approval
 3. **Admin Review**: Admins review documents and applications
@@ -484,6 +532,7 @@ POST /api/auth/delivery-agent/create/  # Create delivery profile
 6. **Access Grant**: Approved users gain platform access
 
 ### Admin Dashboard Features
+
 - **Pending Approvals**: Lists users awaiting approval
 - **Document Review**: View and download uploaded documents
 - **Approval Actions**: Approve/reject with notes
@@ -491,16 +540,61 @@ POST /api/auth/delivery-agent/create/  # Create delivery profile
 - **Analytics**: Registration and approval metrics
 
 ### Email Notifications
+
 - **Beautiful HTML Templates**: Professional, responsive email design
 - **Status Updates**: Approval/rejection notifications
 - **Security Features**: Clear expiry information and warnings
 - **Branding**: Consistent ChefSync styling
+
+## 🚚 Delivery System Features
+
+### Enhanced Pickup Navigation
+
+ChefSync provides delivery partners with dual navigation options for optimal pickup and delivery efficiency:
+
+#### 1. Navigate (Google) - External Navigation
+
+- **Full Google Maps Integration**: Opens Google Maps in a new tab
+- **Turn-by-Turn Navigation**: Voice-guided directions
+- **Real-Time Traffic**: Live traffic updates and route optimization
+- **Alternative Routes**: Multiple route suggestions
+- **Offline Support**: Works with downloaded maps
+
+#### 2. Quick Navigate - Integrated Map
+
+- **In-App Experience**: Stays within ChefSync interface
+- **Quick Reference**: Fast location overview with minimal data usage
+- **Contact Integration**: Direct access to chef/customer phone numbers
+- **Instant Access**: No external app switching required
+- **Mobile Optimized**: Touch-friendly interface for drivers
+
+### Pickup Location Sources
+
+The system intelligently determines pickup locations using:
+
+1. **Primary**: `order.pickup_location` (explicitly set)
+2. **Secondary**: `order.chef.kitchen_location` (chef's registered kitchen)
+3. **Fallback**: Cook profile address
+
+### Location Features
+
+- **Multiple Data Sources**: Ensures location availability
+- **Graceful Degradation**: Handles missing location data
+- **Real-Time Updates**: Dynamic location information
+- **Contact Integration**: One-tap calling for chefs and customers
+
+### Demo and Testing
+
+- **Demo Page**: `/demo/pickup-navigation` for feature showcase
+- **Mock Data**: Sample orders for testing navigation flows
+- **Comparison View**: Side-by-side old vs new navigation experience
 
 ## 🚀 Deployment
 
 ### Production Environment Variables
 
 #### Backend (.env)
+
 ```env
 DEBUG=False
 SECRET_KEY=your-production-secret-key
@@ -522,6 +616,7 @@ SECURE_SSL_REDIRECT=True
 ```
 
 #### Frontend (.env.production)
+
 ```env
 VITE_API_BASE_URL=https://api.yourdomain.com/api
 VITE_GOOGLE_OAUTH_CLIENT_ID=your-production-client-id
@@ -530,6 +625,7 @@ VITE_APP_VERSION=1.0.0
 ```
 
 ### Docker Deployment
+
 ```dockerfile
 # Backend Dockerfile
 FROM python:3.11-slim
@@ -550,6 +646,7 @@ CMD ["npm", "run", "preview"]
 ```
 
 ### Production Checklist
+
 - [ ] Set `DEBUG=False`
 - [ ] Configure production database
 - [ ] Set up SSL certificates
@@ -563,18 +660,21 @@ CMD ["npm", "run", "preview"]
 ## 🧪 Testing
 
 ### Backend Testing
+
 ```bash
 cd backend
 python manage.py test
 ```
 
 ### Frontend Testing
+
 ```bash
 cd frontend
 npm test
 ```
 
 ### Manual Testing Checklist
+
 - [ ] User registration and email verification
 - [ ] OTP sending and verification
 - [ ] Document upload functionality
@@ -590,6 +690,7 @@ npm test
 ## 🤝 Contributing
 
 ### Development Workflow
+
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Make your changes
@@ -599,6 +700,7 @@ npm test
 7. Open a Pull Request
 
 ### Code Standards
+
 - **Python**: Follow PEP 8 style guide
 - **TypeScript**: Use strict mode and proper typing
 - **React**: Use functional components with hooks
@@ -606,6 +708,7 @@ npm test
 - **Commits**: Use conventional commit messages
 
 ### Pull Request Guidelines
+
 - Provide clear description of changes
 - Include screenshots for UI changes
 - Ensure all tests pass
@@ -615,6 +718,7 @@ npm test
 ## 📚 Documentation
 
 ### Additional Resources
+
 - **API Documentation**: Available at `/api/docs/` when running backend
 - **Component Library**: Shadcn/UI documentation
 - **Django Documentation**: Official Django docs
@@ -624,6 +728,7 @@ npm test
 ### Troubleshooting
 
 #### Common Issues
+
 1. **Database Connection Error**: Check database credentials in `.env`
 2. **CORS Error**: Verify `CORS_ALLOWED_ORIGINS` in backend settings
 3. **Google OAuth Error**: Check client ID and authorized origins
@@ -634,6 +739,7 @@ npm test
 8. **PDF Processing Error**: See [POPPLER_INSTALLATION.md](backend/POPPLER_INSTALLATION.md) for complete setup guide
 
 #### Getting Help
+
 - Check existing issues in the repository
 - Create a new issue with detailed description
 - Include error logs and environment details
