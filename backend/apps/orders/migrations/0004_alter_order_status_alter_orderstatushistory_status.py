@@ -6,18 +6,48 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('orders', '0003_alter_orderitem_table'),
+        ("orders", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='order',
-            name='status',
-            field=models.CharField(choices=[('cart', 'Cart'), ('pending', 'Pending Payment'), ('confirmed', 'Confirmed'), ('preparing', 'Preparing'), ('ready', 'Ready for Pickup'), ('out_for_delivery', 'Out for Delivery'), ('delivered', 'Delivered'), ('cancelled', 'Cancelled'), ('rejected', 'Rejected'), ('refunded', 'Refunded')], db_index=True, default='cart', max_length=20),
+            model_name="order",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("cart", "Cart"),
+                    ("pending", "Pending Payment"),
+                    ("confirmed", "Confirmed"),
+                    ("preparing", "Preparing"),
+                    ("ready", "Ready for Pickup"),
+                    ("out_for_delivery", "Out for Delivery"),
+                    ("delivered", "Delivered"),
+                    ("cancelled", "Cancelled"),
+                    ("rejected", "Rejected"),
+                    ("refunded", "Refunded"),
+                ],
+                db_index=True,
+                default="cart",
+                max_length=20,
+            ),
         ),
         migrations.AlterField(
-            model_name='orderstatushistory',
-            name='status',
-            field=models.CharField(choices=[('cart', 'Cart'), ('pending', 'Pending Payment'), ('confirmed', 'Confirmed'), ('preparing', 'Preparing'), ('ready', 'Ready for Pickup'), ('out_for_delivery', 'Out for Delivery'), ('delivered', 'Delivered'), ('cancelled', 'Cancelled'), ('rejected', 'Rejected'), ('refunded', 'Refunded')], max_length=20),
+            model_name="orderstatushistory",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("cart", "Cart"),
+                    ("pending", "Pending Payment"),
+                    ("confirmed", "Confirmed"),
+                    ("preparing", "Preparing"),
+                    ("ready", "Ready for Pickup"),
+                    ("out_for_delivery", "Out for Delivery"),
+                    ("delivered", "Delivered"),
+                    ("cancelled", "Cancelled"),
+                    ("rejected", "Rejected"),
+                    ("refunded", "Refunded"),
+                ],
+                max_length=20,
+            ),
         ),
     ]

@@ -5,6 +5,7 @@ import string
 from datetime import timedelta
 from decimal import Decimal
 
+from apps.food.cloudinary_fields import CloudinaryImageField
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
@@ -91,7 +92,7 @@ class User(AbstractUser):
         default="Customer",
         help_text="User role in the system",
     )
-    profile_image = models.BinaryField(blank=True, null=True)  # LONGBLOB equivalent
+    profile_image = CloudinaryImageField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

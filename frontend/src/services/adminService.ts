@@ -842,7 +842,7 @@ class AdminService {
         config
       );
       console.log("✅ API Response received:", response.status, response.data);
-      return response.data;
+      return response.data.users || []; // Extract users array from response
     } catch (error) {
       console.error("❌ Error fetching pending approvals:", error);
       throw new Error("Failed to fetch pending approvals");

@@ -449,7 +449,7 @@ const EnhancedUserManagement: React.FC = () => {
     action: "approve" | "reject",
     notes?: string
   ) => {
-    const user = pendingApprovals.find((u) => u.user_id === userId);
+    const user = safePendingApprovals.find((u) => u.user_id === userId);
     const actionText = action === "approve" ? "approve" : "reject";
 
     if (
@@ -619,11 +619,14 @@ const EnhancedUserManagement: React.FC = () => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [activeTab, chefs, customers, fetchPendingApprovals, fetchUsersByRole]);
 
+  // Ensure pendingApprovals is always an array
+  const safePendingApprovals = Array.isArray(pendingApprovals) ? pendingApprovals : [];
+
   // Get user stats
   const userStats = {
     totalChefs: chefs.length,
     activeChefs: chefs.filter((c) => c.is_active).length,
-    pendingChefs: pendingApprovals.filter((u) => u.role === "cook").length,
+    pendingChefs: safePendingApprovals.filter((u) => u.role === "cook").length,
     totalCustomers: customers.length,
     activeCustomers: customers.filter((c) => c.is_active).length,
     newChefsThisWeek: chefs.filter((c) => {
@@ -756,12 +759,12 @@ const EnhancedUserManagement: React.FC = () => {
           <TabsTrigger value="pending" className="relative">
             <ShieldCheck className="h-4 w-4 mr-2" />
             Pending Approvals
-            {pendingApprovals.length > 0 && (
+            {safePendingApprovals.length > 0 && (
               <Badge
                 variant="destructive"
                 className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
               >
-                {pendingApprovals.length}
+                {safePendingApprovals.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -795,7 +798,7 @@ const EnhancedUserManagement: React.FC = () => {
                   </CardTitle>
                   <p className="text-sm mt-1 text-gray-600 dark:text-gray-400">
                     Review and approve new user applications •{" "}
-                    {pendingApprovals.length} pending
+                    {safePendingApprovals.length} pending
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -811,7 +814,7 @@ const EnhancedUserManagement: React.FC = () => {
                     />
                     Refresh
                   </Button>
-                  {pendingApprovals.length > 0 && (
+                  {safePendingApprovals.length > 0 && (
                     <div className="flex items-center space-x-2">
                       <Button
                         variant="outline"
@@ -819,10 +822,10 @@ const EnhancedUserManagement: React.FC = () => {
                         onClick={() => {
                           if (
                             window.confirm(
-                              `Approve all ${pendingApprovals.length} pending applications?`
+                              `Approve all ${safePendingApprovals.length} pending applications?`
                             )
                           ) {
-                            pendingApprovals.forEach((user) =>
+                            safePendingApprovals.forEach((user) =>
                               handleApprovalAction(user.user_id, "approve")
                             );
                           }
@@ -838,10 +841,10 @@ const EnhancedUserManagement: React.FC = () => {
                         onClick={() => {
                           if (
                             window.confirm(
-                              `Reject all ${pendingApprovals.length} pending applications?`
+                              `Reject all ${safePendingApprovals.length} pending applications?`
                             )
                           ) {
-                            pendingApprovals.forEach((user) =>
+                            safePendingApprovals.forEach((user) =>
                               handleApprovalAction(user.user_id, "reject")
                             );
                           }
@@ -862,7 +865,7 @@ const EnhancedUserManagement: React.FC = () => {
                   <RefreshCw className="h-8 w-8 animate-spin mr-2" />
                   <span>Loading pending approvals...</span>
                 </div>
-              ) : pendingApprovals.length === 0 ? (
+              ) : safePendingApprovals.length === 0 ? (
                 <div className="text-center py-12">
                   <ShieldCheck className="h-16 w-16 mx-auto text-gray-400 mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
@@ -874,7 +877,7 @@ const EnhancedUserManagement: React.FC = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {pendingApprovals.map((user) => (
+                  {safePendingApprovals.map((user) => (
                     <Card
                       key={user.user_id}
                       className="hover:shadow-md transition-shadow"
