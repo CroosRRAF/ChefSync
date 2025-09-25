@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { CartProvider } from '@/context/CartContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useApprovalStatus } from '@/hooks/useApprovalStatus';
 
@@ -307,22 +308,24 @@ const InnerRoutes: React.FC = () => {
           </ProtectedRoute>
         } />
 
+
         {/* Cook Routes */}
-        <Route path="/cook" element={
-          <ProtectedRoute allowedRoles={['cook']}>
-            <CookLayout />
-          </ProtectedRoute>
-        }>
-          <Route index element={<Navigate to="/cook/dashboard" replace />} />
-          <Route path="dashboard" element={<CookDashboard />} />
-          <Route path="bulk-orders" element={<CookBulkOrders />} />
-          <Route path="home" element={<CookHome />} />
-          <Route path="menu" element={<CookMenu />} />
-          <Route path="orders" element={<CookOrders />} />
-          <Route path="notifications" element={<CookNotifications />} />
-          <Route path="profile" element={<CookProfile />} />
-          <Route path="settings" element={<CookSettings />} />
-        </Route>
+<Route path="/cook" element={
+  <ProtectedRoute allowedRoles={['cook']}>
+    <CookLayout />
+  </ProtectedRoute>
+}>
+  <Route index element={<Navigate to="dashboard" replace />} />
+  <Route path="dashboard" element={<CookDashboard />} />
+  <Route path="bulk-orders" element={<CookBulkOrders />} />
+  <Route path="home" element={<CookHome />} />
+  <Route path="menu" element={<CookMenu />} />
+  <Route path="orders" element={<CookOrders />} />
+  <Route path="notifications" element={<CookNotifications />} />
+  <Route path="profile" element={<CookProfile />} />
+  <Route path="settings" element={<CookSettings />} />
+</Route>
+
 
         {/* Delivery Agent Routes */}
         <Route path="/delivery" element={
@@ -458,13 +461,15 @@ const AppRoutes: React.FC = () => {
       }}
     >
       <AuthProvider>
-        {isValidClientId ? (
-          <GoogleOAuthProvider clientId={googleClientId}>
+        <CartProvider>
+          {isValidClientId ? (
+            <GoogleOAuthProvider clientId={googleClientId}>
+              <InnerRoutes />
+            </GoogleOAuthProvider>
+          ) : (
             <InnerRoutes />
-          </GoogleOAuthProvider>
-        ) : (
-          <InnerRoutes />
-        )}
+          )}
+        </CartProvider>
       </AuthProvider>
     </BrowserRouter>
   );

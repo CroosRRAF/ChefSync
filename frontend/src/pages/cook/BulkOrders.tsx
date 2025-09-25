@@ -126,11 +126,11 @@ export default function BulkOrders() {
       case "pending":
         return <Badge variant="secondary">Pending</Badge>;
       case "accepted":
-        return <Badge className="bg-green-100 text-green-800">Accepted</Badge>;
+        return <Badge className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800">Accepted</Badge>;
       case "declined":
         return <Badge variant="destructive">Declined</Badge>;
       case "collaborating":
-        return <Badge className="bg-purple-100 text-purple-800">Collaborating</Badge>;
+        return <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-800">Collaborating</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -251,7 +251,7 @@ export default function BulkOrders() {
                           variant="outline" 
                           size="sm"
                           onClick={() => handleCollaborate(order.id)}
-                          className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                          className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                         >
                           <Users className="h-4 w-4 mr-1" />
                           Collaborate
@@ -260,7 +260,7 @@ export default function BulkOrders() {
                           variant="outline" 
                           size="sm"
                           onClick={() => handleAcceptOrder(order.id)}
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
                           Accept
@@ -269,7 +269,7 @@ export default function BulkOrders() {
                           variant="outline" 
                           size="sm"
                           onClick={() => handleDeclineOrder(order.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
                         >
                           <XCircle className="h-4 w-4 mr-1" />
                           Decline

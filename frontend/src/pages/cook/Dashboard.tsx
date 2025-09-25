@@ -26,24 +26,24 @@ export default function Dashboard() {
       value: "18",
       change: "+5 today",
       icon: ClipboardList,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50"
+      color: "text-blue-600 dark:text-blue-400",
+      bgColor: "bg-blue-50 dark:bg-blue-900/20"
     },
     {
       title: "Completed Orders",
       value: "127",
       change: "+12 today",
       icon: CheckCircle2,
-      color: "text-green-600",
-      bgColor: "bg-green-50"
+      color: "text-green-600 dark:text-green-400",
+      bgColor: "bg-green-50 dark:bg-green-900/20"
     },
     {
       title: "Bulk Orders",
       value: "8",
       change: "+2 pending",
       icon: Package,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50"
+      color: "text-purple-600 dark:text-purple-400",
+      bgColor: "bg-purple-50 dark:bg-purple-900/20"
     }
   ];
 
@@ -136,7 +136,7 @@ export default function Dashboard() {
                     {[...Array(5)].map((_, i) => (
                       <Star 
                         key={i} 
-                        className={`h-3 w-3 ${i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`} 
+                        className={`h-3 w-3 ${i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300 dark:text-gray-600"}`} 
                       />
                     ))}
                   </div>

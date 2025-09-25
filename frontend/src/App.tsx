@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { CartProvider } from "@/context/CartContext";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import Navbar from "@/components/layout/Navbar";
 import Home from "./pages/Home";
@@ -66,33 +67,31 @@ const App = () => {
   const googleClientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
   const isValidClientId = hasValidGoogleClientId();
 
-  const appContent = (
-    <BrowserRouter
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true
-      }}
-    >
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppContent />
-        </TooltipProvider>
-      </AuthProvider>
-    </BrowserRouter>
-  );
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        {isValidClientId ? (
-          <GoogleOAuthProvider clientId={googleClientId}>
-            {appContent}
-          </GoogleOAuthProvider>
-        ) : (
-          appContent
-        )}
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true
+          }}
+        >
+          <AuthProvider>
+            <CartProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                {isValidClientId ? (
+                  <GoogleOAuthProvider clientId={googleClientId}>
+                    <AppContent />
+                  </GoogleOAuthProvider>
+                ) : (
+                  <AppContent />
+                )}
+              </TooltipProvider>
+            </CartProvider>
+          </AuthProvider>
+        </BrowserRouter>
       </ThemeProvider>
     </QueryClientProvider>
   );

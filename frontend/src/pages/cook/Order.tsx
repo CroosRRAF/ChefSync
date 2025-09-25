@@ -1,14 +1,373 @@
+/**
+ * SAMPLE DATA MODE - ORDER MANAGEMENT SYSTEM
+ * 
+ * Features:
+ * - Sample order data for demonstration
+ * - Accept/Reject orders with local state management
+ * - Filtering by status, search terms, and dates
+ * - Sample dashboard statistics
+ * - Customer communication system
+ * - Professional UI with shadcn/ui components
+ * 
+ * Using sample data instead of API calls for development/testing
+ */
+
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+// import axios from 'axios'; // Disabled for sample data mode
 import { 
   Search, Filter, RefreshCw, MoreVertical, Eye, Edit, Trash2, 
   Users, Clock, CheckCircle, AlertCircle, Package, TrendingUp,
   Calendar, DollarSign, User, MapPin, Phone, Mail, Bell,
-  Sun, Moon
+  Check, X, MessageSquare
 } from 'lucide-react';
-import { useTheme } from '@/context/ThemeContext';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle 
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 // Temporarily disabled to fix infinite loop
 // import { OrderNotifications, useOrderNotifications } from '@/hooks/useOrderNotifications';
+
+/**
+ * SAMPLE DATA MODE: This component uses sample data for demonstration.
+ * Real API integration has been disabled for development/testing.
+ */
+
+// Sample Data
+const SAMPLE_ORDERS: Order[] = [
+  {
+    id: 1,
+    order_number: "ORD-2024-001",
+    status: "pending",
+    status_display: "Pending",
+    total_amount: "45.50",
+    customer_name: "John Smith",
+    chef_name: "Chef Mario",
+    total_items: 3,
+    created_at: "2024-09-24T10:30:00Z",
+    time_since_order: "15 minutes ago",
+    delivery_address: "123 Main St, Downtown, NY 10001",
+    order_type: "delivery",
+    customer: {
+      id: 1,
+      username: "john_smith",
+      email: "john@example.com",
+      first_name: "John",
+      last_name: "Smith",
+      full_name: "John Smith",
+      phone: "+1-555-0123"
+    },
+    items: [
+      {
+        id: 1,
+        quantity: 2,
+        special_instructions: "Extra spicy please",
+        price_details: {
+          id: 1,
+          price: "18.99",
+          size: "Large",
+          food_name: "Margherita Pizza",
+          food_description: "Fresh tomato sauce, mozzarella, basil",
+          food_category: "Pizza",
+          food_image: "/images/margherita-pizza.jpg"
+        },
+        item_total: "37.98"
+      },
+      {
+        id: 2,
+        quantity: 1,
+        special_instructions: "",
+        price_details: {
+          id: 2,
+          price: "7.52",
+          size: "Regular",
+          food_name: "Caesar Salad",
+          food_description: "Romaine lettuce, parmesan, croutons",
+          food_category: "Salad",
+          food_image: "/images/caesar-salad.jpg"
+        },
+        item_total: "7.52"
+      }
+    ],
+    special_instructions: "Please ring doorbell twice",
+    payment_method: "Credit Card",
+    payment_status: "Paid",
+    estimated_delivery_time: "35-45 minutes",
+    time_in_current_status: "15 minutes"
+  },
+  {
+    id: 2,
+    order_number: "ORD-2024-002",
+    status: "confirmed",
+    status_display: "Confirmed",
+    total_amount: "32.75",
+    customer_name: "Sarah Wilson",
+    chef_name: "Chef Mario",
+    total_items: 2,
+    created_at: "2024-09-24T09:45:00Z",
+    time_since_order: "1 hour ago",
+    delivery_address: "456 Oak Ave, Midtown, NY 10002",
+    order_type: "delivery",
+    customer: {
+      id: 2,
+      username: "sarah_wilson",
+      email: "sarah@example.com",
+      first_name: "Sarah",
+      last_name: "Wilson",
+      full_name: "Sarah Wilson",
+      phone: "+1-555-0456"
+    },
+    items: [
+      {
+        id: 3,
+        quantity: 1,
+        special_instructions: "Well done",
+        price_details: {
+          id: 3,
+          price: "24.99",
+          size: "Medium",
+          food_name: "Grilled Salmon",
+          food_description: "Fresh Atlantic salmon with herbs",
+          food_category: "Seafood",
+          food_image: "/images/grilled-salmon.jpg"
+        },
+        item_total: "24.99"
+      },
+      {
+        id: 4,
+        quantity: 1,
+        special_instructions: "",
+        price_details: {
+          id: 4,
+          price: "7.76",
+          size: "Regular",
+          food_name: "Garlic Bread",
+          food_description: "Fresh baked bread with garlic butter",
+          food_category: "Appetizer",
+          food_image: "/images/garlic-bread.jpg"
+        },
+        item_total: "7.76"
+      }
+    ],
+    special_instructions: "",
+    payment_method: "PayPal",
+    payment_status: "Paid",
+    estimated_delivery_time: "25-35 minutes",
+    time_in_current_status: "10 minutes"
+  },
+  {
+    id: 3,
+    order_number: "ORD-2024-003",
+    status: "preparing",
+    status_display: "Preparing",
+    total_amount: "58.25",
+    customer_name: "Mike Johnson",
+    chef_name: "Chef Mario",
+    total_items: 4,
+    created_at: "2024-09-24T09:15:00Z",
+    time_since_order: "1.5 hours ago",
+    delivery_address: "789 Pine St, Uptown, NY 10003",
+    order_type: "pickup",
+    customer: {
+      id: 3,
+      username: "mike_johnson",
+      email: "mike@example.com",
+      first_name: "Mike",
+      last_name: "Johnson",
+      full_name: "Mike Johnson",
+      phone: "+1-555-0789"
+    },
+    items: [
+      {
+        id: 5,
+        quantity: 2,
+        special_instructions: "Medium rare",
+        price_details: {
+          id: 5,
+          price: "22.50",
+          size: "Regular",
+          food_name: "Beef Burger",
+          food_description: "Premium beef patty with cheese and bacon",
+          food_category: "Burger",
+          food_image: "/images/beef-burger.jpg"
+        },
+        item_total: "45.00"
+      },
+      {
+        id: 6,
+        quantity: 2,
+        special_instructions: "",
+        price_details: {
+          id: 6,
+          price: "6.25",
+          size: "Large",
+          food_name: "French Fries",
+          food_description: "Crispy golden fries",
+          food_category: "Side",
+          food_image: "/images/french-fries.jpg"
+        },
+        item_total: "12.50"
+      }
+    ],
+    special_instructions: "Ready for pickup at 11:00 AM",
+    payment_method: "Cash",
+    payment_status: "Pending",
+    estimated_delivery_time: "Ready for pickup",
+    time_in_current_status: "20 minutes"
+  },
+  {
+    id: 4,
+    order_number: "ORD-2024-004",
+    status: "ready",
+    status_display: "Ready",
+    total_amount: "41.99",
+    customer_name: "Lisa Brown",
+    chef_name: "Chef Mario",
+    total_items: 3,
+    created_at: "2024-09-24T08:30:00Z",
+    time_since_order: "2 hours ago",
+    delivery_address: "321 Elm St, Downtown, NY 10004",
+    order_type: "delivery",
+    customer: {
+      id: 4,
+      username: "lisa_brown",
+      email: "lisa@example.com",
+      first_name: "Lisa",
+      last_name: "Brown",
+      full_name: "Lisa Brown",
+      phone: "+1-555-0321"
+    },
+    items: [
+      {
+        id: 7,
+        quantity: 1,
+        special_instructions: "Extra cheese",
+        price_details: {
+          id: 7,
+          price: "16.99",
+          size: "Large",
+          food_name: "Chicken Alfredo",
+          food_description: "Creamy pasta with grilled chicken",
+          food_category: "Pasta",
+          food_image: "/images/chicken-alfredo.jpg"
+        },
+        item_total: "16.99"
+      },
+      {
+        id: 8,
+        quantity: 2,
+        special_instructions: "",
+        price_details: {
+          id: 8,
+          price: "12.50",
+          size: "Regular",
+          food_name: "Chocolate Cake",
+          food_description: "Rich chocolate layer cake",
+          food_category: "Dessert",
+          food_image: "/images/chocolate-cake.jpg"
+        },
+        item_total: "25.00"
+      }
+    ],
+    special_instructions: "Call when arriving",
+    payment_method: "Credit Card",
+    payment_status: "Paid",
+    estimated_delivery_time: "Out for delivery",
+    time_in_current_status: "5 minutes"
+  },
+  {
+    id: 5,
+    order_number: "ORD-2024-005",
+    status: "delivered",
+    status_display: "Delivered",
+    total_amount: "28.75",
+    customer_name: "David Lee",
+    chef_name: "Chef Mario",
+    total_items: 2,
+    created_at: "2024-09-24T07:45:00Z",
+    time_since_order: "3 hours ago",
+    delivery_address: "654 Maple Ave, Midtown, NY 10005",
+    order_type: "delivery",
+    customer: {
+      id: 5,
+      username: "david_lee",
+      email: "david@example.com",
+      first_name: "David",
+      last_name: "Lee",
+      full_name: "David Lee",
+      phone: "+1-555-0654"
+    },
+    items: [
+      {
+        id: 9,
+        quantity: 1,
+        special_instructions: "",
+        price_details: {
+          id: 9,
+          price: "19.99",
+          size: "Medium",
+          food_name: "Sushi Roll Set",
+          food_description: "Assorted fresh sushi rolls",
+          food_category: "Japanese",
+          food_image: "/images/sushi-rolls.jpg"
+        },
+        item_total: "19.99"
+      },
+      {
+        id: 10,
+        quantity: 1,
+        special_instructions: "",
+        price_details: {
+          id: 10,
+          price: "8.76",
+          size: "Regular",
+          food_name: "Miso Soup",
+          food_description: "Traditional Japanese miso soup",
+          food_category: "Soup",
+          food_image: "/images/miso-soup.jpg"
+        },
+        item_total: "8.76"
+      }
+    ],
+    special_instructions: "",
+    payment_method: "Digital Wallet",
+    payment_status: "Paid",
+    estimated_delivery_time: "Delivered",
+    time_in_current_status: "Completed"
+  }
+];
+
+const SAMPLE_STATS: DashboardStats = {
+  total_orders: 25,
+  pending_orders: 3,
+  preparing_orders: 5,
+  ready_orders: 2,
+  completed_orders: 15,
+  today_revenue: 1250.75,
+  average_prep_time: 28,
+  total_customers: 18,
+  status_distribution: [
+    { status: 'pending', count: 3 },
+    { status: 'confirmed', count: 4 },
+    { status: 'preparing', count: 5 },
+    { status: 'ready', count: 2 },
+    { status: 'delivered', count: 15 }
+  ],
+  recent_orders: SAMPLE_ORDERS.slice(0, 5),
+  monthly_revenue: [
+    { month: 'Jan', revenue: 8500 },
+    { month: 'Feb', revenue: 9200 },
+    { month: 'Mar', revenue: 7800 },
+    { month: 'Apr', revenue: 10500 },
+    { month: 'May', revenue: 11200 },
+    { month: 'Jun', revenue: 9800 }
+  ]
+};
 
 // Types
 interface OrderItem {
@@ -124,6 +483,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       case 'out_for_delivery': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700';
       case 'delivered': return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700';
       case 'cancelled': return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700';
+      case 'rejected': return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700';
       default: return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600';
     }
   };
@@ -132,6 +492,93 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(status)}`}>
       {status.replace('_', ' ').toUpperCase()}
     </span>
+  );
+};
+
+// Rejection Modal Component
+const RejectionModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: () => void;
+  order: Order | null;
+  rejectionReason: string;
+  setRejectionReason: (reason: string) => void;
+  isSubmitting: boolean;
+}> = ({ isOpen, onClose, onSubmit, order, rejectionReason, setRejectionReason, isSubmitting }) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-600">
+            <X className="h-5 w-5" />
+            Reject Order
+          </DialogTitle>
+          <DialogDescription>
+            Please provide a reason for rejecting order {order?.order_number}. 
+            This message will be sent to the customer.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="rejectionReason" className="text-sm font-medium">
+              Reason for Rejection <span className="text-red-500">*</span>
+            </Label>
+            <Textarea
+              id="rejectionReason"
+              placeholder="Please explain why you cannot fulfill this order..."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              className="min-h-[100px] resize-none"
+              maxLength={500}
+            />
+            <div className="text-xs text-muted-foreground text-right">
+              {rejectionReason.length}/500 characters
+            </div>
+            <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border">
+              💬 <strong>Customer Message:</strong> This reason will be sent to the customer via email, SMS, and app notification along with refund information.
+            </div>
+          </div>
+          
+          {order && (
+            <div className="rounded-lg bg-muted p-3 space-y-2">
+              <div className="text-sm font-medium">Order Details:</div>
+              <div className="text-sm text-muted-foreground">
+                <div>Customer: {order.customer_name}</div>
+                <div>Items: {order.total_items} items</div>
+                <div>Total: ${order.total_amount}</div>
+              </div>
+            </div>
+          )}
+
+          {rejectionReason.trim() && order && (
+            <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 space-y-2">
+              <div className="text-sm font-medium text-yellow-800">📨 Message Preview:</div>
+              <div className="text-xs text-yellow-700 italic">
+                "Dear {order.customer_name}, we apologize but your order #{order.order_number} has been rejected. Reason: {rejectionReason.trim()}. A full refund will be processed within 2-3 business days."
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex justify-end space-x-2">
+          <Button 
+            variant="outline" 
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="destructive" 
+            onClick={onSubmit}
+            disabled={!rejectionReason.trim() || isSubmitting}
+            className="min-w-[100px]"
+          >
+            {isSubmitting ? 'Rejecting...' : 'Reject Order'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -501,7 +948,6 @@ const OrderDetailModal: React.FC<{
 
 // Main Order Component
 const Order: React.FC = () => {
-  const { theme, toggleTheme } = useTheme();
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -517,6 +963,12 @@ const Order: React.FC = () => {
     message: '',
     type: 'info'
   });
+
+  // Rejection modal state
+  const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
+  const [orderToReject, setOrderToReject] = useState<Order | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
 
   // Real-time notifications - temporarily disabled
   // const { notifications, unreadCount } = useOrderNotifications();
@@ -534,42 +986,89 @@ const Order: React.FC = () => {
     setNotification(prev => ({ ...prev, show: false }));
   };
 
-  // Fetch dashboard stats
+  // Fetch dashboard stats - Using sample data
   const fetchDashboardStats = async () => {
     try {
-      const response = await axios.get('/api/orders/chef/dashboard/dashboard_stats/');
-      setStats(response.data);
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setStats(SAMPLE_STATS);
+      showNotification('Dashboard stats loaded successfully', 'success');
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       showNotification('Failed to load dashboard stats', 'error');
+      // Set default empty stats on error
+      setStats({
+        total_orders: 0,
+        pending_orders: 0,
+        preparing_orders: 0,
+        ready_orders: 0,
+        completed_orders: 0,
+        today_revenue: 0,
+        average_prep_time: 0,
+        total_customers: 0,
+        status_distribution: [],
+        recent_orders: [],
+        monthly_revenue: []
+      });
     }
   };
 
-  // Fetch orders
+  // Fetch orders - Using sample data with filtering
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (statusFilter) params.append('status', statusFilter);
-      if (dateFilter) params.append('date_from', dateFilter);
-
-      const response = await axios.get(`/api/orders/chef/dashboard/?${params.toString()}`);
-      setOrders(response.data.results || response.data);
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Filter sample data based on search and status filters
+      let filteredOrders = [...SAMPLE_ORDERS];
+      
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        filteredOrders = filteredOrders.filter(order =>
+          order.customer_name.toLowerCase().includes(term) ||
+          order.order_number.toLowerCase().includes(term) ||
+          order.delivery_address.toLowerCase().includes(term)
+        );
+      }
+      
+      if (statusFilter) {
+        filteredOrders = filteredOrders.filter(order => order.status === statusFilter);
+      }
+      
+      if (dateFilter) {
+        const filterDate = new Date(dateFilter);
+        filteredOrders = filteredOrders.filter(order => {
+          const orderDate = new Date(order.created_at);
+          return orderDate >= filterDate;
+        });
+      }
+      
+      setOrders(filteredOrders);
+      showNotification(`Loaded ${filteredOrders.length} orders`, 'success');
     } catch (error) {
       console.error('Error fetching orders:', error);
       showNotification('Failed to load orders', 'error');
+      setOrders([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch order details
+  // Fetch order details - Using sample data
   const fetchOrderDetails = async (orderId: number) => {
     try {
-      const response = await axios.get(`/api/orders/orders/${orderId}/`);
-      setSelectedOrder(response.data);
-      setIsDetailModalOpen(true);
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      const order = SAMPLE_ORDERS.find(o => o.id === orderId);
+      if (order) {
+        setSelectedOrder(order);
+        setIsDetailModalOpen(true);
+      } else {
+        showNotification('Order not found', 'error');
+      }
     } catch (error) {
       console.error('Error fetching order details:', error);
       showNotification('Failed to load order details', 'error');
@@ -579,21 +1078,114 @@ const Order: React.FC = () => {
   // Update order status
   const updateOrderStatus = async (orderId: number, newStatus: string, notes?: string) => {
     try {
-      await axios.post(`/api/orders/orders/${orderId}/update_status/`, {
-        status: newStatus,
-        notes: notes || ''
-      });
+      // For sample data mode, update the local state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: newStatus, status_display: newStatus.charAt(0).toUpperCase() + newStatus.slice(1) }
+            : order
+        )
+      );
       
       showNotification('Order status updated successfully', 'success');
-      fetchOrders();
       fetchDashboardStats();
+      
+      // Uncomment below to use real API when ready
+      // await axios.post(`/api/orders/orders/${orderId}/update_status/`, {
+      //   status: newStatus,
+      //   notes: notes || ''
+      // });
+      // fetchOrders();
     } catch (error) {
       console.error('Error updating order status:', error);
       showNotification('Failed to update order status', 'error');
     }
   };
 
-  // Handle bulk actions
+  // Accept order function
+  const handleAcceptOrder = async (orderId: number) => {
+    try {
+      await updateOrderStatus(orderId, 'confirmed', 'Order accepted by chef');
+      
+      // In SAMPLE DATA mode - just show notifications
+      showNotification('✅ Order accepted! Customer will receive confirmation message.', 'success');
+      
+      // Uncomment below to send real customer notifications when API is ready
+      // await axios.post('/api/notifications/send-order-update/', {
+      //   order_id: orderId,
+      //   status: 'accepted',
+      //   message: 'Great news! Your order has been accepted by the chef and is being prepared.',
+      //   notification_types: ['email', 'sms', 'push'] // Multiple notification channels
+      // });
+      
+    } catch (error) {
+      console.error('Error accepting order:', error);
+      showNotification('Failed to accept order', 'error');
+    }
+  };
+
+  // Reject order function
+  const handleRejectOrder = (order: Order) => {
+    setOrderToReject(order);
+    setRejectionReason('');
+    setIsRejectionModalOpen(true);
+  };
+
+  // Submit rejection with reason
+  const submitRejection = async () => {
+    if (!orderToReject || !rejectionReason.trim()) {
+      showNotification('Please provide a reason for rejection', 'error');
+      return;
+    }
+
+    try {
+      setIsSubmittingRejection(true);
+      await updateOrderStatus(orderToReject.id, 'rejected', rejectionReason.trim());
+      
+      // Close modal and reset state
+      setIsRejectionModalOpen(false);
+      setOrderToReject(null);
+      setRejectionReason('');
+      
+      // In SAMPLE DATA mode - show what would happen
+      showNotification(`❌ Order rejected! Customer "${orderToReject.customer_name}" will receive: "${rejectionReason.trim()}"`, 'success');
+      
+      // Uncomment below to send real customer notifications when API is ready
+      // await axios.post('/api/notifications/send-order-update/', {
+      //   order_id: orderToReject.id,
+      //   status: 'rejected',
+      //   message: `Unfortunately, your order has been rejected. Reason: ${rejectionReason.trim()}`,
+      //   customer_message: rejectionReason.trim(),
+      //   notification_types: ['email', 'sms', 'push'],
+      //   refund_initiated: true // Trigger refund process
+      // });
+      
+    } catch (error) {
+      console.error('Error rejecting order:', error);
+      showNotification('Failed to reject order', 'error');
+    } finally {
+      setIsSubmittingRejection(false);
+    }
+  };
+
+  // Cancel rejection modal
+  const cancelRejection = () => {
+    setIsRejectionModalOpen(false);
+    setOrderToReject(null);
+    setRejectionReason('');
+  };
+
+  // Demo function to show customer message examples
+  const showCustomerMessagePreview = (action: 'accept' | 'reject', order: Order, reason?: string) => {
+    const customerMessage = action === 'accept' 
+      ? `Dear ${order.customer_name}, great news! Your order #${order.order_number} has been accepted by the chef and is being prepared. You'll receive updates as your order progresses.`
+      : `Dear ${order.customer_name}, we apologize but your order #${order.order_number} has been rejected. Reason: ${reason}. A full refund will be processed within 2-3 business days.`;
+    
+    console.log('📱 Customer would receive:', customerMessage);
+    return customerMessage;
+  };
+
+  // Handle bulk actions - Using sample data simulation
   const handleBulkAction = async (action: string, additionalData?: any) => {
     if (selectedOrders.length === 0) {
       showNotification('Please select orders first', 'error');
@@ -601,17 +1193,38 @@ const Order: React.FC = () => {
     }
 
     try {
-      const payload = {
-        order_ids: selectedOrders,
-        action,
-        ...additionalData
-      };
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // For sample data, simulate bulk actions locally
+      if (action === 'update_status' && additionalData?.new_status) {
+        setOrders(prevOrders => 
+          prevOrders.map(order => {
+            if (selectedOrders.includes(order.id)) {
+              const newStatus = additionalData.new_status;
+              return { 
+                ...order, 
+                status: newStatus, 
+                status_display: newStatus.charAt(0).toUpperCase() + newStatus.slice(1) 
+              };
+            }
+            return order;
+          })
+        );
+      }
 
-      await axios.post('/api/orders/orders/bulk_action/', payload);
-      showNotification(`Bulk ${action} completed successfully`, 'success');
+      showNotification(`Bulk ${action} completed for ${selectedOrders.length} orders`, 'success');
       setSelectedOrders([]);
-      fetchOrders();
       fetchDashboardStats();
+      
+      // Uncomment below to use real API when ready
+      // const payload = {
+      //   order_ids: selectedOrders,
+      //   action,
+      //   ...additionalData
+      // };
+      // await axios.post('/api/orders/orders/bulk_action/', payload);
+      // fetchOrders();
     } catch (error) {
       console.error('Error performing bulk action:', error);
       showNotification(`Failed to perform bulk ${action}`, 'error');
@@ -620,18 +1233,7 @@ const Order: React.FC = () => {
 
   // Accept order
   const acceptOrder = async (orderId: number) => {
-    try {
-      await axios.post('/api/orders/chef/dashboard/accept_order/', {
-        order_id: orderId
-      });
-      
-      showNotification('Order accepted successfully', 'success');
-      fetchOrders();
-      fetchDashboardStats();
-    } catch (error) {
-      console.error('Error accepting order:', error);
-      showNotification('Failed to accept order', 'error');
-    }
+    await handleAcceptOrder(orderId);
   };
 
   // Handle status filter from status counts
@@ -722,19 +1324,6 @@ const Order: React.FC = () => {
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* Theme Toggle */}
-            <button
-              onClick={() => toggleTheme()}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-            >
-              {theme === 'light' ? (
-                <Moon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              ) : (
-                <Sun className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              )}
-            </button>
-            
             {/* Real-time notifications - temporarily disabled */}
             {/* <OrderNotifications className="mr-4" /> */}
           </div>
@@ -958,13 +1547,28 @@ const Order: React.FC = () => {
                         </button>
                         
                         {order.status === 'pending' && (
-                          <button
-                            onClick={() => acceptOrder(order.id)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Accept Order"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => acceptOrder(order.id)}
+                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 h-8"
+                              title="Accept Order"
+                            >
+                              <Check className="w-3 h-3 mr-1" />
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleRejectOrder(order)}
+                              className="px-3 py-1.5 h-8"
+                              title="Reject Order"
+                            >
+                              <X className="w-3 h-3 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
                         )}
                         
                         {order.status === 'confirmed' && (
@@ -1083,6 +1687,17 @@ const Order: React.FC = () => {
           setSelectedOrder(null);
         }}
         onStatusUpdate={updateOrderStatus}
+      />
+
+      {/* Rejection Modal */}
+      <RejectionModal
+        isOpen={isRejectionModalOpen}
+        onClose={cancelRejection}
+        onSubmit={submitRejection}
+        order={orderToReject}
+        rejectionReason={rejectionReason}
+        setRejectionReason={setRejectionReason}
+        isSubmitting={isSubmittingRejection}
       />
 
       {/* Notification */}

@@ -122,6 +122,14 @@ const ChefMenu: React.FC = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('access_token');
+      
+      if (!token) {
+        showError('Please log in to view your menu');
+        return;
+      }
+      
+      console.log('Loading menu items with token:', token.substring(0, 20) + '...');
+      
       const response = await axios.get('http://127.0.0.1:8000/api/food/chef/foods/', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -129,12 +137,36 @@ const ChefMenu: React.FC = () => {
         }
       });
       
-      const data = Array.isArray(response.data) ? response.data : response.data?.results || [];
+      console.log('Menu API response:', response.data);
+      
+      // Handle different response structures
+      let data = [];
+      if (Array.isArray(response.data)) {
+        data = response.data;
+      } else if (response.data?.results) {
+        data = response.data.results;
+      } else if (response.data?.food) {
+        data = [response.data.food];
+      }
+      
+      console.log('Processed menu data:', data);
       setMenuItems(data);
       setFilteredMenuItems(data);
-    } catch (error) {
+      
+      if (data.length === 0) {
+        console.log('No menu items found for this chef');
+      }
+      
+    } catch (error: any) {
       console.error('Error loading menu items:', error);
-      alert('Error loading menu items. Please try again.');
+      
+      if (error.response?.status === 401) {
+        showError('Your session has expired. Please log in again.');
+        // Redirect to login if needed
+        localStorage.removeItem('access_token');
+      } else {
+        showError('Error loading menu items. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -144,6 +176,14 @@ const ChefMenu: React.FC = () => {
   const searchFoods = async (query: string) => {
     try {
       const token = localStorage.getItem('access_token');
+      
+      if (!token) {
+        showError('Please log in to search foods');
+        return;
+      }
+      
+      console.log('Searching for foods with query:', query);
+      
       const response = await axios.get(`http://127.0.0.1:8000/api/food/chef/foods/search/?q=${encodeURIComponent(query)}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -151,14 +191,20 @@ const ChefMenu: React.FC = () => {
         }
       });
       
+      console.log('Search response:', response.data);
       setSearchResults(response.data);
-      // Only show search results if there are results OR if no results but we want to show the "create new" message
       setShowSearchResults(true);
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('Error searching foods:', error);
       setSearchResults([]);
       setShowSearchResults(false);
-      showError('Error searching foods. Please try again.');
+      
+      if (error.response?.status === 401) {
+        showError('Your session has expired. Please log in again.');
+      } else {
+        showError('Error searching foods. Please try again.');
+      }
     }
   };
 
@@ -257,155 +303,178 @@ const ChefMenu: React.FC = () => {
   };
 
   // Handle form submission for new food or new price
-  const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsSubmitting(true);
-    const formData = new FormData(event.currentTarget);
-    
-    // Validation
-    const foodName = formData.get('name') as string;
-    const price = formData.get('price') as string;
-    const prepTime = formData.get('preparation_time') as string;
-    
-    if (!foodName?.trim()) {
-      showError('Please enter a food name');
+ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
+  event.preventDefault();
+  setIsSubmitting(true);
+
+  console.log('Form submission started');
+  const formData = new FormData(event.currentTarget);
+
+  // Debug: Log all form data
+  console.log('Form data entries:');
+  for (const [key, value] of formData.entries()) {
+    console.log(`${key}:`, value);
+  }
+
+  // Basic validation
+  const foodName = formData.get('name') as string;
+  const price = formData.get('price') as string;
+  const prepTime = formData.get('preparation_time') as string;
+
+  if (!foodName?.trim()) {
+    showError('Please enter a food name');
+    setIsSubmitting(false);
+    return;
+  }
+  if (!price || parseFloat(price) <= 0) {
+    showError('Please enter a valid price');
+    setIsSubmitting(false);
+    return;
+  }
+  if (!prepTime || parseInt(prepTime) <= 0) {
+    showError('Please enter a valid preparation time');
+    setIsSubmitting(false);
+    return;
+  }
+
+  if (isNewFood) {
+    const description = formData.get('description') as string;
+    const category = formData.get('category') as string;
+    if (!description?.trim()) {
+      showError('Please enter a description');
       setIsSubmitting(false);
       return;
     }
-    
-    if (!price || parseFloat(price) <= 0) {
-      showError('Please enter a valid price');
+    if (!category?.trim()) {
+      showError('Please enter a category');
       setIsSubmitting(false);
       return;
     }
-    
-    if (!prepTime || parseInt(prepTime) <= 0) {
-      showError('Please enter a valid preparation time');
+  } else if (!selectedFood) {
+    showError('Please select a food item');
+    setIsSubmitting(false);
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      showError('Please log in again');
       setIsSubmitting(false);
       return;
     }
+
+    let response;
 
     if (isNewFood) {
-      const description = formData.get('description') as string;
-      const category = formData.get('category') as string;
-      
-      if (!description?.trim()) {
-        showError('Please enter a description');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (!category?.trim()) {
-        showError('Please enter a category');
-        setIsSubmitting(false);
-        return;
-      }
-    }
+      // Prepare FormData for new food
+      const foodFormData = new FormData();
+      foodFormData.append('name', foodName);
+      foodFormData.append('category', formData.get('category') as string);
+      foodFormData.append('description', formData.get('description') as string);
+      foodFormData.append('price', price);
+      foodFormData.append('size', (formData.get('size') as string) || 'Medium');
+      foodFormData.append('preparation_time', prepTime);
 
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        showError('Please log in again');
-        setIsSubmitting(false);
-        return;
+      // Convert ingredients to JSON string
+      const ingredientsText = (formData.get('ingredients') as string) || '';
+      const ingredientsArray = ingredientsText
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+      foodFormData.append('ingredients', JSON.stringify(ingredientsArray));
+
+      foodFormData.append('is_vegetarian', formData.get('is_vegetarian') === 'on' ? 'true' : 'false');
+      foodFormData.append('is_vegan', formData.get('is_vegan') === 'on' ? 'true' : 'false');
+      foodFormData.append('spice_level', (formData.get('spice_level') as string) || '');
+      foodFormData.append('is_available', 'true');
+
+      // Add image if present
+      const imageFile = formData.get('image') as File;
+      if (imageFile && imageFile.size > 0) {
+        foodFormData.append('image', imageFile);
       }
 
-      let response;
-      
-      if (isNewFood) {
-        // Create new food
-        const foodFormData = new FormData();
-        foodFormData.append('name', formData.get('name') as string);
-        foodFormData.append('category', formData.get('category') as string);
-        foodFormData.append('description', formData.get('description') as string);
-        foodFormData.append('price', formData.get('price') as string);
-        foodFormData.append('size', formData.get('size') as string || 'Medium');
-        foodFormData.append('preparation_time', formData.get('preparation_time') as string);
-        
-        // Handle ingredients as comma-separated string (backend will convert to JSON)
-        const ingredientsText = formData.get('ingredients') as string || '';
-        foodFormData.append('ingredients', ingredientsText);
-        
-        foodFormData.append('is_vegetarian', formData.get('is_vegetarian') === 'on' ? 'true' : 'false');
-        foodFormData.append('is_vegan', formData.get('is_vegan') === 'on' ? 'true' : 'false');
-        foodFormData.append('spice_level', formData.get('spice_level') as string || '');
-        foodFormData.append('is_available', 'true');
-        
-        // Add image if present
-        const imageFile = formData.get('image') as File;
-        if (imageFile && imageFile.size > 0) {
-          foodFormData.append('image', imageFile);
-        }
-
-        response = await axios.post('http://127.0.0.1:8000/api/food/chef/foods/', foodFormData, {
+      response = await axios.post(
+        'http://127.0.0.1:8000/api/food/chef/foods/',
+        foodFormData,
+        {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      console.log('New food creation response:', response.data);
+    } else {
+      // Add price variant for existing food
+      if (!selectedFood?.id) {
+        showError('Please select a food item first');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const priceValue = parseFloat(price);
+      const prepTimeValue = parseInt(prepTime);
+
+      const priceData = {
+        food: selectedFood.id,
+        price: priceValue,
+        size: (formData.get('size') as string) || 'Medium',
+        preparation_time: prepTimeValue,
+      };
+
+      response = await axios.post(
+        'http://127.0.0.1:8000/api/food/chef/prices/',
+        priceData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log('Price creation response:', response.data);
+    }
+
+    const successMessage = isNewFood
+      ? `Food item "${foodName}" created successfully! It will appear in your menu after admin approval.`
+      : `Price variant added to "${selectedFood?.name}" successfully!`;
+    showSuccess(successMessage);
+
+    resetForm();
+    setIsAddDialogOpen(false);
+
+    console.log('Reloading menu after successful submission...');
+    await loadMenuItems();
+  } catch (error: any) {
+    console.error('Error submitting:', error);
+    console.error('Error response data:', error.response?.data);
+    let errorMessage = 'Error submitting. Please try again.';
+    if (error.response?.data) {
+      // Handle field-specific validation errors
+      if (typeof error.response.data === 'object') {
+        const errors = [];
+        for (const [field, messages] of Object.entries(error.response.data)) {
+          if (Array.isArray(messages)) {
+            errors.push(`${field}: ${messages.join(', ')}`);
+          } else {
+            errors.push(`${field}: ${messages}`);
           }
-        });
+        }
+        if (errors.length > 0) errorMessage = errors.join('\n');
       } else {
-        // Create price for existing food
-        const priceData = {
-          food: selectedFood?.id,
-          price: parseFloat(formData.get('price') as string),
-          size: formData.get('size') as string || 'Medium',
-          preparation_time: parseInt(formData.get('preparation_time') as string)
-        };
-
-        response = await axios.post('http://127.0.0.1:8000/api/food/chef/prices/', priceData, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        errorMessage = error.response.data;
       }
-      
-      // Show success message
-      const successMessage = isNewFood 
-        ? `Food item "${foodName}" created successfully!` 
-        : `Price variant added to "${selectedFood?.name}" successfully!`;
-      showSuccess(successMessage);
-      
-      // Reset form first
-      resetForm();
-      setIsAddDialogOpen(false);
-      
-      // Then reload menu items to ensure new item appears
-      console.log('Reloading menu after successful creation...');
-      await loadMenuItems();
-      
-    } catch (error: any) {
-      console.error('Error submitting:', error);
-      
-      let errorMessage = 'Error submitting. Please try again.';
-      if (error.response?.data) {
-        if (typeof error.response.data === 'string') {
-          errorMessage = error.response.data;
-        } else if (error.response.data.message) {
-          errorMessage = error.response.data.message;
-        } else if (error.response.data.detail) {
-          errorMessage = error.response.data.detail;
-        } else if (typeof error.response.data === 'object') {
-          // Handle field-specific validation errors
-          const errors = [];
-          for (const [field, messages] of Object.entries(error.response.data)) {
-            if (Array.isArray(messages)) {
-              errors.push(`${field}: ${messages.join(', ')}`);
-            } else {
-              errors.push(`${field}: ${messages}`);
-            }
-          }
-          if (errors.length > 0) {
-            errorMessage = errors.join('\n');
-          }
-        }
-      }
-      
-      showError(errorMessage);
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+    showError(errorMessage);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   // Reset form state
   const resetForm = () => {
@@ -438,12 +507,13 @@ const ChefMenu: React.FC = () => {
         return;
       }
       
-      // Update food basic info
+      // Update food basic info - only send allowed fields
       const updateData = {
-        is_available: editFormData.is_available,
-        description: editFormData.description,
-        category: editFormData.category,
+        is_available: editFormData.is_available
+        // Note: description and category updates are restricted by backend
       };
+
+      console.log('Updating food with data:', updateData);
 
       const response = await axios.patch(`http://127.0.0.1:8000/api/food/chef/foods/${editingItem.food_id}/`, updateData, {
         headers: {
@@ -566,7 +636,7 @@ const ChefMenu: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-foreground"></div>
       </div>
     );
   }
@@ -594,7 +664,7 @@ const ChefMenu: React.FC = () => {
               <span className="text-sm font-medium">{notification.message}</span>
               <button
                 onClick={() => setNotification(prev => ({ ...prev, show: false }))}
-                className="ml-2 text-white hover:text-gray-200"
+                className="ml-2 text-foreground hover:text-muted-foreground"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -608,7 +678,7 @@ const ChefMenu: React.FC = () => {
       <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Menu</h1>
+          <h1 className="text-3xl font-bold text-foreground">My Menu</h1>
           <p className="text-gray-600 mt-2">Manage your food items and prices</p>
         </div>
         
@@ -625,278 +695,275 @@ const ChefMenu: React.FC = () => {
           </div>
           
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Food Item
-              </Button>
-            </DialogTrigger>
-          <DialogContent className="sm:max-w-md lg:max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add Food Item</DialogTitle>
-              <DialogDescription>
-                Search for existing food or create a new one
-              </DialogDescription>
-            </DialogHeader>
-            
-            <form onSubmit={handleAddFood} className="space-y-6 py-4" noValidate>
-              {/* Food Name with Search */}
-              <div className="space-y-2 relative">
-                <Label htmlFor="name">Food Name</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={foodSearchTerm}
-                  onChange={(e) => handleFoodNameChange(e.target.value)}
-                  onFocus={handleInputFocus}
-                  onBlur={() => {
-                    // Delay closing to allow clicks on dropdown items
-                    setTimeout(() => setShowSearchResults(false), 150);
-                  }}
-                  placeholder="Search existing food or enter new name"
-                  className="w-full"
-                />
-                
-                {/* Search Results Dropdown */}
-                {showSearchResults && (
-                  <>
-                    {/* Backdrop to catch clicks */}
-                    <div 
-                      className="fixed inset-0 z-40"
+  <DialogTrigger asChild>
+    <Button onClick={resetForm}>
+      <Plus className="mr-2 h-4 w-4" />
+      Add Food Item
+    </Button>
+  </DialogTrigger>
+  <DialogContent className="sm:max-w-md lg:max-w-2xl max-h-[90vh] overflow-y-auto z-[9999]">
+    <DialogHeader>
+      <DialogTitle>Add Food Item</DialogTitle>
+      <DialogDescription>
+        Search for existing food or create a new one
+      </DialogDescription>
+    </DialogHeader>
+
+    <form onSubmit={handleAddFood} className="space-y-6 py-4" noValidate>
+      {/* Food Name with Search */}
+      <div className="space-y-2 relative">
+        <Label htmlFor="name">Food Name</Label>
+        <Input
+          id="name"
+          name="name"
+          value={foodSearchTerm}
+          onChange={(e) => handleFoodNameChange(e.target.value)}
+          onFocus={handleInputFocus}
+          onBlur={() => setTimeout(() => setShowSearchResults(false), 150)}
+          placeholder="Search existing food or enter new name"
+          className="w-full"
+        />
+        {/* Search Results Dropdown */}
+        {showSearchResults && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={handleCloseSearch}
+            ></div>
+            <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {searchResults.length > 0 ? (
+                searchResults.map((food) => (
+                  <div
+                    key={food.id}
+                    className="p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                    onClick={() => handleSelectFood(food)}
+                  >
+                    <div className="font-medium text-gray-900">{food.name}</div>
+                    <div className="text-sm text-gray-600">{food.category}</div>
+                    <div className="text-xs text-gray-500 mt-1">{food.description}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-center text-gray-500 border-t-2 border-orange-200">
+                  <p className="font-medium">No existing foods found for "{foodSearchTerm}"</p>
+                  <p className="text-sm mt-1 mb-3">You can create a new food item with this name</p>
+                  <div className="space-y-2">
+                    <Button 
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      className="w-full"
                       onClick={handleCloseSearch}
-                    ></div>
-                    
-                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                      {searchResults.length > 0 ? (
-                        searchResults.map((food) => (
-                          <div
-                            key={food.id}
-                            className="p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
-                            onClick={() => handleSelectFood(food)}
-                          >
-                            <div className="font-medium text-gray-900">{food.name}</div>
-                            <div className="text-sm text-gray-600">{food.category}</div>
-                            <div className="text-xs text-gray-500 mt-1">{food.description}</div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-4 text-center text-gray-500 border-t-2 border-orange-200">
-                          <p className="font-medium">No existing foods found for "{foodSearchTerm}"</p>
-                          <p className="text-sm mt-1 mb-3">You can create a new food item with this name</p>
-                          <div className="space-y-2">
-                            <Button 
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              className="w-full"
-                              onClick={handleCloseSearch}
-                            >
-                              ✓ Continue Creating New Food
-                            </Button>
-                            <p className="text-xs text-gray-400">or click outside to dismiss</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Show existing food info */}
-              {selectedFood && !isNewFood && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-start space-x-3">
-                    {selectedFood.image_url ? (
-                      <img 
-                        src={selectedFood.image_url} 
-                        alt={selectedFood.name}
-                        className="w-16 h-16 object-cover rounded-lg"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
-                        <Users className="h-8 w-8 text-gray-400" />
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <h4 className="font-medium text-blue-900">{selectedFood.name}</h4>
-                      <p className="text-sm text-blue-700 mt-1">{selectedFood.category}</p>
-                      <p className="text-xs text-blue-600 mt-1">{selectedFood.description}</p>
-                      <div className="mt-2 p-2 bg-blue-100 rounded text-xs text-blue-800">
-                        <strong>Note:</strong> You can only set price, size, and preparation time for existing foods.
-                      </div>
-                    </div>
-                  </div>
-                  <input type="hidden" name="auto_description" defaultValue={selectedFood.description} />
-                </div>
-              )}
-
-              {/* New Food Fields - Only show for new foods */}
-              {isNewFood && (
-                <div className="space-y-6 border-t border-gray-200 pt-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">New Food Information</h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Category *</Label>
-                      <Input 
-                        id="category" 
-                        name="category" 
-                        placeholder="e.g., Main Course, Dessert, Appetizer"
-                        onFocus={handleFormFieldFocus}
-                        className="w-full"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="spice_level">Spice Level</Label>
-                      <select
-                        id="spice_level"
-                        name="spice_level"
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                      >
-                        <option value="">Select spice level</option>
-                        <option value="mild">Mild</option>
-                        <option value="medium">Medium</option>
-                        <option value="hot">Hot</option>
-                        <option value="very_hot">Very Hot</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description *</Label>
-                    <Textarea
-                      id="description"
-                      name="description"
-                      placeholder="Describe your dish in detail..."
-                      rows={4}
-                      onFocus={handleFormFieldFocus}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="ingredients">Ingredients</Label>
-                    <Textarea
-                      id="ingredients"
-                      name="ingredients"
-                      placeholder="List main ingredients (comma separated)"
-                      rows={3}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="image">Image (Optional)</Label>
-                    <Input
-                      id="image"
-                      name="image"
-                      type="file"
-                      accept="image/*"
-                      className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80 w-full"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        id="is_vegetarian"
-                        name="is_vegetarian"
-                        className="rounded border-gray-300 h-4 w-4"
-                      />
-                      <Label htmlFor="is_vegetarian" className="text-sm font-medium">
-                        Vegetarian
-                      </Label>
-                    </div>
-                    
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        id="is_vegan"
-                        name="is_vegan"
-                        className="rounded border-gray-300 h-4 w-4"
-                      />
-                      <Label htmlFor="is_vegan" className="text-sm font-medium">
-                        Vegan
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Price Information - Always shown */}
-              <div className="space-y-4 border-t border-gray-200 pt-6">
-                <h4 className="text-lg font-semibold text-gray-900 mb-4">Pricing Information</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="price" className="text-sm font-medium">Price ($) *</Label>
-                    <Input
-                      id="price"
-                      name="price"
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      className="w-full"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="size" className="text-sm font-medium">Size</Label>
-                    <select
-                      id="size"
-                      name="size"
-                      defaultValue="Medium"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
                     >
-                      <option value="Small">Small</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Large">Large</option>
-                    </select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="preparation_time" className="text-sm font-medium">Prep Time (min) *</Label>
-                    <Input
-                      id="preparation_time"
-                      name="preparation_time"
-                      type="number"
-                      placeholder="15"
-                      className="w-full"
-                      required
-                    />
+                      ✓ Continue Creating New Food
+                    </Button>
+                    <p className="text-xs text-gray-400">or click outside to dismiss</p>
                   </div>
                 </div>
-                
-                {!isNewFood && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-blue-800">
-                      <strong>Note:</strong> Adding a new price variant for existing food "{selectedFood?.name}"
-                    </p>
-                  </div>
-                )}
-              </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
-              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isSubmitting}>
-                  Cancel
-                </Button>
-                <Button type="submit" className="min-w-[120px]" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      {isNewFood ? 'Creating...' : 'Adding...'}
-                    </>
-                  ) : (
-                    isNewFood ? 'Create Food Item' : 'Add Price Variant'
-                  )}
-                </Button>
+      {/* Existing Food Info */}
+      {selectedFood && !isNewFood && (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start space-x-3">
+            {selectedFood.image_url ? (
+              <img 
+                src={selectedFood.image_url} 
+                alt={selectedFood.name}
+                className="w-16 h-16 object-cover rounded-lg"
+              />
+            ) : (
+              <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+                <Users className="h-8 w-8 text-gray-400" />
               </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+            )}
+            <div className="flex-1">
+              <h4 className="font-medium text-blue-900">{selectedFood.name}</h4>
+              <p className="text-sm text-blue-700 mt-1">{selectedFood.category}</p>
+              <p className="text-xs text-blue-600 mt-1">{selectedFood.description}</p>
+              <div className="mt-2 p-2 bg-blue-100 rounded text-xs text-blue-800">
+                <strong>Note:</strong> You can only set price, size, and preparation time for existing foods.
+              </div>
+            </div>
+          </div>
+          <input type="hidden" name="auto_description" defaultValue={selectedFood.description} />
+        </div>
+      )}
+
+      {/* New Food Fields */}
+      {isNewFood && (
+        <div className="space-y-6 border-t border-gray-200 pt-6">
+          <h4 className="text-lg font-semibold text-gray-900 mb-4">New Food Information</h4>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="category">Category *</Label>
+              <Input 
+                id="category" 
+                name="category" 
+                placeholder="e.g., Main Course, Dessert, Appetizer"
+                onFocus={handleFormFieldFocus}
+                className="w-full"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="spice_level">Spice Level</Label>
+              <select
+                id="spice_level"
+                name="spice_level"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              >
+                <option value="">Select spice level</option>
+                <option value="mild">Mild</option>
+                <option value="medium">Medium</option>
+                <option value="hot">Hot</option>
+                <option value="very_hot">Very Hot</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="description">Description *</Label>
+            <Textarea
+              id="description"
+              name="description"
+              placeholder="Describe your dish in detail..."
+              rows={4}
+              onFocus={handleFormFieldFocus}
+              className="w-full"
+            />
+          </div>
+
+          {/* Ingredients as comma-separated → JSON */}
+          <div className="space-y-2">
+            <Label htmlFor="ingredients">Ingredients</Label>
+            <Textarea
+              id="ingredients"
+              name="ingredients"
+              placeholder="List main ingredients (comma separated)"
+              rows={3}
+              className="w-full"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="image">Image (Optional)</Label>
+            <Input
+              id="image"
+              name="image"
+              type="file"
+              accept="image/*"
+              className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80 w-full"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id="is_vegetarian"
+                name="is_vegetarian"
+                className="rounded border-gray-300 h-4 w-4"
+              />
+              <Label htmlFor="is_vegetarian" className="text-sm font-medium">
+                Vegetarian
+              </Label>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id="is_vegan"
+                name="is_vegan"
+                className="rounded border-gray-300 h-4 w-4"
+              />
+              <Label htmlFor="is_vegan" className="text-sm font-medium">
+                Vegan
+              </Label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Price Information */}
+      <div className="space-y-4 border-t border-gray-200 pt-6">
+        <h4 className="text-lg font-semibold text-gray-900 mb-4">Pricing Information</h4>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="price" className="text-sm font-medium">Price ($) *</Label>
+            <Input
+              id="price"
+              name="price"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              className="w-full"
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="size" className="text-sm font-medium">Size</Label>
+            <select
+              id="size"
+              name="size"
+              defaultValue="Medium"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+            >
+              <option value="Small">Small</option>
+              <option value="Medium">Medium</option>
+              <option value="Large">Large</option>
+            </select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="preparation_time" className="text-sm font-medium">Prep Time (min) *</Label>
+            <Input
+              id="preparation_time"
+              name="preparation_time"
+              type="number"
+              placeholder="15"
+              className="w-full"
+              required
+            />
+          </div>
+        </div>
+        
+        {!isNewFood && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              <strong>Note:</strong> Adding a new price variant for existing food "{selectedFood?.name}"
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+        <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isSubmitting}>
+          Cancel
+        </Button>
+        <Button type="submit" className="min-w-[120px]" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              {isNewFood ? 'Creating...' : 'Adding...'}
+            </>
+          ) : (
+            isNewFood ? 'Create Food Item' : 'Add Price Variant'
+          )}
+        </Button>
+      </div>
+    </form>
+  </DialogContent>
+      </Dialog>
+
+
       </div>
       </div>
 
@@ -1099,7 +1166,7 @@ const ChefMenu: React.FC = () => {
                             Edit
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto z-[9999]">
                           <DialogHeader>
                             <DialogTitle>Edit Food Item</DialogTitle>
                             <DialogDescription>

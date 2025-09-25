@@ -3,11 +3,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
+from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer, FoodImage
 from .serializers import (
     CuisineSerializer, FoodCategorySerializer, FoodSerializer, 
     ChefFoodCreateSerializer, ChefFoodPriceSerializer, FoodPriceSerializer, 
-    FoodReviewSerializer, OfferSerializer
+    FoodReviewSerializer, OfferSerializer, FoodImageSerializer
 )
 
 @api_view(['GET'])
@@ -33,15 +33,38 @@ def food_search(request):
     
     results = []
     for food in foods:
+        # Get image URL using serializer method for consistency
+        serializer = FoodSerializer(food)
+        image_url = serializer.get_image_url(food)
+        
         results.append({
             'id': food.food_id,
             'name': food.name,
             'description': food.description,
             'category': food.category,
-            'image_url': food.image.url if food.image else None
+            'image_url': image_url
         })
     
     return Response(results)
+
+
+@api_view(['POST'])
+def upload_image(request):
+    """Image upload endpoint for Cloudinary"""
+    from utils.cloudinary_utils import upload_image_to_cloudinary
+    
+    if 'image' not in request.FILES:
+        return Response({'error': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    image_file = request.FILES['image']
+    try:
+        result = upload_image_to_cloudinary(image_file)
+        return Response({
+            'url': result['secure_url'],
+            'public_id': result['public_id']
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CuisineViewSet(viewsets.ModelViewSet):
@@ -121,12 +144,16 @@ class ChefFoodViewSet(viewsets.ModelViewSet):
         
         results = []
         for food in foods:
+            # Get image URL using serializer method for consistency
+            serializer = FoodSerializer(food)
+            image_url = serializer.get_image_url(food)
+            
             results.append({
                 'id': food.food_id,
                 'name': food.name,
                 'description': food.description,
                 'category': food.category,
-                'image_url': food.image.url if food.image else None
+                'image_url': image_url
             })
         
         return Response(results)
@@ -357,3 +384,16 @@ class OfferViewSet(viewsets.ModelViewSet):
     queryset = Offer.objects.all()
     serializer_class = OfferSerializer
     permission_classes = [IsAuthenticated]
+
+
+class FoodImageViewSet(viewsets.ModelViewSet):
+    queryset = FoodImage.objects.all()
+    serializer_class = FoodImageSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        # Filter by food if provided
+        food_id = self.request.query_params.get('food_id')
+        if food_id:
+            return FoodImage.objects.filter(food_id=food_id)
+        return FoodImage.objects.all()

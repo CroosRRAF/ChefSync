@@ -10,12 +10,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { CookSidebar } from "./CookSidebar";
-import { User, Settings, LogOut } from "lucide-react";
+import { User, Settings, LogOut, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function CookLayout() {
   const [chefStatus, setChefStatus] = useState<"free" | "busy">("free");
   const { logout, user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const toggleStatus = () => {
@@ -65,6 +67,21 @@ export default function CookLayout() {
                   <span className="capitalize font-medium">{chefStatus}</span>
                 </Button>
               </div>
+
+              {/* Theme Toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleTheme}
+                className="p-2"
+                title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+              >
+                {theme === 'light' ? (
+                  <Moon className="w-4 h-4" />
+                ) : (
+                  <Sun className="w-4 h-4" />
+                )}
+              </Button>
 
               {/* Chef Profile */}
               <DropdownMenu>
