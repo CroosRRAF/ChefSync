@@ -1,15 +1,14 @@
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
-from apps.users.fields import LongBlobImageField
-
+from .cloudinary_fields import CloudinaryImageField   
 
 class Cuisine(models.Model):
     """Cuisine categories (e.g., Italian, Chinese, Indian)"""
     
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    image = LongBlobImageField(blank=True, null=True)
+    image = CloudinaryImageField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
     
@@ -27,7 +26,7 @@ class FoodCategory(models.Model):
     name = models.CharField(max_length=100)
     cuisine = models.ForeignKey(Cuisine, on_delete=models.CASCADE, related_name='categories')
     description = models.TextField(blank=True)
-    image = LongBlobImageField(blank=True, null=True)
+    image = CloudinaryImageField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
     
@@ -53,6 +52,7 @@ class Food(models.Model):
     name = models.CharField(max_length=100, null=False)
     category = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    image = CloudinaryImageField(blank=True, null=True, help_text='Food image')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     admin = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
@@ -113,6 +113,7 @@ class FoodPrice(models.Model):
     price_id = models.AutoField(primary_key=True)
     size = models.CharField(max_length=10, choices=SIZE_CHOICES)
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
+    preparation_time = models.PositiveIntegerField(help_text='Preparation time in minutes for this size', default=15)
     image_url = models.CharField(max_length=255, blank=True, null=True)
     food = models.ForeignKey(Food, on_delete=models.CASCADE, related_name='prices')
     cook = models.ForeignKey(
@@ -134,19 +135,40 @@ class FoodPrice(models.Model):
 
 
 class FoodImage(models.Model):
-    """Images for food items"""
+    """Images for food items using Cloudinary URLs"""
     
     food = models.ForeignKey(Food, on_delete=models.CASCADE, related_name='images')
-    image = LongBlobImageField()
-    thumbnail = LongBlobImageField(blank=True, null=True)
+    image_url = models.URLField(max_length=500, blank=True, null=True, help_text="Cloudinary URL for the main image")
+    thumbnail_url = models.URLField(max_length=500, blank=True, null=True, help_text="Cloudinary URL for thumbnail")
+    cloudinary_public_id = models.CharField(max_length=200, blank=True, help_text="Cloudinary public ID for management")
     caption = models.CharField(max_length=200, blank=True)
     is_primary = models.BooleanField(default=False)
     sort_order = models.PositiveIntegerField(default=0)
+    alt_text = models.CharField(max_length=100, blank=True, help_text="Alt text for accessibility")
     
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
         return f"Image for {self.food.name}"
+    
+    @property
+    def optimized_url(self):
+        """Get optimized Cloudinary URL"""
+        if self.image_url and 'cloudinary.com' in self.image_url:
+            from utils.cloudinary_utils import get_optimized_url
+            return get_optimized_url(self.image_url)
+        return self.image_url
+    
+    @property
+    def thumbnail(self):
+        """Get thumbnail URL, generate if not exists"""
+        if self.thumbnail_url:
+            return self.thumbnail_url
+        elif self.image_url and 'cloudinary.com' in self.image_url:
+            from utils.cloudinary_utils import get_optimized_url
+            return get_optimized_url(self.image_url, width=200, height=200)
+        return self.image_url
     
     class Meta:
         db_table = 'food_images'
@@ -163,7 +185,7 @@ class Offer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"Offer for {self.price.food.name} ({self.price.size}): {self.discount}% off"
+        return f"Offer for {self.price.food.name}: {self.discount}% off"
     
     class Meta:
         db_table = 'Offer'
@@ -204,9 +226,11 @@ class FoodReview(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"Review by {self.customer.username} for {self.price.food.name} ({self.price.size})"
+        return f"Review by {self.customer.username} for {self.price.food.name}"
     
     class Meta:
         db_table = 'FoodReview'
         ordering = ['-created_at']
-        unique_together = ['customer', 'price']
+        unique_together = ['customer', 'price', 'order']
+
+

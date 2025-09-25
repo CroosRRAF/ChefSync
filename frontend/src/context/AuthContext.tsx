@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, AuthState, LoginCredentials, RegisterData } from '@/types/auth';
+import { User, AuthState, LoginCredentials, RegisterData, ProfileUpdateData } from '@/types/auth';
 import authService, { AuthResponse } from '@/services/authService';
+import { userService } from '@/services/userService';
 
 // Define the shape of our context
 export interface AuthContextType extends AuthState {
@@ -10,7 +11,7 @@ export interface AuthContextType extends AuthState {
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   oauthLogin: (data: any) => void; // Google / social login direct state set
-  updateProfile: (data: { name?: string; phone?: string; address?: string }) => Promise<void>;
+  updateProfile: (data: ProfileUpdateData) => Promise<void>;
 }
 
 // Create the context with undefined as initial value
@@ -265,12 +266,12 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     dispatch({ type: 'SET_USER', payload: { user: frontendUser, token: data.access } });
   };
 
-  const updateProfile = async (data: { name?: string; phone?: string; address?: string }) => {
+  const updateProfile = async (data: ProfileUpdateData) => {
     if (!state.user) throw new Error('No user logged in');
     
     try {
-      // Call the auth service to update profile on backend
-      const response = await authService.updateProfile(data);
+      // Use userService for comprehensive profile update
+      await userService.updateUserProfile(data);
       
       // Update the user in state with new data
       const updatedUser: User = {

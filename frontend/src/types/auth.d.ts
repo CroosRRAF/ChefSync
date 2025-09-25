@@ -80,3 +80,38 @@ export interface RegisterResponse {
   message: string;
   user_id: string;
 }
+
+// Profile management interfaces
+export interface UserProfileData {
+  specialty_cuisine?: string;
+  experience_level?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  available_hours?: string;
+  service_location?: string;
+  bio?: string;
+}
+
+export interface ProfileUpdateData {
+  // Basic user info
+  name?: string;
+  phone?: string;
+  address?: string;
+  // Cook profile data
+  specialty_cuisine?: string;
+  experience_level?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  available_hours?: string;
+  service_location?: string;
+  bio?: string;
+}
+
+export interface ProfileResponse {
+  name: string;
+  email: string;
+  phone?: string;
+  username?: string;
+  address?: string;
+  specialty_cuisine?: string;
+  experience_level?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  available_hours?: string;
+  service_location?: string;
+  bio?: string;
+}

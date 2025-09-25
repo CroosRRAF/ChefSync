@@ -19,7 +19,7 @@ import {
 import ApiTest from '@/components/ApiTest';
 
 interface PendingUser {
-  id: number;
+  user_id: number;
   name: string;
   email: string;
   role: 'cook' | 'delivery_agent';
@@ -129,26 +129,32 @@ const UnifiedApprovals: React.FC = () => {
 
   const handleApproval = async (user: PendingUser, action: 'approve' | 'reject') => {
     try {
-      setActionLoading(user.id);
-      const endpoint = user.role === 'cook' ? 'auth/admin/approve-cook/' : 'auth/admin/approve-delivery-agent/';
-
-      const response = await apiClient.post(`${endpoint}${user.id}/`, {
+      setActionLoading(user.user_id);
+      
+      console.log(`🔄 ${action}ing user:`, user.user_id, action);
+      
+      const response = await apiClient.post(`auth/admin/user/${user.user_id}/approve/`, {
         action: action
       });
 
-      if (response.status >= 200 && response.status < 300) {
+      console.log(`✅ ${action} response:`, response);
+
+      // Since apiClient.post returns response.data directly, we don't need to check response.status
+      // If we get here without throwing an error, the request was successful
+      if (response) {
         // Remove from pending list
         if (user.role === 'cook') {
-          setPendingCooks(prev => prev.filter(u => u.id !== user.id));
+          setPendingCooks(prev => prev.filter(u => u.user_id !== user.user_id));
         } else {
-          setPendingDeliveryAgents(prev => prev.filter(u => u.id !== user.id));
+          setPendingDeliveryAgents(prev => prev.filter(u => u.user_id !== user.user_id));
         }
 
-        // Show success message
-        alert(`User ${action}d successfully!`);
+        // Show success message with backend response message if available
+        const message = response.message || `User ${action}d successfully!`;
+        alert(`${message} ${action === 'approve' ? 'Approval email sent.' : 'Rejection email sent.'}`);
       }
     } catch (error: any) {
-      console.error(`Error ${action}ing user:`, error);
+      console.error(`❌ Error ${action}ing user:`, error);
 
       // Provide more specific error messages
       if (error.response?.status === 401) {
@@ -174,7 +180,7 @@ const UnifiedApprovals: React.FC = () => {
       return null;
     }
 
-    if (!user.id) {
+    if (!user.user_id) {
       console.warn('UserCard received user without ID:', user);
       return null;
     }
@@ -218,7 +224,7 @@ const UnifiedApprovals: React.FC = () => {
               size="sm"
               variant="outline"
               onClick={() => handleApproval(user, 'reject')}
-              disabled={actionLoading === user.id}
+              disabled={actionLoading === user.user_id}
               className="text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20"
             >
               <XCircle className="h-4 w-4 mr-1" />
@@ -227,7 +233,7 @@ const UnifiedApprovals: React.FC = () => {
             <Button
               size="sm"
               onClick={() => handleApproval(user, 'approve')}
-              disabled={actionLoading === user.id}
+              disabled={actionLoading === user.user_id}
               className="bg-green-600 hover:bg-green-700"
             >
               <CheckCircle className="h-4 w-4 mr-1" />
@@ -445,7 +451,7 @@ const UnifiedApprovals: React.FC = () => {
                 ...(Array.isArray(pendingCooks) ? pendingCooks : []),
                 ...(Array.isArray(pendingDeliveryAgents) ? pendingDeliveryAgents : [])
               ].map((user) => (
-                <UserCard key={user?.id || Math.random()} user={user} />
+                <UserCard key={user?.user_id || Math.random()} user={user} />
               ))}
             </div>
           )}
@@ -467,7 +473,7 @@ const UnifiedApprovals: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 gap-6">
               {(Array.isArray(pendingCooks) ? pendingCooks : []).map((user) => (
-                <UserCard key={user?.id || Math.random()} user={user} />
+                <UserCard key={user?.user_id || Math.random()} user={user} />
               ))}
             </div>
           )}
@@ -489,7 +495,7 @@ const UnifiedApprovals: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 gap-6">
               {(Array.isArray(pendingDeliveryAgents) ? pendingDeliveryAgents : []).map((user) => (
-                <UserCard key={user?.id || Math.random()} user={user} />
+                <UserCard key={user?.user_id || Math.random()} user={user} />
               ))}
             </div>
           )}

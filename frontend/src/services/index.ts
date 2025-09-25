@@ -9,8 +9,7 @@ export type {
   LoginCredentials, 
   RegisterData, 
   User, 
-  AuthResponse, 
-  RefreshTokenResponse 
+  AuthResponse
 } from '../types/auth';
 
 export type {

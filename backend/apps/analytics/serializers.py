@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import SystemSettings, SystemNotification, SystemAuditLog, SystemMaintenance
+from .models import Activity, SystemSettings, SystemNotification, SystemAuditLog, SystemMaintenance
 
 
 class SystemSettingsSerializer(serializers.ModelSerializer):
@@ -66,3 +66,9 @@ class DashboardStatsSerializer(serializers.Serializer):
     total_foods = serializers.IntegerField()
     active_foods = serializers.IntegerField()
     pending_approvals = serializers.IntegerField()
+
+
+class ActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Activity
+        fields = ["id", "action", "order", "created_at"]
