@@ -325,6 +325,173 @@ class AdminService {
     }
   }
 
+  async getOrders(params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    payment_status?: string;
+    search?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+  } = {}): Promise<{
+    orders: AdminOrder[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      total_pages: number;
+    };
+  }> {
+    try {
+      console.log(`🔄 AdminService: Fetching orders with params:`, params);
+      
+      const response = await apiClient.get(`${this.baseUrl}/orders/`, {
+        params: {
+          page: params.page || 1,
+          limit: params.limit || 20,
+          status: params.status || '',
+          payment_status: params.payment_status || '',
+          search: params.search || '',
+          sort_by: params.sort_by || 'created_at',
+          sort_order: params.sort_order || 'desc',
+        },
+      });
+
+      console.log(`✅ AdminService: Orders response:`, {
+        ordersCount: response.data.orders?.length || 0,
+        pagination: response.data.pagination
+      });
+
+      // Transform data to ensure type safety
+      const orders: AdminOrder[] = (response.data.orders || []).map(
+        (order: {
+          id: number;
+          order_number: string;
+          customer_name: string;
+          customer_email: string;
+          status: string;
+          total_amount: string | number;
+          created_at: string;
+          updated_at: string;
+          payment_status: string;
+          items_count: string | number;
+        }) => ({
+          ...order,
+          total_amount:
+            typeof order.total_amount === "string"
+              ? parseFloat(order.total_amount)
+              : Number(order.total_amount) || 0,
+          items_count: Number(order.items_count) || 0,
+          id: Number(order.id) || 0,
+        })
+      );
+
+      return {
+        orders,
+        pagination: response.data.pagination || {
+          page: 1,
+          limit: 20,
+          total: 0,
+          total_pages: 0,
+        },
+      };
+    } catch (error: any) {
+      console.error("❌ AdminService: Error fetching orders:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to fetch orders: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  async getOrderDetails(orderId: number): Promise<any> {
+    try {
+      console.log(`🔄 AdminService: Fetching order details for ID: ${orderId}`);
+      
+      const response = await apiClient.get(`${this.baseUrl}/orders/${orderId}/`);
+      
+      console.log(`✅ AdminService: Order details response:`, response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ AdminService: Error fetching order details:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to fetch order details: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  async updateOrderStatus(orderId: number, newStatus: string): Promise<any> {
+    try {
+      console.log(`🔄 AdminService: Updating order ${orderId} status to ${newStatus}`);
+      
+      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/update_status/`, {
+        status: newStatus
+      });
+      
+      console.log(`✅ AdminService: Order status update response:`, response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ AdminService: Error updating order status:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to update order status: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  async assignChef(orderId: number, chefId: number): Promise<any> {
+    try {
+      console.log(`🔄 AdminService: Assigning chef ${chefId} to order ${orderId}`);
+      
+      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/assign_chef/`, {
+        chef_id: chefId
+      });
+      
+      console.log(`✅ AdminService: Chef assignment response:`, response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ AdminService: Error assigning chef:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to assign chef: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  async assignDeliveryPartner(orderId: number, partnerId: number): Promise<any> {
+    try {
+      console.log(`🔄 AdminService: Assigning delivery partner ${partnerId} to order ${orderId}`);
+      
+      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/assign_delivery/`, {
+        delivery_partner_id: partnerId
+      });
+      
+      console.log(`✅ AdminService: Delivery partner assignment response:`, response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ AdminService: Error assigning delivery partner:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to assign delivery partner: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
   async getNotifications(
     params: {
       limit?: number;

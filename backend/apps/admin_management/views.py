@@ -1545,6 +1545,10 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
 
     permission_classes = [IsAdminUser]
 
+    def list(self, request):
+        """Get paginated list of orders with filters - standard list endpoint"""
+        return self.list_orders(request)
+
     @action(detail=False, methods=["get"])
     def list_orders(self, request):
         """Get paginated list of orders with filters"""
@@ -1552,13 +1556,13 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
             from apps.orders.models import Order
 
             # Get query parameters
-            page = int(request.query_params.get("page", 1))  # type: ignore
-            limit = int(request.query_params.get("limit", 25))  # type: ignore
-            search = request.query_params.get("search", "")  # type: ignore
-            order_status = request.query_params.get("status", "")  # type: ignore
-            payment_status = request.query_params.get("payment_status", "")  # type: ignore
-            sort_by = request.query_params.get("sort_by", "created_at")  # type: ignore
-            sort_order = request.query_params.get("sort_order", "desc")  # type: ignore
+            page = int(request.GET.get("page", 1))  # type: ignore
+            limit = int(request.GET.get("limit", 25))  # type: ignore
+            search = request.GET.get("search", "")  # type: ignore
+            order_status = request.GET.get("status", "")  # type: ignore
+            payment_status = request.GET.get("payment_status", "")  # type: ignore
+            sort_by = request.GET.get("sort_by", "created_at")  # type: ignore
+            sort_order = request.GET.get("sort_order", "desc")  # type: ignore
 
             # Build query
             queryset = Order.objects.select_related("customer").all()
