@@ -9,10 +9,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
 import { Settings, Save, RefreshCw, Shield, Bell, Globe, AlertCircle, CheckCircle, User, Mail, Phone, MapPin } from 'lucide-react';
 import { adminService, type SystemSetting } from '@/services/adminService';
+import { authService } from '@/services/authService';
 import { toast } from 'sonner';
 
 const AdminSettings: React.FC = memo(() => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -118,24 +119,21 @@ const AdminSettings: React.FC = memo(() => {
   const handleProfileUpdate = async () => {
     try {
       setProfileLoading(true);
+      console.log('🔄 Updating admin profile with data:', profileData);
+      
       // Use the auth service to update profile
-      const response = await fetch('/api/auth/profile/update/', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('chefsync_token')}`
-        },
-        body: JSON.stringify(profileData)
-      });
-
-      if (response.ok) {
-        toast.success('Profile updated successfully');
-      } else {
-        throw new Error('Failed to update profile');
-      }
+      const response = await authService.updateProfile(profileData);
+      
+      console.log('✅ Profile update successful:', response);
+      toast.success('Profile updated successfully');
+      
+      // Optionally refresh the user data in the auth context
+      // This would require the auth context to have a refresh method
+      
     } catch (err) {
-      console.error('Failed to update profile:', err);
-      toast.error('Failed to update profile');
+      console.error('❌ Failed to update profile:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update profile';
+      toast.error(errorMessage);
     } finally {
       setProfileLoading(false);
     }
@@ -231,7 +229,7 @@ const AdminSettings: React.FC = memo(() => {
         </TabsList>
 
         <TabsContent value="settings" className="space-y-6">
-          {/* Settings Sections */}        {/* Settings Sections */}
+          {/* Settings Sections */}
         <div className="space-y-6">
           {/* Platform Settings */}
           <Card>

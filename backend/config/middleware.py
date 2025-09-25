@@ -25,5 +25,8 @@ class SecurityHeadersMiddleware:
             response['Access-Control-Allow-Credentials'] = 'true'
             response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
             response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            
+            # Set Cross-Origin-Opener-Policy to unsafe-none for OAuth popups
+            response['Cross-Origin-Opener-Policy'] = 'unsafe-none'
         
         return response

@@ -71,13 +71,12 @@ def csrf_token(request):
 
 
 import requests
-from google.auth.exceptions import GoogleAuthError
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token
+# Google OAuth imports removed - using direct API calls instead
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@csrf_exempt
 @ratelimit(key="ip", rate="10/h", method="POST", block=True)
 def user_registration(request):
     """
@@ -326,6 +325,7 @@ def validate_referral_token(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@csrf_exempt
 @ratelimit(key="ip", rate="5/m", method="POST", block=True)
 def user_login(request):
     """
@@ -601,6 +601,7 @@ def confirm_password_reset(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@csrf_exempt
 def google_oauth_login(request):
     """
     Google OAuth login
@@ -627,24 +628,26 @@ def google_oauth_login(request):
 
     try:
         print("Attempting to verify Google token...")
-        # Verify Google ID token
+        # Get user info from the request
         validated_data = getattr(serializer, "validated_data", {})
-        id_token_value = validated_data.get("id_token")
+        user_info = validated_data.get("user_info")
+        access_token = validated_data.get("access_token")
 
-        if not id_token_value:
+        if not user_info:
             return Response(
-                {"error": "ID token is required"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "User info is required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        idinfo = id_token.verify_oauth2_token(
-            id_token_value, google_requests.Request(), settings.GOOGLE_OAUTH_CLIENT_ID
-        )
+        print("Google user info received successfully!")
+        print("User info:", user_info)
 
-        print("Google token verified successfully!")
-        print("Token info:", idinfo)
-
-        email = idinfo["email"]
-        name = idinfo.get("name", "")
+        email = user_info.get("email")
+        name = user_info.get("name", "")
+        
+        if not email:
+            return Response(
+                {"error": "Email is required in user info"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Get or create user
         user, created = User.objects.get_or_create(
@@ -690,31 +693,12 @@ def google_oauth_login(request):
             status=status.HTTP_200_OK,
         )
 
-    except GoogleAuthError as e:
-        # GoogleAuthError contains useful messages; include them in logs and response for debugging
-        print(f"Google Auth Error: {repr(e)}")
-        print("=== GOOGLE OAUTH LOGIN DEBUG END ===\n")
-        return Response(
-            {"error": "Invalid Google token", "details": str(e)},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    except ValueError as e:
-        # id_token.verify_oauth2_token may raise ValueError for invalid tokens
-        print(f"Google token verification failed: {repr(e)}")
-        print("=== GOOGLE OAUTH LOGIN DEBUG END ===\n")
-        return Response(
-            {"error": "Invalid Google token", "details": str(e)},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
     except Exception as e:
-        # Catch-all: log full exception for debugging
-        import traceback
-
-        tb = traceback.format_exc()
-        print(f"Google OAuth unexpected error: {repr(e)}\n{tb}")
+        # Handle any other errors
+        print(f"Google OAuth Error: {repr(e)}")
         print("=== GOOGLE OAUTH LOGIN DEBUG END ===\n")
         return Response(
-            {"error": "Authentication failed. Please try again.", "details": str(e)},
+            {"error": "Google OAuth authentication failed", "details": str(e)},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -841,6 +825,7 @@ def create_delivery_agent_profile(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@csrf_exempt
 def send_otp(request):
     """
     Send OTP to email for verification
@@ -939,6 +924,7 @@ def verify_otp(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@csrf_exempt
 def complete_registration(request):
     """
     Complete user registration after OTP verification

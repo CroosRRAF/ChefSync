@@ -313,3 +313,60 @@ class DeliveryReview(models.Model):
     class Meta:
         db_table = 'DeliveryReview'
         ordering = ['-created_at']
+
+
+class BulkOrder(models.Model):
+    """Bulk order model for large-scale catering and events"""
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('preparing', 'Preparing'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    bulk_order_id = models.AutoField(primary_key=True)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='bulk_orders')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='created_bulk_orders'
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Bulk Order {self.bulk_order_id} - {self.status}"
+    
+    class Meta:
+        db_table = 'BulkOrder'
+        ordering = ['-created_at']
+
+
+class BulkOrderAssignment(models.Model):
+    """Assignment of chefs to bulk orders"""
+    
+    assignment_id = models.AutoField(primary_key=True)
+    bulk_order = models.ForeignKey(
+        BulkOrder, 
+        on_delete=models.CASCADE, 
+        related_name='assignments'
+    )
+    chef = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='bulk_order_assignments'
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    
+    def __str__(self):
+        return f"Assignment {self.assignment_id} - {self.chef.name} to Bulk Order {self.bulk_order.bulk_order_id}"
+    
+    class Meta:
+        db_table = 'BulkOrderAssignment'
+        ordering = ['-assigned_at']

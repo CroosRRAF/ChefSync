@@ -154,6 +154,19 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
       );
     }
 
+    // Check if data has valid structure
+    if (data.length > 0 && !data[0].name) {
+      console.warn("Chart data missing 'name' field:", data);
+      return (
+        <div className="flex items-center justify-center h-full text-gray-500">
+          <div className="text-center">
+            <div className="text-lg font-medium">Invalid data format</div>
+            <div className="text-sm">Data structure is incorrect</div>
+          </div>
+        </div>
+      );
+    }
+
     const commonProps = {
       data,
       margin: { top: 5, right: 30, left: 20, bottom: 5 },
@@ -177,9 +190,34 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
               }}
             />
             {showLegend && <Legend />}
-            {Object.keys(data[0] || {})
-              .filter((key) => key !== "name" && key !== "value")
-              .map((key, index) => (
+            {(() => {
+              const dataKeys = Object.keys(data[0] || {})
+                .filter((key) => key !== "name" && key !== "value");
+              
+              if (dataKeys.length === 0) {
+                // Fallback to using 'value' field if no other keys exist
+                return (
+                  <Line
+                    key="value"
+                    type="monotone"
+                    dataKey="value"
+                    stroke={colors[0]}
+                    strokeWidth={2}
+                    dot={{
+                      fill: colors[0],
+                      strokeWidth: 2,
+                      r: 4,
+                    }}
+                    activeDot={{
+                      r: 6,
+                      stroke: colors[0],
+                      strokeWidth: 2,
+                    }}
+                  />
+                );
+              }
+              
+              return dataKeys.map((key, index) => (
                 <Line
                   key={key}
                   type="monotone"
@@ -197,7 +235,8 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
                     strokeWidth: 2,
                   }}
                 />
-              ))}
+              ));
+            })()}
           </LineChart>
         );
 
@@ -218,9 +257,26 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
               }}
             />
             {showLegend && <Legend />}
-            {Object.keys(data[0] || {})
-              .filter((key) => key !== "name" && key !== "value")
-              .map((key, index) => (
+            {(() => {
+              const dataKeys = Object.keys(data[0] || {})
+                .filter((key) => key !== "name" && key !== "value");
+              
+              if (dataKeys.length === 0) {
+                // Fallback to using 'value' field if no other keys exist
+                return (
+                  <Area
+                    key="value"
+                    type="monotone"
+                    dataKey="value"
+                    stackId="1"
+                    stroke={colors[0]}
+                    fill={colors[0]}
+                    fillOpacity={0.6}
+                  />
+                );
+              }
+              
+              return dataKeys.map((key, index) => (
                 <Area
                   key={key}
                   type="monotone"
@@ -230,7 +286,8 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
                   fill={colors[index % colors.length]}
                   fillOpacity={0.6}
                 />
-              ))}
+              ));
+            })()}
           </AreaChart>
         );
 
@@ -251,16 +308,31 @@ const InteractiveChart: React.FC<InteractiveChartProps> = ({
               }}
             />
             {showLegend && <Legend />}
-            {Object.keys(data[0] || {})
-              .filter((key) => key !== "name" && key !== "value")
-              .map((key, index) => (
+            {(() => {
+              const dataKeys = Object.keys(data[0] || {})
+                .filter((key) => key !== "name" && key !== "value");
+              
+              if (dataKeys.length === 0) {
+                // Fallback to using 'value' field if no other keys exist
+                return (
+                  <Bar
+                    key="value"
+                    dataKey="value"
+                    fill={colors[0]}
+                    radius={[4, 4, 0, 0]}
+                  />
+                );
+              }
+              
+              return dataKeys.map((key, index) => (
                 <Bar
                   key={key}
                   dataKey={key}
                   fill={colors[index % colors.length]}
                   radius={[4, 4, 0, 0]}
                 />
-              ))}
+              ));
+            })()}
           </BarChart>
         );
 

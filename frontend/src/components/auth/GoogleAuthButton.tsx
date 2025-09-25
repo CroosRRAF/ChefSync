@@ -35,12 +35,18 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
   const isValidClientId = hasValidGoogleClientId();
 
   const login = useGoogleLogin({
+    scope: 'openid email profile',
     onSuccess: async (tokenResponse) => {
       try {
         console.log("Google OAuth tokenResponse:", tokenResponse);
 
         const apiUrl = "/api";
         console.log("Making request to:", `${apiUrl}/auth/google/login/`);
+
+        // Get user info from Google using the access token
+        const userInfoResponse = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${tokenResponse.access_token}`);
+        const userInfo = await userInfoResponse.json();
+        console.log("Google user info:", userInfo);
 
         const res = await fetch(`${apiUrl}/auth/google/login/`, {
           method: "POST",
@@ -49,7 +55,10 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
             Accept: "application/json",
           },
           credentials: "include",
-          body: JSON.stringify({ access_token: tokenResponse.access_token }),
+          body: JSON.stringify({ 
+            access_token: tokenResponse.access_token,
+            user_info: userInfo
+          }),
         });
 
         const data = await res.json();

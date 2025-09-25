@@ -36,7 +36,7 @@ apiClient.interceptors.response.use(
       // Handle unauthorized access
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
-      window.location.href = "/login";
+      window.location.href = "/auth/login";
     } else if (error.response?.status === 500) {
       // Handle server errors with detailed logging
       console.error("🚨 Server Error (500) in Admin API:", {
@@ -1364,6 +1364,88 @@ class AdminService {
     } catch (error) {
       console.error("Error creating backup:", error);
       throw new Error("Failed to create backup");
+    }
+  }
+
+  // System Settings
+  async getSystemSettings(category?: string): Promise<SystemSetting[]> {
+    try {
+      console.log(`🔄 AdminService: Fetching system settings${category ? ` for category: ${category}` : ''}`);
+      
+      const params = category ? { category } : {};
+      const response = await apiClient.get(`${this.baseUrl}/settings/`, { params });
+      
+      console.log(`✅ AdminService: System settings response:`, response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ AdminService: Error fetching system settings:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to fetch system settings: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  async updateSystemSetting(key: string, value: string | number | boolean): Promise<SystemSetting> {
+    try {
+      console.log(`🔄 AdminService: Updating system setting ${key} with value:`, value);
+      
+      const response = await apiClient.patch(`${this.baseUrl}/settings/${key}/`, {
+        value: value.toString()
+      });
+      
+      console.log(`✅ AdminService: System setting update response:`, response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ AdminService: Error updating system setting:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to update system setting: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  async createSystemSetting(setting: Partial<SystemSetting>): Promise<SystemSetting> {
+    try {
+      console.log(`🔄 AdminService: Creating system setting:`, setting);
+      
+      const response = await apiClient.post(`${this.baseUrl}/settings/`, setting);
+      
+      console.log(`✅ AdminService: System setting creation response:`, response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ AdminService: Error creating system setting:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to create system setting: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  async deleteSystemSetting(key: string): Promise<void> {
+    try {
+      console.log(`🔄 AdminService: Deleting system setting: ${key}`);
+      
+      await apiClient.delete(`${this.baseUrl}/settings/${key}/`);
+      
+      console.log(`✅ AdminService: System setting deleted successfully`);
+    } catch (error: any) {
+      console.error("❌ AdminService: Error deleting system setting:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to delete system setting: ${error?.message || 'Unknown error'}`);
     }
   }
 }

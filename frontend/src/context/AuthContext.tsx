@@ -167,6 +167,19 @@ export function AuthProvider({
       }
     } catch (error) {
       console.error("Token validation failed:", error);
+      // Try to refresh token before clearing user
+      try {
+        const refreshToken = localStorage.getItem("refresh_token");
+        if (refreshToken) {
+          const newTokens = await authService.refreshToken(refreshToken);
+          localStorage.setItem("access_token", newTokens.access);
+          localStorage.setItem("refresh_token", newTokens.refresh);
+          // Retry validation with new token
+          return validateToken(newTokens.access);
+        }
+      } catch (refreshError) {
+        console.error("Token refresh failed:", refreshError);
+      }
       dispatch({ type: "CLEAR_USER" });
     }
   };

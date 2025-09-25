@@ -198,8 +198,8 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),  # Standard: 15 minutes
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),  # Standard: 1 day
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),  # Extended to 1 hour
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),  # Extended to 7 days
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
@@ -261,12 +261,20 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # CSRF settings - Allow cross-origin requests from frontend
-CSRF_TRUSTED_ORIGINS = str(
-    config(
-        "CORS_ALLOWED_ORIGINS",
-        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000",
-    )
-).split(",")
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "http://localhost:8082",
+    "http://127.0.0.1:8082",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=False, cast=bool)
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF cookie
 CSRF_USE_SESSIONS = False
@@ -314,7 +322,7 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@chefsync.com")
 
 # Frontend URL for email verification
-FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:8080")
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:8081")
 
 # Google OAuth Configuration
 GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")

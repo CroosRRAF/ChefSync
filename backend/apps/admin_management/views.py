@@ -2047,12 +2047,12 @@ class AdminSystemSettingsViewSet(viewsets.ModelViewSet):
         queryset = self.queryset
 
         # Filter by category
-        category = self.request.query_params.get("category")  # type: ignore
+        category = self.request.GET.get("category")
         if category:
             queryset = queryset.filter(category=category)
 
         # Filter by public settings
-        is_public = self.request.query_params.get("is_public")  # type: ignore
+        is_public = self.request.GET.get("is_public")
         if is_public is not None:
             queryset = queryset.filter(is_public=is_public.lower() == "true")
 

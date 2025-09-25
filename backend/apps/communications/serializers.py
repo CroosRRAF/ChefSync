@@ -79,7 +79,7 @@ class CommunicationSerializer(serializers.ModelSerializer):
     
     def get_user(self, obj):
         return {
-            'id': obj.user.id,
+            'id': obj.user.user_id,
             'name': obj.user.name,
             'email': obj.user.email
         } if obj.user else None
@@ -109,7 +109,7 @@ class CommunicationListSerializer(serializers.ModelSerializer):
     
     def get_user(self, obj):
         return {
-            'id': obj.user.id,
+            'id': obj.user.user_id,
             'name': obj.user.name,
             'email': obj.user.email
         } if obj.user else None

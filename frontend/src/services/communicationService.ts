@@ -39,9 +39,38 @@ apiClient.interceptors.request.use(
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     const status = error.response?.status;
     const data = error.response?.data as any;
+
+    // Handle token expiration (401) with automatic refresh
+    if (status === 401 && error.config && !error.config._retry) {
+      error.config._retry = true;
+      
+      try {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+          // Import authService dynamically to avoid circular dependency
+          const { authService } = await import('./authService');
+          const newTokens = await authService.refreshToken();
+          
+          // Update tokens
+          localStorage.setItem('access_token', newTokens.access);
+          localStorage.setItem('refresh_token', newTokens.refresh);
+          
+          // Retry the original request with new token
+          error.config.headers.Authorization = `Bearer ${newTokens.access}`;
+          return apiClient.request(error.config);
+        }
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError);
+        // Clear tokens and redirect to login
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        window.location.href = '/auth/login';
+        return Promise.reject(refreshError);
+      }
+    }
 
     let message = "An unexpected error occurred";
     if (data?.message || data?.detail) {

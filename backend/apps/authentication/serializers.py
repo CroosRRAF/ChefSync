@@ -306,7 +306,8 @@ class GoogleOAuthSerializer(serializers.Serializer):
     Serializer for Google OAuth
     """
 
-    id_token = serializers.CharField(required=True)
+    access_token = serializers.CharField(required=True)
+    user_info = serializers.DictField(required=True)
 
 
 class CustomerSerializer(serializers.ModelSerializer):
