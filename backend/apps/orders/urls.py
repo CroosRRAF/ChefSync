@@ -5,10 +5,9 @@ from .bulk_views import BulkOrderManagementViewSet
 
 router = DefaultRouter()
 router.register(r'orders', views.OrderViewSet, basename='orders')
-# Temporarily disabled - need to fix serializer issues
 # router.register(r'order-items', views.OrderItemViewSet, basename='order-items')
 # router.register(r'order-history', views.OrderStatusHistoryViewSet, basename='order-history')
-# router.register(r'cart', views.CartItemViewSet, basename='cart')
+router.register(r'cart', views.CartItemViewSet, basename='cart')
 
 # Bulk order management
 router.register(r'bulk', BulkOrderManagementViewSet, basename='bulk-orders')
