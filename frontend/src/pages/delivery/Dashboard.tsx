@@ -41,6 +41,7 @@ import {
   Calendar,
   Activity,
   Timer,
+  Users,
 } from "lucide-react";
 
 const DeliveryDashboard: React.FC = () => {
@@ -92,25 +93,30 @@ const DeliveryDashboard: React.FC = () => {
     }
   };
 
- const fetchAvailableOrders = async () => {
-  try {
-    const ordersData = await getAvailableOrders();
-    console.log("Fetched available orders:", ordersData);
+  const fetchAvailableOrders = async () => {
+    try {
+      const ordersData = await getAvailableOrders();
+      console.log("Fetched available orders:", ordersData);
 
-    // Define statuses considered "available for delivery"
-    const deliverableStatuses = ["pending", "confirmed", "preparing", "ready"];
+      // Define statuses considered "available for delivery"
+      const deliverableStatuses = [
+        "pending",
+        "confirmed",
+        "preparing",
+        "ready",
+      ];
 
-    // Filter orders that are in deliverable statuses
-    const availableOrdersData = ordersData.filter((order) =>
-      deliverableStatuses.includes(order.status.toLowerCase())
-    );
+      // Filter orders that are in deliverable statuses
+      const availableOrdersData = ordersData.filter((order) =>
+        deliverableStatuses.includes(order.status.toLowerCase())
+      );
 
-    setAvailableOrders(availableOrdersData);
-    console.log("Available orders after filtering:", availableOrdersData);
-  } catch (error) {
-    console.error("Failed to fetch available orders:", error);
-  }
-};
+      setAvailableOrders(availableOrdersData);
+      console.log("Available orders after filtering:", availableOrdersData);
+    } catch (error) {
+      console.error("Failed to fetch available orders:", error);
+    }
+  };
 
   const fetchRecentDeliveries = async () => {
     try {
@@ -214,119 +220,235 @@ const DeliveryDashboard: React.FC = () => {
       <div className="space-y-6">
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="border-none shadow-md bg-blue-500 text-white">
+          <Card className="group hover:shadow-card transition-all duration-300 border-none theme-shadow-card theme-status-info text-white transform hover:-translate-y-1">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
-                <p className="text-sm">Active Deliveries</p>
-                <p className="text-3xl font-bold">{activeDeliveries}</p>
+                <p className="text-blue-100 text-sm">Active Deliveries</p>
+                <p className="text-3xl font-bold theme-text-primary text-white">
+                  {activeDeliveries}
+                </p>
               </div>
-              <Truck className="h-10 w-10 text-blue-200" />
+              <Truck className="h-10 w-10 text-blue-200 group-hover:scale-110 transition-transform duration-300" />
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-md bg-green-500 text-white">
+          <Card className="group hover:shadow-card transition-all duration-300 border-none theme-shadow-card theme-status-success text-white transform hover:-translate-y-1">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
-                <p className="text-sm">Completed Today</p>
-                <p className="text-3xl font-bold">{completedToday}</p>
+                <p className="text-green-100 text-sm">Completed Today</p>
+                <p className="text-3xl font-bold text-white">
+                  {completedToday}
+                </p>
               </div>
-              <CheckCircle className="h-10 w-10 text-green-200" />
+              <CheckCircle className="h-10 w-10 text-green-200 group-hover:scale-110 transition-transform duration-300" />
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-md bg-purple-500 text-white">
+          <Card className="group hover:shadow-card transition-all duration-300 border-none theme-shadow-card theme-primary-gradient text-white transform hover:-translate-y-1">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
-                <p className="text-sm">Earnings</p>
-                <p className="text-3xl font-bold">
+                <p className="text-green-100 text-sm">Today's Earnings</p>
+                <p className="text-3xl font-bold text-white">
                   ${totalEarnings.toFixed(2)}
                 </p>
               </div>
-              <DollarSign className="h-10 w-10 text-purple-200" />
+              <DollarSign className="h-10 w-10 text-green-200 group-hover:scale-110 transition-transform duration-300" />
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-md bg-orange-500 text-white">
+          <Card className="group hover:shadow-card transition-all duration-300 border-none theme-shadow-card theme-navy-gradient text-white transform hover:-translate-y-1">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
-                <p className="text-sm">Avg. Delivery Time</p>
-                <p className="text-3xl font-bold">
-                  {dashboard.avg_delivery_time_min}m
+                <p className="text-indigo-100 text-sm">Avg. Delivery Time</p>
+                <p className="text-3xl font-bold text-white">
+                  {dashboard.avg_delivery_time_min}min
                 </p>
               </div>
-              <Timer className="h-10 w-10 text-orange-200" />
+              <Timer className="h-10 w-10 text-indigo-200 group-hover:scale-110 transition-transform duration-300" />
             </CardContent>
           </Card>
         </div>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="deliveries">Recent Deliveries</TabsTrigger>
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-            <TabsTrigger value="logs">Delivery Logs</TabsTrigger>
+          <TabsList
+            className="grid w-full grid-cols-4 rounded-lg p-1 transition-all duration-300"
+            style={{
+              background: "var(--bg-card)",
+              boxShadow: "0 4px 20px var(--shadow-light)",
+            }}
+          >
+            <TabsTrigger
+              value="overview"
+              className="rounded-md transition-all duration-300 data-[state=active]:text-white data-[state=active]:shadow-sm theme-tab-trigger"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger
+              value="deliveries"
+              className="rounded-md transition-all duration-300 data-[state=active]:text-white data-[state=active]:shadow-sm theme-tab-trigger"
+            >
+              Recent Deliveries
+            </TabsTrigger>
+            <TabsTrigger
+              value="performance"
+              className="rounded-md transition-all duration-300 data-[state=active]:text-white data-[state=active]:shadow-sm theme-tab-trigger"
+            >
+              Performance
+            </TabsTrigger>
+            <TabsTrigger
+              value="logs"
+              className="rounded-md transition-all duration-300 data-[state=active]:text-white data-[state=active]:shadow-sm theme-tab-trigger"
+            >
+              Delivery Logs
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            <Card>
+            <Card
+              className="group border-none theme-card-hover theme-animate-fade-in-up"
+              style={{ background: "var(--bg-card)" }}
+            >
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Package className="h-5 w-5" />
-                  <span>Available Orders</span>
+                  <Package
+                    className="h-5 w-5 group-hover:scale-110 transition-transform duration-300"
+                    style={{ color: "var(--primary-emerald)" }}
+                  />
+                  <span style={{ color: "var(--text-primary)" }}>
+                    Available Orders
+                  </span>
                 </CardTitle>
-                <CardDescription>Orders ready for pickup</CardDescription>
+                <CardDescription style={{ color: "var(--text-cool-grey)" }}>
+                  Orders ready for pickup and delivery
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {availableOrders.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>No orders available at the moment</p>
-                    <Button asChild className="mt-4">
+                  <div className="text-center py-12 theme-animate-scale-in">
+                    <div
+                      className="rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center"
+                      style={{
+                        background: "rgba(66, 165, 245, 0.1)",
+                        border: "2px solid rgba(66, 165, 245, 0.2)",
+                      }}
+                    >
+                      <Package
+                        className="h-10 w-10"
+                        style={{ color: "var(--status-info)" }}
+                      />
+                    </div>
+                    <h3
+                      className="text-lg font-medium mb-2"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      No orders available
+                    </h3>
+                    <p
+                      className="mb-6"
+                      style={{ color: "var(--text-cool-grey)" }}
+                    >
+                      Check back later for new delivery opportunities
+                    </p>
+                    <Button asChild className="theme-button-primary">
                       <Link to="/delivery/deliveries">View All Deliveries</Link>
                     </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {availableOrders.slice(0, 5).map((order) => (
+                    {availableOrders.slice(0, 5).map((order, index) => (
                       <div
                         key={order.id}
-                        className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                        className="group p-6 rounded-xl theme-card-hover theme-animate-fade-in-up border-none"
+                        style={{
+                          background: "var(--bg-card)",
+                          animationDelay: `${index * 0.1}s`,
+                        }}
                       >
-                        <div className="flex justify-between items-start mb-2">
+                        <div className="flex justify-between items-start mb-4">
                           <div>
-                            <p className="font-semibold text-gray-900">
+                            <p
+                              className="font-semibold text-lg"
+                              style={{ color: "var(--text-primary)" }}
+                            >
                               Order #{order.id}
                             </p>
-                            <p className="text-sm text-gray-600">
+                            <p
+                              className="text-sm flex items-center mt-1"
+                              style={{ color: "var(--text-cool-grey)" }}
+                            >
+                              <Users className="h-4 w-4 mr-1" />
                               {order.customer?.name || "Unknown Customer"}
                             </p>
                           </div>
-                          {getOrderStatusBadge(order.status)}
+                          <div className="transform group-hover:scale-105 transition-transform duration-300">
+                            {getOrderStatusBadge(order.status)}
+                          </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4 text-sm text-gray-600">
-                            <div className="flex items-center space-x-1">
-                              <Clock className="h-4 w-4" />
-                              <span>{formatTime(order.created_at)}</span>
+                          <div className="flex items-center space-x-6 text-sm">
+                            <div
+                              className="flex items-center space-x-2 px-3 py-1 rounded-full"
+                              style={{
+                                background: "rgba(66, 165, 245, 0.1)",
+                                border: "1px solid rgba(66, 165, 245, 0.2)",
+                              }}
+                            >
+                              <Clock
+                                className="h-4 w-4"
+                                style={{ color: "var(--status-info)" }}
+                              />
+                              <span
+                                className="font-medium"
+                                style={{ color: "var(--status-info)" }}
+                              >
+                                {formatTime(order.created_at)}
+                              </span>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <MapPin className="h-4 w-4" />
-                              <span className="truncate max-w-[200px]">
+                            <div
+                              className="flex items-center space-x-2 px-3 py-1 rounded-full"
+                              style={{
+                                background: "rgba(67, 160, 71, 0.1)",
+                                border: "1px solid rgba(67, 160, 71, 0.2)",
+                              }}
+                            >
+                              <MapPin
+                                className="h-4 w-4"
+                                style={{ color: "var(--status-success)" }}
+                              />
+                              <span
+                                className="truncate max-w-[200px] font-medium"
+                                style={{ color: "var(--status-success)" }}
+                              >
                                 {order.delivery_address ||
                                   "Address not specified"}
                               </span>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <DollarSign className="h-4 w-4" />
-                              <span>${order.total_amount}</span>
+                            <div
+                              className="flex items-center space-x-2 px-3 py-1 rounded-full"
+                              style={{
+                                background: "rgba(156, 39, 176, 0.1)",
+                                border: "1px solid rgba(156, 39, 176, 0.2)",
+                              }}
+                            >
+                              <DollarSign
+                                className="h-4 w-4"
+                                style={{ color: "#9C27B0" }}
+                              />
+                              <span
+                                className="font-semibold"
+                                style={{ color: "#9C27B0" }}
+                              >
+                                ${order.total_amount}
+                              </span>
                             </div>
                           </div>
                           <Button
                             onClick={() => handleAcceptOrder(order.id, order)}
                             disabled={acceptingOrder === order.id}
-                            className="ml-4"
+                            className="ml-4 theme-button-primary"
+                            size="lg"
                           >
                             {acceptingOrder === order.id ? (
                               <>
@@ -360,42 +482,103 @@ const DeliveryDashboard: React.FC = () => {
 
           {/* Deliveries Tab */}
           <TabsContent value="deliveries" className="space-y-6">
-            <Card>
+            <Card
+              className="group border-none theme-card-hover theme-animate-fade-in-up"
+              style={{ background: "var(--bg-card)" }}
+            >
               <CardHeader>
-                <CardTitle>Recent Deliveries</CardTitle>
-                <CardDescription>Your delivery history</CardDescription>
+                <CardTitle className="flex items-center space-x-2">
+                  <CheckCircle
+                    className="h-5 w-5 group-hover:scale-110 transition-transform duration-300"
+                    style={{ color: "var(--status-success)" }}
+                  />
+                  <span style={{ color: "var(--text-primary)" }}>
+                    Recent Deliveries
+                  </span>
+                </CardTitle>
+                <CardDescription style={{ color: "var(--text-cool-grey)" }}>
+                  Your completed delivery history
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {recentDeliveries.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <CheckCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>No recent deliveries</p>
+                    <div className="text-center py-12 theme-animate-scale-in">
+                      <div
+                        className="rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center"
+                        style={{
+                          background: "rgba(67, 160, 71, 0.1)",
+                          border: "2px solid rgba(67, 160, 71, 0.2)",
+                        }}
+                      >
+                        <CheckCircle
+                          className="h-10 w-10"
+                          style={{ color: "var(--status-success)" }}
+                        />
+                      </div>
+                      <h3
+                        className="text-lg font-medium mb-2"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        No recent deliveries
+                      </h3>
+                      <p style={{ color: "var(--text-cool-grey)" }}>
+                        Your completed deliveries will appear here
+                      </p>
                     </div>
                   ) : (
-                    recentDeliveries.slice(0, 5).map((order) => (
+                    recentDeliveries.slice(0, 5).map((order, index) => (
                       <div
                         key={order.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
+                        className="group flex items-center justify-between p-6 rounded-xl theme-card-hover theme-animate-fade-in-up"
+                        style={{
+                          background: "var(--bg-card)",
+                          animationDelay: `${index * 0.1}s`,
+                        }}
                       >
                         <div className="flex items-center space-x-4">
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback>
-                              {order.customer?.name?.charAt(0) || "U"}
-                            </AvatarFallback>
-                          </Avatar>
+                          <div className="relative">
+                            <Avatar className="h-12 w-12 border-2 border-white shadow-md group-hover:scale-110 transition-transform duration-300">
+                              <AvatarFallback
+                                className="font-semibold text-white"
+                                style={{
+                                  background: "var(--primary-gradient)",
+                                }}
+                              >
+                                {order.customer?.name?.charAt(0) || "U"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div
+                              className="absolute -bottom-1 -right-1 rounded-full w-4 h-4 flex items-center justify-center"
+                              style={{ background: "var(--status-success)" }}
+                            >
+                              <CheckCircle className="h-3 w-3 text-white" />
+                            </div>
+                          </div>
                           <div>
-                            <p className="font-medium">
+                            <p
+                              className="font-semibold"
+                              style={{ color: "var(--text-primary)" }}
+                            >
                               {order.customer?.name}
                             </p>
-                            <p className="text-sm text-gray-500">
+                            <p
+                              className="text-sm flex items-center mt-1"
+                              style={{ color: "var(--text-cool-grey)" }}
+                            >
+                              <Package className="h-3 w-3 mr-1" />
                               Order #{order.id}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
-                          {getOrderStatusBadge(order.status)}
-                          <p className="text-sm text-gray-500 mt-1">
+                          <div className="transform group-hover:scale-105 transition-transform duration-300">
+                            {getOrderStatusBadge(order.status)}
+                          </div>
+                          <p
+                            className="text-sm mt-2 font-medium"
+                            style={{ color: "var(--text-cool-grey)" }}
+                          >
                             {formatDate(order.created_at)}
                           </p>
                         </div>
@@ -636,4 +819,3 @@ const DeliveryDashboard: React.FC = () => {
 };
 
 export default DeliveryDashboard;
-

@@ -10,13 +10,6 @@ import os
 import random
 import sys
 from datetime import datetime, timedelta
-from decimal import Decimal
-from pathlib import Path
-
-import django
-import requests
-from django.core.files.base import ContentFile
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from PIL import Image
 
@@ -83,48 +76,27 @@ from apps.users.models import ChefProfile, DeliveryProfile, UserProfile
 class SampleDataCreator:
     def __init__(self):
         self.created_objects = {
-            "users": [],
-            "admins": [],
-            "customers": [],
-            "cooks": [],
-            "delivery_agents": [],
-            "cuisines": [],
-            "food_categories": [],
-            "foods": [],
-            "food_prices": [],
-            "orders": [],
-            "admin_activity_logs": [],
-            "admin_backup_logs": [],
-            "admin_dashboard_widgets": [],
-            "admin_quick_actions": [],
-            "system_health_metrics": [],
-            "document_types": [],
-            "email_otps": [],
-            "jwt_tokens": [],
-            "user_documents": [],
-            "communication_responses": [],
-            "communication_templates": [],
-            "cart_items": [],
-            "deliveries": [],
-            "delivery_reviews": [],
-            "order_status_histories": [],
-            "payment_methods": [],
-            "refunds": [],
-            "transactions": [],
-            "chef_profiles": [],
-            "delivery_profiles": [],
+            'users': [],
+            'admins': [],
+            'customers': [],
+            'cooks': [],
+            'delivery_agents': [],
+            'cuisines': [],
+            'food_categories': [],
+            'foods': [],
+            'food_prices': [],
+            'orders': [],
         }
 
-    def create_placeholder_image(
-        self, text="Sample", size=(300, 300), color=(70, 130, 180)
-    ):
-        """Create a simple placeholder image"""
-        img = Image.new("RGB", size, color=color)
-        # For now, just return a simple colored image
-        img_io = io.BytesIO()
-        img.save(img_io, format="JPEG", quality=85)
-        img_io.seek(0)
-        return img_io.getvalue()
+    def create_placeholder_image(self, text="Sample", size=(300, 300), color=(70, 130, 180)):
+        """Return a placeholder Cloudinary URL"""
+        # Using Cloudinary's URL for placeholder images
+        # This generates a colored placeholder with text
+        width, height = size
+        color_hex = f"{color[0]:02x}{color[1]:02x}{color[2]:02x}"
+
+        # Cloudinary URL for auto-generated placeholder
+        return f"https://res.cloudinary.com/demo/image/upload/c_fill,w_{width},h_{height},g_center/l_text:Arial_40:{text.replace(' ', '%20')}/fl_layer_apply,co_white,g_center/v1/{color_hex}.jpg"
 
     def create_users(self):
         """Create 20 sample users for each role with mixed approval statuses"""
@@ -464,17 +436,18 @@ class SampleDataCreator:
         ]
 
         for data in cuisines_data:
-            if not Cuisine.objects.filter(name=data["name"]).exists():
-                cuisine_image = self.create_placeholder_image(data["name"][:3])
+            if not Cuisine.objects.filter(name=data['name']).exists():
+                cuisine_image_url = self.create_placeholder_image(data['name'][:3])
 
                 cuisine = Cuisine.objects.create(
-                    name=data["name"],
-                    description=data["description"],
+                    name=data['name'],
+                    description=data['description'],
+                    image=cuisine_image_url,  # Store Cloudinary URL directly
                     is_active=True,
                     sort_order=len(self.created_objects["cuisines"]) + 1,
                 )
-                self.created_objects["cuisines"].append(cuisine)
-                print(f"Created cuisine: {cuisine.name}")
+                self.created_objects['cuisines'].append(cuisine)
+                print(f"Created cuisine: {cuisine.name} with image: {cuisine_image_url}")
 
     def create_food_categories(self):
         """Create food categories for each cuisine"""
@@ -484,20 +457,19 @@ class SampleDataCreator:
 
         for cuisine in self.created_objects["cuisines"]:
             for category_name in categories:
-                if not FoodCategory.objects.filter(
-                    name=category_name, cuisine=cuisine
-                ).exists():
-                    category_image = self.create_placeholder_image(category_name[:3])
+                if not FoodCategory.objects.filter(name=category_name, cuisine=cuisine).exists():
+                    category_image_url = self.create_placeholder_image(category_name[:3])
 
                     category = FoodCategory.objects.create(
                         name=category_name,
                         cuisine=cuisine,
                         description=f"{category_name} from {cuisine.name} cuisine",
+                        image=category_image_url,  # Store Cloudinary URL directly
                         is_active=True,
                         sort_order=categories.index(category_name) + 1,
                     )
-                    self.created_objects["food_categories"].append(category)
-                    print(f"Created category: {category.name} for {cuisine.name}")
+                    self.created_objects['food_categories'].append(category)
+                    print(f"Created category: {category.name} for {cuisine.name} with image: {category_image_url}")
 
     def create_foods(self):
         """Create food items"""

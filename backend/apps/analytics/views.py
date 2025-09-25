@@ -5,10 +5,15 @@ from apps.authentication.permissions import IsAdminUser
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from django.db.models import Count, Sum, Avg
+from django.utils import timezone
+from datetime import timedelta
+from .models import SystemSettings, SystemNotification, SystemAuditLog, SystemMaintenance, Activity, Notification
 
 from .models import (
     SystemAuditLog,
@@ -23,6 +28,8 @@ from .serializers import (
     SystemNotificationSerializer,
     SystemSettingsSerializer,
 )
+from apps.orders.models import Order
+from apps.food.models import FoodReview
 
 
 class DashboardViewSet(viewsets.ViewSet):
@@ -51,6 +58,7 @@ class DashboardViewSet(viewsets.ViewSet):
         # User statistics
         total_users = User.objects.count()
         active_users = User.objects.filter(is_active=True).count()
+        new_users_today = User.objects.filter(date_joined__date=today).count()
         new_users_today = User.objects.filter(date_joined__date=today).count()
         new_users_this_week = User.objects.filter(date_joined__gte=week_ago).count()
         new_users_this_month = User.objects.filter(date_joined__gte=month_ago).count()

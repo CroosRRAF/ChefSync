@@ -4,6 +4,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { 
   Plus, 
   Minus, 
@@ -18,88 +20,46 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 
-interface CartItem {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
-  price: number;
-  cookId: string;
-  cookName: string;
-  cookRating: number;
-  prepTime: number;
-  cuisine: string;
-  isVeg: boolean;
-  isVegan?: boolean;
-  discount?: number;
-  tags: string[];
-  quantity: number;
-}
+// Import the correct CartItem interface from menuService
+import { CartItem } from '@/services/menuService';
 
 const CustomerCart: React.FC = () => {
   const navigate = useNavigate();
+  const { cartSummary, updateCartItem, removeCartItem } = useCart();
+  const { isAuthenticated, user } = useAuth();
   
-  // Mock cart data - in real app, this would come from context/state management
-  const [cart, setCart] = useState<CartItem[]>([
-    {
-      id: '1',
-      name: 'Chicken Biryani',
-      description: 'Aromatic basmati rice with tender chicken pieces and traditional spices',
-      image: 'https://images.unsplash.com/photo-1631515243349-e0cb75fb8d3a?w=400&h=300&fit=crop',
-      price: 250,
-      cookId: 'cook1',
-      cookName: 'Rajesh Kumar',
-      cookRating: 4.8,
-      prepTime: 30,
-      cuisine: 'Indian',
-      isVeg: false,
-      tags: ['popular', 'spicy', 'traditional'],
-      quantity: 2
-    },
-    {
-      id: '2',
-      name: 'Vegetable Fried Rice',
-      description: 'Wok-fried rice with fresh vegetables and aromatic seasonings',
-      image: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=400&h=300&fit=crop',
-      price: 180,
-      cookId: 'cook2',
-      cookName: 'Priya Sharma',
-      cookRating: 4.6,
-      prepTime: 20,
-      cuisine: 'Chinese',
-      isVeg: true,
-      tags: ['healthy', 'quick', 'vegetarian'],
-      quantity: 1
-    }
-  ]);
+  // Redirect if not authenticated or not a customer
+  if (!isAuthenticated || user?.role !== 'customer') {
+    navigate('/auth/login');
+    return null;
+  }
 
+  // Use cart data from context
+  const cart = cartSummary?.cart_items || [];
+  
   const subtotal = cart.reduce((sum, item) => {
-    const discountedPrice = item.discount 
-      ? item.price * (1 - item.discount / 100) 
-      : item.price;
-    return sum + (discountedPrice * item.quantity);
+    return sum + (item.unit_price * item.quantity);
   }, 0);
 
   const deliveryFee = subtotal > 300 ? 0 : 40;
   const taxAmount = subtotal * 0.05; // 5% tax
   const total = subtotal + deliveryFee + taxAmount;
 
-  const handleQuantityChange = (itemId: string, newQuantity: number) => {
+  const handleQuantityChange = async (itemId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
-      setCart(prev => prev.filter(item => item.id !== itemId));
+      await removeCartItem(itemId);
     } else {
-      setCart(prev => prev.map(item => 
-        item.id === itemId ? { ...item, quantity: newQuantity } : item
-      ));
+      await updateCartItem(itemId, newQuantity);
     }
   };
 
-  const handleRemoveItem = (itemId: string) => {
-    setCart(prev => prev.filter(item => item.id !== itemId));
+  const handleRemoveItem = async (itemId: number) => {
+    await removeCartItem(itemId);
   };
 
   const handleClearCart = () => {
-    setCart([]);
+    // Clear all items from cart
+    cart.forEach(item => removeCartItem(item.id));
   };
 
   const handleCheckout = () => {
@@ -189,10 +149,6 @@ const CustomerCart: React.FC = () => {
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {cart.map((item, index) => {
-              const discountedPrice = item.discount 
-                ? item.price * (1 - item.discount / 100) 
-                : item.price;
-
               return (
                 <Card key={item.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 animate-slideUp" style={{ animationDelay: `${index * 100}ms` }}>
                   <CardContent className="p-0">
@@ -200,8 +156,8 @@ const CustomerCart: React.FC = () => {
                       {/* Item Image */}
                       <div className="relative w-32 h-32 flex-shrink-0">
                         <img
-                          src={item.image}
-                          alt={item.name}
+                          src={item.food_image || 'https://via.placeholder.com/128x128?text=No+Image'}
+                          alt={item.food_name}
                           className="w-full h-full object-cover"
                         />
                         {item.discount && (
@@ -227,25 +183,20 @@ const CustomerCart: React.FC = () => {
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
                             <h3 className="font-semibold text-lg text-gray-900 dark:text-white mb-1">
-                              {item.name}
+                              {item.food_name}
                             </h3>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                              by {item.cookName}
+                              by {item.cook_name} - {item.size}
                             </p>
                             <div className="flex items-center space-x-4 mb-3">
                               <div className="flex items-center space-x-2">
                                 <span className="text-lg font-bold text-gray-900 dark:text-white">
-                                  ₹{Math.round(discountedPrice)}
+                                  LKR {item.unit_price}
                                 </span>
-                                {item.discount && (
-                                  <span className="text-sm text-gray-500 line-through">
-                                    ₹{item.price}
-                                  </span>
-                                )}
                               </div>
                               <div className="flex items-center text-sm text-gray-500">
                                 <Clock className="h-3 w-3 mr-1" />
-                                {item.prepTime} min
+                                Ready in 30 min
                               </div>
                             </div>
 
@@ -287,7 +238,7 @@ const CustomerCart: React.FC = () => {
                           {/* Item Total */}
                           <div className="text-right">
                             <div className="text-xl font-bold text-gray-900 dark:text-white">
-                              ₹{Math.round(discountedPrice * item.quantity)}
+                              LKR {item.total_price}
                             </div>
                           </div>
                         </div>
@@ -330,7 +281,7 @@ const CustomerCart: React.FC = () => {
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                    <span className="font-medium">₹{Math.round(subtotal)}</span>
+                    <span className="font-medium">LKR {Math.round(subtotal)}</span>
                   </div>
                   
                   <div className="flex justify-between">
@@ -341,13 +292,13 @@ const CustomerCart: React.FC = () => {
                       )}
                     </span>
                     <span className="font-medium">
-                      {deliveryFee === 0 ? 'Free' : `₹${deliveryFee}`}
+                      {deliveryFee === 0 ? 'Free' : `LKR ${deliveryFee}`}
                     </span>
                   </div>
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Taxes & Fees</span>
-                    <span className="font-medium">₹{Math.round(taxAmount)}</span>
+                    <span className="font-medium">LKR {Math.round(taxAmount)}</span>
                   </div>
                   
                   <Separator />
@@ -355,7 +306,7 @@ const CustomerCart: React.FC = () => {
                   <div className="flex justify-between text-lg">
                     <span className="font-bold text-gray-900 dark:text-white">Total</span>
                     <span className="font-bold text-gray-900 dark:text-white">
-                      ₹{Math.round(total)}
+                      LKR {Math.round(total)}
                     </span>
                   </div>
                 </div>
@@ -364,7 +315,7 @@ const CustomerCart: React.FC = () => {
                 {subtotal < 300 && (
                   <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3 mb-6">
                     <p className="text-sm text-orange-800 dark:text-orange-200">
-                      Add ₹{300 - subtotal} more to get free delivery!
+                      Add LKR {300 - subtotal} more to get free delivery!
                     </p>
                   </div>
                 )}

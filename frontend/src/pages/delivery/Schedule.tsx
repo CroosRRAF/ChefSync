@@ -34,7 +34,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import type { Order } from "@/types/order";
+import type { Order } from "@/types/orderType";
 
 interface ScheduleItem {
   id: string;
@@ -208,7 +208,24 @@ const DeliverySchedule: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center h-64">Loading...</div>
+      <DeliveryLayout
+        title="Delivery Schedule"
+        description="Manage your delivery schedule and optimize routes"
+      >
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="bg-gradient-to-br from-primary/10 to-primary/20 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <Calendar className="h-8 w-8 text-primary animate-pulse" />
+            </div>
+            <p className="text-lg font-medium text-gray-900">
+              Loading schedule...
+            </p>
+            <p className="text-gray-600">
+              Please wait while we fetch your data
+            </p>
+          </div>
+        </div>
+      </DeliveryLayout>
     );
   }
 
@@ -217,16 +234,21 @@ const DeliverySchedule: React.FC = () => {
       title="Delivery Schedule"
       description="Manage your delivery schedule and optimize routes"
     >
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex items-center justify-between">
-          <div className="flex space-x-2">
-            <Button onClick={fetchOrders} variant="outline">
+          <div className="flex space-x-4">
+            <Button
+              onClick={fetchOrders}
+              variant="outline"
+              className="hover:bg-primary hover:text-primary-foreground transform hover:scale-105 transition-all duration-300"
+            >
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
             <Button
               onClick={handleOptimizeRoute}
               disabled={orders.length === 0}
+              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:transform-none"
             >
               <Route className="h-4 w-4 mr-2" />
               Optimize Route
@@ -234,20 +256,38 @@ const DeliverySchedule: React.FC = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="today" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="today">Today</TabsTrigger>
-            <TabsTrigger value="week">This Week</TabsTrigger>
-            <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+        <Tabs defaultValue="today" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 h-12 bg-gray-100">
+            <TabsTrigger
+              value="today"
+              className="data-[state=active]:bg-white data-[state=active]:shadow-md transition-all duration-300"
+            >
+              Today
+            </TabsTrigger>
+            <TabsTrigger
+              value="week"
+              className="data-[state=active]:bg-white data-[state=active]:shadow-md transition-all duration-300"
+            >
+              This Week
+            </TabsTrigger>
+            <TabsTrigger
+              value="calendar"
+              className="data-[state=active]:bg-white data-[state=active]:shadow-md transition-all duration-300"
+            >
+              Calendar View
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="today" className="space-y-4">
-            <Card>
+          <TabsContent value="today" className="space-y-6">
+            <Card className="group hover:shadow-card transition-all duration-300 border-none shadow-lg">
               <CardHeader>
-                <CardTitle>
-                  Today's Schedule - {new Date().toDateString()}
+                <CardTitle className="flex items-center space-x-3 text-2xl">
+                  <div className="bg-gradient-to-r from-primary to-primary/80 rounded-full p-2">
+                    <Calendar className="h-6 w-6 text-white" />
+                  </div>
+                  <span>Today's Schedule - {new Date().toDateString()}</span>
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-base">
                   {orders.length} deliveries scheduled for today
                 </CardDescription>
               </CardHeader>

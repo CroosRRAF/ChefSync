@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useCart } from '@/context/CartContext';
 import logoImage from '@/assets/2.png';
 import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import { 
@@ -31,9 +32,9 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ className }) => {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [cartItems, setCartItems] = useState(0); // TODO: Connect to cart context
   const { user, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { cartSummary } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -45,6 +46,7 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
 
   const handleAuthAction = () => {
     if (isAuthenticated) {
@@ -208,12 +210,12 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
                       ? 'text-gray-900'
                       : 'text-gray-300'
                 }`} />
-                {cartItems > 0 && (
+                {cartSummary && cartSummary.total_items > 0 && (
                   <Badge 
                     variant="destructive" 
                     className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
                   >
-                    {cartItems}
+                    {cartSummary.total_items}
                   </Badge>
                 )}
               </Button>
