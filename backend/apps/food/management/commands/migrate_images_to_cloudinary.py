@@ -4,7 +4,7 @@ Management command to migrate blob images to Cloudinary
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from apps.food.models import Cuisine, FoodCategory, Food, FoodImage, FoodPrice
-from apps.food.cloudinary_utils import migrate_blob_to_cloudinary
+from utils.cloudinary_utils import migrate_blob_to_cloudinary
 import time
 
 

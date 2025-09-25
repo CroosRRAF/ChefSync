@@ -1,14 +1,14 @@
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
-from apps.users.fields import LongBlobImageField   
+from .cloudinary_fields import CloudinaryImageField   
 
 class Cuisine(models.Model):
     """Cuisine categories (e.g., Italian, Chinese, Indian)"""
     
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    image = LongBlobImageField(blank=True, null=True)
+    image = CloudinaryImageField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
     
@@ -26,7 +26,7 @@ class FoodCategory(models.Model):
     name = models.CharField(max_length=100)
     cuisine = models.ForeignKey(Cuisine, on_delete=models.CASCADE, related_name='categories')
     description = models.TextField(blank=True)
-    image = LongBlobImageField(blank=True, null=True)
+    image = CloudinaryImageField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
     
@@ -52,7 +52,7 @@ class Food(models.Model):
     name = models.CharField(max_length=100, null=False)
     category = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    image = LongBlobImageField(blank=True, null=True, help_text='Food image')
+    image = CloudinaryImageField(blank=True, null=True, help_text='Food image')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     admin = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
@@ -156,7 +156,7 @@ class FoodImage(models.Model):
     def optimized_url(self):
         """Get optimized Cloudinary URL"""
         if self.image_url and 'cloudinary.com' in self.image_url:
-            from .cloudinary_utils import get_optimized_url
+            from utils.cloudinary_utils import get_optimized_url
             return get_optimized_url(self.image_url)
         return self.image_url
     
@@ -166,8 +166,8 @@ class FoodImage(models.Model):
         if self.thumbnail_url:
             return self.thumbnail_url
         elif self.image_url and 'cloudinary.com' in self.image_url:
-            from .cloudinary_utils import get_optimized_url
-            return get_optimized_url(self.image_url, width=200, height=200, crop='fill')
+            from utils.cloudinary_utils import get_optimized_url
+            return get_optimized_url(self.image_url, width=200, height=200)
         return self.image_url
     
     class Meta:

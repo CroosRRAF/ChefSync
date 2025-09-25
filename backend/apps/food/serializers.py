@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer, FoodImage
-from .utils import convert_image_with_proper_mime_type, get_thumbnail_url
+from utils.cloudinary_utils import get_optimized_url
 
 
 class CuisineSerializer(serializers.ModelSerializer):
@@ -12,13 +12,16 @@ class CuisineSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description', 'image', 'image_url', 'thumbnail_url', 'is_active', 'sort_order']
     
     def get_image_url(self, obj):
-        """Convert blob/base64 image to proper data URL or return optimized Cloudinary URL"""
-        return convert_image_with_proper_mime_type(obj.image)
+        """Return optimized Cloudinary URL"""
+        if obj.image:
+            return get_optimized_url(str(obj.image))
+        return None
     
     def get_thumbnail_url(self, obj):
         """Get thumbnail version of the image"""
-        image_url = convert_image_with_proper_mime_type(obj.image)
-        return get_thumbnail_url(image_url, width=200, height=200)
+        if obj.image:
+            return get_optimized_url(str(obj.image), width=200, height=200)
+        return None
 
 
 class FoodCategorySerializer(serializers.ModelSerializer):
@@ -31,13 +34,16 @@ class FoodCategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'cuisine', 'cuisine_name', 'description', 'image', 'image_url', 'thumbnail_url', 'is_active', 'sort_order']
     
     def get_image_url(self, obj):
-        """Convert blob/base64 image to proper data URL or return optimized Cloudinary URL"""
-        return convert_image_with_proper_mime_type(obj.image)
+        """Return optimized Cloudinary URL"""
+        if obj.image:
+            return get_optimized_url(str(obj.image))
+        return None
     
     def get_thumbnail_url(self, obj):
         """Get thumbnail version of the image"""
-        image_url = convert_image_with_proper_mime_type(obj.image)
-        return get_thumbnail_url(image_url, width=200, height=200)
+        if obj.image:
+            return get_optimized_url(str(obj.image), width=200, height=200)
+        return None
 
 
 class FoodImageSerializer(serializers.ModelSerializer):
@@ -81,9 +87,9 @@ class FoodPriceSerializer(serializers.ModelSerializer):
         return getattr(obj.cook, 'rating', 4.5)
     
     def get_image_data_url(self, obj):
-        """Convert image_url blob to proper data URL if needed"""
+        """Return optimized Cloudinary URL"""
         if obj.image_url:
-            return convert_image_with_proper_mime_type(obj.image_url)
+            return get_optimized_url(str(obj.image_url))
         return None
 
 

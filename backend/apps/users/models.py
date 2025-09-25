@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from .fields import LongBlobImageField
+from apps.food.cloudinary_fields import CloudinaryImageField
 
 
 class UserProfile(models.Model):
@@ -14,7 +14,7 @@ class UserProfile(models.Model):
     ]
     
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
-    profile_picture = LongBlobImageField(blank=True, null=True)
+    profile_picture = CloudinaryImageField(blank=True, null=True)
     address = models.TextField(blank=True)
     date_of_birth = models.DateField(blank=True, null=True)
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True)

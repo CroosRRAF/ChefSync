@@ -4,7 +4,7 @@ Custom fields for handling both Cloudinary URLs and blob data
 from django.db import models
 from django.core.files.base import ContentFile
 from cloudinary.models import CloudinaryField
-from apps.food.cloudinary_utils import upload_image_to_cloudinary, migrate_blob_to_cloudinary
+from utils.cloudinary_utils import upload_image_to_cloudinary, migrate_blob_to_cloudinary
 import base64
 
 

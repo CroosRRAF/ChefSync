@@ -12,7 +12,6 @@ import json
 from decimal import Decimal
 from datetime import datetime, timedelta
 from django.utils import timezone
-from django.core.files.base import ContentFile
 import base64
 
 # Add backend directory to Python path
@@ -493,18 +492,20 @@ class NewSampleFoodCreator:
                         )
                 
                 # Create food images
+                # Create sample images using Cloudinary URLs
                 for i in range(random.randint(1, 3)):
-                    image_data = self.get_sample_image_base64()
-                    # Extract base64 data
-                    image_data = image_data.split(',')[1]
-                    image_content = ContentFile(
-                        base64.b64decode(image_data),
-                        name=f'{food.name.lower().replace(" ", "_")}_{i+1}.png'
-                    )
+                    # Generate a Cloudinary placeholder URL for the food
+                    food_name_clean = food.name.lower().replace(" ", "_").replace("'", "")
+                    color_variations = ['c_fill,co_rgb:ff6b4a', 'c_fill,co_rgb:4ecdc4', 'c_fill,co_rgb:45b7d1', 'c_fill,co_rgb:96ceb4']
+                    color = random.choice(color_variations)
+                    
+                    image_url = f"https://res.cloudinary.com/demo/image/upload/{color},w_400,h_300,g_center/l_text:Arial_40:{food_name_clean}/fl_layer_apply,co_white,g_center/sample.jpg"
                     
                     FoodImage.objects.create(
                         food=food,
-                        image=image_content,
+                        image_url=image_url,
+                        thumbnail_url=f"https://res.cloudinary.com/demo/image/upload/{color},w_200,h_150,g_center/l_text:Arial_20:{food_name_clean}/fl_layer_apply,co_white,g_center/sample.jpg",
+                        cloudinary_public_id=f"sample_{food_name_clean}_{i+1}",
                         caption=f"Delicious {food.name}",
                         is_primary=(i == 0),
                         sort_order=i

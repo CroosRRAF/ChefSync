@@ -33,12 +33,16 @@ def food_search(request):
     
     results = []
     for food in foods:
+        # Get image URL using serializer method for consistency
+        serializer = FoodSerializer(food)
+        image_url = serializer.get_image_url(food)
+        
         results.append({
             'id': food.food_id,
             'name': food.name,
             'description': food.description,
             'category': food.category,
-            'image_url': food.image.url if food.image else None
+            'image_url': image_url
         })
     
     return Response(results)
@@ -47,7 +51,7 @@ def food_search(request):
 @api_view(['POST'])
 def upload_image(request):
     """Image upload endpoint for Cloudinary"""
-    from .cloudinary_utils import upload_image_to_cloudinary
+    from utils.cloudinary_utils import upload_image_to_cloudinary
     
     if 'image' not in request.FILES:
         return Response({'error': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
@@ -140,12 +144,16 @@ class ChefFoodViewSet(viewsets.ModelViewSet):
         
         results = []
         for food in foods:
+            # Get image URL using serializer method for consistency
+            serializer = FoodSerializer(food)
+            image_url = serializer.get_image_url(food)
+            
             results.append({
                 'id': food.food_id,
                 'name': food.name,
                 'description': food.description,
                 'category': food.category,
-                'image_url': food.image.url if food.image else None
+                'image_url': image_url
             })
         
         return Response(results)
