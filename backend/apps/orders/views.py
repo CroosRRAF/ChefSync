@@ -20,6 +20,10 @@ class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        """Filter orders to only show the current user's orders"""
+        return Order.objects.filter(customer=self.request.user).order_by('-created_at')
+
     @action(detail=False, methods=['get'])
     def available(self, request):
         available_orders = self.queryset.filter(
@@ -131,6 +135,83 @@ class CartItemViewSet(viewsets.ModelViewSet):
     queryset = CartItem.objects.all()
     serializer_class = CartItemSerializer
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter cart items to only show the current user's items"""
+        return CartItem.objects.filter(customer=self.request.user)
+    
+    @action(detail=False, methods=['post'])
+    def add_to_cart(self, request):
+        """Add an item to the cart or update quantity if it already exists"""
+        try:
+            price_id = request.data.get('price_id')
+            quantity = request.data.get('quantity', 1)
+            special_instructions = request.data.get('special_instructions', '')
+            
+            if not price_id:
+                return Response(
+                    {'error': 'price_id is required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if item already exists in cart
+            cart_item, created = CartItem.objects.get_or_create(
+                customer=request.user,
+                price_id=price_id,  # Django will automatically map this to the FoodPrice primary key
+                defaults={
+                    'quantity': quantity,
+                    'special_instructions': special_instructions
+                }
+            )
+            
+            if not created:
+                # Item exists, update quantity
+                cart_item.quantity += quantity
+                cart_item.save()
+            
+            serializer = self.get_serializer(cart_item)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'])
+    def cart_summary(self, request):
+        """Get cart summary with total price and items"""
+        try:
+            cart_items = self.get_queryset()
+            total_price = sum(item.total_price for item in cart_items)
+            total_items = sum(item.quantity for item in cart_items)
+            
+            serializer = self.get_serializer(cart_items, many=True)
+            
+            return Response({
+                'total_value': total_price,  # Changed from total_price to total_value
+                'total_items': total_items,
+                'cart_items': serializer.data
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['delete'])
+    def clear_cart(self, request):
+        """Clear all items from the cart"""
+        try:
+            deleted_count = self.get_queryset().delete()[0]
+            return Response({
+                'message': f'Removed {deleted_count} items from cart'
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 # Chef Dashboard API Views

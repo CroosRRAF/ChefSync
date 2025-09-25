@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/context/AuthContext';
-import { useOrderStore } from '@/store/orderStore';
 import { useNavigate } from 'react-router-dom';
+import { customerService, CustomerStats } from '@/services/customerService';
+// import { testCustomerAPI } from '@/utils/testCustomerAPI';
 import { 
   ShoppingCart, 
   Clock, 
@@ -18,33 +19,50 @@ import {
   Trophy,
   Target,
   Award,
-  User
+  User,
+  Loader2
 } from 'lucide-react';
 
 const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
-  const { orders, getOrdersByCustomer } = useOrderStore();
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [stats, setStats] = useState<CustomerStats | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const customerOrders = user ? getOrdersByCustomer(user.id) : [];
-  
-  const totalOrders = customerOrders.length;
-  const pendingOrders = customerOrders.filter(order => 
-    ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
-  ).length;
-  const completedOrders = customerOrders.filter(order => order.status === 'delivered').length;
-  const totalSpent = customerOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
-  const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        const customerStats = await customerService.getCustomerStats();
+        setStats(customerStats);
+        console.log('Customer stats loaded:', customerStats);
+      } catch (error) {
+        console.error('Error fetching customer stats:', error);
+        // Set default stats on error
+        setStats({
+          total_orders: 0,
+          completed_orders: 0,
+          pending_orders: 0,
+          total_spent: 0,
+          average_order_value: 0,
+          favorite_cuisines: [],
+          recent_orders: []
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const recentOrders = customerOrders
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 3);
+    fetchStats();
+  }, [user]);
 
   const getCustomerLevel = (orderCount: number) => {
     if (orderCount >= 50) return { level: 'Diamond', color: 'bg-purple-500', progress: 100 };
@@ -53,7 +71,20 @@ const CustomerDashboard: React.FC = () => {
     return { level: 'Bronze', color: 'bg-orange-400', progress: orderCount / 10 * 100 };
   };
 
-  const customerLevel = getCustomerLevel(completedOrders);
+  const customerLevel = stats ? getCustomerLevel(stats.completed_orders) : { level: 'Bronze', color: 'bg-orange-500', progress: 0 };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-16">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+            <span className="ml-2 text-gray-600">Loading dashboard...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -112,13 +143,14 @@ const CustomerDashboard: React.FC = () => {
         </CardContent>
       </Card>
 
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="border-none shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white transform hover:scale-105 transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-blue-100 text-sm font-medium">Total Orders</p>
-                <p className="text-3xl font-bold">{totalOrders}</p>
+                <p className="text-3xl font-bold">{stats?.total_orders || 0}</p>
               </div>
               <ShoppingCart className="h-10 w-10 text-blue-200" />
             </div>
@@ -130,7 +162,7 @@ const CustomerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-100 text-sm font-medium">Total Spent</p>
-                <p className="text-3xl font-bold">${totalSpent.toFixed(2)}</p>
+                <p className="text-3xl font-bold">LKR {Math.round(stats?.total_spent || 0)}</p>
               </div>
               <DollarSign className="h-10 w-10 text-green-200" />
             </div>
@@ -142,7 +174,7 @@ const CustomerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-purple-100 text-sm font-medium">Active Orders</p>
-                <p className="text-3xl font-bold">{pendingOrders}</p>
+                <p className="text-3xl font-bold">{stats?.pending_orders || 0}</p>
               </div>
               <Clock className="h-10 w-10 text-purple-200" />
             </div>
@@ -154,7 +186,7 @@ const CustomerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-orange-100 text-sm font-medium">Avg Order</p>
-                <p className="text-3xl font-bold">${averageOrderValue.toFixed(2)}</p>
+                <p className="text-3xl font-bold">LKR {Math.round(stats?.average_order_value || 0)}</p>
               </div>
               <TrendingUp className="h-10 w-10 text-orange-200" />
             </div>
@@ -178,7 +210,7 @@ const CustomerDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900 dark:text-white">{customerLevel.level} Level</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">{completedOrders} orders completed</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{stats?.completed_orders || 0} orders completed</p>
                 </div>
               </div>
             </div>
@@ -196,22 +228,22 @@ const CustomerDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentOrders.length > 0 ? (
-              recentOrders.map((order) => (
+            {stats?.recent_orders && stats.recent_orders.length > 0 ? (
+              stats.recent_orders.map((order) => (
                 <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
                       <Package className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">Order #{order.id}</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">Order #{order.order_number}</p>
                       <p className="text-sm text-gray-600 dark:text-gray-300">
                         {new Date(order.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-gray-900 dark:text-white">${order.total_amount}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">LKR {Math.round(order.total_amount)}</p>
                     <Badge className={getStatusColor(order.status)}>
                       {order.status.replace('_', ' ')}
                     </Badge>
@@ -278,7 +310,7 @@ const CustomerDashboard: React.FC = () => {
         <CardContent>
           <div className="text-center">
             <Award className="h-12 w-12 mx-auto mb-2 text-yellow-100" />
-            <p className="text-2xl font-bold mb-1">{completedOrders * 10}</p>
+            <p className="text-2xl font-bold mb-1">{(stats?.completed_orders || 0) * 10}</p>
             <p className="text-yellow-100 text-sm mb-4">Points Earned</p>
             <Button variant="secondary" size="sm" className="bg-white text-orange-600 hover:bg-yellow-50">
               Redeem Points
