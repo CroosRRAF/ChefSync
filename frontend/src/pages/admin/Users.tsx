@@ -63,7 +63,7 @@ const EnhancedUserManagement: React.FC = () => {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Approval state
-  const [activeTab, setActiveTab] = useState("chefs");
+  const [activeTab, setActiveTab] = useState("pending");
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [selectedApprovalUser, setSelectedApprovalUser] = useState<any>(null);
@@ -311,11 +311,30 @@ const EnhancedUserManagement: React.FC = () => {
     }
   };
 
-  // Handle bulk actions
+  // Handle bulk actions with confirmation
   const handleBulkAction = async (
     selectedUsers: AdminUser[],
     action: string
   ) => {
+    if (selectedUsers.length === 0) return;
+
+    const actionText =
+      action === "activate"
+        ? "activate"
+        : action === "deactivate"
+        ? "deactivate"
+        : "delete";
+
+    if (
+      !window.confirm(
+        `Are you sure you want to ${actionText} ${selectedUsers.length} user${
+          selectedUsers.length > 1 ? "s" : ""
+        }?`
+      )
+    ) {
+      return;
+    }
+
     try {
       const userIds = selectedUsers.map((user) => user.id);
 
@@ -424,12 +443,23 @@ const EnhancedUserManagement: React.FC = () => {
     }
   }, []);
 
-  // Handle approval action
+  // Handle approval action with confirmation
   const handleApprovalAction = async (
     userId: number,
     action: "approve" | "reject",
     notes?: string
   ) => {
+    const user = pendingApprovals.find((u) => u.user_id === userId);
+    const actionText = action === "approve" ? "approve" : "reject";
+
+    if (
+      !window.confirm(
+        `Are you sure you want to ${actionText} ${user?.name || "this user"}?`
+      )
+    ) {
+      return;
+    }
+
     try {
       await adminService.approveUser(userId, action, notes);
 
@@ -534,14 +564,60 @@ const EnhancedUserManagement: React.FC = () => {
     }
   };
 
-  // Handle tab changes
+  // Keyboard shortcuts for admin efficiency
   useEffect(() => {
-    if (activeTab === "chefs") {
-      fetchUsersByRole("cook");
-    } else if (activeTab === "customers") {
-      fetchUsersByRole("customer");
-    }
-  }, [activeTab, fetchUsersByRole]);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle shortcuts when not typing in inputs
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      // Ctrl/Cmd + R: Refresh data
+      if ((event.ctrlKey || event.metaKey) && event.key === "r") {
+        event.preventDefault();
+        if (activeTab === "pending") {
+          fetchPendingApprovals();
+        } else if (activeTab === "chefs") {
+          fetchUsersByRole("cook");
+        } else if (activeTab === "customers") {
+          fetchUsersByRole("customer");
+        }
+      }
+
+      // Ctrl/Cmd + A: Select all (in current tab)
+      if ((event.ctrlKey || event.metaKey) && event.key === "a") {
+        event.preventDefault();
+        if (activeTab === "chefs") {
+          setSelectedChefs(chefs.map((c) => c.id));
+        } else if (activeTab === "customers") {
+          setSelectedCustomers(customers.map((c) => c.id));
+        }
+      }
+
+      // Escape: Clear selections
+      if (event.key === "Escape") {
+        setSelectedChefs([]);
+        setSelectedCustomers([]);
+      }
+
+      // Number keys: Switch tabs (1=pending, 2=chefs, 3=customers)
+      if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (event.key === "1") {
+          setActiveTab("pending");
+        } else if (event.key === "2") {
+          setActiveTab("chefs");
+        } else if (event.key === "3") {
+          setActiveTab("customers");
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab, chefs, customers, fetchPendingApprovals, fetchUsersByRole]);
 
   // Get user stats
   const userStats = {
@@ -644,13 +720,17 @@ const EnhancedUserManagement: React.FC = () => {
           <p className="mt-1 text-gray-600 dark:text-gray-400">
             Manage users, roles, and permissions across your platform.
           </p>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-500">
+            <span className="font-medium">Keyboard shortcuts:</span> 1-3: Switch
+            tabs • Ctrl+R: Refresh • Ctrl+A: Select all • Esc: Clear selection
+          </div>
         </div>
         <div className="flex items-center space-x-3">
           <Button variant="outline" onClick={() => fetchUsers()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          {activeTab === "users" && (
+          {activeTab === "customers" && (
             <>
               {activeFilterCount > 0 && (
                 <Button variant="outline" onClick={handleClearFilters}>
@@ -672,7 +752,19 @@ const EnhancedUserManagement: React.FC = () => {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="pending" className="relative">
+            <ShieldCheck className="h-4 w-4 mr-2" />
+            Pending Approvals
+            {pendingApprovals.length > 0 && (
+              <Badge
+                variant="destructive"
+                className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+              >
+                {pendingApprovals.length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="chefs" className="relative">
             <ChefHat className="h-4 w-4 mr-2" />
             Chefs
@@ -691,6 +783,177 @@ const EnhancedUserManagement: React.FC = () => {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="pending" className="space-y-6">
+          {/* Pending Approvals Header */}
+          <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl font-semibold flex items-center">
+                    <ShieldCheck className="h-5 w-5 mr-2 text-orange-600 dark:text-orange-400" />
+                    Pending Approvals
+                  </CardTitle>
+                  <p className="text-sm mt-1 text-gray-600 dark:text-gray-400">
+                    Review and approve new user applications •{" "}
+                    {pendingApprovals.length} pending
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={fetchPendingApprovals}
+                    disabled={approvalLoading}
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 mr-2 ${
+                        approvalLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </Button>
+                  {pendingApprovals.length > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Approve all ${pendingApprovals.length} pending applications?`
+                            )
+                          ) {
+                            pendingApprovals.forEach((user) =>
+                              handleApprovalAction(user.user_id, "approve")
+                            );
+                          }
+                        }}
+                        className="border-green-500 text-green-600 hover:bg-green-50"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Approve All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Reject all ${pendingApprovals.length} pending applications?`
+                            )
+                          ) {
+                            pendingApprovals.forEach((user) =>
+                              handleApprovalAction(user.user_id, "reject")
+                            );
+                          }
+                        }}
+                        className="border-red-500 text-red-600 hover:bg-red-50"
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Reject All
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {approvalLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin mr-2" />
+                  <span>Loading pending approvals...</span>
+                </div>
+              ) : pendingApprovals.length === 0 ? (
+                <div className="text-center py-12">
+                  <ShieldCheck className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    No Pending Approvals
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    All user applications have been reviewed.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {pendingApprovals.map((user) => (
+                    <Card
+                      key={user.user_id}
+                      className="hover:shadow-md transition-shadow"
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-lg bg-gradient-to-br from-orange-500 to-red-600">
+                            {user.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                              {user.name}
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {user.email}
+                            </p>
+                            <Badge variant="secondary" className="mt-1">
+                              {user.role === "cook"
+                                ? "Chef"
+                                : user.role === "customer"
+                                ? "Customer"
+                                : "Delivery Agent"}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          <div className="text-sm">
+                            <span className="font-medium">Applied:</span>{" "}
+                            {new Date(user.created_at).toLocaleDateString()}
+                          </div>
+                          {user.phone_no && (
+                            <div className="text-sm">
+                              <span className="font-medium">Phone:</span>{" "}
+                              {user.phone_no}
+                            </div>
+                          )}
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                handleApprovalAction(user.user_id, "approve")
+                              }
+                              className="flex-1 bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() =>
+                                handleApprovalAction(user.user_id, "reject")
+                              }
+                              className="flex-1"
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleApprovalUserDetail(user)}
+                            className="w-full"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View Details
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
         <TabsContent value="chefs" className="space-y-6">
           {/* Bulk Actions Bar */}
           {selectedChefs.length > 0 && (
