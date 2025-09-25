@@ -22,6 +22,7 @@ import DeliveryLayout from "@/components/delivery/DeliveryLayout";
 import GoogleMapComponent from "@/components/delivery/GoogleMapComponent";
 import {
   getAvailableOrders,
+  getMyAssignedOrders,
   updateDeliveryLocation,
   getRouteDirections,
   optimizeDeliveryRoute,
@@ -43,6 +44,7 @@ import type { Order } from "../../types/orderType";
 import OrderStatusTracker from "@/components/delivery/OrderStatusTracker";
 import DeliveryTracker from "@/components/delivery/DeliveryTracker";
 import PickupDeliveryFlow from "@/components/delivery/PickupDeliveryFlow";
+import DeliveryPhaseCard from "@/components/delivery/DeliveryPhaseCard";
 
 interface Location {
   lat: number;
@@ -66,6 +68,7 @@ const DeliveryMap: React.FC = () => {
   const { toast } = useToast();
   const location = useLocation();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [assignedOrders, setAssignedOrders] = useState<Order[]>([]);
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -93,6 +96,7 @@ const DeliveryMap: React.FC = () => {
 
   useEffect(() => {
     fetchOrders();
+    fetchAssignedOrders();
     checkLocationPermissions();
   }, []);
 
@@ -113,6 +117,19 @@ const DeliveryMap: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAssignedOrders = async () => {
+    try {
+      const assignedData = await getMyAssignedOrders();
+      // Filter for active delivery states
+      const activeOrders = assignedData.filter((order) =>
+        ["ready", "out_for_delivery", "in_transit"].includes(order.status)
+      );
+      setAssignedOrders(activeOrders);
+    } catch (error) {
+      console.error("Failed to fetch assigned orders:", error);
     }
   };
 
@@ -286,16 +303,31 @@ const DeliveryMap: React.FC = () => {
       )
     );
 
+    // Update assigned orders as well
+    setAssignedOrders((prevOrders) =>
+      prevOrders.map((order) =>
+        order.id === orderId ? { ...order, status: newStatus } : order
+      )
+    );
+
     // If the selected order was updated, update it too
     if (selectedOrder?.id === orderId) {
       setSelectedOrder((prev) =>
         prev ? { ...prev, status: newStatus } : null
       );
     }
+
+    // Refresh assigned orders from server to get latest data
+    fetchAssignedOrders();
   };
 
   const handleDeliveryComplete = (orderId: number) => {
     setOrders((prevOrders) =>
+      prevOrders.filter((order) => order.id !== orderId)
+    );
+
+    // Also remove from assigned orders
+    setAssignedOrders((prevOrders) =>
       prevOrders.filter((order) => order.id !== orderId)
     );
 
@@ -308,6 +340,9 @@ const DeliveryMap: React.FC = () => {
       title: "Delivery Completed",
       description: `Order #${orderId} has been successfully delivered!`,
     });
+
+    // Refresh assigned orders to ensure consistency
+    fetchAssignedOrders();
   };
 
   // Get destination location for selected order (mock for now)
@@ -425,7 +460,10 @@ const DeliveryMap: React.FC = () => {
               Optimize Route
             </Button>
             <Button
-              onClick={fetchOrders}
+              onClick={() => {
+                fetchOrders();
+                fetchAssignedOrders();
+              }}
               variant="outline"
               className="hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transform hover:scale-105 transition-all duration-300"
             >
@@ -706,6 +744,58 @@ const DeliveryMap: React.FC = () => {
                 onStatusUpdate={handleStatusUpdate}
                 onNavigate={handleGetDirections}
               />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Active Deliveries Section */}
+        {assignedOrders.length > 0 && (
+          <Card className="border-none theme-card-hover">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Truck className="h-5 w-5 mr-2 text-blue-600" />
+                  <span>Active Deliveries</span>
+                </div>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                  {assignedOrders.length} active
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                Your currently assigned orders for pickup and delivery
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {assignedOrders.map((order, index) => (
+                  <DeliveryPhaseCard
+                    key={order.id}
+                    order={order}
+                    onNavigateToMap={(order) => {
+                      setSelectedOrder(order);
+                      setShowOrderDetails(true);
+                      // Scroll to top to see the selected order
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="transform hover:scale-[1.02] transition-all duration-300"
+                    style={{ animationDelay: `${index * 0.1}s` }}
+                  />
+                ))}
+              </div>
+              <div className="mt-6 flex justify-between items-center">
+                <Button
+                  onClick={fetchAssignedOrders}
+                  variant="outline"
+                  size="sm"
+                  className="hover:bg-blue-50 hover:border-blue-300"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh Active Deliveries
+                </Button>
+                <p className="text-sm text-gray-500">
+                  Last updated: {new Date().toLocaleTimeString()}
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
