@@ -311,5 +311,5 @@ class DeliveryReview(models.Model):
         return f"Delivery Review by {self.customer.name} - {self.rating}/5"
 
     class Meta:
-        db_table = "DeliveryReview"
-        ordering = ["-created_at"]
+        db_table = 'DeliveryReview'
+        ordering = ['-created_at']

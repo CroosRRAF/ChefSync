@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
-import { useUserStore } from '@/store/userStore';
-import { useOrderStore } from '@/store/orderStore';
+import { customerService, CustomerProfile } from '@/services/customerService';
 import { 
   User, 
   Save, 
@@ -38,22 +37,103 @@ import { useNavigate } from 'react-router-dom';
 
 const CustomerProfile: React.FC = () => {
   const { user } = useAuth();
-  const { updateUser } = useUserStore();
-  const { orders, getOrdersByCustomer } = useOrderStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [profile, setProfile] = useState<CustomerProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [stats, setStats] = useState({
+    total_orders: 0,
+    completed_orders: 0,
+    pending_orders: 0,
+    total_spent: 0,
+    average_order_value: 0
+  });
   const navigate = useNavigate();
   
-  // Get customer's orders
-  const customerOrders = user ? getOrdersByCustomer(user.id) : [];
-  const totalOrders = customerOrders.length;
-  const completedOrders = customerOrders.filter(order => order.status === 'delivered').length;
-  const totalSpent = customerOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+  // Fetch profile data and stats
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        const [profileData, customerStats] = await Promise.all([
+          customerService.getProfile(),
+          customerService.getCustomerStats()
+        ]);
+        setProfile(profileData);
+        setStats(customerStats);
+        console.log('Profile loaded:', profileData);
+        console.log('Stats loaded:', customerStats);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        // Set default profile and stats on error
+        setProfile({
+          user_id: user.id,
+          name: user.name || user.username,
+          email: user.email,
+          phone_no: user.phone_no || '',
+          address: user.address || '',
+          role: user.role,
+          role_display: user.role_display || user.role,
+          profile_image: user.profile_image || null,
+          email_verified: user.email_verified || false,
+          created_at: user.created_at || new Date().toISOString(),
+          updated_at: user.updated_at || new Date().toISOString(),
+          profile_data: null
+        });
+        setStats({
+          total_orders: 0,
+          completed_orders: 0,
+          pending_orders: 0,
+          total_spent: 0,
+          average_order_value: 0
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  // Update form data when profile is loaded
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        name: profile.name || '',
+        email: profile.email || '',
+        phone: profile.phone_no || '',
+        address: profile.address || '',
+        bio: 'Food enthusiast who loves exploring new cuisines and supporting local restaurants. Always looking for the next great meal!',
+        preferences: {
+          cuisine: ['Italian', 'Mexican', 'Asian', 'Mediterranean'],
+          dietary: ['No restrictions'],
+          spiceLevel: 'Medium',
+          deliveryTime: '30-45 minutes'
+        },
+        loyaltyPoints: 1250,
+        memberSince: new Date(profile.created_at).getFullYear(),
+        favoriteRestaurants: ['Mario\'s Italian', 'Spice Garden', 'Sushi Zen'],
+        paymentMethods: [
+          { type: 'Credit Card', last4: '**** 1234', isDefault: true },
+          { type: 'PayPal', email: profile.email, isDefault: false }
+        ],
+        notifications: {
+          orderUpdates: true,
+          promotions: true,
+          newRestaurants: false,
+          deliveryAlerts: true
+        }
+      });
+    }
+  }, [profile]);
   
   const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    address: user?.address || '',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
     bio: 'Food enthusiast who loves exploring new cuisines and supporting local restaurants. Always looking for the next great meal!',
     preferences: {
       cuisine: ['Italian', 'Mexican', 'Asian', 'Mediterranean'],
@@ -95,11 +175,23 @@ const CustomerProfile: React.FC = () => {
 
   const handleSave = async () => {
     try {
-      // Here you would typically call an API to update the user profile
-      await updateUser(formData);
+      setSaving(true);
+      const updatedProfile = await customerService.updateProfile({
+        name: formData.name,
+        phone_no: formData.phone,
+        address: formData.address
+      });
+      
+      // Update local profile state
+      setProfile(updatedProfile);
       setIsEditing(false);
+      alert('Profile updated successfully!');
+      console.log('Profile updated:', updatedProfile);
     } catch (error) {
-      console.error('Failed to update profile:', error);
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -121,7 +213,7 @@ const CustomerProfile: React.FC = () => {
     return { level: 'Bronze', color: 'bg-orange-400', progress: orderCount / 10 * 100 };
   };
 
-  const customerLevel = getCustomerLevel(completedOrders);
+  const customerLevel = getCustomerLevel(stats.completed_orders);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
@@ -198,11 +290,11 @@ const CustomerProfile: React.FC = () => {
                 
                 <div className="grid grid-cols-2 gap-4 text-center">
                   <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">{totalOrders}</p>
+                    <p className="text-2xl font-bold text-blue-600">{stats.total_orders}</p>
                     <p className="text-sm text-gray-600">Orders</p>
                   </div>
                   <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">${totalSpent.toFixed(0)}</p>
+                    <p className="text-2xl font-bold text-blue-600">LKR {Math.round(stats.total_spent)}</p>
                     <p className="text-sm text-gray-600">Spent</p>
                   </div>
                 </div>
@@ -257,16 +349,16 @@ const CustomerProfile: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Total Orders</span>
-                    <span className="text-sm font-medium">{totalOrders}</span>
+                    <span className="text-sm font-medium">{stats.total_orders}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Completed</span>
-                    <span className="text-sm font-medium text-green-600">{completedOrders}</span>
+                    <span className="text-sm font-medium text-green-600">{stats.completed_orders}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Success Rate</span>
                     <span className="text-sm font-medium">
-                      {totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0}%
+                      {stats.total_orders > 0 ? Math.round((stats.completed_orders / stats.total_orders) * 100) : 0}%
                     </span>
                   </div>
                 </div>
@@ -545,6 +637,7 @@ const CustomerProfile: React.FC = () => {
                     </div>
                     <Button
                       onClick={handleSave}
+                      disabled={saving}
                       className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
                     >
                       <Save className="h-4 w-4 mr-2" />

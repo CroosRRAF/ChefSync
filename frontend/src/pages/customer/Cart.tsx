@@ -25,7 +25,7 @@ import { CartItem } from '@/services/menuService';
 
 const CustomerCart: React.FC = () => {
   const navigate = useNavigate();
-  const { cartSummary, updateCartItem, removeCartItem } = useCart();
+  const { cartSummary, updateCartItem, removeFromCart } = useCart();
   const { isAuthenticated, user } = useAuth();
   
   // Redirect if not authenticated or not a customer
@@ -38,11 +38,12 @@ const CustomerCart: React.FC = () => {
   const cart = cartSummary?.cart_items || [];
   
   const subtotal = cart.reduce((sum, item) => {
-    return sum + (item.unit_price * item.quantity);
+    const unitPrice = item.unit_price || 0;
+    return sum + (parseFloat(unitPrice.toString()) * item.quantity);
   }, 0);
 
   const deliveryFee = subtotal > 300 ? 0 : 40;
-  const taxAmount = subtotal * 0.05; // 5% tax
+  const taxAmount = subtotal * 0.10; // 10% tax
   const total = subtotal + deliveryFee + taxAmount;
 
   const handleQuantityChange = async (itemId: number, newQuantity: number) => {
@@ -54,17 +55,16 @@ const CustomerCart: React.FC = () => {
   };
 
   const handleRemoveItem = async (itemId: number) => {
-    await removeCartItem(itemId);
+    await removeFromCart(itemId);
   };
 
   const handleClearCart = () => {
     // Clear all items from cart
-    cart.forEach(item => removeCartItem(item.id));
+    cart.forEach(item => removeFromCart(item.id));
   };
 
   const handleCheckout = () => {
-    // In a real app, this would navigate to payment
-    alert('Checkout functionality will be implemented with backend integration!');
+    navigate('/checkout');
   };
 
   if (cart.length === 0) {
@@ -191,7 +191,7 @@ const CustomerCart: React.FC = () => {
                             <div className="flex items-center space-x-4 mb-3">
                               <div className="flex items-center space-x-2">
                                 <span className="text-lg font-bold text-gray-900 dark:text-white">
-                                  LKR {item.unit_price}
+                                  LKR {parseFloat((item.unit_price || 0).toString()).toFixed(2)}
                                 </span>
                               </div>
                               <div className="flex items-center text-sm text-gray-500">
@@ -238,7 +238,7 @@ const CustomerCart: React.FC = () => {
                           {/* Item Total */}
                           <div className="text-right">
                             <div className="text-xl font-bold text-gray-900 dark:text-white">
-                              LKR {item.total_price}
+                              LKR {parseFloat((item.total_price || 0).toString()).toFixed(2)}
                             </div>
                           </div>
                         </div>
@@ -281,7 +281,7 @@ const CustomerCart: React.FC = () => {
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                    <span className="font-medium">LKR {Math.round(subtotal)}</span>
+                    <span className="font-medium">LKR {subtotal.toFixed(2)}</span>
                   </div>
                   
                   <div className="flex justify-between">
@@ -292,13 +292,13 @@ const CustomerCart: React.FC = () => {
                       )}
                     </span>
                     <span className="font-medium">
-                      {deliveryFee === 0 ? 'Free' : `LKR ${deliveryFee}`}
+                      {deliveryFee === 0 ? 'Free' : `LKR ${deliveryFee.toFixed(2)}`}
                     </span>
                   </div>
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Taxes & Fees</span>
-                    <span className="font-medium">LKR {Math.round(taxAmount)}</span>
+                    <span className="font-medium">LKR {taxAmount.toFixed(2)}</span>
                   </div>
                   
                   <Separator />
@@ -306,7 +306,7 @@ const CustomerCart: React.FC = () => {
                   <div className="flex justify-between text-lg">
                     <span className="font-bold text-gray-900 dark:text-white">Total</span>
                     <span className="font-bold text-gray-900 dark:text-white">
-                      LKR {Math.round(total)}
+                      LKR {total.toFixed(2)}
                     </span>
                   </div>
                 </div>

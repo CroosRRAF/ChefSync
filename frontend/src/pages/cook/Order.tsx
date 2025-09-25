@@ -1,19 +1,19 @@
 /**
- * SAMPLE DATA MODE - ORDER MANAGEMENT SYSTEM
+ * API-INTEGRATED ORDER MANAGEMENT SYSTEM
  * 
  * Features:
- * - Sample order data for demonstration
- * - Accept/Reject orders with local state management
+ * - Real API integration with Django backend
+ * - Accept/Reject orders with backend synchronization
  * - Filtering by status, search terms, and dates
- * - Sample dashboard statistics
+ * - Live dashboard statistics
  * - Customer communication system
  * - Professional UI with shadcn/ui components
  * 
- * Using sample data instead of API calls for development/testing
+ * Using real API calls to Django backend
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-// import axios from 'axios'; // Disabled for sample data mode
+import { type Order, type ChefDashboardStats, useOrderService } from '../../services/orderService';
 import { 
   Search, Filter, RefreshCw, MoreVertical, Eye, Edit, Trash2, 
   Users, Clock, CheckCircle, AlertCircle, Package, TrendingUp,
@@ -30,407 +30,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-// Temporarily disabled to fix infinite loop
-// import { OrderNotifications, useOrderNotifications } from '@/hooks/useOrderNotifications';
-
-/**
- * SAMPLE DATA MODE: This component uses sample data for demonstration.
- * Real API integration has been disabled for development/testing.
- */
-
-// Sample Data
-const SAMPLE_ORDERS: Order[] = [
-  {
-    id: 1,
-    order_number: "ORD-2024-001",
-    status: "pending",
-    status_display: "Pending",
-    total_amount: "45.50",
-    customer_name: "John Smith",
-    chef_name: "Chef Mario",
-    total_items: 3,
-    created_at: "2024-09-24T10:30:00Z",
-    time_since_order: "15 minutes ago",
-    delivery_address: "123 Main St, Downtown, NY 10001",
-    order_type: "delivery",
-    customer: {
-      id: 1,
-      username: "john_smith",
-      email: "john@example.com",
-      first_name: "John",
-      last_name: "Smith",
-      full_name: "John Smith",
-      phone: "+1-555-0123"
-    },
-    items: [
-      {
-        id: 1,
-        quantity: 2,
-        special_instructions: "Extra spicy please",
-        price_details: {
-          id: 1,
-          price: "18.99",
-          size: "Large",
-          food_name: "Margherita Pizza",
-          food_description: "Fresh tomato sauce, mozzarella, basil",
-          food_category: "Pizza",
-          food_image: "/images/margherita-pizza.jpg"
-        },
-        item_total: "37.98"
-      },
-      {
-        id: 2,
-        quantity: 1,
-        special_instructions: "",
-        price_details: {
-          id: 2,
-          price: "7.52",
-          size: "Regular",
-          food_name: "Caesar Salad",
-          food_description: "Romaine lettuce, parmesan, croutons",
-          food_category: "Salad",
-          food_image: "/images/caesar-salad.jpg"
-        },
-        item_total: "7.52"
-      }
-    ],
-    special_instructions: "Please ring doorbell twice",
-    payment_method: "Credit Card",
-    payment_status: "Paid",
-    estimated_delivery_time: "35-45 minutes",
-    time_in_current_status: "15 minutes"
-  },
-  {
-    id: 2,
-    order_number: "ORD-2024-002",
-    status: "confirmed",
-    status_display: "Confirmed",
-    total_amount: "32.75",
-    customer_name: "Sarah Wilson",
-    chef_name: "Chef Mario",
-    total_items: 2,
-    created_at: "2024-09-24T09:45:00Z",
-    time_since_order: "1 hour ago",
-    delivery_address: "456 Oak Ave, Midtown, NY 10002",
-    order_type: "delivery",
-    customer: {
-      id: 2,
-      username: "sarah_wilson",
-      email: "sarah@example.com",
-      first_name: "Sarah",
-      last_name: "Wilson",
-      full_name: "Sarah Wilson",
-      phone: "+1-555-0456"
-    },
-    items: [
-      {
-        id: 3,
-        quantity: 1,
-        special_instructions: "Well done",
-        price_details: {
-          id: 3,
-          price: "24.99",
-          size: "Medium",
-          food_name: "Grilled Salmon",
-          food_description: "Fresh Atlantic salmon with herbs",
-          food_category: "Seafood",
-          food_image: "/images/grilled-salmon.jpg"
-        },
-        item_total: "24.99"
-      },
-      {
-        id: 4,
-        quantity: 1,
-        special_instructions: "",
-        price_details: {
-          id: 4,
-          price: "7.76",
-          size: "Regular",
-          food_name: "Garlic Bread",
-          food_description: "Fresh baked bread with garlic butter",
-          food_category: "Appetizer",
-          food_image: "/images/garlic-bread.jpg"
-        },
-        item_total: "7.76"
-      }
-    ],
-    special_instructions: "",
-    payment_method: "PayPal",
-    payment_status: "Paid",
-    estimated_delivery_time: "25-35 minutes",
-    time_in_current_status: "10 minutes"
-  },
-  {
-    id: 3,
-    order_number: "ORD-2024-003",
-    status: "preparing",
-    status_display: "Preparing",
-    total_amount: "58.25",
-    customer_name: "Mike Johnson",
-    chef_name: "Chef Mario",
-    total_items: 4,
-    created_at: "2024-09-24T09:15:00Z",
-    time_since_order: "1.5 hours ago",
-    delivery_address: "789 Pine St, Uptown, NY 10003",
-    order_type: "pickup",
-    customer: {
-      id: 3,
-      username: "mike_johnson",
-      email: "mike@example.com",
-      first_name: "Mike",
-      last_name: "Johnson",
-      full_name: "Mike Johnson",
-      phone: "+1-555-0789"
-    },
-    items: [
-      {
-        id: 5,
-        quantity: 2,
-        special_instructions: "Medium rare",
-        price_details: {
-          id: 5,
-          price: "22.50",
-          size: "Regular",
-          food_name: "Beef Burger",
-          food_description: "Premium beef patty with cheese and bacon",
-          food_category: "Burger",
-          food_image: "/images/beef-burger.jpg"
-        },
-        item_total: "45.00"
-      },
-      {
-        id: 6,
-        quantity: 2,
-        special_instructions: "",
-        price_details: {
-          id: 6,
-          price: "6.25",
-          size: "Large",
-          food_name: "French Fries",
-          food_description: "Crispy golden fries",
-          food_category: "Side",
-          food_image: "/images/french-fries.jpg"
-        },
-        item_total: "12.50"
-      }
-    ],
-    special_instructions: "Ready for pickup at 11:00 AM",
-    payment_method: "Cash",
-    payment_status: "Pending",
-    estimated_delivery_time: "Ready for pickup",
-    time_in_current_status: "20 minutes"
-  },
-  {
-    id: 4,
-    order_number: "ORD-2024-004",
-    status: "ready",
-    status_display: "Ready",
-    total_amount: "41.99",
-    customer_name: "Lisa Brown",
-    chef_name: "Chef Mario",
-    total_items: 3,
-    created_at: "2024-09-24T08:30:00Z",
-    time_since_order: "2 hours ago",
-    delivery_address: "321 Elm St, Downtown, NY 10004",
-    order_type: "delivery",
-    customer: {
-      id: 4,
-      username: "lisa_brown",
-      email: "lisa@example.com",
-      first_name: "Lisa",
-      last_name: "Brown",
-      full_name: "Lisa Brown",
-      phone: "+1-555-0321"
-    },
-    items: [
-      {
-        id: 7,
-        quantity: 1,
-        special_instructions: "Extra cheese",
-        price_details: {
-          id: 7,
-          price: "16.99",
-          size: "Large",
-          food_name: "Chicken Alfredo",
-          food_description: "Creamy pasta with grilled chicken",
-          food_category: "Pasta",
-          food_image: "/images/chicken-alfredo.jpg"
-        },
-        item_total: "16.99"
-      },
-      {
-        id: 8,
-        quantity: 2,
-        special_instructions: "",
-        price_details: {
-          id: 8,
-          price: "12.50",
-          size: "Regular",
-          food_name: "Chocolate Cake",
-          food_description: "Rich chocolate layer cake",
-          food_category: "Dessert",
-          food_image: "/images/chocolate-cake.jpg"
-        },
-        item_total: "25.00"
-      }
-    ],
-    special_instructions: "Call when arriving",
-    payment_method: "Credit Card",
-    payment_status: "Paid",
-    estimated_delivery_time: "Out for delivery",
-    time_in_current_status: "5 minutes"
-  },
-  {
-    id: 5,
-    order_number: "ORD-2024-005",
-    status: "delivered",
-    status_display: "Delivered",
-    total_amount: "28.75",
-    customer_name: "David Lee",
-    chef_name: "Chef Mario",
-    total_items: 2,
-    created_at: "2024-09-24T07:45:00Z",
-    time_since_order: "3 hours ago",
-    delivery_address: "654 Maple Ave, Midtown, NY 10005",
-    order_type: "delivery",
-    customer: {
-      id: 5,
-      username: "david_lee",
-      email: "david@example.com",
-      first_name: "David",
-      last_name: "Lee",
-      full_name: "David Lee",
-      phone: "+1-555-0654"
-    },
-    items: [
-      {
-        id: 9,
-        quantity: 1,
-        special_instructions: "",
-        price_details: {
-          id: 9,
-          price: "19.99",
-          size: "Medium",
-          food_name: "Sushi Roll Set",
-          food_description: "Assorted fresh sushi rolls",
-          food_category: "Japanese",
-          food_image: "/images/sushi-rolls.jpg"
-        },
-        item_total: "19.99"
-      },
-      {
-        id: 10,
-        quantity: 1,
-        special_instructions: "",
-        price_details: {
-          id: 10,
-          price: "8.76",
-          size: "Regular",
-          food_name: "Miso Soup",
-          food_description: "Traditional Japanese miso soup",
-          food_category: "Soup",
-          food_image: "/images/miso-soup.jpg"
-        },
-        item_total: "8.76"
-      }
-    ],
-    special_instructions: "",
-    payment_method: "Digital Wallet",
-    payment_status: "Paid",
-    estimated_delivery_time: "Delivered",
-    time_in_current_status: "Completed"
-  }
-];
-
-const SAMPLE_STATS: DashboardStats = {
-  total_orders: 25,
-  pending_orders: 3,
-  preparing_orders: 5,
-  ready_orders: 2,
-  completed_orders: 15,
-  today_revenue: 1250.75,
-  average_prep_time: 28,
-  total_customers: 18,
-  status_distribution: [
-    { status: 'pending', count: 3 },
-    { status: 'confirmed', count: 4 },
-    { status: 'preparing', count: 5 },
-    { status: 'ready', count: 2 },
-    { status: 'delivered', count: 15 }
-  ],
-  recent_orders: SAMPLE_ORDERS.slice(0, 5),
-  monthly_revenue: [
-    { month: 'Jan', revenue: 8500 },
-    { month: 'Feb', revenue: 9200 },
-    { month: 'Mar', revenue: 7800 },
-    { month: 'Apr', revenue: 10500 },
-    { month: 'May', revenue: 11200 },
-    { month: 'Jun', revenue: 9800 }
-  ]
-};
-
-// Types
-interface OrderItem {
-  id: number;
-  quantity: number;
-  special_instructions: string;
-  price_details: {
-    id: number;
-    price: string;
-    size: string;
-    food_name: string;
-    food_description: string;
-    food_category: string;
-    food_image: string;
-  };
-  item_total: string;
-}
-
-interface Customer {
-  id: number;
-  username: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  full_name: string;
-  phone: string;
-}
-
-interface Order {
-  id: number;
-  order_number: string;
-  status: string;
-  status_display: string;
-  total_amount: string;
-  customer_name: string;
-  chef_name: string;
-  total_items: number;
-  created_at: string;
-  time_since_order: string;
-  delivery_address: string;
-  order_type: string;
-  customer?: Customer;
-  items?: OrderItem[];
-  special_instructions?: string;
-  payment_method?: string;
-  payment_status?: string;
-  estimated_delivery_time?: string;
-  time_in_current_status?: string;
-}
-
-interface DashboardStats {
-  total_orders: number;
-  pending_orders: number;
-  preparing_orders: number;
-  ready_orders: number;
-  completed_orders: number;
-  today_revenue: number;
-  average_prep_time: number;
-  total_customers: number;
-  status_distribution: Array<{ status: string; count: number }>;
-  recent_orders: Order[];
-  monthly_revenue: Array<{ month: string; revenue: number }>;
-}
 
 interface NotificationState {
   show: boolean;
@@ -447,10 +46,12 @@ const Notification: React.FC<NotificationState & { onClose: () => void }> = ({
 }) => {
   useEffect(() => {
     if (show) {
-      const timer = setTimeout(onClose, 5000);
+      // Longer timeout for longer messages
+      const timeout = message.length > 100 ? 8000 : 5000;
+      const timer = setTimeout(onClose, timeout);
       return () => clearTimeout(timer);
     }
-  }, [show, onClose]);
+  }, [show, onClose, message]);
 
   if (!show) return null;
 
@@ -461,10 +62,10 @@ const Notification: React.FC<NotificationState & { onClose: () => void }> = ({
   }[type];
 
   return (
-    <div className={`fixed top-4 right-4 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-slide-in`}>
-      <div className="flex items-center justify-between">
-        <span>{message}</span>
-        <button onClick={onClose} className="ml-4 text-white hover:text-gray-200">
+    <div className={`fixed top-4 right-4 ${bgColor} text-white px-6 py-4 rounded-lg shadow-lg z-50 animate-slide-in max-w-md`}>
+      <div className="flex items-start justify-between">
+        <span className="text-sm leading-relaxed pr-2">{message}</span>
+        <button onClick={onClose} className="ml-2 text-white hover:text-gray-200 text-lg leading-none">
           ×
         </button>
       </div>
@@ -500,182 +101,258 @@ const RejectionModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onSubmit: () => void;
-  order: Order | null;
   rejectionReason: string;
   setRejectionReason: (reason: string) => void;
   isSubmitting: boolean;
-}> = ({ isOpen, onClose, onSubmit, order, rejectionReason, setRejectionReason, isSubmitting }) => {
+  orderNumber?: string;
+  order?: Order;
+}> = ({ isOpen, onClose, onSubmit, rejectionReason, setRejectionReason, isSubmitting, orderNumber, order }) => {
+  
+  const [selectedReason, setSelectedReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+
+  // Predefined rejection reasons
+  const predefinedReasons = [
+    {
+      value: 'ingredients_unavailable',
+      label: 'Ingredients Not Available',
+      description: 'Required ingredients are out of stock',
+      customerMessage: 'We apologize, but some ingredients for your order are currently unavailable. Your payment will be refunded within 3-5 business days.'
+    },
+    {
+      value: 'kitchen_closed',
+      label: 'Kitchen Temporarily Closed',
+      description: 'Kitchen is closed due to maintenance or emergency',
+      customerMessage: 'Our kitchen is temporarily closed due to unforeseen circumstances. We sincerely apologize for the inconvenience and will process your refund immediately.'
+    },
+    {
+      value: 'high_order_volume',
+      label: 'High Order Volume',
+      description: 'Cannot fulfill due to overwhelming demand',
+      customerMessage: 'We are experiencing exceptionally high demand and cannot fulfill your order within a reasonable time. Thank you for your understanding.'
+    },
+    {
+      value: 'preparation_issues',
+      label: 'Food Preparation Issues',
+      description: 'Issues with food preparation or quality standards',
+      customerMessage: 'We encountered issues that would affect the quality of your food. We maintain high standards and prefer to cancel rather than compromise quality.'
+    },
+    {
+      value: 'delivery_area',
+      label: 'Delivery Area Restriction',
+      description: 'Cannot deliver to the specified location',
+      customerMessage: 'Unfortunately, we cannot deliver to your location due to distance restrictions or delivery area limitations.'
+    },
+    {
+      value: 'payment_issue',
+      label: 'Payment Processing Issue',
+      description: 'Problems with payment verification',
+      customerMessage: 'There was an issue processing your payment. Please check with your bank or try a different payment method.'
+    }
+  ];
+
+  const handleReasonSelect = (reasonValue: string) => {
+    setSelectedReason(reasonValue);
+    const reason = predefinedReasons.find(r => r.value === reasonValue);
+    if (reason) {
+      setRejectionReason(reason.customerMessage);
+    }
+    setCustomReason('');
+  };
+
+  const handleCustomReasonChange = (value: string) => {
+    setCustomReason(value);
+    setRejectionReason(value);
+    setSelectedReason('custom');
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit();
+  };
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedReason('');
+      setCustomReason('');
+      setRejectionReason('');
+    }
+  }, [isOpen]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600">
-            <X className="h-5 w-5" />
-            Reject Order
+          <DialogTitle className="flex items-center">
+            <X className="w-5 h-5 mr-2 text-red-500" />
+            Reject Order {orderNumber}
           </DialogTitle>
           <DialogDescription>
-            Please provide a reason for rejecting order {order?.order_number}. 
-            This message will be sent to the customer.
+            Please provide a clear reason for rejecting this order. The customer will receive this information along with automatic refund processing.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="rejectionReason" className="text-sm font-medium">
-              Reason for Rejection <span className="text-red-500">*</span>
-            </Label>
-            <Textarea
-              id="rejectionReason"
-              placeholder="Please explain why you cannot fulfill this order..."
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              className="min-h-[100px] resize-none"
-              maxLength={500}
-            />
-            <div className="text-xs text-muted-foreground text-right">
-              {rejectionReason.length}/500 characters
-            </div>
-            <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border">
-              💬 <strong>Customer Message:</strong> This reason will be sent to the customer via email, SMS, and app notification along with refund information.
+
+        {/* Order Summary */}
+        {order && (
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
+            <h4 className="font-medium mb-2">Order Summary</h4>
+            <div className="text-sm space-y-1">
+              <p><span className="font-medium">Customer:</span> {order.customer_name}</p>
+              <p><span className="font-medium">Total:</span> ${order.total_amount}</p>
+              <p><span className="font-medium">Items:</span> {order.items?.length || 0} items</p>
             </div>
           </div>
-          
-          {order && (
-            <div className="rounded-lg bg-muted p-3 space-y-2">
-              <div className="text-sm font-medium">Order Details:</div>
-              <div className="text-sm text-muted-foreground">
-                <div>Customer: {order.customer_name}</div>
-                <div>Items: {order.total_items} items</div>
-                <div>Total: ${order.total_amount}</div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Predefined Reasons */}
+          <div>
+            <Label className="text-base font-medium mb-3 block">Select Rejection Reason</Label>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {predefinedReasons.map((reason) => (
+                <div
+                  key={reason.value}
+                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                    selectedReason === reason.value
+                      ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}
+                  onClick={() => handleReasonSelect(reason.value)}
+                >
+                  <div className="flex items-start space-x-3">
+                    <input
+                      type="radio"
+                      name="rejection-reason"
+                      value={reason.value}
+                      checked={selectedReason === reason.value}
+                      onChange={() => handleReasonSelect(reason.value)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <h5 className="font-medium text-sm">{reason.label}</h5>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{reason.description}</p>
+                      <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
+                        <strong>Customer will see:</strong> "{reason.customerMessage}"
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Custom Reason Option */}
+              <div
+                className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                  selectedReason === 'custom'
+                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+                onClick={() => setSelectedReason('custom')}
+              >
+                <div className="flex items-start space-x-3">
+                  <input
+                    type="radio"
+                    name="rejection-reason"
+                    value="custom"
+                    checked={selectedReason === 'custom'}
+                    onChange={() => setSelectedReason('custom')}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <h5 className="font-medium text-sm">Custom Reason</h5>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Write your own personalized reason</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Custom Reason Textarea */}
+          {selectedReason === 'custom' && (
+            <div>
+              <Label htmlFor="custom-reason">Custom Rejection Reason *</Label>
+              <Textarea
+                id="custom-reason"
+                placeholder="Please provide a clear, professional explanation for the customer. This message will be sent directly to them."
+                value={customReason}
+                onChange={(e) => handleCustomReasonChange(e.target.value)}
+                required
+                className="min-h-[100px] mt-2"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                💡 Tip: Be specific and empathetic. Include what the customer should expect next (refund timeline, alternative suggestions, etc.)
+              </p>
+            </div>
+          )}
+
+
+
+          {/* Customer Communication Preview */}
+          {rejectionReason && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+              <h4 className="font-medium text-sm mb-2 flex items-center">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Customer Notification Preview
+              </h4>
+              <div className="text-sm bg-white dark:bg-gray-800 rounded p-3 border">
+                <p className="font-medium">Dear {order?.customer_name || '[Customer Name]'},</p>
+                <p className="mt-2">We regret to inform you that we cannot fulfill order #{orderNumber}.</p>
+                <p className="mt-2"><strong>Reason:</strong> {rejectionReason}</p>
+                <p className="mt-2">Your payment will be automatically refunded to your original payment method within 3-5 business days.</p>
+                <p className="mt-2">We sincerely apologize for any inconvenience caused.</p>
+                <p className="mt-2">Best regards,<br/>ChefSync Team</p>
               </div>
             </div>
           )}
 
-          {rejectionReason.trim() && order && (
-            <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 space-y-2">
-              <div className="text-sm font-medium text-yellow-800">📨 Message Preview:</div>
-              <div className="text-xs text-yellow-700 italic">
-                "Dear {order.customer_name}, we apologize but your order #{order.order_number} has been rejected. Reason: {rejectionReason.trim()}. A full refund will be processed within 2-3 business days."
-              </div>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex justify-end space-x-2">
-          <Button 
-            variant="outline" 
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button 
-            variant="destructive" 
-            onClick={onSubmit}
-            disabled={!rejectionReason.trim() || isSubmitting}
-            className="min-w-[100px]"
-          >
-            {isSubmitting ? 'Rejecting...' : 'Reject Order'}
-          </Button>
-        </div>
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              variant="destructive" 
+              disabled={!rejectionReason.trim() || isSubmitting}
+            >
+              {isSubmitting ? 'Processing Rejection...' : 'Reject Order & Notify Customer'}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
 };
 
-// Status Counts Summary Component
+// Status Counts Component
 const StatusCounts: React.FC<{ statusCounts: any; onStatusClick?: (status: string) => void }> = ({ 
   statusCounts, 
-  onStatusClick 
+  onStatusClick = () => {} 
 }) => {
-  const statusCards = [
-    {
-      title: 'Pending',
-      status: 'pending',
-      value: statusCounts.pending,
-      icon: Clock,
-      color: 'bg-yellow-500',
-      bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
-      textColor: 'text-yellow-900 dark:text-yellow-100',
-      hoverColor: 'hover:bg-yellow-100 dark:hover:bg-yellow-800/30'
-    },
-    {
-      title: 'Confirmed',
-      status: 'confirmed', 
-      value: statusCounts.confirmed,
-      icon: CheckCircle,
-      color: 'bg-blue-500',
-      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-      textColor: 'text-blue-900 dark:text-blue-100',
-      hoverColor: 'hover:bg-blue-100 dark:hover:bg-blue-800/30'
-    },
-    {
-      title: 'Preparing',
-      status: 'preparing',
-      value: statusCounts.preparing,
-      icon: Package,
-      color: 'bg-orange-500',
-      bgColor: 'bg-orange-50 dark:bg-orange-900/20',
-      textColor: 'text-orange-900 dark:text-orange-100', 
-      hoverColor: 'hover:bg-orange-100 dark:hover:bg-orange-800/30'
-    },
-    {
-      title: 'Ready',
-      status: 'ready',
-      value: statusCounts.ready,
-      icon: CheckCircle,
-      color: 'bg-green-500',
-      bgColor: 'bg-green-50 dark:bg-green-900/20',
-      textColor: 'text-green-900 dark:text-green-100',
-      hoverColor: 'hover:bg-green-100 dark:hover:bg-green-800/30'
-    },
-    {
-      title: 'Out for Delivery',
-      status: 'out_for_delivery',
-      value: statusCounts.out_for_delivery,
-      icon: TrendingUp,
-      color: 'bg-purple-500',
-      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-      textColor: 'text-purple-900 dark:text-purple-100',
-      hoverColor: 'hover:bg-purple-100 dark:hover:bg-purple-800/30'
-    },
-    {
-      title: 'Delivered',
-      status: 'delivered',
-      value: statusCounts.delivered,
-      icon: CheckCircle,
-      color: 'bg-emerald-500',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-900/20',
-      textColor: 'text-emerald-900 dark:text-emerald-100',
-      hoverColor: 'hover:bg-emerald-100 dark:hover:bg-emerald-800/30'
-    }
+  const statuses = [
+    { key: 'pending_orders', label: 'Pending', color: 'text-yellow-600', icon: Clock },
+    { key: 'preparing_orders', label: 'Preparing', color: 'text-orange-600', icon: Package },
+    { key: 'ready_orders', label: 'Ready', color: 'text-green-600', icon: CheckCircle },
+    { key: 'completed_orders', label: 'Completed', color: 'text-blue-600', icon: Users }
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-      {statusCards.map((card, index) => {
-        const IconComponent = card.icon;
-        const isClickable = onStatusClick && card.value > 0;
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      {statuses.map((status) => {
+        const Icon = status.icon;
+        const count = statusCounts?.[status.key] || 0;
         
         return (
-          <div 
-            key={index} 
-            className={`${card.bgColor} rounded-lg border dark:border-gray-600 p-4 transition-all duration-200 ${
-              isClickable ? `${card.hoverColor} cursor-pointer transform hover:scale-105 shadow-sm hover:shadow-md` : ''
-            }`}
-            onClick={() => isClickable && onStatusClick(card.status)}
-            title={isClickable ? `Click to filter ${card.title.toLowerCase()} orders` : ''}
+          <div
+            key={status.key}
+            className="bg-white dark:bg-gray-800 rounded-lg p-4 border cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => onStatusClick(status.key.replace('_orders', ''))}
           >
             <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className={`text-sm font-medium ${card.textColor} opacity-75`}>{card.title}</p>
-                <p className={`text-2xl font-bold ${card.textColor} mt-1`}>{card.value}</p>
-                {card.value > 0 && isClickable && (
-                  <p className={`text-xs ${card.textColor} opacity-60 mt-1`}>Click to filter</p>
-                )}
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{status.label}</p>
+                <p className={`text-2xl font-bold ${status.color}`}>{count}</p>
               </div>
-              <div className={`${card.color} p-2 rounded-lg opacity-80`}>
-                <IconComponent className="w-4 h-4 text-white" />
-              </div>
+              <Icon className={`h-8 w-8 ${status.color}`} />
             </div>
           </div>
         );
@@ -684,59 +361,60 @@ const StatusCounts: React.FC<{ statusCounts: any; onStatusClick?: (status: strin
   );
 };
 
-// Dashboard Stats Cards Component
-const DashboardStats: React.FC<{ stats: DashboardStats | null }> = ({ stats }) => {
-  if (!stats) return null;
+// Dashboard Stats Component
+const DashboardStats: React.FC<{ stats: ChefDashboardStats | null }> = ({ stats }) => {
+  if (!stats) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border animate-pulse">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border animate-pulse">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border animate-pulse">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+      </div>
+    );
+  }
 
-  const statCards = [
+  const dashboardCards = [
     {
-      title: 'Total Orders',
-      value: stats.total_orders,
+      title: 'Completed Orders',
+      value: stats.orders_completed,
       icon: Package,
-      color: 'bg-blue-500',
-      change: '+12%'
+      color: 'text-blue-600'
     },
     {
       title: 'Pending Orders',
       value: stats.pending_orders,
       icon: Clock,
-      color: 'bg-yellow-500',
-      change: '+3%'
-    },
-    {
-      title: 'Ready Orders',
-      value: stats.ready_orders,
-      icon: CheckCircle,
-      color: 'bg-green-500',
-      change: '+8%'
+      color: 'text-yellow-600'
     },
     {
       title: 'Today Revenue',
       value: `$${stats.today_revenue.toFixed(2)}`,
       icon: DollarSign,
-      color: 'bg-emerald-500',
-      change: '+15%'
+      color: 'text-green-600'
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      {statCards.map((card, index) => {
-        const IconComponent = card.icon;
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {dashboardCards.map((card, index) => {
+        const Icon = card.icon;
         return (
-          <div key={index} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6">
+          <div key={index} className="bg-white dark:bg-gray-800 rounded-lg p-6 border">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{card.title}</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{card.value}</p>
-                <p className="text-sm text-green-600 dark:text-green-400 flex items-center mt-1">
-                  <TrendingUp className="w-4 h-4 mr-1" />
-                  {card.change}
-                </p>
+                <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
               </div>
-              <div className={`${card.color} p-3 rounded-lg`}>
-                <IconComponent className="w-6 h-6 text-white" />
-              </div>
+              <Icon className={`h-8 w-8 ${card.color}`} />
             </div>
           </div>
         );
@@ -747,209 +425,192 @@ const DashboardStats: React.FC<{ stats: DashboardStats | null }> = ({ stats }) =
 
 // Order Detail Modal Component
 const OrderDetailModal: React.FC<{
-  order: Order | null;
   isOpen: boolean;
   onClose: () => void;
-  onStatusUpdate: (orderId: number, newStatus: string, notes?: string) => void;
-}> = ({ order, isOpen, onClose, onStatusUpdate }) => {
-  const [newStatus, setNewStatus] = useState('');
-  const [notes, setNotes] = useState('');
+  order: Order | null;
+  onAccept: (orderId: number) => void;
+  onReject: (order: Order) => void;
+  onUpdateStatus: (orderId: number, status: string) => void;
+}> = ({ isOpen, onClose, order, onAccept, onReject, onUpdateStatus }) => {
+  
+  if (!order) return null;
 
-  useEffect(() => {
-    if (order) {
-      setNewStatus(order.status);
-      setNotes('');
-    }
-  }, [order]);
-
-  if (!isOpen || !order) return null;
-
-  const statusOptions = [
-    'pending', 'confirmed', 'preparing', 'ready', 
-    'out_for_delivery', 'delivered', 'cancelled'
-  ];
-
-  const handleStatusUpdate = () => {
-    if (newStatus !== order.status) {
-      onStatusUpdate(order.id, newStatus, notes);
-      onClose();
-    }
+  const getNextStatus = (currentStatus: string) => {
+    const statusFlow = {
+      'pending': 'confirmed',
+      'confirmed': 'preparing', 
+      'preparing': 'ready',
+      'ready': 'out_for_delivery',
+      'out_for_delivery': 'delivered'
+    };
+    return statusFlow[currentStatus as keyof typeof statusFlow];
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4">
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Order Details - #{order.order_number}</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              ×
-            </button>
-          </div>
-        </div>
+  const getStatusAction = (status: string) => {
+    const actions = {
+      'pending': 'Accept Order',
+      'confirmed': 'Start Preparing',
+      'preparing': 'Mark as Ready',
+      'ready': 'Send for Delivery',
+      'out_for_delivery': 'Mark as Delivered'
+    };
+    return actions[status as keyof typeof actions];
+  };
 
-        <div className="p-6 space-y-6">
-          {/* Order Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Order Information</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Status:</span>
-                  <StatusBadge status={order.status} />
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Amount:</span>
-                  <span className="font-medium">${order.total_amount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Order Type:</span>
-                  <span>{order.order_type}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Created:</span>
-                  <span>{new Date(order.created_at).toLocaleString()}</span>
-                </div>
-                {order.time_in_current_status && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Time in Status:</span>
-                    <span>{order.time_in_current_status}</span>
-                  </div>
-                )}
+  const nextStatus = getNextStatus(order.status);
+  const statusAction = getStatusAction(order.status);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            <span>Order Details - {order.order_number}</span>
+            <StatusBadge status={order.status} />
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          {/* Customer Information */}
+          <div className="border rounded-lg p-4">
+            <h3 className="font-semibold mb-3 flex items-center">
+              <User className="w-4 h-4 mr-2" />
+              Customer Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Name</p>
+                <p className="font-medium">{order.customer?.full_name || order.customer_name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                <p className="font-medium">{order.customer?.phone || 'Not provided'}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Address</p>
+                <p className="font-medium">{order.delivery_address}</p>
               </div>
             </div>
-
-            {/* Customer Info */}
-            {order.customer && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Customer Information</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <User className="w-4 h-4 mr-2 text-gray-500" />
-                    <span>{order.customer.full_name}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Mail className="w-4 h-4 mr-2 text-gray-500" />
-                    <span>{order.customer.email}</span>
-                  </div>
-                  {order.customer.phone && (
-                    <div className="flex items-center">
-                      <Phone className="w-4 h-4 mr-2 text-gray-500" />
-                      <span>{order.customer.phone}</span>
-                    </div>
-                  )}
-                  {order.delivery_address && (
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 mr-2 text-gray-500" />
-                      <span>{order.delivery_address}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Order Items */}
-          {order.items && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Order Items</h3>
-              <div className="space-y-3">
-                {order.items.map((item, index) => (
-                  <div key={index} className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{item.price_details.food_name}</h4>
-                        <p className="text-sm text-gray-600">{item.price_details.food_description}</p>
-                        <p className="text-sm text-gray-500">Size: {item.price_details.size}</p>
-                        {item.special_instructions && (
-                          <p className="text-sm text-blue-600 mt-1">
-                            Special: {item.special_instructions}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">Qty: {item.quantity}</p>
-                        <p className="text-lg font-semibold">${item.item_total}</p>
-                      </div>
-                    </div>
+          <div className="border rounded-lg p-4">
+            <h3 className="font-semibold mb-3 flex items-center">
+              <Package className="w-4 h-4 mr-2" />
+              Order Items ({order.items?.length || 0})
+            </h3>
+            <div className="space-y-3">
+              {order.items?.map((item, index) => (
+                <div key={index} className="flex justify-between items-start p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                  <div className="flex-1">
+                    <p className="font-medium">{item.price_details.food_name}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{item.price_details.food_description}</p>
+                    <p className="text-xs text-gray-500">Size: {item.price_details.size}</p>
+                    {item.special_instructions && (
+                      <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
+                        Note: {item.special_instructions}
+                      </p>
+                    )}
                   </div>
-                ))}
+                  <div className="text-right ml-4">
+                    <p className="font-medium">Qty: {item.quantity}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">${item.price_details.price}</p>
+                    <p className="font-bold">${item.item_total}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Order Summary */}
+          <div className="border rounded-lg p-4">
+            <h3 className="font-semibold mb-3 flex items-center">
+              <DollarSign className="w-4 h-4 mr-2" />
+              Order Summary
+            </h3>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span>Total Items</span>
+                <span>{order.total_items}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Payment Method</span>
+                <span>{order.payment_method}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Payment Status</span>
+                <span className={order.payment_status === 'Paid' ? 'text-green-600' : 'text-orange-600'}>
+                  {order.payment_status}
+                </span>
+              </div>
+              <div className="border-t pt-2">
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total Amount</span>
+                  <span>${order.total_amount}</span>
+                </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Special Instructions */}
           {order.special_instructions && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Special Instructions</h3>
-              <p className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="border rounded-lg p-4">
+              <h3 className="font-semibold mb-3 flex items-center">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Special Instructions
+              </h3>
+              <p className="text-sm bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded">
                 {order.special_instructions}
               </p>
             </div>
           )}
 
-          {/* Status Update Section */}
-          <div className="space-y-4 border-t pt-6">
-            <h3 className="text-lg font-medium">Update Status</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  New Status
-                </label>
-                <select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <Button variant="outline" onClick={onClose}>
+              Close
+            </Button>
+            
+            {order.status === 'pending' && (
+              <>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => onReject(order)}
+                  className="flex items-center"
                 >
-                  {statusOptions.map(status => (
-                    <option key={status} value={status}>
-                      {status.replace('_', ' ').toUpperCase()}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add status update notes..."
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  <X className="w-4 h-4 mr-2" />
+                  Reject
+                </Button>
+                <Button 
+                  onClick={() => onAccept(order.id)}
+                  className="flex items-center"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Accept Order
+                </Button>
+              </>
+            )}
+            
+            {nextStatus && (
+              <Button 
+                onClick={() => onUpdateStatus(order.id, nextStatus)}
+                className="flex items-center"
               >
-                Cancel
-              </button>
-              <button
-                onClick={handleStatusUpdate}
-                disabled={newStatus === order.status}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Update Status
-              </button>
-            </div>
+                <Package className="w-4 h-4 mr-2" />
+                {statusAction}
+              </Button>
+            )}
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
 // Main Order Component
 const Order: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<ChefDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -970,10 +631,17 @@ const Order: React.FC = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
 
-  // Real-time notifications - temporarily disabled
-  // const { notifications, unreadCount } = useOrderNotifications();
-  const unreadCount = 0; // Placeholder
+  // Use the order service hook
+  const {
+    loadOrders,
+    loadOrderDetails,
+    acceptOrder,
+    rejectOrder,
+    updateStatus,
+    loadDashboardStats
+  } = useOrderService();
 
+  const unreadCount = 0; // Placeholder for notifications
   const ordersPerPage = 10;
 
   // Show notification
@@ -986,116 +654,92 @@ const Order: React.FC = () => {
     setNotification(prev => ({ ...prev, show: false }));
   };
 
-  // Fetch dashboard stats - Using sample data
+  // Fetch dashboard stats from API
   const fetchDashboardStats = async () => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setStats(SAMPLE_STATS);
-      showNotification('Dashboard stats loaded successfully', 'success');
+      const dashboardStats = await loadDashboardStats();
+      setStats(dashboardStats);
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       showNotification('Failed to load dashboard stats', 'error');
       // Set default empty stats on error
       setStats({
-        total_orders: 0,
-        pending_orders: 0,
-        preparing_orders: 0,
-        ready_orders: 0,
-        completed_orders: 0,
+        orders_completed: 0,
+        orders_active: 0,
+        bulk_orders: 0,
+        total_reviews: 0,
+        average_rating: 0,
         today_revenue: 0,
-        average_prep_time: 0,
-        total_customers: 0,
-        status_distribution: [],
-        recent_orders: [],
-        monthly_revenue: []
+        pending_orders: 0,
+        monthly_orders: 0,
+        customer_satisfaction: 0
       });
     }
   };
 
-  // Fetch orders - Using sample data with filtering
+  // Fetch orders from API with filtering
   const fetchOrders = async () => {
     try {
       setLoading(true);
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Filter sample data based on search and status filters
-      let filteredOrders = [...SAMPLE_ORDERS];
-      
+      // Prepare filters for API call
+      const filters: any = {};
+      if (statusFilter && statusFilter !== 'all') {
+        filters.status = statusFilter;
+      }
       if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        filteredOrders = filteredOrders.filter(order =>
-          order.customer_name.toLowerCase().includes(term) ||
-          order.order_number.toLowerCase().includes(term) ||
-          order.delivery_address.toLowerCase().includes(term)
-        );
+        filters.search = searchTerm;
       }
-      
-      if (statusFilter) {
-        filteredOrders = filteredOrders.filter(order => order.status === statusFilter);
-      }
-      
       if (dateFilter) {
-        const filterDate = new Date(dateFilter);
-        filteredOrders = filteredOrders.filter(order => {
-          const orderDate = new Date(order.created_at);
-          return orderDate >= filterDate;
-        });
+        filters.date_from = dateFilter;
       }
       
-      setOrders(filteredOrders);
-      showNotification(`Loaded ${filteredOrders.length} orders`, 'success');
+      const fetchedOrders = await loadOrders(filters);
+      setOrders(fetchedOrders);
+      showNotification(`Loaded ${fetchedOrders.length} orders`, 'success');
+      
     } catch (error) {
       console.error('Error fetching orders:', error);
       showNotification('Failed to load orders', 'error');
-      setOrders([]); // Set empty array on error
+      setOrders([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch order details - Using sample data
+  // Fetch order details from API
   const fetchOrderDetails = async (orderId: number) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      const order = SAMPLE_ORDERS.find(o => o.id === orderId);
-      if (order) {
-        setSelectedOrder(order);
-        setIsDetailModalOpen(true);
-      } else {
-        showNotification('Order not found', 'error');
-      }
+      const order = await loadOrderDetails(orderId);
+      setSelectedOrder(order);
+      setIsDetailModalOpen(true);
     } catch (error) {
       console.error('Error fetching order details:', error);
       showNotification('Failed to load order details', 'error');
     }
   };
 
-  // Update order status
+  // Update order status via API
   const updateOrderStatus = async (orderId: number, newStatus: string, notes?: string) => {
     try {
-      // For sample data mode, update the local state
+      await updateStatus(orderId, newStatus, notes);
+      
+      // Update local state
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId 
-            ? { ...order, status: newStatus, status_display: newStatus.charAt(0).toUpperCase() + newStatus.slice(1) }
+            ? { 
+                ...order, 
+                status: newStatus as Order['status'], 
+                status_display: newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ')
+              }
             : order
         )
       );
       
       showNotification('Order status updated successfully', 'success');
-      fetchDashboardStats();
+      await fetchDashboardStats(); // Refresh stats
       
-      // Uncomment below to use real API when ready
-      // await axios.post(`/api/orders/orders/${orderId}/update_status/`, {
-      //   status: newStatus,
-      //   notes: notes || ''
-      // });
-      // fetchOrders();
     } catch (error) {
       console.error('Error updating order status:', error);
       showNotification('Failed to update order status', 'error');
@@ -1105,18 +749,19 @@ const Order: React.FC = () => {
   // Accept order function
   const handleAcceptOrder = async (orderId: number) => {
     try {
-      await updateOrderStatus(orderId, 'confirmed', 'Order accepted by chef');
+      await acceptOrder(orderId, 'Order accepted by chef');
       
-      // In SAMPLE DATA mode - just show notifications
+      // Update local state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: 'confirmed', status_display: 'Confirmed' }
+            : order
+        )
+      );
+      
       showNotification('✅ Order accepted! Customer will receive confirmation message.', 'success');
-      
-      // Uncomment below to send real customer notifications when API is ready
-      // await axios.post('/api/notifications/send-order-update/', {
-      //   order_id: orderId,
-      //   status: 'accepted',
-      //   message: 'Great news! Your order has been accepted by the chef and is being prepared.',
-      //   notification_types: ['email', 'sms', 'push'] // Multiple notification channels
-      // });
+      await fetchDashboardStats();
       
     } catch (error) {
       console.error('Error accepting order:', error);
@@ -1140,25 +785,27 @@ const Order: React.FC = () => {
 
     try {
       setIsSubmittingRejection(true);
-      await updateOrderStatus(orderToReject.id, 'rejected', rejectionReason.trim());
+      await rejectOrder(orderToReject.id, rejectionReason.trim());
+      
+      // Update local state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderToReject.id 
+            ? { ...order, status: 'cancelled', status_display: 'Cancelled' }
+            : order
+        )
+      );
       
       // Close modal and reset state
       setIsRejectionModalOpen(false);
       setOrderToReject(null);
       setRejectionReason('');
       
-      // In SAMPLE DATA mode - show what would happen
-      showNotification(`❌ Order rejected! Customer "${orderToReject.customer_name}" will receive: "${rejectionReason.trim()}"`, 'success');
-      
-      // Uncomment below to send real customer notifications when API is ready
-      // await axios.post('/api/notifications/send-order-update/', {
-      //   order_id: orderToReject.id,
-      //   status: 'rejected',
-      //   message: `Unfortunately, your order has been rejected. Reason: ${rejectionReason.trim()}`,
-      //   customer_message: rejectionReason.trim(),
-      //   notification_types: ['email', 'sms', 'push'],
-      //   refund_initiated: true // Trigger refund process
-      // });
+      showNotification(
+        `🚫 Order #${orderToReject.order_number} rejected successfully. Customer ${orderToReject.customer_name} has been notified with your reason and will receive an automatic refund within 3-5 business days.`,
+        'success'
+      );
+      await fetchDashboardStats();
       
     } catch (error) {
       console.error('Error rejecting order:', error);
@@ -1168,544 +815,283 @@ const Order: React.FC = () => {
     }
   };
 
-  // Cancel rejection modal
-  const cancelRejection = () => {
-    setIsRejectionModalOpen(false);
-    setOrderToReject(null);
-    setRejectionReason('');
-  };
+  // Pagination
+  const totalPages = Math.ceil(orders.length / ordersPerPage);
+  const startIndex = (currentPage - 1) * ordersPerPage;
+  const endIndex = startIndex + ordersPerPage;
+  const currentOrders = orders.slice(startIndex, endIndex);
 
-  // Demo function to show customer message examples
-  const showCustomerMessagePreview = (action: 'accept' | 'reject', order: Order, reason?: string) => {
-    const customerMessage = action === 'accept' 
-      ? `Dear ${order.customer_name}, great news! Your order #${order.order_number} has been accepted by the chef and is being prepared. You'll receive updates as your order progresses.`
-      : `Dear ${order.customer_name}, we apologize but your order #${order.order_number} has been rejected. Reason: ${reason}. A full refund will be processed within 2-3 business days.`;
-    
-    console.log('📱 Customer would receive:', customerMessage);
-    return customerMessage;
-  };
-
-  // Handle bulk actions - Using sample data simulation
-  const handleBulkAction = async (action: string, additionalData?: any) => {
-    if (selectedOrders.length === 0) {
-      showNotification('Please select orders first', 'error');
-      return;
-    }
-
-    try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // For sample data, simulate bulk actions locally
-      if (action === 'update_status' && additionalData?.new_status) {
-        setOrders(prevOrders => 
-          prevOrders.map(order => {
-            if (selectedOrders.includes(order.id)) {
-              const newStatus = additionalData.new_status;
-              return { 
-                ...order, 
-                status: newStatus, 
-                status_display: newStatus.charAt(0).toUpperCase() + newStatus.slice(1) 
-              };
-            }
-            return order;
-          })
-        );
-      }
-
-      showNotification(`Bulk ${action} completed for ${selectedOrders.length} orders`, 'success');
-      setSelectedOrders([]);
-      fetchDashboardStats();
-      
-      // Uncomment below to use real API when ready
-      // const payload = {
-      //   order_ids: selectedOrders,
-      //   action,
-      //   ...additionalData
-      // };
-      // await axios.post('/api/orders/orders/bulk_action/', payload);
-      // fetchOrders();
-    } catch (error) {
-      console.error('Error performing bulk action:', error);
-      showNotification(`Failed to perform bulk ${action}`, 'error');
-    }
-  };
-
-  // Accept order
-  const acceptOrder = async (orderId: number) => {
-    await handleAcceptOrder(orderId);
-  };
-
-  // Handle status filter from status counts
-  const handleStatusFilter = (status: string) => {
-    setStatusFilter(status === statusFilter ? '' : status); // Toggle filter
-    setCurrentPage(1); // Reset to first page
-  };
-
-  // Filter orders based on search and filters
-  const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
-      const matchesSearch = !searchTerm || 
-        order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.delivery_address?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = !statusFilter || order.status === statusFilter;
-      
-      return matchesSearch && matchesStatus;
-    });
-  }, [orders, searchTerm, statusFilter]);
-
-  // Calculate status counts from actual orders data
+  // Filter for status counts
   const statusCounts = useMemo(() => {
-    const counts = {
-      pending: 0,
-      confirmed: 0,
-      preparing: 0,
-      ready: 0,
-      out_for_delivery: 0,
-      delivered: 0,
-      cancelled: 0,
-      total: orders.length
-    };
-
-    orders.forEach(order => {
-      if (counts.hasOwnProperty(order.status)) {
-        counts[order.status as keyof typeof counts]++;
-      }
-    });
-
-    return counts;
+    return orders.reduce((acc, order) => {
+      const key = `${order.status}_orders`;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
   }, [orders]);
 
-  // Paginate orders
-  const paginatedOrders = useMemo(() => {
-    const startIndex = (currentPage - 1) * ordersPerPage;
-    return filteredOrders.slice(startIndex, startIndex + ordersPerPage);
-  }, [filteredOrders, currentPage, ordersPerPage]);
-
-  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
-
-  // Load data on component mount
+  // Effects
   useEffect(() => {
     fetchOrders();
     fetchDashboardStats();
   }, []);
 
-  // Auto-refresh when there are new notifications - temporarily disabled
-  // useEffect(() => {
-  //   if (unreadCount > 0) {
-  //     fetchOrders();
-  //     fetchDashboardStats();
-  //   }
-  // }, [unreadCount]);
-
-  // Refresh data when filters change
   useEffect(() => {
-    setCurrentPage(1);
+    fetchOrders();
   }, [searchTerm, statusFilter, dateFilter]);
 
-  if (loading && orders.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  // Handle status filter from status counts
+  const handleStatusCountClick = (status: string) => {
+    setStatusFilter(status === statusFilter ? '' : status);
+    setCurrentPage(1);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Chef Dashboard</h1>
-            <p className="text-gray-600 dark:text-gray-400">Manage your orders and track performance</p>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            {/* Real-time notifications - temporarily disabled */}
-            {/* <OrderNotifications className="mr-4" /> */}
-          </div>
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Notification */}
+      <Notification {...notification} onClose={hideNotification} />
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Order Management</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Manage incoming orders and track kitchen operations
+          </p>
         </div>
-
-        {/* Status Counts Summary */}
-        <StatusCounts 
-          statusCounts={statusCounts} 
-          onStatusClick={handleStatusFilter}
-        />
-
-        {/* Dashboard Stats */}
-        <DashboardStats stats={stats} />
-
-        {/* Filters and Search */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-            <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Search orders..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-              </div>
-
-              {/* Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className={`border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${
-                  statusFilter ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-900 dark:text-blue-100' : 'border-gray-300 dark:border-gray-600'
-                }`}
-              >
-                <option value="">All Status ({statusCounts.total})</option>
-                <option value="pending">Pending ({statusCounts.pending})</option>
-                <option value="confirmed">Confirmed ({statusCounts.confirmed})</option>
-                <option value="preparing">Preparing ({statusCounts.preparing})</option>
-                <option value="ready">Ready ({statusCounts.ready})</option>
-                <option value="out_for_delivery">Out for Delivery ({statusCounts.out_for_delivery})</option>
-                <option value="delivered">Delivered ({statusCounts.delivered})</option>
-                <option value="cancelled">Cancelled ({statusCounts.cancelled})</option>
-              </select>
-
-              {/* Date Filter */}
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-              />
-            </div>
-
-            <div className="flex space-x-2">
-              <button
-                onClick={fetchOrders}
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </button>
-              
-              {/* Clear Filters Button */}
-              {(statusFilter || searchTerm || dateFilter) && (
-                <button
-                  onClick={() => {
-                    setStatusFilter('');
-                    setSearchTerm('');
-                    setDateFilter('');
-                  }}
-                  className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                >
-                  <Filter className="w-4 h-4 mr-2" />
-                  Clear Filters
-                </button>
-              )}
-              
-              {/* Bulk Actions */}
-              {selectedOrders.length > 0 && (
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleBulkAction('update_status', { new_status: 'preparing' })}
-                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
-                  >
-                    Mark Preparing
-                  </button>
-                  <button
-                    onClick={() => handleBulkAction('update_status', { new_status: 'ready' })}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    Mark Ready
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Active Filters Display */}
-          {(statusFilter || searchTerm || dateFilter) && (
-            <div className="mt-4 flex items-center space-x-2 text-sm text-gray-600">
-              <Filter className="w-4 h-4" />
-              <span>Active filters:</span>
-              {statusFilter && (
-                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                  Status: {statusFilter.replace('_', ' ')}
-                </span>
-              )}
-              {searchTerm && (
-                <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">
-                  Search: "{searchTerm}"
-                </span>
-              )}
-              {dateFilter && (
-                <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                  Date: {dateFilter}
-                </span>
-              )}
-              <span className="text-gray-500">({filteredOrders.length} results)</span>
+        <div className="flex items-center space-x-4">
+          {unreadCount > 0 && (
+            <div className="relative">
+              <Bell className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+              <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                {unreadCount}
+              </span>
             </div>
           )}
+          <Button onClick={() => { fetchOrders(); fetchDashboardStats(); }}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
         </div>
+      </div>
 
-        {/* Orders Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-600">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <input
-                      type="checkbox"
-                      checked={selectedOrders.length === paginatedOrders.length && paginatedOrders.length > 0}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedOrders(paginatedOrders.map(order => order.id));
-                        } else {
-                          setSelectedOrders([]);
-                        }
-                      }}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Order
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Customer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Items
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {paginatedOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedOrders.includes(order.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedOrders([...selectedOrders, order.id]);
-                          } else {
-                            setSelectedOrders(selectedOrders.filter(id => id !== order.id));
-                          }
-                        }}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">#{order.order_number}</div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{order.order_type}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-gray-100">{order.customer_name}</div>
-                      {order.delivery_address && (
-                        <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-32" title={order.delivery_address}>
-                          {order.delivery_address}
+      {/* Dashboard Stats */}
+      <DashboardStats stats={stats} />
+      
+      {/* Status Counts */}
+      <StatusCounts statusCounts={statusCounts} onStatusClick={handleStatusCountClick} />
+
+      {/* Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border p-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                placeholder="Search by customer name, order number, or address..."
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <select
+              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="preparing">Preparing</option>
+              <option value="ready">Ready</option>
+              <option value="out_for_delivery">Out for Delivery</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <input
+              type="date"
+              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Orders Table */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">Loading orders...</p>
+          </div>
+        ) : currentOrders.length === 0 ? (
+          <div className="p-8 text-center">
+            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-xl font-medium text-gray-600 dark:text-gray-400 mb-2">No orders found</p>
+            <p className="text-gray-500">Try adjusting your filters or refresh the page.</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Order
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Customer
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Items
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Total
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Time
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {currentOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {order.order_number}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {order.order_type}
+                          </div>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={order.status} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {order.total_items}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                      ${order.total_amount}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {order.time_since_order}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <User className="h-4 w-4 text-gray-400 mr-2" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {order.customer?.full_name || order.customer_name}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              {order.customer?.phone}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge status={order.status} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {order.total_items} items
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        ${order.total_amount}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 mr-1" />
+                          {order.time_since_order}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => fetchOrderDetails(order.id)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View Details"
                         >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
                         
                         {order.status === 'pending' && (
-                          <div className="flex gap-2">
+                          <>
                             <Button
                               size="sm"
-                              variant="default"
-                              onClick={() => acceptOrder(order.id)}
-                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 h-8"
-                              title="Accept Order"
+                              onClick={() => handleAcceptOrder(order.id)}
                             >
-                              <Check className="w-3 h-3 mr-1" />
+                              <Check className="h-4 w-4 mr-1" />
                               Accept
                             </Button>
                             <Button
                               size="sm"
                               variant="destructive"
                               onClick={() => handleRejectOrder(order)}
-                              className="px-3 py-1.5 h-8"
-                              title="Reject Order"
                             >
-                              <X className="w-3 h-3 mr-1" />
+                              <X className="h-4 w-4 mr-1" />
                               Reject
                             </Button>
-                          </div>
+                          </>
                         )}
-                        
-                        {order.status === 'confirmed' && (
-                          <button
-                            onClick={() => updateOrderStatus(order.id, 'preparing')}
-                            className="text-orange-600 hover:text-orange-900"
-                            title="Start Preparing"
-                          >
-                            <Clock className="w-4 h-4" />
-                          </button>
-                        )}
-                        
-                        {order.status === 'preparing' && (
-                          <button
-                            onClick={() => updateOrderStatus(order.id, 'ready')}
-                            className="text-green-600 hover:text-green-900"
-                            title="Mark Ready"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-              <div className="flex-1 flex justify-between sm:hidden">
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700">
-                    Showing <span className="font-medium">{((currentPage - 1) * ordersPerPage) + 1}</span> to{' '}
-                    <span className="font-medium">
-                      {Math.min(currentPage * ordersPerPage, filteredOrders.length)}
-                    </span> of{' '}
-                    <span className="font-medium">{filteredOrders.length}</span> results
-                  </p>
-                </div>
-                <div>
-                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                    <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    Showing {startIndex + 1} to {Math.min(endIndex, orders.length)} of {orders.length} orders
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                     >
                       Previous
-                    </button>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          page === currentPage
-                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                       disabled={currentPage === totalPages}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                     >
                       Next
-                    </button>
-                  </nav>
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Empty State */}
-        {filteredOrders.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <Package className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No orders found</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || statusFilter || dateFilter 
-                ? "Try adjusting your filters or search terms."
-                : "Orders will appear here when customers place them."
-              }
-            </p>
-          </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Order Detail Modal */}
       <OrderDetailModal
-        order={selectedOrder}
         isOpen={isDetailModalOpen}
-        onClose={() => {
-          setIsDetailModalOpen(false);
-          setSelectedOrder(null);
-        }}
-        onStatusUpdate={updateOrderStatus}
+        onClose={() => setIsDetailModalOpen(false)}
+        order={selectedOrder}
+        onAccept={handleAcceptOrder}
+        onReject={handleRejectOrder}
+        onUpdateStatus={updateOrderStatus}
       />
 
       {/* Rejection Modal */}
       <RejectionModal
         isOpen={isRejectionModalOpen}
-        onClose={cancelRejection}
+        onClose={() => setIsRejectionModalOpen(false)}
         onSubmit={submitRejection}
-        order={orderToReject}
         rejectionReason={rejectionReason}
         setRejectionReason={setRejectionReason}
         isSubmitting={isSubmittingRejection}
-      />
-
-      {/* Notification */}
-      <Notification
-        show={notification.show}
-        message={notification.message}
-        type={notification.type}
-        onClose={hideNotification}
+        orderNumber={orderToReject?.order_number}
+        order={orderToReject}
       />
     </div>
   );

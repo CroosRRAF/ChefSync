@@ -1,6 +1,7 @@
 import axios from "axios";
 
-// Create axios instance with default config
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL + '/api' : '/api';
+// ✅ Create axios instance
 const apiClient = axios.create({
   baseURL: "/api",
   headers: {
@@ -76,11 +77,12 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Handle unauthorized access
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("chefsync_token");
-      localStorage.removeItem("chefsync_refresh_token");
-      window.location.href = "/login";
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      // Only redirect to login if not already on login page
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
