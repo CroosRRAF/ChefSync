@@ -392,18 +392,22 @@ class AdminUserManagementViewSet(viewsets.ModelViewSet):
         """Filter users based on query parameters"""
         queryset = User.objects.all()
         role = self.request.query_params.get("role")
-        is_active = self.request.query_params.get("is_active")
+        approval_status = self.request.query_params.get("approval_status")
+        status = self.request.query_params.get("status")
         search = self.request.query_params.get("search")
 
         if role:
             queryset = queryset.filter(role=role)
-        if is_active is not None:
-            queryset = queryset.filter(is_active=is_active.lower() == "true")
+        if approval_status:
+            queryset = queryset.filter(approval_status=approval_status)
+        if status:
+            queryset = queryset.filter(status=status)
         if search:
             queryset = queryset.filter(
                 models.Q(email__icontains=search)
                 | models.Q(first_name__icontains=search)
                 | models.Q(last_name__icontains=search)
+                | models.Q(id__icontains=search)
             )
 
         return queryset.order_by("-date_joined")
@@ -417,10 +421,23 @@ class AdminUserManagementViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def activate(self, request, pk=None):
-        """Activate a user account"""
+        """Activate a user account (separate from approval)"""
         user = self.get_object()
-        user.is_active = True
+        user.status = "active"
         user.save()
+
+        # Send activation notification email
+        try:
+            from apps.authentication.services.user_management_email_service import (
+                UserManagementEmailService,
+            )
+
+            UserManagementEmailService.send_user_activation_notification(
+                user, activated=True
+            )
+        except Exception as email_error:
+            print(f"Failed to send activation email: {str(email_error)}")
+            # Don't fail the activation if email fails
 
         # Log the activity
         AdminActivityLog.objects.create(
@@ -437,15 +454,28 @@ class AdminUserManagementViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def deactivate(self, request, pk=None):
-        """Deactivate a user account"""
+        """Deactivate a user account (separate from approval)"""
         user = self.get_object()
-        user.is_active = False
+        user.status = "inactive"
         user.save()
+
+        # Send deactivation notification email
+        try:
+            from apps.authentication.services.user_management_email_service import (
+                UserManagementEmailService,
+            )
+
+            UserManagementEmailService.send_user_activation_notification(
+                user, activated=False
+            )
+        except Exception as email_error:
+            print(f"Failed to send deactivation email: {str(email_error)}")
+            # Don't fail the deactivation if email fails
 
         # Log the activity
         AdminActivityLog.objects.create(
             admin=request.user,
-            action="suspend",
+            action="deactivate",
             resource_type="user",
             resource_id=str(user.id),
             description=f"Deactivated user account: {user.email}",

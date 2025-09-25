@@ -56,7 +56,7 @@ const Dashboard: React.FC = () => {
       setRefreshing(true);
       setError(null);
 
-      // Fetch all dashboard data in parallel
+      // Fetch all dashboard data in parallel with individual error handling
       const [
         statsData,
         ordersData,
@@ -67,7 +67,7 @@ const Dashboard: React.FC = () => {
         ordersTrendData,
         topPerformingChefsData,
         topPerformingFoodItemsData,
-      ] = await Promise.all([
+      ] = await Promise.allSettled([
         adminService.getDashboardStats(),
         adminService.getRecentOrders(5),
         adminService.getRecentActivities(5),
@@ -77,11 +77,19 @@ const Dashboard: React.FC = () => {
         adminService.getOrdersTrend(30),
         adminService.getTopPerformingChefs(10),
         adminService.getTopPerformingFoodItems(10),
-      ]);
+      ]).then(results => 
+        results.map((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(`❌ Failed to load data ${index}:`, result.reason);
+            return null;
+          }
+          return result.value;
+        })
+      );
 
-      setStats(statsData);
-      setRecentOrders(ordersData);
-      setRecentActivities(activitiesData);
+      setStats(statsData as DashboardStats);
+      setRecentOrders((ordersData as AdminOrder[]) || []);
+      setRecentActivities((activitiesData as AdminActivityLog[]) || []);
       setWeeklyPerformance(weeklyPerformanceData);
       setRevenueTrend(revenueTrendData);
       setGrowthAnalytics(growthAnalyticsData);
@@ -89,6 +97,13 @@ const Dashboard: React.FC = () => {
       setTopPerformingChefs(topPerformingChefsData);
       setTopPerformingFoodItems(topPerformingFoodItemsData);
       setLastRefresh(new Date());
+      
+      // Debug logging
+      console.log("📊 Dashboard Data Loaded:");
+      console.log("Weekly Performance:", weeklyPerformanceData);
+      console.log("Revenue Trend:", revenueTrendData);
+      console.log("Growth Analytics:", growthAnalyticsData);
+      console.log("Orders Trend:", ordersTrendData);
     } catch (err) {
       console.error("Dashboard API Error:", err);
       setError(
@@ -337,14 +352,18 @@ const Dashboard: React.FC = () => {
                   ) : revenueTrend ? (
                     <InteractiveChart
                       title=""
-                      data={transformBackendChartData(revenueTrend)}
+                      data={transformBackendChartData(revenueTrend).map(item => ({
+                        name: item.name,
+                        value: item.value || 0,
+                        ...item
+                      }))}
                       type="bar"
                       height={200}
                       showLegend={false}
                     />
                   ) : (
                     <div className="h-32 flex items-center justify-center text-muted-foreground">
-                      Loading revenue data...
+                      {revenueTrend === null ? "Failed to load revenue data" : "Loading revenue data..."}
                     </div>
                   )}
                 </CardContent>
@@ -364,14 +383,18 @@ const Dashboard: React.FC = () => {
                   ) : growthAnalytics ? (
                     <InteractiveChart
                       title=""
-                      data={transformBackendChartData(growthAnalytics)}
+                      data={transformBackendChartData(growthAnalytics).map(item => ({
+                        name: item.name,
+                        value: item.value || 0,
+                        ...item
+                      }))}
                       type="area"
                       height={200}
                       showLegend={true}
                     />
                   ) : (
                     <div className="h-32 flex items-center justify-center text-muted-foreground">
-                      Loading growth data...
+                      {growthAnalytics === null ? "Failed to load growth data" : "Loading growth data..."}
                     </div>
                   )}
                 </CardContent>
@@ -391,14 +414,18 @@ const Dashboard: React.FC = () => {
                   ) : ordersTrend ? (
                     <InteractiveChart
                       title=""
-                      data={transformBackendChartData(ordersTrend)}
+                      data={transformBackendChartData(ordersTrend).map(item => ({
+                        name: item.name,
+                        value: item.value || 0,
+                        ...item
+                      }))}
                       type="line"
                       height={200}
                       showLegend={false}
                     />
                   ) : (
                     <div className="h-32 flex items-center justify-center text-muted-foreground">
-                      Loading orders data...
+                      {ordersTrend === null ? "Failed to load orders data" : "Loading orders data..."}
                     </div>
                   )}
                 </CardContent>
@@ -418,14 +445,18 @@ const Dashboard: React.FC = () => {
                   ) : weeklyPerformance ? (
                     <InteractiveChart
                       title=""
-                      data={transformBackendChartData(weeklyPerformance)}
+                      data={transformBackendChartData(weeklyPerformance).map(item => ({
+                        name: item.name,
+                        value: item.value || 0,
+                        ...item
+                      }))}
                       type="bar"
                       height={200}
                       showLegend={false}
                     />
                   ) : (
                     <div className="h-32 flex items-center justify-center text-muted-foreground">
-                      Loading food performance data...
+                      {weeklyPerformance === null ? "Failed to load food performance data" : "Loading food performance data..."}
                     </div>
                   )}
                 </CardContent>

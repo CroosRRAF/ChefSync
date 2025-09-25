@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Account Deactivated - ChefSync</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #f4f4f4;
+        padding: 20px;
+      }
+      .container {
+        background-color: #ffffff;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .logo {
+        max-width: 150px;
+        height: auto;
+      }
+      .warning-icon {
+        font-size: 48px;
+        color: #dc3545;
+        margin: 20px 0;
+      }
+      .title {
+        color: #dc3545;
+        font-size: 24px;
+        margin: 20px 0;
+        text-align: center;
+      }
+      .content {
+        margin: 20px 0;
+      }
+      .highlight-box {
+        background-color: #f8d7da;
+        border-left: 4px solid #dc3545;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 4px;
+      }
+      .button {
+        display: inline-block;
+        background-color: #007bff;
+        color: white;
+        padding: 12px 30px;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: bold;
+        margin: 20px 0;
+        text-align: center;
+      }
+      .footer {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+        font-size: 12px;
+        color: #666;
+        text-align: center;
+      }
+      .support-link {
+        color: #007bff;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      {% if logo_base64 %}
+      <div class="header">
+        <img
+          src="data:image/svg+xml;base64,{{ logo_base64 }}"
+          alt="ChefSync Logo"
+          class="logo"
+        />
+      </div>
+      {% endif %}
+
+      <div class="warning-icon">⚠️</div>
+
+      <h1 class="title">Account Deactivated</h1>
+
+      <div class="content">
+        <p>Dear {{ user_name }},</p>
+
+        <div class="highlight-box">
+          <strong>Important:</strong> Your ChefSync account has been
+          deactivated.
+        </div>
+
+        <p>
+          Your account deactivation was completed on {{ status_change_date }}.
+          This means:
+        </p>
+
+        <ul>
+          <li>You will not be able to log in to your account</li>
+          <li>Access to platform features is temporarily suspended</li>
+          <li>Your account data remains secure and can be reactivated</li>
+        </ul>
+
+        <p>
+          If you believe this deactivation was made in error or if you have
+          questions about this action, please contact our support team
+          immediately for assistance.
+        </p>
+
+        <div style="text-align: center; margin: 30px 0">
+          <a href="{{ support_url }}" class="button">Contact Support</a>
+        </div>
+
+        <p>
+          We appreciate your understanding and hope to resolve this matter
+          quickly.
+        </p>
+
+        <p>Best regards,<br />The ChefSync Team</p>
+      </div>
+
+      <div class="footer">
+        <p>
+          This is an automated message from ChefSync. Please do not reply to
+          this email.<br />
+          Need help?
+          <a href="{{ support_url }}" class="support-link">Contact Support</a>
+        </p>
+        <p style="margin-top: 10px; font-size: 11px; color: #999">
+          © {{ status_change_date|date:"Y" }} ChefSync. All rights reserved.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

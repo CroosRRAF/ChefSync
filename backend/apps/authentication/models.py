@@ -66,6 +66,12 @@ class User(AbstractUser):
         ("rejected", "Rejected"),
     ]
 
+    # Activation status choices
+    STATUS_CHOICES = [
+        ("active", "Active"),
+        ("inactive", "Inactive"),
+    ]
+
     # Gender choices
     GENDER_CHOICES = [
         ("Male", "Male"),
@@ -107,6 +113,12 @@ class User(AbstractUser):
         choices=APPROVAL_STATUS_CHOICES,
         default="approved",
         help_text="Approval status for cooks and delivery agents",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="active",
+        help_text="Activation status for all users",
     )
     approval_notes = models.TextField(
         blank=True, null=True, help_text="Admin notes for approval/rejection"
@@ -183,16 +195,19 @@ class User(AbstractUser):
             Customer.objects.get_or_create(user=self)
             # Customers are automatically approved
             self.approval_status = "approved"
+            self.status = "active"
             self.save()
         elif self.role in ["cook", "Cook"]:
             Cook.objects.get_or_create(user=self)
             # Cooks need admin approval
             self.approval_status = "pending"
+            self.status = "active"
             self.save()
         elif self.role in ["delivery_agent", "DeliveryAgent"]:
             DeliveryAgent.objects.get_or_create(user=self)
             # Delivery agents need admin approval
             self.approval_status = "pending"
+            self.status = "active"
             self.save()
 
     def get_profile(self):
@@ -266,8 +281,12 @@ class User(AbstractUser):
         self.save()
 
     def can_login(self):
-        """Check if user can login based on approval status"""
-        # Customers can always login
+        """Check if user can login based on approval status and activation status"""
+        # Check if user is active
+        if self.status != "active":
+            return False
+
+        # Customers can always login if active
         if self.role in ["customer", "Customer"]:
             return True
 

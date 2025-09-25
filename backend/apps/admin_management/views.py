@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
@@ -61,7 +62,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
 
             # User statistics
             total_users = User.objects.count()
-            active_users = User.objects.filter(is_active=True).count()
+            active_users = User.objects.filter(status="active").count()
             new_users_today = User.objects.filter(date_joined__date=today).count()
             new_users_this_week = User.objects.filter(date_joined__gte=week_ago).count()
             new_users_this_month = User.objects.filter(
@@ -79,9 +80,9 @@ class AdminDashboardViewSet(viewsets.ViewSet):
 
             # Chef statistics
             total_chefs = User.objects.filter(role="cook").count()
-            active_chefs = User.objects.filter(role="cook", is_active=True).count()
+            active_chefs = User.objects.filter(role="cook", status="active").count()
             pending_chef_approvals = User.objects.filter(
-                role="cook", is_active=False
+                role="cook", approval_status="pending"
             ).count()
 
             # Order statistics
@@ -315,7 +316,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get weekly performance data for pie chart (last 30 days)"""
         try:
             # Get date range (default 30 days)
-            days = int(request.query_params.get("days", 30))
+            days = int(request.GET.get("days", 30))
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
 
@@ -381,7 +382,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get revenue trend data for bar chart (last 30 days)"""
         try:
             # Get date range (default 30 days)
-            days = int(request.query_params.get("days", 30))
+            days = int(request.GET.get("days", 30))
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
 
@@ -451,7 +452,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get growth analytics data for area chart (last 30 days)"""
         try:
             # Get date range (default 30 days)
-            days = int(request.query_params.get("days", 30))
+            days = int(request.GET.get("days", 30))
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
 
@@ -541,7 +542,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get orders trend data for line chart (last 30 days)"""
         try:
             # Get date range (default 30 days)
-            days = int(request.query_params.get("days", 30))
+            days = int(request.GET.get("days", 30))
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
 
@@ -721,6 +722,49 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
     permission_classes = [IsAdminUser]
 
     @action(detail=False, methods=["get"])
+    def stats(self, request):
+        """Get user statistics"""
+        try:
+            # Get all user counts
+            total_users = User.objects.count()
+            active_users = User.objects.filter(status="active").count()
+            inactive_users = User.objects.filter(status="inactive").count()
+            
+            # Get role counts
+            admin_count = User.objects.filter(role="admin").count()
+            cook_count = User.objects.filter(role="cook").count()
+            customer_count = User.objects.filter(role="customer").count()
+            delivery_agent_count = User.objects.filter(role="DeliveryAgent").count()
+            
+            # Get new users this week
+            from datetime import datetime, timedelta
+            week_ago = datetime.now() - timedelta(days=7)
+            new_users_this_week = User.objects.filter(date_joined__gte=week_ago).count()
+            
+            # Get pending approvals
+            pending_user_approvals = User.objects.filter(
+                role__in=["cook", "DeliveryAgent"], 
+                approval_status="pending"
+            ).count()
+            
+            return Response({
+                "total_users": total_users,
+                "active_users": active_users,
+                "inactive_users": inactive_users,
+                "new_users_this_week": new_users_this_week,
+                "admin_count": admin_count,
+                "total_chefs": cook_count,
+                "customer_count": customer_count,
+                "delivery_agent_count": delivery_agent_count,
+                "pending_user_approvals": pending_user_approvals,
+            })
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to fetch user statistics: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
     def list_users(self, request):
         """Get paginated list of users with filters"""
         try:
@@ -767,9 +811,9 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 queryset = queryset.filter(role=role)
 
             if status_param == "active":
-                queryset = queryset.filter(is_active=True)
+                queryset = queryset.filter(status="active")
             elif status_param == "inactive":
-                queryset = queryset.filter(is_active=False)
+                queryset = queryset.filter(status="inactive")
 
             # Apply sorting
             if sort_order == "desc":
@@ -814,7 +858,8 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                             "email": user.email,
                             "name": user.name or "",  # type: ignore
                             "role": user.role,  # type: ignore
-                            "is_active": user.is_active,
+                            "is_active": user.status == "active",
+                            "approval_status": user.approval_status,  # type: ignore
                             "last_login": user.last_login,
                             "date_joined": user.date_joined,
                             "total_orders": total_orders,
@@ -831,7 +876,8 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                             "email": user.email,
                             "name": user.name or "",  # type: ignore
                             "role": user.role,  # type: ignore
-                            "is_active": user.is_active,
+                            "is_active": user.status == "active",
+                            "approval_status": user.approval_status,  # type: ignore
                             "last_login": user.last_login,
                             "date_joined": user.date_joined,
                             "total_orders": 0,
@@ -880,8 +926,8 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
             # Update users
             updated_count = User.objects.filter(
-                user_id__in=user_ids, is_active=False
-            ).update(is_active=True)
+                user_id__in=user_ids, status="inactive"
+            ).update(status="active")
 
             # Log activity
             AdminActivityLog.objects.create(
@@ -920,7 +966,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
             # Don't allow deactivating admin users
             admin_users = User.objects.filter(
-                user_id__in=user_ids, role="admin", is_active=True
+                user_id__in=user_ids, role="admin", status="active"
             ).values_list("user_id", flat=True)
 
             if admin_users:
@@ -931,9 +977,9 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
             # Update users
             updated_count = (
-                User.objects.filter(user_id__in=user_ids, is_active=True)
+                User.objects.filter(user_id__in=user_ids, status="active")
                 .exclude(role="admin")
-                .update(is_active=False)
+                .update(status="inactive")
             )
 
             # Log activity
@@ -986,7 +1032,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             updated_count = (
                 User.objects.filter(user_id__in=user_ids)
                 .exclude(role="admin")
-                .update(is_active=False)
+                .update(status="inactive")
             )
 
             # Log activity
@@ -1063,6 +1109,25 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     }
                 )
 
+            # Get user documents (for cooks and delivery agents)
+            documents_data = []
+            if user.role in ["cook", "DeliveryAgent"]:
+                from apps.users.models import UserDocument
+                documents = UserDocument.objects.filter(user=user, is_visible_to_admin=True)
+                for doc in documents:
+                    documents_data.append({
+                        "id": doc.id,
+                        "file_name": doc.file_name,
+                        "file": doc.file.url if doc.file else "",
+                        "document_type": {
+                            "id": doc.document_type.id,
+                            "name": doc.document_type.name,
+                            "description": doc.document_type.description,
+                        },
+                        "uploaded_at": doc.uploaded_at,
+                        "is_visible_to_admin": doc.is_visible_to_admin,
+                    })
+
             user_data = {
                 "id": user.user_id,  # type: ignore
                 "email": user.email,
@@ -1070,7 +1135,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 "phone_no": user.phone_no,  # type: ignore
                 "address": user.address,  # type: ignore
                 "role": user.role,  # type: ignore
-                "is_active": user.is_active,
+                "is_active": user.status == "active",
                 "email_verified": user.email_verified,  # type: ignore
                 "last_login": user.last_login,
                 "date_joined": user.date_joined,
@@ -1082,6 +1147,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 },
                 "recent_orders": recent_orders_data,
                 "activity_logs": activity_data,
+                "documents": documents_data,
             }
 
             return Response(user_data)
@@ -1104,7 +1170,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
             # Get update data
             update_data = {}
-            allowed_fields = ["name", "phone_no", "address", "role", "is_active"]
+            allowed_fields = ["name", "phone_no", "address", "role", "status"]
 
             for field in allowed_fields:
                 if field in request.data:
@@ -1160,7 +1226,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                         "email": user.email,
                         "name": user.name,  # type: ignore
                         "role": user.role,  # type: ignore
-                        "is_active": user.is_active,
+                        "is_active": user.status == "active",
                     },
                 }
             )
@@ -1195,9 +1261,9 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 queryset = queryset.filter(role=role)
 
             if user_status == "active":
-                queryset = queryset.filter(is_active=True)
+                queryset = queryset.filter(status="active")
             elif user_status == "inactive":
-                queryset = queryset.filter(is_active=False)
+                queryset = queryset.filter(status="inactive")
 
             # Create CSV response
             response = HttpResponse(content_type="text/csv")
@@ -1229,7 +1295,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                         user.name,  # type: ignore
                         user.phone_no or "",  # type: ignore
                         user.role,  # type: ignore
-                        "Yes" if user.is_active else "No",
+                        "Yes" if user.status == "active" else "No",
                         "Yes" if user.email_verified else "No",  # type: ignore
                         (
                             user.date_joined.strftime("%Y-%m-%d %H:%M:%S")
@@ -1260,6 +1326,216 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response(
                 {"error": f"Failed to export users: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"])
+    def activate(self, request, pk=None):
+        """Activate a user account (separate from approval)"""
+        try:
+            user = User.objects.get(pk=pk)
+
+            if user.status == "active":
+                return Response(
+                    {"error": "User is already active"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Update user status
+            user.status = "active"
+            user.save()
+
+            # Send activation notification email
+            try:
+                from apps.authentication.services.user_management_email_service import (
+                    UserManagementEmailService,
+                )
+
+                UserManagementEmailService.send_user_activation_notification(
+                    user, activated=True
+                )
+            except Exception as email_error:
+                print(f"Failed to send activation email: {str(email_error)}")
+                # Don't fail the activation if email fails
+
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action="activate",
+                resource_type="user",
+                resource_id=str(user.user_id),  # type: ignore
+                description=f"Activated user account: {user.email}",
+                ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT"),
+            )
+
+            return Response(
+                {
+                    "message": "User activated successfully",
+                    "user": {
+                        "id": user.user_id,  # type: ignore
+                        "email": user.email,
+                        "name": user.name,  # type: ignore
+                        "is_active": user.status == "active",
+                    },
+                }
+            )
+
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to activate user: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"])
+    def deactivate(self, request, pk=None):
+        """Deactivate a user account (separate from approval)"""
+        try:
+            user = User.objects.get(pk=pk)
+
+            if user.status == "inactive":
+                return Response(
+                    {"error": "User is already inactive"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Don't allow deactivating admin users
+            if user.role == "admin":
+                return Response(
+                    {"error": "Cannot deactivate admin users"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Update user status
+            user.status = "inactive"
+            user.save()
+
+            # Send deactivation notification email
+            try:
+                from apps.authentication.services.user_management_email_service import (
+                    UserManagementEmailService,
+                )
+
+                UserManagementEmailService.send_user_activation_notification(
+                    user, activated=False
+                )
+            except Exception as email_error:
+                print(f"Failed to send deactivation email: {str(email_error)}")
+                # Don't fail the deactivation if email fails
+
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action="deactivate",
+                resource_type="user",
+                resource_id=str(user.user_id),  # type: ignore
+                description=f"Deactivated user account: {user.email}",
+                ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT"),
+            )
+
+            return Response(
+                {
+                    "message": "User deactivated successfully",
+                    "user": {
+                        "id": user.user_id,  # type: ignore
+                        "email": user.email,
+                        "name": user.name,  # type: ignore
+                        "is_active": user.status == "active",
+                    },
+                }
+            )
+
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to deactivate user: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    def statistics(self, request):
+        """Get user management statistics for dashboard"""
+        try:
+            # Basic user counts
+            total_users = User.objects.count()
+            active_users = User.objects.filter(status="active").count()
+            inactive_users = User.objects.filter(status="inactive").count()
+
+            # Role distribution
+            role_stats = (
+                User.objects.values("role")
+                .annotate(count=models.Count("id"))
+                .order_by("role")
+            )
+
+            # Approval status for cooks and delivery agents
+            pending_approvals = User.objects.filter(
+                role__in=["cook", "DeliveryAgent"], approval_status="pending"
+            ).count()
+
+            approved_users = User.objects.filter(
+                role__in=["cook", "DeliveryAgent"], approval_status="approved"
+            ).count()
+
+            rejected_users = User.objects.filter(
+                role__in=["cook", "DeliveryAgent"], approval_status="rejected"
+            ).count()
+
+            # Recent registrations (last 30 days)
+            thirty_days_ago = timezone.now() - timedelta(days=30)
+            recent_registrations = User.objects.filter(
+                date_joined__gte=thirty_days_ago
+            ).count()
+
+            # Recent approvals (last 7 days)
+            seven_days_ago = timezone.now() - timedelta(days=7)
+            recent_approvals = User.objects.filter(
+                role__in=["cook", "DeliveryAgent"],
+                approval_status="approved",
+                approved_at__gte=seven_days_ago,
+            ).count()
+
+            # Email verification stats
+            verified_emails = User.objects.filter(email_verified=True).count()
+            unverified_emails = User.objects.filter(email_verified=False).count()
+
+            # Failed login attempts (users with failed attempts > 0)
+            users_with_failed_logins = User.objects.filter(
+                failed_login_attempts__gt=0
+            ).count()
+
+            # Locked accounts
+            locked_accounts = User.objects.filter(account_locked=True).count()
+
+            return Response(
+                {
+                    "total_users": total_users,
+                    "active_users": active_users,
+                    "inactive_users": inactive_users,
+                    "pending_approvals": pending_approvals,
+                    "approved_users": approved_users,
+                    "rejected_users": rejected_users,
+                    "recent_registrations": recent_registrations,
+                    "recent_approvals": recent_approvals,
+                    "verified_emails": verified_emails,
+                    "unverified_emails": unverified_emails,
+                    "users_with_failed_logins": users_with_failed_logins,
+                    "locked_accounts": locked_accounts,
+                    "role_distribution": list(role_stats),
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to fetch user statistics: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -1517,7 +1793,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                 )
 
             # Verify chef exists and has correct role
-            chef = User.objects.get(pk=chef_id, role="cook", is_active=True)
+            chef = User.objects.get(pk=chef_id, role="cook", status="active")
 
             # Update order
             old_chef = order.chef
@@ -1582,7 +1858,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
 
             # Verify delivery partner exists and has correct role
             partner = User.objects.get(
-                pk=partner_id, role="delivery_agent", is_active=True
+                pk=partner_id, role="DeliveryAgent", status="active"
             )
 
             # Update order
@@ -1635,7 +1911,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
     def available_chefs(self, request):
         """Get list of available chefs for order assignment"""
         try:
-            chefs = User.objects.filter(role="cook", is_active=True).values(
+            chefs = User.objects.filter(role="cook", status="active").values(
                 "id", "name", "email"
             )
 
@@ -1652,7 +1928,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
         """Get list of available delivery partners for order assignment"""
         try:
             partners = User.objects.filter(
-                role="delivery_agent", is_active=True
+                role="DeliveryAgent", status="active"
             ).values("id", "name", "email")
 
             return Response({"partners": list(partners)})

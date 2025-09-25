@@ -147,6 +147,7 @@ export interface AdminUser {
   name: string;
   role: string;
   is_active: boolean;
+  approval_status: string;
   last_login: string | null;
   date_joined: string;
   total_orders: number;
@@ -663,6 +664,7 @@ class AdminService {
       search?: string;
       role?: string;
       status?: string;
+      approval_status?: string;
       sort_by?: string;
       sort_order?: string;
     } = {}
@@ -677,6 +679,7 @@ class AdminService {
             search: params.search || "",
             role: params.role || "",
             status: params.status || "",
+            approval_status: params.approval_status || "",
             sort_by: params.sort_by || "date_joined",
             sort_order: params.sort_order || "desc",
           },
@@ -708,10 +711,131 @@ class AdminService {
 
   async updateUser(userId: number, updates: Partial<AdminUser>): Promise<void> {
     try {
-      await apiClient.patch(`${this.baseUrl}/users/${userId}/update/`, updates);
+      console.log(`🔄 AdminService: Updating user ${userId} with:`, updates);
+      await apiClient.patch(`${this.baseUrl}/users/${userId}/update_user/`, updates);
+      console.log(`✅ AdminService: Update successful`);
+    } catch (error: any) {
+      console.error("❌ AdminService: Error updating user:", error);
+      console.error("Error details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method
+      });
+      
+      // Re-throw with more specific error message
+      const errorMessage = error.response?.data?.error || 
+                         error.response?.data?.detail || 
+                         error.message || 
+                         "Failed to update user";
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Get user statistics
+  async getUserStats(): Promise<any> {
+    try {
+      console.log(`🔄 AdminService: Fetching user stats`);
+      const response = await apiClient.get(`${this.baseUrl}/users/stats/`);
+      console.log(`✅ AdminService: Stats response:`, response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ AdminService: Error fetching user stats:", error);
+      console.error("Error details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method
+      });
+      
+      // Re-throw with more specific error message
+      const errorMessage = error.response?.data?.error || 
+                         error.response?.data?.detail || 
+                         error.message || 
+                         "Failed to fetch user stats";
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Individual User Activation/Deactivation
+  async activateUser(userId: number): Promise<{ message: string }> {
+    try {
+      console.log(`🔄 AdminService: Activating user ${userId}`);
+      const response = await apiClient.post(
+        `${this.baseUrl}/users/${userId}/activate/`
+      );
+      console.log(`✅ AdminService: Activate response:`, response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ AdminService: Error activating user:", error);
+      console.error("Error details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method
+      });
+      
+      // Re-throw with more specific error message
+      const errorMessage = error.response?.data?.error || 
+                         error.response?.data?.detail || 
+                         error.message || 
+                         "Failed to activate user";
+      throw new Error(errorMessage);
+    }
+  }
+
+  async deactivateUser(userId: number): Promise<{ message: string }> {
+    try {
+      console.log(`🔄 AdminService: Deactivating user ${userId}`);
+      const response = await apiClient.post(
+        `${this.baseUrl}/users/${userId}/deactivate/`
+      );
+      console.log(`✅ AdminService: Deactivate response:`, response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ AdminService: Error deactivating user:", error);
+      console.error("Error details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method
+      });
+      
+      // Re-throw with more specific error message
+      const errorMessage = error.response?.data?.error || 
+                         error.response?.data?.detail || 
+                         error.message || 
+                         "Failed to deactivate user";
+      throw new Error(errorMessage);
+    }
+  }
+
+  // User Statistics
+  async getUserStatistics(): Promise<{
+    total_users: number;
+    active_users: number;
+    inactive_users: number;
+    pending_approvals: number;
+    total_chefs: number;
+    active_chefs: number;
+    pending_chef_approvals: number;
+    total_customers: number;
+    active_customers: number;
+    new_users_today: number;
+    new_users_this_week: number;
+    new_users_this_month: number;
+    user_growth_percentage: number;
+  }> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/users/statistics/`);
+      return response.data;
     } catch (error) {
-      console.error("Error updating user:", error);
-      throw new Error("Failed to update user");
+      console.error("Error fetching user statistics:", error);
+      throw new Error("Failed to fetch user statistics");
     }
   }
 
@@ -944,17 +1068,32 @@ class AdminService {
     } = {}
   ): Promise<Blob> {
     try {
-      const response = await apiClient.get(`${this.baseUrl}/users/export/`, {
+      console.log(`🔄 AdminService: Exporting users with params:`, params);
+      const response = await apiClient.get(`${this.baseUrl}/users/export_users/`, {
         params: {
           role: params.role || "",
           status: params.status || "",
         },
         responseType: "blob",
       });
+      console.log(`✅ AdminService: Export successful`);
       return response.data;
-    } catch (error) {
-      console.error("Error exporting users:", error);
-      throw new Error("Failed to export users");
+    } catch (error: any) {
+      console.error("❌ AdminService: Error exporting users:", error);
+      console.error("Error details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method
+      });
+      
+      // Re-throw with more specific error message
+      const errorMessage = error.response?.data?.error || 
+                         error.response?.data?.detail || 
+                         error.message || 
+                         "Failed to export users";
+      throw new Error(errorMessage);
     }
   }
 

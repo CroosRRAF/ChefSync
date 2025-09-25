@@ -105,10 +105,19 @@ urlpatterns = [
         views.check_email_availability,
         name="check_email_availability",
     ),
-
     # Referral System
-    path('referral/create-token/', views.create_referral_token, name='create_referral_token'),
-    path('referral/stats/', views.get_referral_stats, name='get_referral_stats'),
-    path('referral/tokens/', views.get_referral_tokens, name='get_referral_tokens'),
-    path('referral/validate/', views.validate_referral_token, name='validate_referral_token'),
+    path(
+        "referral/create-token/",
+        views.create_referral_token,
+        name="create_referral_token",
+    ),
+    path("referral/stats/", views.get_referral_stats, name="get_referral_stats"),
+    path("referral/tokens/", views.get_referral_tokens, name="get_referral_tokens"),
+    path(
+        "referral/validate/",
+        views.validate_referral_token,
+        name="validate_referral_token",
+    ),
+    # Admin User Management
+    path("admin/users/stats/", views.get_user_stats, name="get_user_stats"),
 ]

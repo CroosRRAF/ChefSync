@@ -1,29 +1,37 @@
-import { AdvancedStatsCard } from "@/components/admin/UnifiedStatsCard";
+import AdvancedDataTable from "@/components/admin/AdvancedDataTable";
+import AdvancedStatsCard from "@/components/admin/AdvancedStatsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { adminService, type AdminUser } from "@/services/adminService";
 import {
   AlertTriangle,
   Calendar,
   CheckCircle,
-  ChefHat,
+  Clock,
+  DollarSign,
   Download,
   Eye,
   FileText,
   Filter,
   RefreshCw,
   Search,
-  ShieldCheck,
-  ShieldX,
-  Star,
   Trash2,
   UserCheck,
   Users,
   UserX,
   XCircle,
+  Shield,
+  Mail,
+  Phone,
+  MapPin,
+  Activity,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  XCircle as XCircleIcon,
+  Clock3,
 } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
@@ -33,8 +41,6 @@ const EnhancedUserManagement: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [chefs, setChefs] = useState<AdminUser[]>([]);
-  const [customers, setCustomers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({
@@ -55,54 +61,25 @@ const EnhancedUserManagement: React.FC = () => {
     search: "",
     role: "",
     status: "",
+    approval_status: "",
   });
 
-  // Bulk selection state
-  const [selectedChefs, setSelectedChefs] = useState<number[]>([]);
-  const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
-  const [bulkActionLoading, setBulkActionLoading] = useState(false);
-
   // Approval state
-  const [activeTab, setActiveTab] = useState("pending");
+  const [activeTab, setActiveTab] = useState("users");
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [selectedApprovalUser, setSelectedApprovalUser] = useState<any>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
 
-  // Fetch users by role
-  const fetchUsersByRole = useCallback(
-    async (role: string, page = 1, search = "", status = "") => {
-      if (!user) return;
-
-      try {
-        const response = await adminService.getUsers({
-          page,
-          limit: pagination.limit,
-          search,
-          role,
-          status,
-          sort_by: "date_joined",
-          sort_order: "desc",
-        });
-
-        if (role === "cook") {
-          setChefs(response.users);
-        } else if (role === "customer") {
-          setCustomers(response.users);
-        }
-
-        return response;
-      } catch (err) {
-        console.error(`Error fetching ${role}s:`, err);
-        throw err;
-      }
-    },
-    [user, pagination.limit]
-  );
-
-  // Fetch all users (for stats)
+  // Fetch users
   const fetchUsers = useCallback(
-    async (page = 1, search = "", role = "", status = "") => {
+    async (
+      page = 1,
+      search = "",
+      role = "",
+      status = "",
+      approval_status = ""
+    ) => {
       if (!user) return;
 
       try {
@@ -115,6 +92,7 @@ const EnhancedUserManagement: React.FC = () => {
           search,
           role,
           status,
+          approval_status,
           sort_by: "date_joined",
           sort_order: "desc",
         });
@@ -130,25 +108,45 @@ const EnhancedUserManagement: React.FC = () => {
     [user, pagination.limit]
   );
 
+  // Get user stats
+  // Get stats from backend instead of calculating from current page
+  const [userStats, setUserStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    newThisWeek: 0,
+    adminCount: 0,
+    cookCount: 0,
+    customerCount: 0,
+    deliveryCount: 0,
+    pendingApprovals: 0,
+  });
+
+  // Fetch user stats from backend
+  const fetchUserStats = useCallback(async () => {
+    try {
+      const stats = await adminService.getUserStats();
+      setUserStats({
+        total: stats.total_users || 0,
+        active: stats.active_users || 0,
+        inactive: (stats.total_users || 0) - (stats.active_users || 0),
+        newThisWeek: stats.new_users_this_week || 0,
+        adminCount: stats.admin_count || 0,
+        cookCount: stats.total_chefs || 0,
+        customerCount: stats.customer_count || 0,
+        deliveryCount: stats.delivery_agent_count || 0,
+        pendingApprovals: stats.pending_user_approvals || 0,
+      });
+    } catch (error) {
+      console.error("Failed to fetch user stats:", error);
+    }
+  }, []);
+
   // Initial fetch
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        // Load chefs and customers separately
-        await Promise.all([
-          fetchUsersByRole("cook"),
-          fetchUsersByRole("customer"),
-          fetchPendingApprovals(),
-        ]);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, [fetchUsersByRole]);
+    fetchUsers();
+    fetchUserStats();
+  }, [fetchUsers, fetchUserStats]);
 
   // Enhanced search with debouncing
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(
@@ -165,12 +163,18 @@ const EnhancedUserManagement: React.FC = () => {
       // Debounce search
       const timeout = setTimeout(() => {
         setFilters((prev) => ({ ...prev, search: searchTerm }));
-        fetchUsers(1, searchTerm, filters.role, filters.status);
+        fetchUsers(
+          1,
+          searchTerm,
+          filters.role,
+          filters.status,
+          filters.approval_status
+        );
       }, 300);
 
       setSearchTimeout(timeout);
     },
-    [filters.role, filters.status, searchTimeout]
+    [filters.role, filters.status, filters.approval_status, searchTimeout]
   );
 
   // Enhanced filter change with date range support
@@ -216,15 +220,21 @@ const EnhancedUserManagement: React.FC = () => {
         }
       }
 
-      fetchUsers(1, newFilters.search, newFilters.role, newFilters.status);
+      fetchUsers(
+        1,
+        newFilters.search,
+        newFilters.role,
+        newFilters.status,
+        newFilters.approval_status
+      );
     },
     [filters]
   );
 
   // Clear all filters
   const handleClearFilters = () => {
-    setFilters({ search: "", role: "", status: "" });
-    fetchUsers(1, "", "", "");
+    setFilters({ search: "", role: "", status: "", approval_status: "" });
+    fetchUsers(1, "", "", "", "");
   };
 
   // Get active filter count
@@ -236,23 +246,23 @@ const EnhancedUserManagement: React.FC = () => {
   const handleUserPreview = (user: AdminUser, event: React.MouseEvent) => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const scrollLeft =
-      window.pageXOffset || document.documentElement.scrollLeft;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
 
-    const previewWidth = 320; // w-80 = 320px
-    const previewHeight = 200; // approximate height
+    const previewWidth = 384; // w-96 = 384px
+    const previewHeight = 250; // approximate height
 
     let x = rect.left + rect.width / 2 + scrollLeft;
     let y = rect.top + scrollTop - 10;
     let above = true;
 
-    // Adjust if preview would go off-screen
+    // Adjust if preview would go off-screen horizontally
     if (x + previewWidth / 2 > window.innerWidth + scrollLeft) {
-      x = window.innerWidth + scrollLeft - previewWidth / 2 - 10;
+      x = window.innerWidth + scrollLeft - previewWidth / 2 - 20;
     } else if (x - previewWidth / 2 < scrollLeft) {
-      x = scrollLeft + previewWidth / 2 + 10;
+      x = scrollLeft + previewWidth / 2 + 20;
     }
 
+    // Adjust if preview would go off-screen vertically
     if (y - previewHeight < scrollTop) {
       // Show below instead of above
       y = rect.bottom + scrollTop + 10;
@@ -266,11 +276,11 @@ const EnhancedUserManagement: React.FC = () => {
   };
 
   const handlePreviewClose = () => {
-    // Add a small delay to prevent flickering
+    // Add a small delay to prevent flickering when moving between elements
     setTimeout(() => {
       setShowPreview(false);
       setPreviewUser(null);
-    }, 100);
+    }, 150);
   };
 
   // Handle user detail view
@@ -304,37 +314,24 @@ const EnhancedUserManagement: React.FC = () => {
         setUserDetails(details);
       }
       // Refresh user list
-      fetchUsers(pagination.page, filters.search, filters.role, filters.status);
+      fetchUsers(
+        pagination.page,
+        filters.search,
+        filters.role,
+        filters.status,
+        filters.approval_status
+      );
     } catch (err) {
       console.error("Failed to update user:", err);
       setError(err instanceof Error ? err.message : "Failed to update user");
     }
   };
 
-  // Handle bulk actions with confirmation
+  // Handle bulk actions
   const handleBulkAction = async (
     selectedUsers: AdminUser[],
     action: string
   ) => {
-    if (selectedUsers.length === 0) return;
-
-    const actionText =
-      action === "activate"
-        ? "activate"
-        : action === "deactivate"
-        ? "deactivate"
-        : "delete";
-
-    if (
-      !window.confirm(
-        `Are you sure you want to ${actionText} ${selectedUsers.length} user${
-          selectedUsers.length > 1 ? "s" : ""
-        }?`
-      )
-    ) {
-      return;
-    }
-
     try {
       const userIds = selectedUsers.map((user) => user.id);
 
@@ -352,7 +349,13 @@ const EnhancedUserManagement: React.FC = () => {
           console.log(`Bulk action: ${action}`, selectedUsers);
       }
       // Refresh the user list
-      fetchUsers(pagination.page, filters.search, filters.role, filters.status);
+      fetchUsers(
+        pagination.page,
+        filters.search,
+        filters.role,
+        filters.status,
+        filters.approval_status
+      );
     } catch (err) {
       console.error("Failed to perform bulk action:", err);
       setError(
@@ -361,22 +364,21 @@ const EnhancedUserManagement: React.FC = () => {
     }
   };
 
-  // Handle user approval/rejection
+  // Handle user approval/rejection (only for cooks and delivery agents)
   const handleUserApproval = async (
     user: AdminUser,
     action: "approve" | "reject"
   ) => {
     try {
-      // Use the correct adminService method
+      // Use the correct adminService method for approval
       await adminService.approveUser(user.id, action);
 
-      // Update local state
+      // Update local state - approval only changes approval_status, not is_active
       setUsers((prev) =>
         prev.map((u) =>
           u.id === user.id
             ? {
                 ...u,
-                is_active: action === "approve",
                 approval_status: action === "approve" ? "approved" : "rejected",
               }
             : u
@@ -387,13 +389,88 @@ const EnhancedUserManagement: React.FC = () => {
       alert(`User ${action}d successfully!`);
 
       // Refresh the user list
-      fetchUsers(pagination.page, filters.search, filters.role, filters.status);
+      fetchUsers(
+        pagination.page,
+        filters.search,
+        filters.role,
+        filters.status,
+        filters.approval_status
+      );
     } catch (error: any) {
       console.error(`Error ${action}ing user:`, error);
       alert(
         `Failed to ${action} user: ${
           error.response?.data?.detail || error.message
         }`
+      );
+    }
+  };
+
+  // Handle user activation/deactivation (for all users)
+  const handleUserActivation = async (user: AdminUser) => {
+    try {
+      const action = user.is_active ? "deactivate" : "activate";
+      console.log(`🔄 Attempting to ${action} user ${user.id} (${user.email})`);
+
+      // Use the correct adminService methods for activation
+      if (user.is_active) {
+        console.log("📤 Calling deactivateUser API...");
+        await adminService.deactivateUser(user.id);
+        console.log("✅ Deactivate API call successful");
+      } else {
+        console.log("📤 Calling activateUser API...");
+        await adminService.activateUser(user.id);
+        console.log("✅ Activate API call successful");
+      }
+
+      // Update local state - only change is_active status
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id
+            ? {
+                ...u,
+                is_active: !user.is_active,
+              }
+            : u
+        )
+      );
+
+      // Show success message
+      alert(`User ${action}d successfully!`);
+
+      // Refresh the user list
+      fetchUsers(
+        pagination.page,
+        filters.search,
+        filters.role,
+        filters.status,
+        filters.approval_status
+      );
+    } catch (error: any) {
+      console.error(
+        `❌ Error ${user.is_active ? "deactivate" : "activate"}ing user:`,
+        error
+      );
+      
+      // Enhanced error handling
+      let errorMessage = "Unknown error occurred";
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      console.error("Error details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      alert(
+        `Failed to ${user.is_active ? "deactivate" : "activate"} user: ${errorMessage}`
       );
     }
   };
@@ -443,23 +520,12 @@ const EnhancedUserManagement: React.FC = () => {
     }
   }, []);
 
-  // Handle approval action with confirmation
+  // Handle approval action
   const handleApprovalAction = async (
     userId: number,
     action: "approve" | "reject",
     notes?: string
   ) => {
-    const user = safePendingApprovals.find((u) => u.user_id === userId);
-    const actionText = action === "approve" ? "approve" : "reject";
-
-    if (
-      !window.confirm(
-        `Are you sure you want to ${actionText} ${user?.name || "this user"}?`
-      )
-    ) {
-      return;
-    }
-
     try {
       await adminService.approveUser(userId, action, notes);
 
@@ -497,159 +563,247 @@ const EnhancedUserManagement: React.FC = () => {
     }
   };
 
-  // Bulk action handlers
-  const handleBulkChefAction = async (action: string) => {
-    if (selectedChefs.length === 0) return;
-
-    try {
-      setBulkActionLoading(true);
-
-      switch (action) {
-        case "activate":
-          await adminService.bulkActivateUsers(selectedChefs);
-          break;
-        case "deactivate":
-          await adminService.bulkDeactivateUsers(selectedChefs);
-          break;
-        case "delete":
-          await adminService.bulkDeleteUsers(selectedChefs);
-          break;
-        case "approve":
-          // Bulk approve pending chefs
-          for (const chefId of selectedChefs) {
-            await adminService.approveUser(chefId, "approve");
-          }
-          break;
-      }
-
-      // Refresh data
-      await fetchUsersByRole("cook");
-      setSelectedChefs([]);
-      alert(`${action} completed for ${selectedChefs.length} chef(s)`);
-    } catch (err) {
-      console.error("Bulk action failed:", err);
-      alert(`Failed to ${action} chefs`);
-    } finally {
-      setBulkActionLoading(false);
-    }
-  };
-
-  const handleBulkCustomerAction = async (action: string) => {
-    if (selectedCustomers.length === 0) return;
-
-    try {
-      setBulkActionLoading(true);
-
-      switch (action) {
-        case "activate":
-          await adminService.bulkActivateUsers(selectedCustomers);
-          break;
-        case "deactivate":
-          await adminService.bulkDeactivateUsers(selectedCustomers);
-          break;
-        case "delete":
-          await adminService.bulkDeleteUsers(selectedCustomers);
-          break;
-      }
-
-      // Refresh data
-      await fetchUsersByRole("customer");
-      setSelectedCustomers([]);
-      alert(`${action} completed for ${selectedCustomers.length} customer(s)`);
-    } catch (err) {
-      console.error("Bulk action failed:", err);
-      alert(`Failed to ${action} customers`);
-    } finally {
-      setBulkActionLoading(false);
-    }
-  };
-
-  // Keyboard shortcuts for admin efficiency
+  // Fetch approvals when tab changes
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Only handle shortcuts when not typing in inputs
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-
-      // Ctrl/Cmd + R: Refresh data
-      if ((event.ctrlKey || event.metaKey) && event.key === "r") {
-        event.preventDefault();
-        if (activeTab === "pending") {
-          fetchPendingApprovals();
-        } else if (activeTab === "chefs") {
-          fetchUsersByRole("cook");
-        } else if (activeTab === "customers") {
-          fetchUsersByRole("customer");
-        }
-      }
-
-      // Ctrl/Cmd + A: Select all (in current tab)
-      if ((event.ctrlKey || event.metaKey) && event.key === "a") {
-        event.preventDefault();
-        if (activeTab === "chefs") {
-          setSelectedChefs(chefs.map((c) => c.id));
-        } else if (activeTab === "customers") {
-          setSelectedCustomers(customers.map((c) => c.id));
-        }
-      }
-
-      // Escape: Clear selections
-      if (event.key === "Escape") {
-        setSelectedChefs([]);
-        setSelectedCustomers([]);
-      }
-
-      // Number keys: Switch tabs (1=pending, 2=chefs, 3=customers)
-      if (!event.ctrlKey && !event.metaKey && !event.altKey) {
-        if (event.key === "1") {
-          setActiveTab("pending");
-        } else if (event.key === "2") {
-          setActiveTab("chefs");
-        } else if (event.key === "3") {
-          setActiveTab("customers");
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeTab, chefs, customers, fetchPendingApprovals, fetchUsersByRole]);
-
-  // Ensure pendingApprovals is always an array
-  const safePendingApprovals = Array.isArray(pendingApprovals) ? pendingApprovals : [];
-
-  // Get user stats
-  const userStats = {
-    totalChefs: chefs.length,
-    activeChefs: chefs.filter((c) => c.is_active).length,
-    pendingChefs: safePendingApprovals.filter((u) => u.role === "cook").length,
-    totalCustomers: customers.length,
-    activeCustomers: customers.filter((c) => c.is_active).length,
-    newChefsThisWeek: chefs.filter((c) => {
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      return new Date(c.date_joined) > weekAgo;
-    }).length,
-    newCustomersThisWeek: customers.filter((c) => {
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      return new Date(c.date_joined) > weekAgo;
-    }).length,
-  };
+    if (activeTab === "approvals") {
+      fetchPendingApprovals();
+    }
+  }, [activeTab, fetchPendingApprovals]);
 
   // Table columns
   const columns = [
-    { key: "name", title: "Name", sortable: true },
-    { key: "role", title: "Role", sortable: true },
-    { key: "is_active", title: "Status", sortable: true },
-    { key: "total_orders", title: "Orders", sortable: true },
-    { key: "total_spent", title: "Total Spent", sortable: true },
-    { key: "last_login", title: "Last Login", sortable: true },
-    { key: "actions", title: "Actions" },
+    {
+      key: "name",
+      title: "Name",
+      sortable: true,
+      render: (value: string, row: AdminUser) => (
+        <div
+          className="flex items-center space-x-3 cursor-pointer p-2 rounded transition-all duration-200 relative group hover:bg-gray-50 dark:hover:bg-gray-800"
+          onMouseEnter={(e) => {
+            e.stopPropagation();
+            handleUserPreview(row, e);
+          }}
+          onMouseLeave={(e) => {
+            e.stopPropagation();
+            // Delay hiding to allow mouse to move to preview
+            setTimeout(() => {
+              if (!showPreview) return; // Already hidden
+              setShowPreview(false);
+              setPreviewUser(null);
+            }, 200);
+          }}
+          onClick={() => handleUserDetail(row)}
+        >
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700">
+            {value.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <div
+              className="font-medium transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400"
+              style={{
+                color: theme === "dark" ? "#F9FAFB" : "#111827",
+              }}
+            >
+              {value}
+            </div>
+            <div
+              className="text-sm"
+              style={{
+                color: theme === "dark" ? "#9CA3AF" : "#6B7280",
+              }}
+            >
+              {row.email}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "role",
+      title: "Role",
+      sortable: true,
+      render: (value: string) => (
+        <Badge
+          variant="secondary"
+          className={`text-xs ${
+            value === "admin"
+              ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
+              : value === "cook"
+              ? "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800"
+              : value === "delivery_agent"
+              ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800"
+              : "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
+          }`}
+        >
+          {value === "delivery_agent"
+            ? "Delivery"
+            : value.charAt(0).toUpperCase() + value.slice(1)}
+        </Badge>
+      ),
+    },
+    {
+      key: "is_active",
+      title: "Status",
+      sortable: true,
+      render: (value: boolean) => (
+        <div className="flex items-center space-x-2">
+          <div
+            className={`w-2 h-2 rounded-full ${
+              value ? "bg-green-500" : "bg-red-500"
+            }`}
+          ></div>
+          <Badge
+            variant="secondary"
+            className={`text-xs ${
+              value
+                ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
+                : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
+            }`}
+          >
+            {value ? "Active" : "Inactive"}
+          </Badge>
+        </div>
+      ),
+    },
+    {
+      key: "approval_status",
+      title: "Approval",
+      sortable: true,
+      render: (value: string) => (
+        <div className="flex items-center space-x-2">
+          <div
+            className={`w-2 h-2 rounded-full ${
+              value === "approved"
+                ? "bg-green-500"
+                : value === "pending"
+                ? "bg-yellow-500"
+                : "bg-red-500"
+            }`}
+          ></div>
+          <Badge
+            variant="secondary"
+            className={`text-xs ${
+              value === "approved"
+                ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
+                : value === "pending"
+                ? "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800"
+                : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
+            }`}
+          >
+            {value === "approved"
+              ? "Approved"
+              : value === "pending"
+              ? "Pending"
+              : "Rejected"}
+          </Badge>
+        </div>
+      ),
+    },
+    {
+      key: "total_orders",
+      title: "Orders",
+      sortable: true,
+      align: "center" as const,
+      render: (value: number) => (
+        <span className="font-medium text-gray-900 dark:text-gray-100">
+          {value}
+        </span>
+      ),
+    },
+    {
+      key: "total_spent",
+      title: "Total Spent",
+      sortable: true,
+      align: "right" as const,
+      render: (value: number) => (
+        <span className="font-medium text-gray-900 dark:text-gray-100">
+          ${value.toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      key: "last_login",
+      title: "Last Login",
+      sortable: true,
+      render: (value: string | null) => (
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          {value ? new Date(value).toLocaleDateString() : "Never"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      title: "Actions",
+      render: (value: any, row: AdminUser) => (
+        <div className="flex items-center space-x-1">
+          {/* Approval actions for cooks and delivery agents who are pending or rejected */}
+          {(row.role === "cook" || row.role === "delivery_agent") &&
+            (row.approval_status === "pending" ||
+              row.approval_status === "rejected") && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleUserApproval(row, "approve");
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400"
+                  title="Approve User"
+                >
+                  <UserCheck className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleUserApproval(row, "reject");
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+                  title="Reject User"
+                >
+                  <UserX className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+
+          {/* Activation/Deactivation actions for all users */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleUserActivation(row);
+            }}
+            className={`h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 ${
+              row.is_active
+                ? "text-red-600 dark:text-red-400"
+                : "text-green-600 dark:text-green-400"
+            }`}
+            title={row.is_active ? "Deactivate User" : "Activate User"}
+          >
+            {row.is_active ? (
+              <UserX className="h-4 w-4" />
+            ) : (
+              <UserCheck className="h-4 w-4" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleUserDetail(row);
+            }}
+            className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+            title="View Details"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   // Filter options
@@ -670,6 +824,15 @@ const EnhancedUserManagement: React.FC = () => {
       options: [
         { value: "active", label: "Active" },
         { value: "inactive", label: "Inactive" },
+      ],
+    },
+    {
+      key: "approval_status",
+      label: "Approval Status",
+      options: [
+        { value: "pending", label: "Pending" },
+        { value: "approved", label: "Approved" },
+        { value: "rejected", label: "Rejected" },
       ],
     },
     {
@@ -723,17 +886,13 @@ const EnhancedUserManagement: React.FC = () => {
           <p className="mt-1 text-gray-600 dark:text-gray-400">
             Manage users, roles, and permissions across your platform.
           </p>
-          <div className="mt-2 text-xs text-gray-500 dark:text-gray-500">
-            <span className="font-medium">Keyboard shortcuts:</span> 1-3: Switch
-            tabs • Ctrl+R: Refresh • Ctrl+A: Select all • Esc: Clear selection
-          </div>
         </div>
         <div className="flex items-center space-x-3">
           <Button variant="outline" onClick={() => fetchUsers()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          {activeTab === "customers" && (
+          {activeTab === "users" && (
             <>
               {activeFilterCount > 0 && (
                 <Button variant="outline" onClick={handleClearFilters}>
@@ -755,107 +914,1187 @@ const EnhancedUserManagement: React.FC = () => {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="pending" className="relative">
-            <ShieldCheck className="h-4 w-4 mr-2" />
-            Pending Approvals
-            {safePendingApprovals.length > 0 && (
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="approvals" className="relative">
+            Approvals
+            {pendingApprovals.length > 0 && (
               <Badge
                 variant="destructive"
                 className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
               >
-                {safePendingApprovals.length}
+                {pendingApprovals.length}
               </Badge>
             )}
-          </TabsTrigger>
-          <TabsTrigger value="chefs" className="relative">
-            <ChefHat className="h-4 w-4 mr-2" />
-            Chefs
-            {userStats.pendingChefs > 0 && (
-              <Badge
-                variant="destructive"
-                className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-              >
-                {userStats.pendingChefs}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="customers">
-            <Users className="h-4 w-4 mr-2" />
-            Customers
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pending" className="space-y-6">
-          {/* Pending Approvals Header */}
-          <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl font-semibold flex items-center">
-                    <ShieldCheck className="h-5 w-5 mr-2 text-orange-600 dark:text-orange-400" />
-                    Pending Approvals
-                  </CardTitle>
-                  <p className="text-sm mt-1 text-gray-600 dark:text-gray-400">
-                    Review and approve new user applications •{" "}
-                    {safePendingApprovals.length} pending
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={fetchPendingApprovals}
-                    disabled={approvalLoading}
-                  >
-                    <RefreshCw
-                      className={`h-4 w-4 mr-2 ${
-                        approvalLoading ? "animate-spin" : ""
-                      }`}
+        <TabsContent value="users" className="space-y-6">
+          {/* Enhanced Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <AdvancedStatsCard
+              title="Total Users"
+              value={userStats.total}
+              subtitle={`${userStats.active} active, ${userStats.inactive} inactive`}
+              icon={<Users className="h-6 w-6" />}
+              color="blue"
+              onRefresh={() => fetchUsers()}
+              variant="advanced"
+            />
+
+            <AdvancedStatsCard
+              title="Active Users"
+              value={userStats.active}
+              subtitle={`${Math.round((userStats.active / userStats.total) * 100)}% of total`}
+              icon={<UserCheck className="h-6 w-6" />}
+              color="green"
+              onRefresh={() => fetchUsers()}
+              variant="advanced"
+            />
+
+            <AdvancedStatsCard
+              title="New This Week"
+              value={userStats.newThisWeek}
+              subtitle="Recent registrations"
+              icon={<TrendingUp className="h-6 w-6" />}
+              color="purple"
+              onRefresh={() => fetchUsers()}
+              variant="advanced"
+            />
+
+            <AdvancedStatsCard
+              title="Pending Approvals"
+              value={pendingApprovals.length}
+              subtitle="Awaiting review"
+              icon={<Clock3 className="h-6 w-6" />}
+              color="yellow"
+              onRefresh={() => fetchPendingApprovals()}
+              variant="advanced"
+            />
+          </div>
+
+          {/* Enhanced Search and Filters Bar */}
+          <Card className="border-0 shadow-lg bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-6">
+                  <div className="relative group">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 group-focus-within:text-blue-500 transition-colors" />
+                    <input
+                      type="text"
+                      placeholder="Search by name, email, or phone..."
+                      className="pl-10 pr-4 py-3 border-2 rounded-xl focus:ring-2 focus:border-transparent w-96 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 transition-all duration-200 shadow-sm hover:shadow-md"
+                      value={filters.search}
+                      onChange={(e) => handleSearch(e.target.value)}
                     />
-                    Refresh
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Activity className="h-4 w-4 text-green-500" />
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {pagination.total} users found
+                      {filters.search && ` for "${filters.search}"`}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  {activeFilterCount > 0 && (
+                    <Badge variant="secondary" className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                      <Filter className="h-3 w-3 mr-1" />
+                      {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""} active
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Enhanced Quick Filter Buttons */}
+              <div className="flex items-center space-x-3 flex-wrap gap-3">
+                <div className="flex items-center space-x-2">
+                  <Shield className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Quick Filters:
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2 flex-wrap gap-2">
+                  <Button
+                    variant={filters.role === "" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleFilterChange("role", "")}
+                    className={`transition-all duration-200 ${
+                      filters.role === ""
+                        ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                        : "hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300"
+                    }`}
+                  >
+                    <Users className="h-3 w-3 mr-1" />
+                    All Users ({userStats.total})
                   </Button>
-                  {safePendingApprovals.length > 0 && (
+                  <Button
+                    variant={filters.role === "admin" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() =>
+                      handleFilterChange(
+                        "role",
+                        filters.role === "admin" ? "" : "admin"
+                      )
+                    }
+                    className={`transition-all duration-200 ${
+                      filters.role === "admin"
+                        ? "bg-red-600 hover:bg-red-700 text-white shadow-lg"
+                        : "hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300"
+                    }`}
+                  >
+                    <Shield className="h-3 w-3 mr-1" />
+                    Admins ({userStats.adminCount})
+                  </Button>
+                  <Button
+                    variant={filters.role === "cook" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() =>
+                      handleFilterChange(
+                        "role",
+                        filters.role === "cook" ? "" : "cook"
+                      )
+                    }
+                    className={`transition-all duration-200 ${
+                      filters.role === "cook"
+                        ? "bg-yellow-600 hover:bg-yellow-700 text-white shadow-lg"
+                        : "hover:bg-yellow-50 dark:hover:bg-yellow-900/20 hover:border-yellow-300"
+                    }`}
+                  >
+                    <UserCheck className="h-3 w-3 mr-1" />
+                    Cooks ({userStats.cookCount})
+                  </Button>
+                  <Button
+                    variant={filters.role === "customer" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() =>
+                      handleFilterChange(
+                        "role",
+                        filters.role === "customer" ? "" : "customer"
+                      )
+                    }
+                    className={`transition-all duration-200 ${
+                      filters.role === "customer"
+                        ? "bg-green-600 hover:bg-green-700 text-white shadow-lg"
+                        : "hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300"
+                    }`}
+                  >
+                    <Users className="h-3 w-3 mr-1" />
+                    Customers ({userStats.customerCount})
+                  </Button>
+                  <Button
+                    variant={
+                      filters.role === "delivery_agent" ? "default" : "outline"
+                    }
+                    size="sm"
+                    onClick={() =>
+                      handleFilterChange(
+                        "role",
+                        filters.role === "delivery_agent" ? "" : "delivery_agent"
+                      )
+                    }
+                    className={`transition-all duration-200 ${
+                      filters.role === "delivery_agent"
+                        ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                        : "hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300"
+                    }`}
+                  >
+                    <Activity className="h-3 w-3 mr-1" />
+                    Delivery ({userStats.deliveryCount})
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Enhanced Main Content */}
+          <Card className="shadow-xl border-0 bg-gradient-to-br from-white via-gray-50 to-white dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 border-gray-200 dark:border-gray-700 overflow-hidden">
+            <CardHeader className="pb-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30">
+                    <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <CardTitle
+                      className="text-2xl font-bold flex items-center"
+                      style={{
+                        color: theme === "dark" ? "#F9FAFB" : "#111827",
+                      }}
+                    >
+                      User Management
+                    </CardTitle>
+                    <p
+                      className="text-sm mt-1 font-medium"
+                      style={{
+                        color: theme === "dark" ? "#9CA3AF" : "#6B7280",
+                      }}
+                    >
+                      Manage all users across your platform • {pagination.total}{" "}
+                      total users
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      Page {pagination.page} of {pagination.pages}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-500">
+                      {pagination.limit} per page
+                    </div>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                    <span className="text-white font-bold text-lg">
+                      {pagination.total}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <AdvancedDataTable
+                title=""
+                data={users}
+                columns={columns}
+                searchable
+                filterable
+                sortable
+                selectable
+                bulkActions={bulkActions}
+                filters={filterOptions}
+                loading={loading}
+                error={error}
+                onExport={handleExport}
+                currentPage={pagination.page}
+                totalPages={pagination.pages}
+                totalItems={pagination.total}
+                pageSize={pagination.limit}
+                showPagination
+                onPageChange={(page) =>
+                  fetchUsers(
+                    page,
+                    filters.search,
+                    filters.role,
+                    filters.status,
+                    filters.approval_status
+                  )
+                }
+                onRowClick={(row) => handleUserDetail(row)}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Enhanced User Preview Popup */}
+          {showPreview && previewUser && (
+            <div
+              className="fixed z-[9999] pointer-events-auto animate-in fade-in-0 zoom-in-95 duration-300"
+              style={{
+                left: `${previewPosition.x}px`,
+                top: `${previewPosition.y}px`,
+                transform: previewAbove
+                  ? "translate(-50%, -100%)"
+                  : "translate(-50%, 0%)",
+              }}
+              onMouseEnter={() => setShowPreview(true)}
+              onMouseLeave={handlePreviewClose}
+            >
+              <div className="border-2 rounded-2xl shadow-2xl p-6 w-96 backdrop-blur-sm bg-white/98 dark:bg-gray-800/98 border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700">
+                    {previewUser.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3
+                      className="font-semibold truncate"
+                      style={{
+                        color: theme === "dark" ? "#F9FAFB" : "#111827",
+                      }}
+                    >
+                      {previewUser.name}
+                    </h3>
+                    <p
+                      className="text-sm truncate"
+                      style={{
+                        color: theme === "dark" ? "#9CA3AF" : "#6B7280",
+                      }}
+                    >
+                      {previewUser.email}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className="font-medium"
+                      style={{
+                        color: theme === "dark" ? "#D1D5DB" : "#374151",
+                      }}
+                    >
+                      Role:
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      style={{
+                        backgroundColor:
+                          previewUser.role === "admin"
+                            ? theme === "dark"
+                              ? "#7F1D1D"
+                              : "#FEF2F2"
+                            : previewUser.role === "cook"
+                            ? theme === "dark"
+                              ? "#92400E"
+                              : "#FFFBEB"
+                            : previewUser.role === "delivery_agent"
+                            ? theme === "dark"
+                              ? "#1E3A8A"
+                              : "#EFF6FF"
+                            : theme === "dark"
+                            ? "#14532D"
+                            : "#F0FDF4",
+                        color:
+                          previewUser.role === "admin"
+                            ? theme === "dark"
+                              ? "#FCA5A5"
+                              : "#DC2626"
+                            : previewUser.role === "cook"
+                            ? theme === "dark"
+                              ? "#FBBF24"
+                              : "#D97706"
+                            : previewUser.role === "delivery_agent"
+                            ? theme === "dark"
+                              ? "#3B82F6"
+                              : "#2563EB"
+                            : theme === "dark"
+                            ? "#22C55E"
+                            : "#16A34A",
+                      }}
+                      className="text-xs"
+                    >
+                      {previewUser.role === "delivery_agent"
+                        ? "Delivery"
+                        : previewUser.role.charAt(0).toUpperCase() +
+                          previewUser.role.slice(1)}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className="font-medium"
+                      style={{
+                        color: theme === "dark" ? "#D1D5DB" : "#374151",
+                      }}
+                    >
+                      Status:
+                    </span>
+                    <div className="flex items-center space-x-1">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{
+                          backgroundColor: previewUser.is_active
+                            ? "#22C55E"
+                            : "#EF4444",
+                        }}
+                      ></div>
+                      <Badge
+                        variant="secondary"
+                        style={{
+                          backgroundColor: previewUser.is_active
+                            ? theme === "dark"
+                              ? "#14532D"
+                              : "#F0FDF4"
+                            : theme === "dark"
+                            ? "#7F1D1D"
+                            : "#FEF2F2",
+                          color: previewUser.is_active
+                            ? theme === "dark"
+                              ? "#22C55E"
+                              : "#16A34A"
+                            : theme === "dark"
+                            ? "#FCA5A5"
+                            : "#DC2626",
+                        }}
+                        className="text-xs"
+                      >
+                        {previewUser.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span
+                      className="font-medium"
+                      style={{
+                        color: theme === "dark" ? "#D1D5DB" : "#374151",
+                      }}
+                    >
+                      Orders:
+                    </span>
+                    <span
+                      className="ml-2 font-semibold"
+                      style={{
+                        color: theme === "dark" ? "#F9FAFB" : "#111827",
+                      }}
+                    >
+                      {previewUser.total_orders}
+                    </span>
+                  </div>
+                  <div>
+                    <span
+                      className="font-medium"
+                      style={{
+                        color: theme === "dark" ? "#D1D5DB" : "#374151",
+                      }}
+                    >
+                      Spent:
+                    </span>
+                    <span
+                      className="ml-2 font-semibold"
+                      style={{
+                        color: theme === "dark" ? "#F9FAFB" : "#111827",
+                      }}
+                    >
+                      ${previewUser.total_spent.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Document Preview for Cooks and Delivery Agents */}
+                {(previewUser.role === "cook" || previewUser.role === "delivery_agent") && (
+                  <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <FileText className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Documents
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Click "View Details" to see submitted documents
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  className="mt-4 pt-3 border-t"
+                  style={{
+                    borderColor: theme === "dark" ? "#374151" : "#E5E7EB",
+                  }}
+                >
+                  <div
+                    className="flex items-center justify-between text-xs"
+                    style={{
+                      color: theme === "dark" ? "#9CA3AF" : "#6B7280",
+                    }}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        Joined:{" "}
+                        {new Date(previewUser.date_joined).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span>
+                        Last Login:{" "}
+                        {previewUser.last_login
+                          ? new Date(
+                              previewUser.last_login
+                            ).toLocaleDateString()
+                          : "Never"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Enhanced User Detail Modal */}
+          {showUserDetail && selectedUser && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in-0 duration-300">
+              <div
+                className="rounded-2xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-y-auto shadow-2xl border-2 border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 animate-in zoom-in-95 duration-300"
+              >
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2
+                      className="text-2xl font-bold"
+                      style={{
+                        color: theme === "dark" ? "#F9FAFB" : "#111827",
+                      }}
+                    >
+                      User Details
+                    </h2>
                     <div className="flex items-center space-x-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Approve all ${safePendingApprovals.length} pending applications?`
-                            )
-                          ) {
-                            safePendingApprovals.forEach((user) =>
-                              handleApprovalAction(user.user_id, "approve")
-                            );
-                          }
-                        }}
-                        className="border-green-500 text-green-600 hover:bg-green-50"
+                        onClick={() =>
+                          userDetails &&
+                          handleUserActivation({
+                            id: userDetails.id,
+                            is_active: userDetails.is_active,
+                            email: userDetails.email,
+                            name: userDetails.name,
+                            role: userDetails.role,
+                            approval_status: userDetails.approval_status || "approved",
+                            last_login: userDetails.last_login,
+                            date_joined: userDetails.date_joined,
+                            total_orders: userDetails.statistics?.total_orders || 0,
+                            total_spent: userDetails.statistics?.total_spent || 0,
+                          })
+                        }
+                        disabled={!userDetails || userDetailLoading}
                       >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Approve All
+                        {userDetails?.is_active ? (
+                          <>
+                            <UserX className="h-4 w-4 mr-1" />
+                            Deactivate
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="h-4 w-4 mr-1" />
+                            Activate
+                          </>
+                        )}
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          if (
-                            window.confirm(
-                              `Reject all ${safePendingApprovals.length} pending applications?`
-                            )
-                          ) {
-                            safePendingApprovals.forEach((user) =>
-                              handleApprovalAction(user.user_id, "reject")
-                            );
-                          }
+                          setShowUserDetail(false);
+                          setSelectedUser(null);
+                          setUserDetails(null);
                         }}
-                        className="border-red-500 text-red-600 hover:bg-red-50"
                       >
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Reject All
+                        ✕
                       </Button>
                     </div>
+                  </div>
+
+                  {userDetailLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw
+                        className="h-8 w-8 animate-spin"
+                        style={{
+                          color: theme === "dark" ? "#3B82F6" : "#2563EB",
+                        }}
+                      />
+                      <span
+                        className="ml-2"
+                        style={{
+                          color: theme === "dark" ? "#9CA3AF" : "#6B7280",
+                        }}
+                      >
+                        Loading user details...
+                      </span>
+                    </div>
+                  ) : userDetails ? (
+                    <div className="space-y-6">
+                      {/* User Info */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center">
+                              <UserCheck className="h-5 w-5 mr-2" />
+                              Basic Information
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="flex items-center space-x-3">
+                              <div
+                                className="w-12 h-12 rounded-full flex items-center justify-center"
+                                style={{
+                                  backgroundColor:
+                                    theme === "dark" ? "#374151" : "#E5E7EB",
+                                }}
+                              >
+                                <Users
+                                  className="h-6 w-6"
+                                  style={{
+                                    color:
+                                      theme === "dark" ? "#9CA3AF" : "#6B7280",
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <h3
+                                  className="font-semibold text-lg"
+                                  style={{
+                                    color:
+                                      theme === "dark" ? "#F9FAFB" : "#111827",
+                                  }}
+                                >
+                                  {userDetails?.name || "Loading..."}
+                                </h3>
+                                <p
+                                  style={{
+                                    color:
+                                      theme === "dark" ? "#9CA3AF" : "#6B7280",
+                                  }}
+                                >
+                                  {userDetails?.email || "Loading..."}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="font-medium">Role:</span>
+                                <select
+                                  value={userDetails?.role || ""}
+                                  onChange={(e) =>
+                                    userDetails &&
+                                    handleUserUpdate(userDetails.id, {
+                                      role: e.target.value,
+                                    })
+                                  }
+                                  className="ml-2 px-2 py-1 border rounded text-sm"
+                                  style={{
+                                    backgroundColor:
+                                      theme === "dark" ? "#1F2937" : "#FFFFFF",
+                                    borderColor:
+                                      theme === "dark" ? "#374151" : "#D1D5DB",
+                                    color:
+                                      theme === "dark" ? "#F9FAFB" : "#111827",
+                                  }}
+                                  disabled={!userDetails || userDetailLoading}
+                                >
+                                  <option value="customer">Customer</option>
+                                  <option value="cook">Cook</option>
+                                  <option value="delivery_agent">
+                                    Delivery Agent
+                                  </option>
+                                  <option value="admin">Admin</option>
+                                </select>
+                              </div>
+                              <div>
+                                <span className="font-medium">Status:</span>
+                                <Button
+                                  variant={
+                                    userDetails?.is_active
+                                      ? "default"
+                                      : "destructive"
+                                  }
+                                  size="sm"
+                                  className="ml-2"
+                                  onClick={() =>
+                                    userDetails &&
+                                    handleUserActivation({
+                                      id: userDetails.id,
+                                      is_active: userDetails.is_active,
+                                      email: userDetails.email,
+                                      name: userDetails.name,
+                                      role: userDetails.role,
+                                      approval_status: userDetails.approval_status || "approved",
+                                      last_login: userDetails.last_login,
+                                      date_joined: userDetails.date_joined,
+                                      total_orders: userDetails.statistics?.total_orders || 0,
+                                      total_spent: userDetails.statistics?.total_spent || 0,
+                                    })
+                                  }
+                                  disabled={!userDetails || userDetailLoading}
+                                >
+                                  {userDetails?.is_active ? (
+                                    <>
+                                      <UserX className="h-4 w-4 mr-1" />
+                                      Deactivate
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserCheck className="h-4 w-4 mr-1" />
+                                      Activate
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                              <div>
+                                <span className="font-medium">Phone:</span>
+                                <input
+                                  type="text"
+                                  value={userDetails?.phone_no || ""}
+                                  onChange={(e) =>
+                                    setUserDetails(
+                                      userDetails
+                                        ? {
+                                            ...userDetails,
+                                            phone_no: e.target.value,
+                                          }
+                                        : null
+                                    )
+                                  }
+                                  onBlur={(e) =>
+                                    userDetails &&
+                                    handleUserUpdate(userDetails.id, {
+                                      phone_no: e.target.value,
+                                    })
+                                  }
+                                  className="ml-2 px-2 py-1 border rounded text-sm w-32"
+                                  style={{
+                                    backgroundColor:
+                                      theme === "dark" ? "#1F2937" : "#FFFFFF",
+                                    borderColor:
+                                      theme === "dark" ? "#374151" : "#D1D5DB",
+                                    color:
+                                      theme === "dark" ? "#F9FAFB" : "#111827",
+                                  }}
+                                  placeholder="Phone number"
+                                  disabled={!userDetails || userDetailLoading}
+                                />
+                              </div>
+                              <div>
+                                <span className="font-medium">Address:</span>
+                                <input
+                                  type="text"
+                                  value={userDetails?.address || ""}
+                                  onChange={(e) =>
+                                    setUserDetails(
+                                      userDetails
+                                        ? {
+                                            ...userDetails,
+                                            address: e.target.value,
+                                          }
+                                        : null
+                                    )
+                                  }
+                                  onBlur={(e) =>
+                                    userDetails &&
+                                    handleUserUpdate(userDetails.id, {
+                                      address: e.target.value,
+                                    })
+                                  }
+                                  className="ml-2 px-2 py-1 border rounded text-sm w-32"
+                                  style={{
+                                    backgroundColor:
+                                      theme === "dark" ? "#1F2937" : "#FFFFFF",
+                                    borderColor:
+                                      theme === "dark" ? "#374151" : "#D1D5DB",
+                                    color:
+                                      theme === "dark" ? "#F9FAFB" : "#111827",
+                                  }}
+                                  placeholder="Address"
+                                  disabled={!userDetails || userDetailLoading}
+                                />
+                              </div>
+                              <div>
+                                <span className="font-medium">Joined:</span>
+                                <span className="ml-2 text-gray-600">
+                                  {userDetails?.date_joined
+                                    ? new Date(
+                                        userDetails.date_joined
+                                      ).toLocaleDateString()
+                                    : "N/A"}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="font-medium">Last Login:</span>
+                                <span className="ml-2 text-gray-600">
+                                  {userDetails?.last_login
+                                    ? new Date(
+                                        userDetails.last_login
+                                      ).toLocaleDateString()
+                                    : "Never"}
+                                </span>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center">
+                              <DollarSign className="h-5 w-5 mr-2" />
+                              Statistics
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div
+                                className="text-center p-4 rounded-lg"
+                                style={{
+                                  backgroundColor:
+                                    theme === "dark" ? "#1E3A8A" : "#EFF6FF",
+                                }}
+                              >
+                                <div
+                                  className="text-2xl font-bold"
+                                  style={{
+                                    color:
+                                      theme === "dark" ? "#3B82F6" : "#2563EB",
+                                  }}
+                                >
+                                  {userDetails?.statistics?.total_orders || 0}
+                                </div>
+                                <div
+                                  className="text-sm"
+                                  style={{
+                                    color:
+                                      theme === "dark" ? "#9CA3AF" : "#6B7280",
+                                  }}
+                                >
+                                  Total Orders
+                                </div>
+                              </div>
+                              <div
+                                className="text-center p-4 rounded-lg"
+                                style={{
+                                  backgroundColor:
+                                    theme === "dark" ? "#14532D" : "#F0FDF4",
+                                }}
+                              >
+                                <div
+                                  className="text-2xl font-bold"
+                                  style={{
+                                    color:
+                                      theme === "dark" ? "#22C55E" : "#16A34A",
+                                  }}
+                                >
+                                  $
+                                  {userDetails?.statistics?.total_spent?.toFixed(
+                                    2
+                                  ) || "0.00"}
+                                </div>
+                                <div
+                                  className="text-sm"
+                                  style={{
+                                    color:
+                                      theme === "dark" ? "#9CA3AF" : "#6B7280",
+                                  }}
+                                >
+                                  Total Spent
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      {/* User Documents for Cooks and Delivery Agents */}
+                      {userDetails?.documents && userDetails.documents.length > 0 && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center">
+                              <FileText className="h-5 w-5 mr-2" />
+                              Submitted Documents ({userDetails.documents.length})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {userDetails.documents.map((doc: any, index: number) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                  style={{
+                                    borderColor:
+                                      theme === "dark" ? "#374151" : "#E5E7EB",
+                                  }}
+                                >
+                                  <FileText className="h-8 w-8 text-blue-500" />
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                                      {doc.document_type.name}
+                                    </h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                      {doc.document_type.description}
+                                    </p>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                      Uploaded {new Date(doc.uploaded_at).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(doc.file, "_blank")}
+                                    className="hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                  >
+                                    <Eye className="h-4 w-4 mr-1" />
+                                    View
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Recent Orders */}
+                      {userDetails?.recent_orders &&
+                        userDetails.recent_orders.length > 0 && (
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>Recent Orders</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-3">
+                                {userDetails.recent_orders.map((order: any) => (
+                                  <div
+                                    key={order.id}
+                                    className="flex items-center justify-between p-3 border rounded-lg"
+                                    style={{
+                                      borderColor:
+                                        theme === "dark"
+                                          ? "#374151"
+                                          : "#E5E7EB",
+                                    }}
+                                  >
+                                    <div>
+                                      <div
+                                        className="font-medium"
+                                        style={{
+                                          color:
+                                            theme === "dark"
+                                              ? "#F9FAFB"
+                                              : "#111827",
+                                        }}
+                                      >
+                                        Order #{order.order_number}
+                                      </div>
+                                      <div
+                                        className="text-sm"
+                                        style={{
+                                          color:
+                                            theme === "dark"
+                                              ? "#9CA3AF"
+                                              : "#6B7280",
+                                        }}
+                                      >
+                                        {new Date(
+                                          order.created_at
+                                        ).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div
+                                        className="font-medium"
+                                        style={{
+                                          color:
+                                            theme === "dark"
+                                              ? "#F9FAFB"
+                                              : "#111827",
+                                        }}
+                                      >
+                                        ${order.total_amount}
+                                      </div>
+                                      <Badge
+                                        variant="secondary"
+                                        style={{
+                                          backgroundColor:
+                                            order.status === "delivered"
+                                              ? theme === "dark"
+                                                ? "#14532D"
+                                                : "#F0FDF4"
+                                              : order.status === "cancelled"
+                                              ? theme === "dark"
+                                                ? "#7F1D1D"
+                                                : "#FEF2F2"
+                                              : theme === "dark"
+                                              ? "#1F2937"
+                                              : "#F3F4F6",
+                                          color:
+                                            order.status === "delivered"
+                                              ? theme === "dark"
+                                                ? "#22C55E"
+                                                : "#16A34A"
+                                              : order.status === "cancelled"
+                                              ? theme === "dark"
+                                                ? "#FCA5A5"
+                                                : "#DC2626"
+                                              : theme === "dark"
+                                              ? "#D1D5DB"
+                                              : "#374151",
+                                        }}
+                                      >
+                                        {order.status}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+
+                      {/* Activity Logs */}
+                      {userDetails?.activity_logs &&
+                        userDetails.activity_logs.length > 0 && (
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>Recent Activity</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-3">
+                                {userDetails.activity_logs.map((log: any) => (
+                                  <div
+                                    key={log.id}
+                                    className="flex items-start space-x-3 p-3 border rounded-lg"
+                                    style={{
+                                      borderColor:
+                                        theme === "dark"
+                                          ? "#374151"
+                                          : "#E5E7EB",
+                                    }}
+                                  >
+                                    <div
+                                      className="w-2 h-2 rounded-full mt-2"
+                                      style={{
+                                        backgroundColor:
+                                          theme === "dark"
+                                            ? "#3B82F6"
+                                            : "#2563EB",
+                                      }}
+                                    ></div>
+                                    <div className="flex-1">
+                                      <div
+                                        className="font-medium"
+                                        style={{
+                                          color:
+                                            theme === "dark"
+                                              ? "#F9FAFB"
+                                              : "#111827",
+                                        }}
+                                      >
+                                        {log.action}
+                                      </div>
+                                      <div
+                                        className="text-sm"
+                                        style={{
+                                          color:
+                                            theme === "dark"
+                                              ? "#9CA3AF"
+                                              : "#6B7280",
+                                        }}
+                                      >
+                                        {log.description}
+                                      </div>
+                                      <div
+                                        className="text-xs mt-1"
+                                        style={{
+                                          color:
+                                            theme === "dark"
+                                              ? "#6B7280"
+                                              : "#9CA3AF",
+                                        }}
+                                      >
+                                        {new Date(
+                                          log.timestamp
+                                        ).toLocaleString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                    </div>
+                  ) : (
+                    <div
+                      className="text-center py-8"
+                      style={{
+                        color: theme === "dark" ? "#9CA3AF" : "#6B7280",
+                      }}
+                    >
+                      Failed to load user details
+                    </div>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="approvals" className="space-y-6">
+          {/* Approvals Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2
+                className="text-xl font-semibold"
+                style={{
+                  color: theme === "dark" ? "#F9FAFB" : "#111827",
+                }}
+              >
+                Pending Approvals
+              </h2>
+              <p
+                className="mt-1"
+                style={{
+                  color: theme === "dark" ? "#9CA3AF" : "#6B7280",
+                }}
+              >
+                Review and approve new cooks and delivery agents.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={fetchPendingApprovals}
+              disabled={approvalLoading}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${
+                  approvalLoading ? "animate-spin" : ""
+                }`}
+              />
+              Refresh
+            </Button>
+          </div>
+
+          {/* Enhanced Approvals Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <AdvancedStatsCard
+              title="Pending Cooks"
+              value={
+                pendingApprovals.filter((user) => user.role === "cook").length
+              }
+              subtitle="Awaiting approval"
+              icon={<UserCheck className="h-6 w-6" />}
+              color="yellow"
+              onRefresh={fetchPendingApprovals}
+              variant="advanced"
+            />
+
+            <AdvancedStatsCard
+              title="Pending Delivery Agents"
+              value={
+                pendingApprovals.filter(
+                  (user) => user.role === "delivery_agent"
+                ).length
+              }
+              subtitle="Awaiting approval"
+              icon={<Activity className="h-6 w-6" />}
+              color="blue"
+              onRefresh={fetchPendingApprovals}
+              variant="advanced"
+            />
+
+            <AdvancedStatsCard
+              title="Total Pending"
+              value={pendingApprovals.length}
+              subtitle="All roles"
+              icon={<Clock3 className="h-6 w-6" />}
+              color="purple"
+              onRefresh={fetchPendingApprovals}
+              variant="advanced"
+            />
+          </div>
+
+          {/* Enhanced Approvals List */}
+          <Card className="shadow-xl border-0 bg-gradient-to-br from-white via-gray-50 to-white dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 border-gray-200 dark:border-gray-700 overflow-hidden">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl font-semibold flex items-center text-gray-900 dark:text-gray-100">
+                    <Clock
+                      className="h-5 w-5 mr-2"
+                      style={{
+                        color: theme === "dark" ? "#F59E0B" : "#D97706",
+                      }}
+                    />
+                    Pending Approvals
+                  </CardTitle>
+                  <p className="text-sm mt-1 text-gray-600 dark:text-gray-400">
+                    {pendingApprovals.length} users waiting for approval
+                  </p>
                 </div>
               </div>
             </CardHeader>
@@ -865,91 +2104,118 @@ const EnhancedUserManagement: React.FC = () => {
                   <RefreshCw className="h-8 w-8 animate-spin mr-2" />
                   <span>Loading pending approvals...</span>
                 </div>
-              ) : safePendingApprovals.length === 0 ? (
-                <div className="text-center py-12">
-                  <ShieldCheck className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    No Pending Approvals
+              ) : pendingApprovals.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                  <h3 className="text-lg font-medium mb-2">
+                    No pending approvals
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-400">
+                  <p className="text-muted-foreground">
                     All user applications have been reviewed.
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {safePendingApprovals.map((user) => (
-                    <Card
-                      key={user.user_id}
-                      className="hover:shadow-md transition-shadow"
-                    >
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-lg bg-gradient-to-br from-orange-500 to-red-600">
+                <div className="space-y-4">
+                  {pendingApprovals.map((user) => (
+                    <Card key={user.user_id} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div
+                            className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold"
+                            style={{
+                              background:
+                                user.role === "cook"
+                                  ? "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)"
+                                  : "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
+                            }}
+                          >
                             {user.name.charAt(0).toUpperCase()}
                           </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                              {user.name}
-                            </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <div>
+                            <h3 className="font-semibold">{user.name}</h3>
+                            <p className="text-sm text-muted-foreground">
                               {user.email}
                             </p>
-                            <Badge variant="secondary" className="mt-1">
-                              {user.role === "cook"
-                                ? "Chef"
-                                : user.role === "customer"
-                                ? "Customer"
-                                : "Delivery Agent"}
-                            </Badge>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <Badge variant="secondary">
+                                {user.role === "delivery_agent"
+                                  ? "Delivery Agent"
+                                  : user.role.charAt(0).toUpperCase() +
+                                    user.role.slice(1)}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                Applied{" "}
+                                {new Date(user.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <div className="space-y-3">
-                          <div className="text-sm">
-                            <span className="font-medium">Applied:</span>{" "}
-                            {new Date(user.created_at).toLocaleDateString()}
-                          </div>
-                          {user.phone_no && (
-                            <div className="text-sm">
-                              <span className="font-medium">Phone:</span>{" "}
-                              {user.phone_no}
-                            </div>
-                          )}
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                handleApprovalAction(user.user_id, "approve")
-                              }
-                              className="flex-1 bg-green-600 hover:bg-green-700"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() =>
-                                handleApprovalAction(user.user_id, "reject")
-                              }
-                              className="flex-1"
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                          </div>
+                        <div className="flex items-center space-x-2">
                           <Button
-                            size="sm"
                             variant="outline"
+                            size="sm"
                             onClick={() => handleApprovalUserDetail(user)}
-                            className="w-full"
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View Details
                           </Button>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() =>
+                              handleApprovalAction(user.user_id, "approve")
+                            }
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() =>
+                              handleApprovalAction(user.user_id, "reject")
+                            }
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Reject
+                          </Button>
                         </div>
-                      </CardContent>
+                      </div>
+
+                      {/* Documents Preview */}
+                      {user.documents && user.documents.length > 0 && (
+                        <div className="mt-4 pt-4 border-t">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <FileText className="h-4 w-4" />
+                            <span className="text-sm font-medium">
+                              Submitted Documents ({user.documents.length})
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {user.documents
+                              .slice(0, 4)
+                              .map((doc: any, index: number) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center space-x-2 p-2 bg-muted rounded"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  <span className="text-sm truncate">
+                                    {doc.document_type.name}
+                                  </span>
+                                </div>
+                              ))}
+                            {user.documents.length > 4 && (
+                              <div className="flex items-center space-x-2 p-2 bg-muted rounded">
+                                <span className="text-sm text-muted-foreground">
+                                  +{user.documents.length - 4} more documents
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </Card>
                   ))}
                 </div>
@@ -957,681 +2223,13 @@ const EnhancedUserManagement: React.FC = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="chefs" className="space-y-6">
-          {/* Bulk Actions Bar */}
-          {selectedChefs.length > 0 && (
-            <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-sm font-medium">
-                      {selectedChefs.length} chef
-                      {selectedChefs.length > 1 ? "s" : ""} selected
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedChefs([])}
-                    >
-                      Clear Selection
-                    </Button>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleBulkChefAction("activate")}
-                      disabled={bulkActionLoading}
-                    >
-                      <UserCheck className="h-4 w-4 mr-1" />
-                      Activate
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleBulkChefAction("deactivate")}
-                      disabled={bulkActionLoading}
-                    >
-                      <UserX className="h-4 w-4 mr-1" />
-                      Deactivate
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleBulkChefAction("approve")}
-                      disabled={bulkActionLoading}
-                      className="border-green-500 text-green-600 hover:bg-green-50"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Approve All
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Chefs Table */}
-          <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border-gray-200 dark:border-gray-700">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle
-                    className="text-xl font-semibold flex items-center"
-                    style={{
-                      color: theme === "dark" ? "#F9FAFB" : "#111827",
-                    }}
-                  >
-                    <ChefHat className="h-5 w-5 mr-2 text-yellow-600 dark:text-yellow-400" />
-                    All Chefs
-                  </CardTitle>
-                  <p
-                    className="text-sm mt-1"
-                    style={{
-                      color: theme === "dark" ? "#9CA3AF" : "#6B7280",
-                    }}
-                  >
-                    Manage chefs, approve applications, and monitor performance
-                    • {chefs.length} total chefs
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="secondary" className="text-xs">
-                    Page {pagination.page} of {pagination.pages}
-                  </Badge>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="h-8 w-8 animate-spin mr-2" />
-                  <span>Loading chefs...</span>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          <Checkbox
-                            checked={
-                              selectedChefs.length === chefs.length &&
-                              chefs.length > 0
-                            }
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedChefs(chefs.map((c) => c.id));
-                              } else {
-                                setSelectedChefs([]);
-                              }
-                            }}
-                          />
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Chef
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Status
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Rating
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Orders
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Revenue
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {chefs.map((chef) => (
-                        <tr
-                          key={chef.id}
-                          className="border-b hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                          onClick={() => handleUserDetail(chef)}
-                        >
-                          <td className="py-3 px-4">
-                            <Checkbox
-                              checked={selectedChefs.includes(chef.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedChefs((prev) => [
-                                    ...prev,
-                                    chef.id,
-                                  ]);
-                                } else {
-                                  setSelectedChefs((prev) =>
-                                    prev.filter((id) => id !== chef.id)
-                                  );
-                                }
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm bg-gradient-to-br from-yellow-500 to-orange-600">
-                                {chef.name.charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <div className="font-medium">{chef.name}</div>
-                                <div className="text-sm text-gray-500">
-                                  {chef.email}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center space-x-2">
-                              <div
-                                className={`w-2 h-2 rounded-full ${
-                                  chef.is_active
-                                    ? "bg-green-500"
-                                    : "bg-yellow-500"
-                                }`}
-                              ></div>
-                              <Badge variant="secondary">
-                                {chef.is_active ? "Active" : "Pending"}
-                              </Badge>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center space-x-1">
-                              <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                              <span className="font-medium">4.5</span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="font-medium">
-                              {chef.total_orders}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="font-medium">
-                              ${chef.total_spent.toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center space-x-1">
-                              {!chef.is_active && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleUserApproval(chef, "approve");
-                                    }}
-                                    className="h-8 w-8 p-0 hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400"
-                                    title="Approve Chef"
-                                  >
-                                    <CheckCircle className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleUserApproval(chef, "reject");
-                                    }}
-                                    className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
-                                    title="Reject Chef"
-                                  >
-                                    <XCircle className="h-4 w-4" />
-                                  </Button>
-                                </>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleUserDetail(chef);
-                                }}
-                                className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                                title="View Details"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {chefs.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      No chefs found
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="customers" className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <AdvancedStatsCard
-              title="Total Chefs"
-              value={userStats.totalChefs}
-              subtitle={`${userStats.activeChefs} active`}
-              icon={<ChefHat className="h-6 w-6" />}
-              color="yellow"
-              onRefresh={() => fetchUsersByRole("cook")}
-            />
-
-            <AdvancedStatsCard
-              title="Active Chefs"
-              value={userStats.activeChefs}
-              subtitle={`${userStats.pendingChefs} pending approval`}
-              icon={<UserCheck className="h-6 w-6" />}
-              color="green"
-              onRefresh={() => fetchUsersByRole("cook")}
-            />
-
-            <AdvancedStatsCard
-              title="Total Customers"
-              value={userStats.totalCustomers}
-              subtitle={`${userStats.activeCustomers} active`}
-              icon={<Users className="h-6 w-6" />}
-              color="blue"
-              onRefresh={() => fetchUsersByRole("customer")}
-            />
-
-            <AdvancedStatsCard
-              title="New This Week"
-              value={
-                userStats.newChefsThisWeek + userStats.newCustomersThisWeek
-              }
-              subtitle={`${userStats.newChefsThisWeek} chefs, ${userStats.newCustomersThisWeek} customers`}
-              icon={<Calendar className="h-6 w-6" />}
-              color="purple"
-              onRefresh={() => {
-                fetchUsersByRole("cook");
-                fetchUsersByRole("customer");
-              }}
-            />
-          </div>
-
-          {/* Search and Filters Bar */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                    <input
-                      type="text"
-                      placeholder="Search by name, email, or phone..."
-                      className="pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:border-transparent w-80 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-blue-500 dark:focus:ring-blue-400"
-                      value={filters.search}
-                      onChange={(e) => handleSearch(e.target.value)}
-                    />
-                  </div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {pagination.total} users found
-                    {filters.search && ` for "${filters.search}"`}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {activeFilterCount > 0 && (
-                    <Badge variant="secondary">
-                      {activeFilterCount} filter
-                      {activeFilterCount > 1 ? "s" : ""} active
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              {/* Quick Filter Buttons */}
-              <div className="flex items-center space-x-2 flex-wrap gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Quick Filters:
-                </span>
-                {activeTab === "chefs" ? (
-                  <>
-                    <Button
-                      variant={filters.status === "" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handleFilterChange("status", "")}
-                    >
-                      All Chefs ({userStats.totalChefs})
-                    </Button>
-                    <Button
-                      variant={
-                        filters.status === "active" ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() => handleFilterChange("status", "active")}
-                    >
-                      Active ({userStats.activeChefs})
-                    </Button>
-                    <Button
-                      variant={
-                        filters.status === "inactive" ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() => handleFilterChange("status", "inactive")}
-                    >
-                      Pending Approval ({userStats.pendingChefs})
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant={filters.status === "" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handleFilterChange("status", "")}
-                    >
-                      All Customers ({userStats.totalCustomers})
-                    </Button>
-                    <Button
-                      variant={
-                        filters.status === "active" ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() => handleFilterChange("status", "active")}
-                    >
-                      Active ({userStats.activeCustomers})
-                    </Button>
-                    <Button
-                      variant={
-                        filters.status === "inactive" ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() => handleFilterChange("status", "inactive")}
-                    >
-                      Inactive (
-                      {userStats.totalCustomers - userStats.activeCustomers})
-                    </Button>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          {/* Bulk Actions Bar */}
-          {selectedCustomers.length > 0 && (
-            <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-sm font-medium">
-                      {selectedCustomers.length} customer
-                      {selectedCustomers.length > 1 ? "s" : ""} selected
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedCustomers([])}
-                    >
-                      Clear Selection
-                    </Button>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleBulkCustomerAction("activate")}
-                      disabled={bulkActionLoading}
-                    >
-                      <UserCheck className="h-4 w-4 mr-1" />
-                      Activate
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleBulkCustomerAction("deactivate")}
-                      disabled={bulkActionLoading}
-                    >
-                      <UserX className="h-4 w-4 mr-1" />
-                      Deactivate
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleBulkCustomerAction("block")}
-                      disabled={bulkActionLoading}
-                      className="border-red-500 text-red-600 hover:bg-red-50"
-                    >
-                      <ShieldX className="h-4 w-4 mr-1" />
-                      Block
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Customers Table */}
-          <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border-gray-200 dark:border-gray-700">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle
-                    className="text-xl font-semibold flex items-center"
-                    style={{
-                      color: theme === "dark" ? "#F9FAFB" : "#111827",
-                    }}
-                  >
-                    <Users className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
-                    All Customers
-                  </CardTitle>
-                  <p
-                    className="text-sm mt-1"
-                    style={{
-                      color: theme === "dark" ? "#9CA3AF" : "#6B7280",
-                    }}
-                  >
-                    Manage customers, view order history, and monitor activity •{" "}
-                    {customers.length} total customers
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="secondary" className="text-xs">
-                    Page {pagination.page} of {pagination.pages}
-                  </Badge>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="h-8 w-8 animate-spin mr-2" />
-                  <span>Loading customers...</span>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          <Checkbox
-                            checked={
-                              selectedCustomers.length === customers.length &&
-                              customers.length > 0
-                            }
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedCustomers(
-                                  customers.map((c) => c.id)
-                                );
-                              } else {
-                                setSelectedCustomers([]);
-                              }
-                            }}
-                          />
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Customer
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Status
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Orders
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Total Spent
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Last Order
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customers.map((customer) => (
-                        <tr
-                          key={customer.id}
-                          className="border-b hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                          onClick={() => handleUserDetail(customer)}
-                        >
-                          <td className="py-3 px-4">
-                            <Checkbox
-                              checked={selectedCustomers.includes(customer.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedCustomers((prev) => [
-                                    ...prev,
-                                    customer.id,
-                                  ]);
-                                } else {
-                                  setSelectedCustomers((prev) =>
-                                    prev.filter((id) => id !== customer.id)
-                                  );
-                                }
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm bg-gradient-to-br from-blue-500 to-purple-600">
-                                {customer.name.charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <div className="font-medium">
-                                  {customer.name}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {customer.email}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center space-x-2">
-                              <div
-                                className={`w-2 h-2 rounded-full ${
-                                  customer.is_active
-                                    ? "bg-green-500"
-                                    : "bg-red-500"
-                                }`}
-                              ></div>
-                              <Badge variant="secondary">
-                                {customer.is_active ? "Active" : "Blocked"}
-                              </Badge>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="font-medium">
-                              {customer.total_orders}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="font-medium">
-                              ${customer.total_spent.toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="text-sm text-gray-500">
-                              {customer.last_login
-                                ? new Date(
-                                    customer.last_login
-                                  ).toLocaleDateString()
-                                : "Never"}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center space-x-1">
-                              {!customer.is_active && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleUserUpdate(customer.id, {
-                                      is_active: true,
-                                    });
-                                  }}
-                                  className="h-8 w-8 p-0 hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400"
-                                  title="Unblock Customer"
-                                >
-                                  <ShieldCheck className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {customer.is_active && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleUserUpdate(customer.id, {
-                                      is_active: false,
-                                    });
-                                  }}
-                                  className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
-                                  title="Block Customer"
-                                >
-                                  <ShieldX className="h-4 w-4" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleUserDetail(customer);
-                                }}
-                                className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                                title="View Details"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {customers.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      No customers found
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
-      {/* Approval User Detail Modal */}
+      {/* Enhanced Approval User Detail Modal */}
       {showApprovalModal && selectedApprovalUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in-0 duration-300">
           <div
-            className="rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-            style={{
-              backgroundColor: theme === "dark" ? "#1F2937" : "#FFFFFF",
-            }}
+            className="rounded-2xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-y-auto shadow-2xl border-2 border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 animate-in zoom-in-95 duration-300"
           >
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
