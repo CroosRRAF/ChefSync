@@ -394,3 +394,149 @@ class FoodImageViewSet(viewsets.ModelViewSet):
         if food_id:
             return FoodImage.objects.filter(food_id=food_id)
         return FoodImage.objects.all()
+# ================================
+# ADMIN FOOD APPROVAL SYSTEM
+# ================================
+
+class AdminFoodApprovalViewSet(viewsets.ReadOnlyModelViewSet):
+    """Admin endpoints for food approval workflow"""
+    
+    serializer_class = FoodSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Only admin users can access pending foods"""
+        if not self.request.user.is_staff:
+            return Food.objects.none()
+        
+        # Filter by status if provided
+        status_filter = self.request.query_params.get('status', 'Pending')
+        return Food.objects.filter(status=status_filter).order_by('-created_at')
+    
+    @action(detail=False, methods=['get'])
+    def pending(self, request):
+        """Get all foods pending approval"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        pending_foods = Food.objects.filter(status='Pending').order_by('-created_at')
+        serializer = self.get_serializer(pending_foods, many=True)
+        
+        return Response({
+            'count': pending_foods.count(),
+            'foods': serializer.data
+        })
+    
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """Approve a pending food item"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        food = self.get_object()
+        
+        if food.status != 'Pending':
+            return Response(
+                {'error': 'Only pending foods can be approved'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Approve the food
+        food.status = 'Approved'
+        food.admin = request.user
+        food.is_available = True  # Make available when approved
+        food.save()
+        
+        # Send notification to chef
+        self._notify_chef(food, 'approved', request.data.get('comments', ''))
+        
+        return Response({
+            'message': f'Food "{food.name}" has been approved successfully',
+            'food': FoodSerializer(food, context={'request': request}).data
+        }, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a pending food item"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        food = self.get_object()
+        
+        if food.status != 'Pending':
+            return Response(
+                {'error': 'Only pending foods can be rejected'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        rejection_reason = request.data.get('reason', 'No reason provided')
+        
+        # Reject the food
+        food.status = 'Rejected'
+        food.admin = request.user
+        food.is_available = False
+        food.save()
+        
+        # Send notification to chef
+        self._notify_chef(food, 'rejected', rejection_reason)
+        
+        return Response({
+            'message': f'Food "{food.name}" has been rejected',
+            'reason': rejection_reason
+        }, status=status.HTTP_200_OK)
+    
+    def _notify_chef(self, food, action, comments):
+        """Send notification to chef about approval decision"""
+        from apps.communications.models import Notification
+        
+        if not food.chef:
+            return
+        
+        if action == 'approved':
+            subject = f"Food Approved: {food.name}"
+            message = f"Great news! Your food item '{food.name}' has been approved and is now visible to customers."
+        else:
+            subject = f"Food Rejected: {food.name}"
+            message = f"Your food item '{food.name}' has been rejected. Reason: {comments}"
+        
+        if comments and action == 'approved':
+            message += f" Admin comments: {comments}"
+        
+        Notification.objects.create(
+            user=food.chef,
+            subject=subject,
+            message=message,
+            status='Unread'
+        )
+
+
+@api_view(['GET'])
+def chef_food_status(request):
+    """Get approval status of chef's submitted foods"""
+    if not request.user:
+        return Response(
+            {'error': 'Authentication required'}, 
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    chef_foods = Food.objects.filter(chef=request.user)
+    
+    from django.db.models import Count
+    status_counts = chef_foods.values('status').annotate(count=Count('status'))
+    
+    recent_foods = chef_foods.order_by('-created_at')[:5]
+    
+    return Response({
+        'status_summary': {item['status']: item['count'] for item in status_counts},
+        'recent_submissions': FoodSerializer(recent_foods, many=True, context={'request': request}).data,
+        'total_foods': chef_foods.count()
+    })

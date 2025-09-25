@@ -29,9 +29,9 @@ class Order(models.Model):
     
     PAYMENT_METHOD_CHOICES = [
         ('cash', 'Cash on Delivery'),
-        ('card', 'Credit/Debit Card'),
-        ('online', 'Online Payment'),
-        ('wallet', 'Digital Wallet'),
+        # ('card', 'Credit/Debit Card'),
+        # ('online', 'Online Payment'),
+        # ('wallet', 'Digital Wallet'),
     ]
     
     # Order Identification
@@ -249,3 +249,55 @@ class DeliveryReview(models.Model):
     class Meta:
         db_table = 'DeliveryReview'
         ordering = ['-created_at']
+
+
+class BulkOrder(models.Model):
+    """Bulk Order model based on existing database table"""
+    bulk_order_id = models.AutoField(primary_key=True)
+    status = models.CharField(max_length=20)
+    total_quantity = models.PositiveIntegerField()
+    description = models.TextField(blank=True, null=True)
+    deadline = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.DO_NOTHING,
+        related_name='created_bulk_orders'
+    )
+    order = models.OneToOneField(
+        Order,
+        on_delete=models.DO_NOTHING,
+        related_name='bulk_order'
+    )
+    
+    def __str__(self):
+        return f"Bulk Order #{self.bulk_order_id} - {self.status}"
+    
+    class Meta:
+        managed = True  # Allow Django to manage this table
+        db_table = 'bulk_orders'
+        ordering = ['-created_at']
+
+
+class BulkOrderAssignment(models.Model):
+    """Bulk Order Assignment model based on existing database table"""
+    id = models.BigAutoField(primary_key=True)
+    bulk_order = models.ForeignKey(
+        BulkOrder,
+        on_delete=models.DO_NOTHING,
+        related_name='assignments'
+    )
+    chef = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.DO_NOTHING,
+        related_name='bulk_order_assignments'
+    )
+    
+    def __str__(self):
+        return f"Assignment: Chef {self.chef.username} -> Bulk Order #{self.bulk_order.bulk_order_id}"
+    
+    class Meta:
+        managed = True
+        db_table = 'bulk_order_assignments'
+        unique_together = (('bulk_order', 'chef'),)

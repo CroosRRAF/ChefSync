@@ -88,6 +88,14 @@ const ChefMenu: React.FC = () => {
     description: '',
     is_available: false
   });
+  
+  // Enhanced form states for multiple sizes and dietary options
+  const [priceVariants, setPriceVariants] = useState<Array<{
+    size: string;
+    price: number;
+    preparation_time: number;
+  }>>([{ size: 'Medium', price: 0, preparation_time: 15 }]);
+  const [dietaryType, setDietaryType] = useState<'vegetarian' | 'vegan' | 'non-vegetarian'>('vegetarian');
   const [notification, setNotification] = useState<{
     message: string;
     type: 'success' | 'error';
@@ -98,6 +106,60 @@ const ChefMenu: React.FC = () => {
   useEffect(() => {
     loadMenuItems();
   }, []);
+
+  // Helper function to get suggested preparation time based on size
+  const getSuggestedPrepTime = (size: string): number => {
+    const baseTimes = {
+      'Small': 10,
+      'Medium': 15,
+      'Large': 25,
+      'Extra Large': 35,
+      'Family Size': 45
+    };
+    return baseTimes[size as keyof typeof baseTimes] || 15;
+  };
+
+  // Add new price variant
+  const addPriceVariant = () => {
+    setPriceVariants([...priceVariants, {
+      size: 'Medium',
+      price: 0,
+      preparation_time: 15
+    }]);
+  };
+
+  // Remove price variant
+  const removePriceVariant = (index: number) => {
+    if (priceVariants.length > 1) {
+      setPriceVariants(priceVariants.filter((_, i) => i !== index));
+    }
+  };
+
+  // Update price variant
+  const updatePriceVariant = (index: number, field: string, value: any) => {
+    const updated = [...priceVariants];
+    updated[index] = { ...updated[index], [field]: value };
+    
+    // Auto-update preparation time when size changes
+    if (field === 'size') {
+      updated[index].preparation_time = getSuggestedPrepTime(value);
+    }
+    
+    setPriceVariants(updated);
+  };
+
+  // Reset form function
+  const resetForm = () => {
+    setFoodSearchTerm('');
+    setSelectedFood(null);
+    setIsNewFood(true);
+    setPriceVariants([{ size: 'Medium', price: 0, preparation_time: 15 }]);
+    setDietaryType('vegetarian');
+    setShowSearchResults(false);
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+  };
 
   // Auto-hide notification after 4 seconds
   useEffect(() => {
@@ -303,63 +365,79 @@ const ChefMenu: React.FC = () => {
   };
 
   // Handle form submission for new food or new price
- const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
+const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
   event.preventDefault();
   setIsSubmitting(true);
 
-  console.log('Form submission started');
+  console.log("Form submission started");
   const formData = new FormData(event.currentTarget);
 
   // Debug: Log all form data
-  console.log('Form data entries:');
+  console.log("Form data entries:");
   for (const [key, value] of formData.entries()) {
     console.log(`${key}:`, value);
   }
 
   // Basic validation
-  const foodName = formData.get('name') as string;
-  const price = formData.get('price') as string;
-  const prepTime = formData.get('preparation_time') as string;
+  const foodName = formData.get("name") as string;
 
   if (!foodName?.trim()) {
-    showError('Please enter a food name');
+    showError("Please enter a food name");
     setIsSubmitting(false);
     return;
   }
-  if (!price || parseFloat(price) <= 0) {
-    showError('Please enter a valid price');
+
+  // Validate price variants
+  if (priceVariants.length === 0) {
+    showError("Please add at least one size and price variant");
     setIsSubmitting(false);
     return;
   }
-  if (!prepTime || parseInt(prepTime) <= 0) {
-    showError('Please enter a valid preparation time');
+
+  // Check for duplicate sizes in the same submission
+  const sizes = priceVariants.map((v) => v.size);
+  const uniqueSizes = new Set(sizes);
+  if (sizes.length !== uniqueSizes.size) {
+    showError(
+      "Please ensure each size variant is unique. You cannot have duplicate sizes."
+    );
     setIsSubmitting(false);
     return;
+  }
+
+  for (const variant of priceVariants) {
+    if (!variant.size || variant.price <= 0 || variant.preparation_time <= 0) {
+      showError(
+        "Please ensure all size variants have valid price and preparation time"
+      );
+      setIsSubmitting(false);
+      return;
+    }
   }
 
   if (isNewFood) {
-    const description = formData.get('description') as string;
-    const category = formData.get('category') as string;
+    const description = formData.get("description") as string;
+    const category = formData.get("category") as string;
     if (!description?.trim()) {
-      showError('Please enter a description');
+      showError("Please enter a description");
       setIsSubmitting(false);
       return;
     }
     if (!category?.trim()) {
-      showError('Please enter a category');
+      showError("Please enter a category");
       setIsSubmitting(false);
       return;
     }
   } else if (!selectedFood) {
-    showError('Please select a food item');
+    showError("Please select a food item");
     setIsSubmitting(false);
     return;
   }
 
   try {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem("access_token");
     if (!token) {
-      showError('Please log in again');
+      showError("Please log in again");
       setIsSubmitting(false);
       return;
     }
@@ -369,102 +447,215 @@ const ChefMenu: React.FC = () => {
     if (isNewFood) {
       // Prepare FormData for new food
       const foodFormData = new FormData();
-      foodFormData.append('name', foodName);
-      foodFormData.append('category', formData.get('category') as string);
-      foodFormData.append('description', formData.get('description') as string);
-      foodFormData.append('price', price);
-      foodFormData.append('size', (formData.get('size') as string) || 'Medium');
-      foodFormData.append('preparation_time', prepTime);
+      foodFormData.append("name", foodName);
+      foodFormData.append("category", formData.get("category") as string);
+      foodFormData.append("description", formData.get("description") as string);
 
       // Convert ingredients to JSON string
-      const ingredientsText = (formData.get('ingredients') as string) || '';
+      const ingredientsText = (formData.get("ingredients") as string) || "";
       const ingredientsArray = ingredientsText
-        .split(',')
+        .split(",")
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
-      foodFormData.append('ingredients', JSON.stringify(ingredientsArray));
+      foodFormData.append("ingredients", JSON.stringify(ingredientsArray));
 
-      foodFormData.append('is_vegetarian', formData.get('is_vegetarian') === 'on' ? 'true' : 'false');
-      foodFormData.append('is_vegan', formData.get('is_vegan') === 'on' ? 'true' : 'false');
-      foodFormData.append('spice_level', (formData.get('spice_level') as string) || '');
-      foodFormData.append('is_available', 'true');
+      // Handle dietary type as boolean fields
+      foodFormData.append(
+        "is_vegetarian",
+        dietaryType === "vegetarian" ? "true" : "false"
+      );
+      foodFormData.append("is_vegan", dietaryType === "vegan" ? "true" : "false");
+      foodFormData.append("spice_level", (formData.get("spice_level") as string) || "");
+      foodFormData.append("is_available", "true");
 
       // Add image if present
-      const imageFile = formData.get('image') as File;
+      const imageFile = formData.get("image") as File;
       if (imageFile && imageFile.size > 0) {
-        foodFormData.append('image', imageFile);
+        foodFormData.append("image", imageFile);
       }
 
+      // Add first price variant to the main food data
+      const primaryVariant = priceVariants[0];
+      foodFormData.append("price", primaryVariant.price.toString());
+      foodFormData.append("size", primaryVariant.size);
+      foodFormData.append("preparation_time", primaryVariant.preparation_time.toString());
+
       response = await axios.post(
-        'http://127.0.0.1:8000/api/food/chef/foods/',
+        "http://127.0.0.1:8000/api/food/chef/foods/",
         foodFormData,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
           },
         }
       );
 
-      console.log('New food creation response:', response.data);
-    } else {
-      // Add price variant for existing food
-      if (!selectedFood?.id) {
-        showError('Please select a food item first');
+      console.log("New food creation response:", response.data);
+
+      // ✅ Safely extract food ID from the nested food object
+      const foodData = response.data.food;
+      const foodId = foodData?.food_id || foodData?.id;
+      if (!foodId) {
+        console.error("❌ No food ID returned from backend:", response.data);
+        showError("Could not determine food ID for price variants.");
         setIsSubmitting(false);
         return;
       }
 
-      const priceValue = parseFloat(price);
-      const prepTimeValue = parseInt(prepTime);
+      // Add additional price variants if any
+      if (priceVariants.length > 1) {
+        console.log("Food ID for additional variants:", foodId);
+        console.log("Adding additional variants:", priceVariants.slice(1));
 
-      const priceData = {
-        food: selectedFood.id,
-        price: priceValue,
-        size: (formData.get('size') as string) || 'Medium',
-        preparation_time: prepTimeValue,
-      };
+        for (let i = 1; i < priceVariants.length; i++) {
+          const variant = priceVariants[i];
+          const priceData = {
+            food: foodId,
+            price: parseFloat(variant.price.toString()),
+            size: variant.size,
+            preparation_time: parseInt(variant.preparation_time.toString()),
+          };
 
-      response = await axios.post(
-        'http://127.0.0.1:8000/api/food/chef/prices/',
-        priceData,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          console.log(`Creating price variant ${i}:`, priceData);
+
+          try {
+            const priceResponse = await axios.post(
+              "http://127.0.0.1:8000/api/food/chef/prices/",
+              priceData,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+            console.log(`✅ Price variant ${i} created successfully:`, priceResponse.data);
+          } catch (priceError: any) {
+            console.error(`❌ Error creating price variant ${i}:`, priceError);
+            console.error(
+              `Price variant ${i} error response:`,
+              priceError.response?.data
+            );
+
+            if (priceError.response?.status === 400) {
+              const errorData = priceError.response.data;
+              if (
+                errorData.non_field_errors &&
+                errorData.non_field_errors[0]?.includes("already have a")
+              ) {
+                showError(
+                  `⚠️ Size ${variant.size} already exists for this food. Skipping duplicate size.`
+                );
+                continue;
+              }
+            }
+
+            showError(
+              `Error creating price variant ${i} (${variant.size}): ${JSON.stringify(
+                priceError.response?.data || priceError.message
+              )}`
+            );
+            throw priceError;
+          }
         }
-      );
+      }
+    } else {
+      // Add price variants for existing food
+      if (!selectedFood?.id) {
+        showError("Please select a food item first");
+        setIsSubmitting(false);
+        return;
+      }
 
-      console.log('Price creation response:', response.data);
+      let successCount = 0;
+      let skippedCount = 0;
+
+      for (let i = 0; i < priceVariants.length; i++) {
+        const variant = priceVariants[i];
+        const priceData = {
+          food: selectedFood.id,
+          price: parseFloat(variant.price.toString()),
+          size: variant.size,
+          preparation_time: parseInt(variant.preparation_time.toString()),
+        };
+
+        console.log(`Creating price variant ${i} for existing food:`, priceData);
+
+        try {
+          await axios.post("http://127.0.0.1:8000/api/food/chef/prices/", priceData, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+          successCount++;
+          console.log(`✅ Price variant ${i} created successfully`);
+        } catch (priceError: any) {
+          console.error(`❌ Error creating price variant ${i}:`, priceError);
+          console.error(
+            `Price variant ${i} error response:`,
+            priceError.response?.data
+          );
+
+          if (priceError.response?.status === 400) {
+            const errorData = priceError.response.data;
+            if (
+              errorData.non_field_errors &&
+              errorData.non_field_errors[0]?.includes("already have a")
+            ) {
+              skippedCount++;
+              console.log(`⚠️ Skipping duplicate size ${variant.size}`);
+              continue;
+            }
+          }
+
+          showError(
+            `Error creating price variant ${i} (${variant.size}): ${JSON.stringify(
+              priceError.response?.data || priceError.message
+            )}`
+          );
+          throw priceError;
+        }
+      }
+
+      if (skippedCount > 0) {
+        showSuccess(
+          `✅ ${successCount} new price variant(s) added to "${selectedFood?.name}"! ${skippedCount} duplicate size(s) were skipped.`
+        );
+      } else {
+        showSuccess(
+          `✅ ${successCount} price variant(s) added to "${selectedFood?.name}" successfully!`
+        );
+      }
     }
 
-    const successMessage = isNewFood
-      ? `Food item "${foodName}" created successfully! It will appear in your menu after admin approval.`
-      : `Price variant added to "${selectedFood?.name}" successfully!`;
-    showSuccess(successMessage);
+    // Show success message (only for new foods or if no skipped variants message was shown)
+    if (isNewFood) {
+      const successMessage = `🎉 Food item "${foodName}" created successfully with ${priceVariants.length} size variant(s)! It will appear in your menu after admin approval.`;
+      showSuccess(successMessage);
+    }
 
     resetForm();
     setIsAddDialogOpen(false);
 
-    console.log('Reloading menu after successful submission...');
+    console.log("Reloading menu after successful submission...");
     await loadMenuItems();
   } catch (error: any) {
-    console.error('Error submitting:', error);
-    console.error('Error response data:', error.response?.data);
-    let errorMessage = 'Error submitting. Please try again.';
+    console.error("❌ Error submitting:", error);
+    console.error("Error response data:", error.response?.data);
+    let errorMessage = "Error submitting. Please try again.";
     if (error.response?.data) {
-      // Handle field-specific validation errors
-      if (typeof error.response.data === 'object') {
+      if (typeof error.response.data === "object") {
         const errors = [];
         for (const [field, messages] of Object.entries(error.response.data)) {
           if (Array.isArray(messages)) {
-            errors.push(`${field}: ${messages.join(', ')}`);
+            errors.push(`${field}: ${messages.join(", ")}`);
           } else {
             errors.push(`${field}: ${messages}`);
           }
         }
-        if (errors.length > 0) errorMessage = errors.join('\n');
+        if (errors.length > 0) errorMessage = errors.join("\n");
       } else {
         errorMessage = error.response.data;
       }
@@ -476,16 +667,6 @@ const ChefMenu: React.FC = () => {
 };
 
 
-  // Reset form state
-  const resetForm = () => {
-    setFoodSearchTerm('');
-    setSelectedFood(null);
-    setIsNewFood(true);
-    setShowSearchResults(false);
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
-  };
 
   // Handle edit food
   const handleEditFood = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -645,7 +826,7 @@ const ChefMenu: React.FC = () => {
     <>
       {/* Custom Notification */}
       {notification.show && (
-        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-[10000] animate-in slide-in-from-top-2">
           <div className={`px-4 py-3 rounded-lg shadow-lg max-w-sm ${
             notification.type === 'success' 
               ? 'bg-green-600 text-white' 
@@ -694,7 +875,10 @@ const ChefMenu: React.FC = () => {
             />
           </div>
           
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+            setIsAddDialogOpen(open);
+            if (!open) resetForm();
+          }}>
   <DialogTrigger asChild>
     <Button onClick={resetForm}>
       <Plus className="mr-2 h-4 w-4" />
@@ -862,90 +1046,184 @@ const ChefMenu: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="flex items-center space-x-3">
-              <input
-                type="checkbox"
-                id="is_vegetarian"
-                name="is_vegetarian"
-                className="rounded border-gray-300 h-4 w-4"
-              />
-              <Label htmlFor="is_vegetarian" className="text-sm font-medium">
-                Vegetarian
-              </Label>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <input
-                type="checkbox"
-                id="is_vegan"
-                name="is_vegan"
-                className="rounded border-gray-300 h-4 w-4"
-              />
-              <Label htmlFor="is_vegan" className="text-sm font-medium">
-                Vegan
-              </Label>
+          {/* Dietary Type - Radio Buttons */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Dietary Type *</Label>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex items-center space-x-3">
+                <input
+                  type="radio"
+                  id="vegetarian"
+                  name="dietary_type"
+                  value="vegetarian"
+                  checked={dietaryType === 'vegetarian'}
+                  onChange={(e) => setDietaryType(e.target.value as any)}
+                  className="h-4 w-4 text-green-600"
+                />
+                <Label htmlFor="vegetarian" className="text-sm font-medium flex items-center">
+                  🥗 Vegetarian
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <input
+                  type="radio"
+                  id="vegan"
+                  name="dietary_type"
+                  value="vegan"
+                  checked={dietaryType === 'vegan'}
+                  onChange={(e) => setDietaryType(e.target.value as any)}
+                  className="h-4 w-4 text-green-600"
+                />
+                <Label htmlFor="vegan" className="text-sm font-medium flex items-center">
+                  🌱 Vegan
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <input
+                  type="radio"
+                  id="non-vegetarian"
+                  name="dietary_type"
+                  value="non-vegetarian"
+                  checked={dietaryType === 'non-vegetarian'}
+                  onChange={(e) => setDietaryType(e.target.value as any)}
+                  className="h-4 w-4 text-red-600"
+                />
+                <Label htmlFor="non-vegetarian" className="text-sm font-medium flex items-center">
+                  🍖 Non-Vegetarian
+                </Label>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Price Information */}
+      {/* Multiple Size Pricing Information */}
       <div className="space-y-4 border-t border-gray-200 pt-6">
-        <h4 className="text-lg font-semibold text-gray-900 mb-4">Pricing Information</h4>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="price" className="text-sm font-medium">Price ($) *</Label>
-            <Input
-              id="price"
-              name="price"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              className="w-full"
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="size" className="text-sm font-medium">Size</Label>
-            <select
-              id="size"
-              name="size"
-              defaultValue="Medium"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-            >
-              <option value="Small">Small</option>
-              <option value="Medium">Medium</option>
-              <option value="Large">Large</option>
-            </select>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="preparation_time" className="text-sm font-medium">Prep Time (min) *</Label>
-            <Input
-              id="preparation_time"
-              name="preparation_time"
-              type="number"
-              placeholder="15"
-              className="w-full"
-              required
-            />
-          </div>
+        <div className="flex items-center justify-between">
+          <h4 className="text-lg font-semibold text-gray-900">Size & Pricing Information</h4>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addPriceVariant}
+            className="text-xs"
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            Add Size
+          </Button>
         </div>
         
-        {!isNewFood && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-800">
-              <strong>Note:</strong> Adding a new price variant for existing food "{selectedFood?.name}"
-            </p>
+        <div className="space-y-4">
+          {priceVariants.map((variant, index) => (
+            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Size *</Label>
+                <select
+                  value={variant.size}
+                  onChange={(e) => updatePriceVariant(index, 'size', e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  required
+                >
+                  <option value="Small">Small</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Large">Large</option>
+                  <option value="Extra Large">Extra Large</option>
+                  <option value="Family Size">Family Size</option>
+                </select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Price (LKR) *</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
+                    Rs.
+                  </span>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={variant.price || ''}
+                    onChange={(e) => {
+                      const value = Math.max(0, parseFloat(e.target.value) || 0);
+                      updatePriceVariant(index, 'price', value);
+                    }}
+                    placeholder="0.00"
+                    className="pl-10 w-full"
+                    required
+                  />
+                </div>
+                <p className="text-xs text-gray-500">Sri Lankan Rupees</p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Prep Time (min) *</Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={variant.preparation_time || ''}
+                    onChange={(e) => {
+                      const value = Math.max(1, parseInt(e.target.value) || 1);
+                      updatePriceVariant(index, 'preparation_time', value);
+                    }}
+                    placeholder="15"
+                    className="w-full"
+                    required
+                  />
+                  <Clock className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                </div>
+                <p className="text-xs text-gray-500">Minutes to prepare</p>
+              </div>
+              
+              <div className="flex items-end">
+                {priceVariants.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => removePriceVariant(index)}
+                    className="w-full"
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Price Summary */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h5 className="font-medium text-blue-900 mb-2">📋 Price Summary</h5>
+          <div className="space-y-1">
+            {priceVariants.map((variant, index) => (
+              <div key={index} className="flex justify-between text-sm">
+                <span className="text-blue-700">{variant.size}:</span>
+                <span className="font-medium text-blue-900">
+                  Rs. {variant.price?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'} 
+                  <span className="text-blue-600 ml-1">({variant.preparation_time} min)</span>
+                </span>
+              </div>
+            ))}
           </div>
-        )}
+          {!isNewFood && (
+            <div className="mt-3 pt-3 border-t border-blue-200">
+              <p className="text-xs text-blue-800">
+                <strong>Note:</strong> Adding new size variants for existing food "{selectedFood?.name}"
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-        <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isSubmitting}>
+        <Button type="button" variant="outline" onClick={() => { 
+          resetForm(); 
+          setIsAddDialogOpen(false); 
+        }} disabled={isSubmitting}>
           Cancel
         </Button>
         <Button type="submit" className="min-w-[120px]" disabled={isSubmitting}>
@@ -1073,8 +1351,8 @@ const ChefMenu: React.FC = () => {
                             <span className="font-medium">{price.size}</span>
                             <div className="flex items-center space-x-4 text-xs text-gray-600">
                               <div className="flex items-center">
-                                <DollarSign className="w-3 h-3 mr-1" />
-                                {price.price}
+                                <div className="w-3 h-3 mr-1" />
+                                Rs. {price.price}
                               </div>
                               <div className="flex items-center">
                                 <Clock className="w-3 h-3 mr-1" />
@@ -1242,7 +1520,7 @@ const ChefMenu: React.FC = () => {
                                         </div>
                                         
                                         <div className="space-y-2">
-                                          <Label>Price ($)</Label>
+                                          <Label>Price (Rs.)</Label>
                                           <Input
                                             type="number"
                                             step="0.01"
