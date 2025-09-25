@@ -45,10 +45,10 @@ const DeliveryNavbar: React.FC = () => {
       description: "Overview and statistics",
     },
     {
-      title: "Deliveries",
-      href: "/delivery/deliveries",
+      title: "All Orders",
+      href: "/delivery/orders",
       icon: Package,
-      description: "Manage active deliveries",
+      description: "View and manage all orders",
     },
     {
       title: "Map",

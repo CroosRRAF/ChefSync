@@ -22,6 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import DeliveryLayout from "@/components/delivery/DeliveryLayout";
 import {
   getAvailableOrders,
+  getMyAssignedOrders,
   getDashboardSummary,
   getDeliveryLogs,
   getDeliveryHistory,
@@ -43,11 +44,13 @@ import {
   Timer,
   Users,
 } from "lucide-react";
+import DeliveryPhaseCard from "@/components/delivery/DeliveryPhaseCard";
 
 const DeliveryDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
+  const [assignedOrders, setAssignedOrders] = useState<Order[]>([]);
   const [recentDeliveries, setRecentDeliveries] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [acceptingOrder, setAcceptingOrder] = useState<number | null>(null);
@@ -79,6 +82,7 @@ const DeliveryDashboard: React.FC = () => {
     fetchAvailableOrders();
     fetchRecentDeliveries();
     fetchDeliveryLogs();
+    fetchAssignedOrders();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -137,6 +141,23 @@ const DeliveryDashboard: React.FC = () => {
       setDeliveryLogs(logs);
     } catch (error) {
       console.error("Failed to fetch delivery logs:", error);
+    }
+  };
+
+  const fetchAssignedOrders = async () => {
+    try {
+      console.log("Fetching assigned orders...");
+      const assignedData = await getMyAssignedOrders();
+      console.log("Fetched assigned orders:", assignedData);
+
+      // Filter for active delivery states
+      const activeOrders = assignedData.filter((order) =>
+        ["ready", "out_for_delivery", "in_transit"].includes(order.status)
+      );
+
+      setAssignedOrders(activeOrders);
+    } catch (error) {
+      console.error("Failed to fetch assigned orders:", error);
     }
   };
 
@@ -352,7 +373,7 @@ const DeliveryDashboard: React.FC = () => {
                       Check back later for new delivery opportunities
                     </p>
                     <Button asChild className="theme-button-primary">
-                      <Link to="/delivery/deliveries">View All Deliveries</Link>
+                      <Link to="/delivery/orders">View All Orders</Link>
                     </Button>
                   </div>
                 ) : (
@@ -468,7 +489,7 @@ const DeliveryDashboard: React.FC = () => {
                     {availableOrders.length > 5 && (
                       <div className="text-center">
                         <Button asChild variant="outline">
-                          <Link to="/delivery/deliveries">
+                          <Link to="/delivery/orders">
                             View All {availableOrders.length} Orders
                           </Link>
                         </Button>
@@ -478,6 +499,60 @@ const DeliveryDashboard: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Active Deliveries Section */}
+            {assignedOrders.length > 0 && (
+              <Card
+                className="group border-none theme-card-hover theme-animate-fade-in-up"
+                style={{ background: "var(--bg-card)" }}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Truck
+                      className="h-5 w-5 group-hover:scale-110 transition-transform duration-300"
+                      style={{ color: "var(--primary-emerald)" }}
+                    />
+                    <span style={{ color: "var(--text-primary)" }}>
+                      Active Deliveries
+                    </span>
+                    <Badge variant="secondary" className="ml-2">
+                      {assignedOrders.length}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription style={{ color: "var(--text-cool-grey)" }}>
+                    Your currently assigned orders for pickup and delivery
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {assignedOrders.map((order, index) => (
+                      <DeliveryPhaseCard
+                        key={order.id}
+                        order={order}
+                        onNavigateToMap={(order) =>
+                          navigate("/delivery/map", {
+                            state: {
+                              selectedOrderId: order.id,
+                              orderDetails: order,
+                            },
+                          })
+                        }
+                        className="theme-animate-fade-in-up"
+                        style={{ animationDelay: `${index * 0.1}s` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-6 text-center">
+                    <Button asChild variant="outline" size="lg">
+                      <Link to="/delivery/map">
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Open Map View
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Deliveries Tab */}

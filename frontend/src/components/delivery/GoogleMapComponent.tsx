@@ -9,7 +9,7 @@ import {
 import { MapPin, Navigation, Clock, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { geocodeAddress } from "@/utils/mapUtils";
-import type { Order } from "../../types/order";
+import type { Order } from "../../types/orderType";
 
 interface Location {
   lat: number;
@@ -139,9 +139,21 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
           unitSystem: google.maps.UnitSystem.METRIC,
           avoidHighways: false,
           avoidTolls: false,
+          optimizeWaypoints: true,
         });
 
         setDirectionsResponse(result);
+
+        // Calculate estimated time and distance
+        const route = result.routes[0];
+        if (route) {
+          const leg = route.legs[0];
+          const distance = leg.distance?.text || "Unknown";
+          const duration = leg.duration?.text || "Unknown";
+
+          console.log(`Route calculated: ${distance}, ${duration}`);
+        }
+
         onGetDirections(order);
       } catch (error) {
         console.error("Error calculating directions:", error);
@@ -306,25 +318,45 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 </div>
               </div>
 
-              <div className="flex space-x-2">
+              <div className="flex flex-col space-y-2">
+                <div className="flex space-x-2">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      onOrderSelect(selectedOrder);
+                      setSelectedOrder(null);
+                    }}
+                    className="text-xs py-1 px-2 h-auto flex-1"
+                  >
+                    View Details
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => calculateDirections(selectedOrder)}
+                    className="text-xs py-1 px-2 h-auto flex-1"
+                  >
+                    <Navigation className="h-3 w-3 mr-1" />
+                    Map Route
+                  </Button>
+                </div>
                 <Button
                   size="sm"
                   onClick={() => {
-                    onOrderSelect(selectedOrder);
+                    const destination =
+                      selectedOrder.delivery_address ||
+                      `${selectedOrder.customer?.name || "Customer"} Location`;
+                    const encodedDestination = encodeURIComponent(destination);
+                    const googleMapsUrl = currentLocation
+                      ? `https://www.google.com/maps/dir/${currentLocation.lat},${currentLocation.lng}/${encodedDestination}`
+                      : `https://www.google.com/maps/search/${encodedDestination}`;
+                    window.open(googleMapsUrl, "_blank");
                     setSelectedOrder(null);
                   }}
-                  className="text-xs py-1 px-2 h-auto"
-                >
-                  View Details
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => calculateDirections(selectedOrder)}
-                  className="text-xs py-1 px-2 h-auto"
+                  className="text-xs py-1 px-2 h-auto w-full bg-blue-600 hover:bg-blue-700"
                 >
                   <Navigation className="h-3 w-3 mr-1" />
-                  Navigate
+                  Open in Google Maps
                 </Button>
               </div>
             </div>

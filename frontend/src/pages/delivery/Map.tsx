@@ -37,8 +37,12 @@ import {
   Route,
   AlertCircle,
   Zap,
+  Package,
 } from "lucide-react";
 import type { Order } from "../../types/orderType";
+import OrderStatusTracker from "@/components/delivery/OrderStatusTracker";
+import DeliveryTracker from "@/components/delivery/DeliveryTracker";
+import PickupDeliveryFlow from "@/components/delivery/PickupDeliveryFlow";
 
 interface Location {
   lat: number;
@@ -275,6 +279,50 @@ const DeliveryMap: React.FC = () => {
     setShowOrderDetails(true);
   };
 
+  const handleStatusUpdate = (orderId: number, newStatus: Order["status"]) => {
+    setOrders((prevOrders) =>
+      prevOrders.map((order) =>
+        order.id === orderId ? { ...order, status: newStatus } : order
+      )
+    );
+
+    // If the selected order was updated, update it too
+    if (selectedOrder?.id === orderId) {
+      setSelectedOrder((prev) =>
+        prev ? { ...prev, status: newStatus } : null
+      );
+    }
+  };
+
+  const handleDeliveryComplete = (orderId: number) => {
+    setOrders((prevOrders) =>
+      prevOrders.filter((order) => order.id !== orderId)
+    );
+
+    if (selectedOrder?.id === orderId) {
+      setSelectedOrder(null);
+      setShowOrderDetails(false);
+    }
+
+    toast({
+      title: "Delivery Completed",
+      description: `Order #${orderId} has been successfully delivered!`,
+    });
+  };
+
+  // Get destination location for selected order (mock for now)
+  const getDestinationLocation = (order: Order) => {
+    // In a real app, this would geocode the delivery address
+    // For now, return a mock location near San Francisco
+    const mockLocations = [
+      { lat: 37.7849, lng: -122.4094 },
+      { lat: 37.7649, lng: -122.4294 },
+      { lat: 37.7949, lng: -122.3994 },
+      { lat: 37.7549, lng: -122.4394 },
+    ];
+    return mockLocations[order.id % mockLocations.length];
+  };
+
   const handleGetDirections = async (order: Order) => {
     if (!currentLocation) {
       toast({
@@ -286,17 +334,46 @@ const DeliveryMap: React.FC = () => {
     }
 
     try {
-      // This will be handled by the GoogleMapComponent
-      // We can also call the backend service if needed
-      await getRouteDirections(order.id);
+      // Create directions URL for external navigation apps
+      const destination =
+        order.delivery_address ||
+        `${order.customer?.name || "Customer"} Location`;
+      const encodedDestination = encodeURIComponent(destination);
+
+      // For mobile devices, try to open in Google Maps app
+      const isMobile =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
+
+      if (isMobile) {
+        // Try to open in Google Maps app first
+        const googleMapsUrl = `https://www.google.com/maps/dir/${currentLocation.lat},${currentLocation.lng}/${encodedDestination}`;
+        window.open(googleMapsUrl, "_blank");
+      } else {
+        // For desktop, open in new tab
+        const googleMapsUrl = `https://www.google.com/maps/dir/${currentLocation.lat},${currentLocation.lng}/${encodedDestination}`;
+        window.open(googleMapsUrl, "_blank");
+      }
+
+      // Also call the backend service for tracking
+      try {
+        await getRouteDirections(order.id);
+      } catch (backendError) {
+        console.error("Backend route directions failed:", backendError);
+      }
 
       toast({
-        title: "Directions Calculated",
-        description: `Route to Order #${order.id} has been calculated and displayed on the map.`,
+        title: "Navigation Started",
+        description: `Opening directions to Order #${order.id} in Google Maps.`,
       });
     } catch (error) {
-      // Don't show error toast since the GoogleMapComponent handles direction calculation
-      console.error("Backend route directions failed:", error);
+      console.error("Navigation failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Navigation Error",
+        description: "Failed to start navigation. Please try again.",
+      });
     }
   };
 
@@ -529,73 +606,109 @@ const DeliveryMap: React.FC = () => {
 
         {/* Order Details Dialog */}
         <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Order Details</DialogTitle>
+              <DialogTitle>Order Details & Delivery Status</DialogTitle>
               <DialogDescription>
-                Complete information for Order #{selectedOrder?.id}
+                Complete information and tracking for Order #{selectedOrder?.id}
               </DialogDescription>
             </DialogHeader>
             {selectedOrder && (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">
-                    Customer
-                  </label>
-                  <p className="font-medium">
-                    {selectedOrder.customer?.name || "Unknown"}
-                  </p>
-                </div>
+              <div className="space-y-6">
+                {/* Two-Stage Pickup & Delivery Flow */}
+                <PickupDeliveryFlow
+                  order={selectedOrder}
+                  currentLocation={currentLocation}
+                  onStatusUpdate={handleStatusUpdate}
+                  onOrderComplete={handleDeliveryComplete}
+                />
 
-                <div>
-                  <label className="text-sm font-medium text-gray-600">
-                    Delivery Address
-                  </label>
-                  <p className="font-medium">
-                    {selectedOrder.delivery_address || "Not specified"}
-                  </p>
-                </div>
+                {/* Order Information */}
+                <Card>
+                  <CardContent className="p-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">
+                          Customer
+                        </label>
+                        <p className="font-medium">
+                          {selectedOrder.customer?.name || "Unknown"}
+                        </p>
+                        {selectedOrder.customer?.phone && (
+                          <p className="text-sm text-gray-500">
+                            {selectedOrder.customer.phone}
+                          </p>
+                        )}
+                      </div>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-600">
-                    Order Total
-                  </label>
-                  <p className="font-medium">${selectedOrder.total_amount}</p>
-                </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">
+                          Order Total
+                        </label>
+                        <p className="font-medium text-lg text-green-600">
+                          ${selectedOrder.total_amount}
+                        </p>
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-600">
-                    Status
-                  </label>
-                  <div className="mt-1">
-                    {getStatusBadge(selectedOrder.status)}
-                  </div>
-                </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">
+                        Delivery Address
+                      </label>
+                      <p className="font-medium">
+                        {selectedOrder.delivery_address || "Not specified"}
+                      </p>
+                    </div>
 
-                {selectedOrder.delivery_instructions && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">
-                      Delivery Instructions
-                    </label>
-                    <p className="font-medium">
-                      {selectedOrder.delivery_instructions}
-                    </p>
-                  </div>
-                )}
+                    {selectedOrder.delivery_instructions && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">
+                          Delivery Instructions
+                        </label>
+                        <p className="font-medium bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                          {selectedOrder.delivery_instructions}
+                        </p>
+                      </div>
+                    )}
 
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={() => handleGetDirections(selectedOrder)}
-                    className="flex-1"
-                  >
-                    <Navigation className="h-4 w-4 mr-2" />
-                    Navigate
-                  </Button>
-                </div>
+                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 mr-1" />
+                        <span>
+                          Ordered:{" "}
+                          {new Date(selectedOrder.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Delivery Flow Steps - Show when order is selected */}
+        {selectedOrder && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Package className="h-5 w-5 mr-2" />
+                Current Delivery: Order #{selectedOrder.id}
+              </CardTitle>
+              <CardDescription>
+                Follow the step-by-step delivery process
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <OrderStatusTracker
+                order={selectedOrder}
+                currentLocation={currentLocation}
+                onStatusUpdate={handleStatusUpdate}
+                onNavigate={handleGetDirections}
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </DeliveryLayout>
   );

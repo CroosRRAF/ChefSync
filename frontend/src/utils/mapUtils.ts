@@ -158,3 +158,84 @@ export const getOptimizedRoute = async (
     return null;
   }
 };
+
+/**
+ * Calculate distance between two points using Haversine formula
+ */
+export const calculateDistanceHaversine = (point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number => {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = toRadians(point2.lat - point1.lat);
+  const dLon = toRadians(point2.lng - point1.lng);
+  
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(point1.lat)) * Math.cos(toRadians(point2.lat)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in kilometers
+};
+
+/**
+ * Convert degrees to radians
+ */
+const toRadians = (degrees: number): number => {
+  return degrees * (Math.PI / 180);
+};
+
+/**
+ * Estimate travel time based on distance
+ */
+export const estimateTravelTime = (distanceKm: number, mode: 'driving' | 'walking' | 'cycling' = 'driving'): number => {
+  const speeds = {
+    driving: 40, // km/h average city driving
+    cycling: 15, // km/h average cycling
+    walking: 5   // km/h average walking
+  };
+  
+  return Math.round((distanceKm / speeds[mode]) * 60); // Return time in minutes
+};
+
+/**
+ * Generate Google Maps navigation URL
+ */
+export const generateNavigationUrl = (
+  destination: { lat: number; lng: number } | string,
+  origin?: { lat: number; lng: number },
+  travelMode: 'driving' | 'walking' | 'transit' | 'bicycling' = 'driving'
+): string => {
+  const baseUrl = 'https://www.google.com/maps/dir/';
+  
+  let url = baseUrl;
+  
+  if (origin) {
+    url += `${origin.lat},${origin.lng}/`;
+  }
+  
+  if (typeof destination === 'string') {
+    url += encodeURIComponent(destination);
+  } else {
+    url += `${destination.lat},${destination.lng}`;
+  }
+  
+  return url;
+};
+
+/**
+ * Check if user is within delivery radius of a location
+ */
+export const isWithinDeliveryRadius = (
+  userLocation: { lat: number; lng: number },
+  destinationLocation: { lat: number; lng: number },
+  radiusKm: number = 0.1 // 100 meters default
+): boolean => {
+  const distance = calculateDistanceHaversine(userLocation, destinationLocation);
+  return distance <= radiusKm;
+};
+
+/**
+ * Format location coordinates for display
+ */
+export const formatLocation = (location: { lat: number; lng: number }, precision: number = 6): string => {
+  return `${location.lat.toFixed(precision)}, ${location.lng.toFixed(precision)}`;
+};

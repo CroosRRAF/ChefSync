@@ -73,6 +73,12 @@ export const acceptOrder = async (orderId: number): Promise<Order> => {
   return res.data;
 };
 
+// 🚚 Get Cook Details
+export const getCookDetails = async (cookId: number): Promise<any> => {
+  const res = await apiClient.get(`/auth/cook-profile/${cookId}/`);
+  return res.data;
+}
+
 // 🚚 Update order status with enhanced tracking
 export const updateOrderStatus = async (
   orderId: number,
@@ -318,6 +324,135 @@ export const requestEmergencyHelp = async (
   //   location: await getCurrentLocation()
   // });
   // return res.data;
+};
+
+// 🎯 Enhanced location and tracking services
+export const startDeliveryTracking = async (orderId: number, startLocation: { lat: number; lng: number }) => {
+  try {
+    // TODO: Uncomment when backend endpoint is ready
+    // const res = await apiClient.post(`/delivery/tracking/${orderId}/start/`, {
+    //   start_location: startLocation,
+    //   timestamp: new Date().toISOString()
+    // });
+    // return res.data;
+    
+    console.warn("Delivery tracking endpoint not yet implemented in backend");
+    return {
+      success: true,
+      trackingId: `tracking_${orderId}_${Date.now()}`,
+      startTime: new Date().toISOString(),
+      startLocation
+    };
+  } catch (error) {
+    console.error("Failed to start delivery tracking:", error);
+    throw error;
+  }
+};
+
+export const updateDeliveryProgress = async (
+  orderId: number,
+  progress: {
+    currentLocation: { lat: number; lng: number };
+    estimatedArrival?: string;
+    distanceRemaining?: number;
+    status: 'en_route' | 'nearby' | 'at_location';
+  }
+) => {
+  try {
+    // TODO: Uncomment when backend endpoint is ready
+    // const res = await apiClient.post(`/delivery/tracking/${orderId}/update/`, {
+    //   ...progress,
+    //   timestamp: new Date().toISOString()
+    // });
+    // return res.data;
+    
+    console.warn("Delivery progress update endpoint not yet implemented in backend");
+    return {
+      success: true,
+      orderId,
+      ...progress,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error("Failed to update delivery progress:", error);
+    throw error;
+  }
+};
+
+export const completeDelivery = async (
+  orderId: number,
+  completionData: {
+    location: { lat: number; lng: number };
+    completionTime: string;
+    deliveryPhoto?: string;
+    customerSignature?: string;
+    deliveryNotes?: string;
+  }
+) => {
+  try {
+    const res = await apiClient.post(`/orders/orders/${orderId}/complete/`, {
+      ...completionData,
+      status: 'delivered'
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Failed to complete delivery:", error);
+    throw error;
+  }
+};
+
+// 🚗 Navigation and routing helpers
+export const calculateOptimalRoute = async (
+  currentLocation: { lat: number; lng: number },
+  destinations: { orderId: number; address: string; lat?: number; lng?: number }[]
+) => {
+  try {
+    // TODO: Integrate with Google Maps Directions API or backend route optimization
+    console.warn("Route calculation using mock data");
+    
+    return {
+      optimizedRoute: destinations.map((dest, index) => ({
+        ...dest,
+        order: index + 1,
+        estimatedDuration: Math.random() * 30 + 10, // 10-40 minutes
+        distance: Math.random() * 5 + 1 // 1-6 km
+      })),
+      totalDistance: destinations.length * 3.5,
+      totalDuration: destinations.length * 20,
+      savings: {
+        distanceSaved: destinations.length * 0.8,
+        timeSaved: destinations.length * 5
+      }
+    };
+  } catch (error) {
+    console.error("Failed to calculate optimal route:", error);
+    throw error;
+  }
+};
+
+export const getNavigationInstructions = async (
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number }
+) => {
+  try {
+    // This would integrate with Google Maps Directions API
+    console.warn("Using mock navigation instructions");
+    
+    return {
+      instructions: [
+        "Head north on Main St",
+        "Turn right onto Oak Ave",
+        "Turn left onto Pine St",
+        "Destination will be on your right"
+      ],
+      distance: "2.3 km",
+      duration: "8 minutes",
+      polyline: "", // Would contain encoded polyline for map display
+    };
+  } catch (error) {
+    console.error("Failed to get navigation instructions:", error);
+    throw error;
+  }
 };
 
 // Helper function to get current location
