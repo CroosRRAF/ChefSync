@@ -17,7 +17,8 @@ from .serializers import (
     PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
     GoogleOAuthSerializer, JWTTokenSerializer,
     SendOTPSerializer, VerifyOTPSerializer, CompleteRegistrationSerializer,
-    DocumentTypeSerializer, UserDocumentSerializer, UserApprovalSerializer, UserApprovalActionSerializer
+    DocumentTypeSerializer, UserDocumentSerializer, UserApprovalSerializer, UserApprovalActionSerializer,
+    CookProfileManagementSerializer
 )
 from .models import User, Customer, Cook, DeliveryAgent
 from .permissions import IsAdminUser
@@ -677,6 +678,68 @@ def create_cook_profile(request):
             'cook': CookSerializer(cook).data
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def cook_profile_detail(request):
+    """
+    Get comprehensive cook profile combining user and cook data
+    """
+    if request.user.role not in ['cook', 'Cook']:
+        return Response({
+            'error': 'This endpoint is only available for cooks'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    serializer = CookProfileManagementSerializer(request.user)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def cook_profile_update(request):
+    """
+    Update comprehensive cook profile combining user and cook data
+    """
+    if request.user.role not in ['cook', 'Cook']:
+        return Response({
+            'error': 'This endpoint is only available for cooks'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    serializer = CookProfileManagementSerializer(
+        request.user, 
+        data=request.data, 
+        partial=True
+    )
+    
+    if serializer.is_valid():
+        serializer.save()
+        return Response({
+            'message': 'Profile updated successfully',
+            'profile': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def cook_profile_delete(request):
+    """
+    Delete cook user account (soft delete by deactivating)
+    """
+    if request.user.role not in ['cook', 'Cook']:
+        return Response({
+            'error': 'This endpoint is only available for cooks'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    # Soft delete - deactivate the account instead of permanent deletion
+    request.user.is_active = False
+    request.user.save()
+    
+    return Response({
+        'message': 'Account has been deactivated successfully'
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

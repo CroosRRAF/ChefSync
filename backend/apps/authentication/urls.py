@@ -37,6 +37,11 @@ urlpatterns = [
     path('profile/', views.user_profile, name='profile'),
     path('profile/update/', views.update_profile, name='update_profile'),
     
+    # Cook Profile Management (comprehensive)
+    path('cook-profile/', views.cook_profile_detail, name='cook_profile_detail'),
+    path('cook-profile/update/', views.cook_profile_update, name='cook_profile_update'),
+    path('cook-profile/delete/', views.cook_profile_delete, name='cook_profile_delete'),
+    
     # Profile Creation
     path('customer/create/', views.create_customer_profile, name='create_customer'),
     path('cook/create/', views.create_cook_profile, name='create_cook'),

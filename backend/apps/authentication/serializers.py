@@ -9,6 +9,12 @@ from django.apps import apps
 # Get models from Django's app registry to avoid import issues
 DocumentType = apps.get_model('authentication', 'DocumentType')
 UserDocument = apps.get_model('authentication', 'UserDocument')
+# Import ChefProfile from users app
+try:
+    from apps.users.models import ChefProfile
+except ImportError:
+    ChefProfile = apps.get_model('users', 'ChefProfile')
+UserDocument = apps.get_model('authentication', 'UserDocument')
 from .services.email_service import EmailService
 import re
 
@@ -274,6 +280,102 @@ class CookSerializer(serializers.ModelSerializer):
         model = Cook
         fields = ['user_id', 'user', 'specialty', 'kitchen_location', 'experience_years', 
                  'rating_avg', 'availability_hours']
+
+
+class CookProfileManagementSerializer(serializers.Serializer):
+    """
+    Comprehensive serializer for cook profile management combining User and Cook data
+    """
+    # User fields
+    name = serializers.CharField(max_length=100, required=False)
+    email = serializers.EmailField(read_only=True)  # Email should not be editable via profile
+    phone = serializers.CharField(source='phone_no', max_length=20, required=False, allow_blank=True)
+    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    
+    # Cook profile fields
+    specialty_cuisine = serializers.CharField(source='cook.specialty', max_length=100, required=False, allow_blank=True)
+    experience_level = serializers.SerializerMethodField()
+    available_hours = serializers.CharField(source='cook.availability_hours', max_length=50, required=False, allow_blank=True)
+    service_location = serializers.CharField(source='cook.kitchen_location', max_length=255, required=False, allow_blank=True)
+    bio = serializers.CharField(source='address', required=False, allow_blank=True)  # Using address field as bio
+    
+    # Chef profile fields (rating and reviews)
+    rating_average = serializers.SerializerMethodField()
+    total_reviews = serializers.SerializerMethodField()
+    
+    class Meta:
+        fields = ['name', 'email', 'phone', 'username', 'address', 'specialty_cuisine', 
+                 'experience_level', 'available_hours', 'service_location', 'bio',
+                 'rating_average', 'total_reviews']
+    
+    def get_experience_level(self, obj):
+        """Convert experience_years to experience_level enum"""
+        if hasattr(obj, 'cook') and obj.cook.experience_years is not None:
+            years = obj.cook.experience_years
+            if years <= 1:
+                return 'beginner'
+            elif years <= 3:
+                return 'intermediate'
+            elif years <= 7:
+                return 'advanced'
+            else:
+                return 'expert'
+        return 'beginner'
+    
+    def get_rating_average(self, obj):
+        """Get rating average from ChefProfile"""
+        try:
+            chef_profile = ChefProfile.objects.get(user=obj)
+            return float(chef_profile.rating_average)
+        except ChefProfile.DoesNotExist:
+            return 0.0
+    
+    def get_total_reviews(self, obj):
+        """Get total reviews from ChefProfile"""
+        try:
+            chef_profile = ChefProfile.objects.get(user=obj)
+            return chef_profile.total_reviews
+        except ChefProfile.DoesNotExist:
+            return 0
+    
+    def update(self, instance, validated_data):
+        """Update both User and Cook models"""
+        # Extract cook data
+        cook_data = validated_data.pop('cook', {})
+        
+        # Handle experience_level conversion to experience_years
+        if 'experience_level' in self.initial_data:
+            experience_level = self.initial_data['experience_level']
+            experience_map = {
+                'beginner': 1,
+                'intermediate': 2,
+                'advanced': 5,
+                'expert': 10
+            }
+            cook_data['experience_years'] = experience_map.get(experience_level, 1)
+        
+        # Update User fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Update or create Cook profile
+        cook_profile, created = Cook.objects.get_or_create(user=instance)
+        for attr, value in cook_data.items():
+            setattr(cook_profile, attr, value)
+        cook_profile.save()
+        
+        return instance
+    
+    def to_representation(self, instance):
+        """Custom representation to include cook data"""
+        data = super().to_representation(instance)
+        
+        # Ensure cook profile exists
+        cook_profile, created = Cook.objects.get_or_create(user=instance)
+        
+        return data
 
 
 class DeliveryAgentSerializer(serializers.ModelSerializer):

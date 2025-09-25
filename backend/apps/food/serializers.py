@@ -196,6 +196,8 @@ class ChefFoodCreateSerializer(serializers.ModelSerializer):
     price = serializers.DecimalField(max_digits=10, decimal_places=2, write_only=True)
     size = serializers.CharField(max_length=10, write_only=True, default='Medium')
     preparation_time = serializers.IntegerField(write_only=True, default=15)
+    # Custom image field that accepts files
+    image = serializers.FileField(required=False, allow_null=True, write_only=True)
     
     class Meta:
         model = Food
@@ -204,6 +206,25 @@ class ChefFoodCreateSerializer(serializers.ModelSerializer):
             'is_vegetarian', 'is_vegan', 'spice_level', 'is_available',
             'price', 'size', 'preparation_time'
         ]
+    
+    def validate_image(self, value):
+        """Validate and process image upload"""
+        if value:
+            print(f"DEBUG: Image file received in validate_image: {value.name}, size: {value.size}")
+            # Upload to Cloudinary
+            try:
+                from utils.cloudinary_utils import upload_image_to_cloudinary
+                result = upload_image_to_cloudinary(value, folder='foods')
+                if result and 'secure_url' in result:
+                    print(f"DEBUG: Image uploaded to Cloudinary: {result['secure_url']}")
+                    return result['secure_url']
+                else:
+                    print("ERROR: Cloudinary upload failed - no secure_url in result")
+                    return None
+            except Exception as e:
+                print(f"ERROR: Cloudinary upload failed: {e}")
+                return None
+        return None
     
     def validate(self, data):
         """Add debug logging for all validation data"""
@@ -243,15 +264,23 @@ class ChefFoodCreateSerializer(serializers.ModelSerializer):
         # Debug logging to see what ingredients we received
         print(f"DEBUG: Creating food with validated_data ingredients: {validated_data.get('ingredients')}")
         print(f"DEBUG: Ingredients type: {type(validated_data.get('ingredients'))}")
+        print(f"DEBUG: Image in validated_data: {validated_data.get('image')}")
         
         # Extract price data
         price = validated_data.pop('price')
         size = validated_data.pop('size', 'Medium')
         prep_time = validated_data.pop('preparation_time', 15)
         
+        # Handle image - it should be a Cloudinary URL now from validate_image
+        image_url = validated_data.pop('image', None)
+        
         # Set status to pending and assign chef
         validated_data['status'] = 'Pending'
         validated_data['chef'] = self.context['request'].user
+        
+        # Set the image URL if we have one
+        if image_url:
+            validated_data['image'] = image_url
         
         # Ensure ingredients is properly formatted
         if 'ingredients' not in validated_data:
