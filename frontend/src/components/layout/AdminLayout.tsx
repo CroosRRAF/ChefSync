@@ -350,7 +350,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
 
         <SidebarInset>
           {/* Modern Header */}
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 sticky top-0 z-50 bg-background">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
 
