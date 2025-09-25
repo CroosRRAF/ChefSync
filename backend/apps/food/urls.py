@@ -12,6 +12,9 @@ router.register(r'categories', views.FoodCategoryViewSet, basename='categories')
 router.register(r'reviews', views.FoodReviewViewSet, basename='reviews')
 router.register(r'offers', views.OfferViewSet, basename='offers')
 
+# Admin approval endpoints
+router.register(r'admin/approvals', views.AdminFoodApprovalViewSet, basename='admin-approvals')
+
 urlpatterns = [
     # Include all router URLs
     path('', include(router.urls)),
@@ -21,4 +24,7 @@ urlpatterns = [
     
     # Simple test endpoint
     path('test/', views.food_list, name='food-list'),
+    
+    # Chef food status endpoint
+    path('chef/status/', views.chef_food_status, name='chef-food-status'),
 ]

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db.models import Sum, Count
-from .models import Order, OrderItem, OrderStatusHistory, CartItem
+from .models import Order, OrderItem, OrderStatusHistory, CartItem, BulkOrder, BulkOrderAssignment
 from apps.food.models import Food, FoodPrice
 from django.contrib.auth import get_user_model
 from apps.users.models import ChefProfile
@@ -26,9 +26,25 @@ class CustomerSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'phone']
+        fields = ['user_id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'phone_no', 'name']
         
     def get_full_name(self, obj):
+        if obj.name:
+            return obj.name
+        return f"{obj.first_name} {obj.last_name}".strip() or obj.username
+
+
+class ChefSerializer(serializers.ModelSerializer):
+    """Serializer for chef user information"""
+    full_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = ['user_id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'phone_no', 'name']
+        
+    def get_full_name(self, obj):
+        if obj.name:
+            return obj.name
         return f"{obj.first_name} {obj.last_name}".strip() or obj.username
 
 
@@ -98,13 +114,32 @@ class OrderListSerializer(serializers.ModelSerializer):
             return f"{int(hours / 24)}d ago"
 
 
+class ChefSerializer(serializers.ModelSerializer):
+    """Serializer for chef user information"""
+    full_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'phone_no', 'name']
+        
+    def get_full_name(self, obj):
+        if obj.name:
+            return obj.name
+        return f"{obj.first_name} {obj.last_name}".strip() or obj.username
+
+
 class OrderDetailSerializer(serializers.ModelSerializer):
     """Comprehensive serializer for order details"""
     customer = CustomerSerializer(read_only=True)
-    chef = ChefProfileSerializer(read_only=True)
+    chef = ChefSerializer(read_only=True)  # Changed from ChefProfileSerializer to ChefSerializer
     items = OrderItemDetailSerializer(many=True, read_only=True)
     status_history = OrderStatusHistorySerializer(many=True, read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    # Fields expected by frontend
+    customer_name = serializers.SerializerMethodField()
+    chef_name = serializers.SerializerMethodField()
+    time_since_order = serializers.SerializerMethodField()
     
     # Computed fields
     total_items = serializers.SerializerMethodField()
@@ -115,14 +150,38 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'order_number', 'status', 'status_display', 'order_type',
+            'id', 'order_number', 'status', 'status_display','order_type',
             'total_amount', 'delivery_fee', 'tax_amount', 'discount_amount',
-            'delivery_address', 'special_instructions', 'payment_method',
+            'delivery_address', 'delivery_instructions', 'payment_method',
             'payment_status', 'estimated_delivery_time', 'actual_delivery_time',
             'created_at', 'updated_at', 'customer', 'chef', 'items',
             'status_history', 'total_items', 'estimated_prep_time',
-            'can_edit', 'time_in_current_status'
+            'can_edit', 'time_in_current_status', 'customer_name', 'chef_name', 
+            'time_since_order', 'customer_notes', 'chef_notes'
         ]
+    
+    def get_customer_name(self, obj):
+        if obj.customer:
+            return obj.customer.name or f"{obj.customer.first_name} {obj.customer.last_name}".strip() or obj.customer.username
+        return "Unknown Customer"
+    
+    def get_chef_name(self, obj):
+        if obj.chef:
+            return obj.chef.name or f"{obj.chef.first_name} {obj.chef.last_name}".strip() or obj.chef.username
+        return "Unknown Chef"
+    
+    def get_time_since_order(self, obj):
+        from django.utils import timezone
+        diff = timezone.now() - obj.created_at
+        minutes = int(diff.total_seconds() / 60)
+        if minutes < 60:
+            return f"{minutes} minutes ago"
+        elif minutes < 1440:  # Less than 24 hours
+            hours = int(minutes / 60)
+            return f"{hours} hours ago"
+        else:
+            days = int(minutes / 1440)
+            return f"{days} days ago"
     
     def get_total_items(self, obj):
         return obj.items.aggregate(total=Sum('quantity'))['total'] or 0
@@ -205,3 +264,141 @@ class OrderSerializer(OrderDetailSerializer):
 class OrderItemSerializer(OrderItemDetailSerializer):
     """Legacy serializer - use OrderItemDetailSerializer instead"""
     pass
+
+
+# ===== BULK ORDER SERIALIZERS =====
+
+class BulkOrderAssignmentSerializer(serializers.ModelSerializer):
+    """Serializer for bulk order assignments"""
+    chef_name = serializers.SerializerMethodField()
+    chef_username = serializers.CharField(source='chef.username', read_only=True)
+    chef_email = serializers.CharField(source='chef.email', read_only=True)
+    
+    class Meta:
+        model = BulkOrderAssignment
+        fields = ['id', 'chef', 'chef_name', 'chef_username', 'chef_email']
+    
+    def get_chef_name(self, obj):
+        return obj.chef.name if obj.chef and obj.chef.name else obj.chef.username if obj.chef else 'Unknown Chef'
+
+
+class BulkOrderListSerializer(serializers.ModelSerializer):
+    """Serializer for bulk order list view - matches frontend BulkOrder interface"""
+    # Map bulk order fields to frontend expected fields
+    id = serializers.IntegerField(source='bulk_order_id', read_only=True)
+    order_number = serializers.SerializerMethodField()
+    customer_name = serializers.SerializerMethodField()
+    event_type = serializers.SerializerMethodField()
+    total_amount = serializers.SerializerMethodField()
+    event_date = serializers.DateTimeField(source='deadline', read_only=True)
+    
+    # Menu items as expected by frontend
+    items = serializers.SerializerMethodField()
+    
+    # Collaborators from assignments
+    collaborators = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BulkOrder
+        fields = [
+            'id', 'order_number', 'customer_name', 'event_type', 'event_date',
+            'status', 'total_amount', 'total_quantity', 'description',
+            'items', 'collaborators', 'created_at', 'updated_at'
+        ]
+    
+    def get_customer_name(self, obj):
+        return obj.created_by.name if obj.created_by and obj.created_by.name else obj.created_by.username if obj.created_by else 'Unknown User'
+    
+    def get_order_number(self, obj):
+        return f"BULK-{obj.bulk_order_id:06d}"
+    
+    def get_event_type(self, obj):
+        # Extract event type from description or default
+        if obj.description:
+            # Try to extract event type from description
+            description_lower = obj.description.lower()
+            if 'wedding' in description_lower:
+                return 'wedding'
+            elif 'corporate' in description_lower:
+                return 'corporate'
+            elif 'party' in description_lower:
+                return 'party'
+            elif 'birthday' in description_lower:
+                return 'birthday'
+        return 'other'
+    
+    def get_total_amount(self, obj):
+        # Calculate from related order or return default
+        if obj.order:
+            return str(obj.order.total_amount)
+        return "0.00"
+    
+    def get_items(self, obj):
+        # Get items from the related order
+        if obj.order:
+            order_items = obj.order.items.all()[:3]  # Limit to first 3
+            return [
+                {
+                    'id': item.order_item_id,
+                    'food_name': item.food_name or 'Unknown Item',
+                    'quantity': item.quantity,
+                    'special_instructions': item.special_instructions or None
+                }
+                for item in order_items
+            ]
+        return []
+    
+    def get_collaborators(self, obj):
+        # Get assigned chefs
+        assignments = obj.assignments.select_related('chef')
+        return [
+            {
+                'id': assignment.chef.id,
+                'name': assignment.chef.name if assignment.chef.name else assignment.chef.username,
+                'email': assignment.chef.email,
+                'role': 'chef'
+            }
+            for assignment in assignments
+        ]
+
+
+class BulkOrderDetailSerializer(serializers.ModelSerializer):
+    """Detailed serializer for bulk order with all related data"""
+    id = serializers.IntegerField(source='bulk_order_id', read_only=True)
+    order_number = serializers.SerializerMethodField()
+    customer = CustomerSerializer(source='created_by', read_only=True)
+    event_type = serializers.SerializerMethodField()
+    total_amount = serializers.SerializerMethodField()
+    event_date = serializers.DateTimeField(source='deadline', read_only=True)
+    assignments = BulkOrderAssignmentSerializer(many=True, read_only=True)
+    order_details = OrderDetailSerializer(source='order', read_only=True)
+    
+    class Meta:
+        model = BulkOrder
+        fields = [
+            'id', 'order_number', 'customer', 'event_type', 'event_date',
+            'status', 'total_amount', 'total_quantity', 'description',
+            'assignments', 'order_details', 'created_at', 'updated_at'
+        ]
+    
+    def get_order_number(self, obj):
+        return f"BULK-{obj.bulk_order_id:06d}"
+    
+    def get_event_type(self, obj):
+        # Extract event type from description or default
+        if obj.description:
+            description_lower = obj.description.lower()
+            if 'wedding' in description_lower:
+                return 'wedding'
+            elif 'corporate' in description_lower:
+                return 'corporate'
+            elif 'party' in description_lower:
+                return 'party'
+            elif 'birthday' in description_lower:
+                return 'birthday'
+        return 'other'
+    
+    def get_total_amount(self, obj):
+        if obj.order:
+            return str(obj.order.total_amount)
+        return "0.00"
