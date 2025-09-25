@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -79,7 +78,6 @@ const AdminComplaints: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCommunication, setSelectedCommunication] = useState<Communication | null>(null);
-  const [activeTab, setActiveTab] = useState("complaints");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -91,10 +89,10 @@ const AdminComplaints: React.FC = () => {
   const [sendingResponse, setSendingResponse] = useState(false);
 
   // Calculate derived stats
-  const totalComplaints = stats?.by_type.find((type) => type.communication_type === "complaint")?.count || 0;
+  const totalCommunications = stats?.total || 0;
   const pendingReview = stats?.by_status.find((status) => status.status === "pending")?.count || 0;
   const resolved = stats?.by_status.find((status) => status.status === "resolved")?.count || 0;
-  const positiveFeedback = stats?.by_type.find((type) => type.communication_type === "feedback")?.count || 0;
+  const inProgress = stats?.by_status.find((status) => status.status === "in_progress")?.count || 0;
 
   // Load communications
   const loadCommunications = async () => {
@@ -122,20 +120,13 @@ const AdminComplaints: React.FC = () => {
     }
   }, [user]);
 
-  // Filter communications based on current tab and filters
+  // Filter communications based on filters
   const filteredCommunications = useMemo(() => {
     let filtered = communications;
 
-    // Filter by tab
-    if (activeTab === "complaints") {
-      filtered = filtered.filter(comm => comm.communication_type === "complaint");
-    } else if (activeTab === "feedback") {
-      filtered = filtered.filter(comm => comm.communication_type === "feedback");
-    }
-
-    // Apply other filters
+    // Apply filters
     if (searchTerm) {
-      filtered = filtered.filter(comm => 
+      filtered = filtered.filter(comm =>
         comm.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
         comm.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
         comm.reference_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -157,7 +148,7 @@ const AdminComplaints: React.FC = () => {
     }
 
     return filtered;
-  }, [communications, activeTab, searchTerm, statusFilter, priorityFilter, typeFilter]);
+  }, [communications, searchTerm, statusFilter, priorityFilter, typeFilter]);
 
   // Handle response submission
   const handleSubmitResponse = async () => {
@@ -246,9 +237,9 @@ const AdminComplaints: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
       <div>
-          <h1 className="text-3xl font-bold tracking-tight">Complaints & Feedback</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Communications Management</h1>
           <p className="text-muted-foreground">
-          Manage all complaints and feedback from users
+          Manage all communications from users including complaints, feedback, suggestions, and inquiries
         </p>
         </div>
         <Button onClick={loadCommunications} disabled={loading}>
@@ -261,12 +252,12 @@ const AdminComplaints: React.FC = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Complaints</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Communications</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-                <div className="text-2xl font-bold">{totalComplaints}</div>
-            <p className="text-xs text-muted-foreground">All time complaints</p>
+                <div className="text-2xl font-bold">{totalCommunications}</div>
+            <p className="text-xs text-muted-foreground">All communications</p>
           </CardContent>
         </Card>
         <Card>
@@ -281,22 +272,22 @@ const AdminComplaints: React.FC = () => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+            <Loader2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+                <div className="text-2xl font-bold">{inProgress}</div>
+            <p className="text-xs text-muted-foreground">Being processed</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Resolved</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
                 <div className="text-2xl font-bold">{resolved}</div>
             <p className="text-xs text-muted-foreground">Successfully resolved</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Positive Feedback</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-                <div className="text-2xl font-bold">{positiveFeedback}</div>
-            <p className="text-xs text-muted-foreground">User feedback</p>
           </CardContent>
         </Card>
       </div>
@@ -324,19 +315,12 @@ const AdminComplaints: React.FC = () => {
       {!loading && !error && (
       <Card>
         <CardHeader>
-          <CardTitle>Complaints & Feedback Management</CardTitle>
+          <CardTitle>Communications Management</CardTitle>
           <CardDescription>
-              Manage all complaints and feedback from users. View, respond, and resolve issues.
+              Manage all communications from users. View, respond, and resolve issues with proper filtering and notifications.
           </CardDescription>
         </CardHeader>
         <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="complaints">Complaints</TabsTrigger>
-              <TabsTrigger value="feedback">Feedback</TabsTrigger>
-                <TabsTrigger value="all">All Communications</TabsTrigger>
-            </TabsList>
-
               {/* Filters */}
               <div className="flex flex-wrap gap-4 mt-6 mb-4">
                 <div className="flex-1 min-w-[200px]">
@@ -384,6 +368,7 @@ const AdminComplaints: React.FC = () => {
                     <SelectItem value="feedback">Feedback</SelectItem>
                     <SelectItem value="suggestion">Suggestion</SelectItem>
                     <SelectItem value="inquiry">Inquiry</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -423,7 +408,7 @@ const AdminComplaints: React.FC = () => {
                                 #{communication.reference_number}
                               </span>
                             </div>
-                            
+
                             <div>
                               <h3 className="font-semibold text-lg">{communication.subject}</h3>
                               <p className="text-muted-foreground mt-1 line-clamp-2">
@@ -506,7 +491,6 @@ const AdminComplaints: React.FC = () => {
                   ))
                 )}
               </div>
-          </Tabs>
         </CardContent>
       </Card>
       )}

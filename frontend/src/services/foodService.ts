@@ -29,6 +29,18 @@ api.interceptors.request.use(
 // Food API endpoints
 export const fetchFoods = async (params: FoodFilterParams): Promise<PaginatedResponse<Food>> => {
   const response = await api.get(`/food/foods/`, { params });
+  
+  // Handle both paginated and non-paginated responses
+  if (Array.isArray(response.data)) {
+    // If response is an array, wrap it in paginated format
+    return {
+      count: response.data.length,
+      next: null,
+      previous: null,
+      results: response.data
+    };
+  }
+  
   return response.data;
 };
 
@@ -62,6 +74,17 @@ export const deleteFood = async (id: number): Promise<void> => {
 // Cuisine API endpoints
 export const fetchCuisines = async (params: { page?: number; search?: string }): Promise<PaginatedResponse<Cuisine>> => {
   const response = await api.get(`/food/cuisines/`, { params });
+  
+  // Handle both paginated and non-paginated responses
+  if (Array.isArray(response.data)) {
+    return {
+      count: response.data.length,
+      next: null,
+      previous: null,
+      results: response.data
+    };
+  }
+  
   return response.data;
 };
 
@@ -95,6 +118,17 @@ export const deleteCuisine = async (id: number): Promise<void> => {
 // Category API endpoints
 export const fetchFoodCategories = async (params: { page?: number; search?: string; cuisine?: number }): Promise<PaginatedResponse<FoodCategory>> => {
   const response = await api.get(`/food/categories/`, { params });
+  
+  // Handle both paginated and non-paginated responses
+  if (Array.isArray(response.data)) {
+    return {
+      count: response.data.length,
+      next: null,
+      previous: null,
+      results: response.data
+    };
+  }
+  
   return response.data;
 };
 

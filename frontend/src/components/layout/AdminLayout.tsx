@@ -108,11 +108,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
       description: "Visual reports, AI insights, exports",
     },
     {
-      label: "Complaints & Support",
-      href: "/admin/complaints",
+      label: "Communications",
+      href: "/admin/communications",
       icon: MessageSquare,
       badge: 2,
-      description: "Ticketing system with AI categorization",
+      description: "Unified communications management with notifications",
     },
     {
       label: "Notifications",

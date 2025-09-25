@@ -64,7 +64,7 @@ const RoleBasedNavigation: React.FC = () => {
           { label: 'Orders', href: '/admin/orders', icon: Package },
           { label: 'Foods', href: '/admin/foods', icon: ChefHat },
           { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
-          { label: 'Complaints', href: '/admin/complaints', icon: MessageSquare },
+          { label: 'Communications', href: '/admin/communications', icon: MessageSquare },
           { label: 'Notifications', href: '/admin/notifications', icon: Bell },
           { label: 'Settings', href: '/admin/settings', icon: Settings },
         ];

@@ -30,18 +30,17 @@ class CommunicationViewSet(viewsets.ModelViewSet):
     serializer_class = CommunicationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return CommunicationListSerializer
-        return CommunicationSerializer
-
     def get_queryset(self):
         """Filter communications based on query parameters"""
         queryset = self.queryset.select_related('user', 'assigned_to').prefetch_related(
             'tag_relations__tag',
             'responses'
         )
-        
+
+        # For admin users, don't apply pagination
+        if self.request.user and self.request.user.role == 'admin':
+            self.pagination_class = None
+
         # Get query parameters
         status = self.request.query_params.get('status')
         priority = self.request.query_params.get('priority')
@@ -51,7 +50,7 @@ class CommunicationViewSet(viewsets.ModelViewSet):
         assigned_to = self.request.query_params.get('assigned_to')
         category = self.request.query_params.get('category')
         tag = self.request.query_params.get('tag')
-        
+
         # Apply filters
         if status:
             queryset = queryset.filter(status=status)
@@ -70,7 +69,7 @@ class CommunicationViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(category_relations__category_id=category)
         if tag:
             queryset = queryset.filter(tag_relations__tag_id=tag)
-        
+
         # Search filter
         if search:
             queryset = queryset.filter(
@@ -80,8 +79,37 @@ class CommunicationViewSet(viewsets.ModelViewSet):
                 Q(user__name__icontains=search) |
                 Q(user__email__icontains=search)
             )
-        
+
         return queryset.distinct()
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return CommunicationListSerializer
+        return CommunicationSerializer
+
+    def list(self, request, *args, **kwargs):
+        """Override list to return all communications for admin users"""
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # For admin users, return all results without pagination
+        if request.user and request.user.role == 'admin':
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                'count': queryset.count(),
+                'next': None,
+                'previous': None,
+                'results': serializer.data
+            })
+
+        # For regular users, use default pagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
 
     def perform_create(self, serializer):
         # Generate unique reference number
@@ -90,7 +118,28 @@ class CommunicationViewSet(viewsets.ModelViewSet):
             user=self.request.user,
             reference_number=reference_number
         )
-        
+
+        # Create notification for admin
+        from apps.admin_management.models import AdminNotification
+        communication = serializer.instance
+        priority = 'high' if communication.priority == 'urgent' else 'medium'
+
+        AdminNotification.objects.create(
+            title=f"New {communication.communication_type.title()} Received",
+            message=f"{communication.user.name} submitted a {communication.communication_type}: {communication.subject}",
+            notification_type='communication_received',
+            priority=priority,
+            metadata={
+                'communication_id': communication.id,
+                'reference_number': communication.reference_number,
+                'communication_type': communication.communication_type,
+                'user_name': communication.user.name,
+                'user_email': communication.user.email,
+                'priority': communication.priority,
+                'subject': communication.subject,
+            }
+        )
+
         # Log activity
         AdminActivityLog.objects.create(
             admin=self.request.user,
@@ -278,11 +327,40 @@ class CommunicationResponseViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(responder=self.request.user)
-        
+
         # Mark communication as read
         communication = serializer.validated_data['communication']
         communication.mark_as_read()
-        
+
+        # Create notification for admin
+        from apps.admin_management.models import AdminNotification
+        AdminNotification.objects.create(
+            title=f"New Response to {communication.communication_type.title()}",
+            message=f"Response added to communication {communication.reference_number} by {self.request.user.name}",
+            notification_type='communication_response',
+            priority='medium',
+            metadata={
+                'communication_id': communication.id,
+                'reference_number': communication.reference_number,
+                'communication_type': communication.communication_type,
+                'user_name': communication.user.name,
+                'user_email': communication.user.email,
+                'response_id': serializer.instance.id,
+                'responder_name': self.request.user.name,
+                'responder_email': self.request.user.email,
+            }
+        )
+
+        # Send email notification to user
+        try:
+            from .services.communication_email_service import CommunicationEmailService
+            CommunicationEmailService.send_response_notification(
+                communication, serializer.instance, self.request.user
+            )
+        except Exception as email_error:
+            print(f"Failed to send response email: {email_error}")
+            # Don't fail the response creation if email fails
+
         # Log activity
         AdminActivityLog.objects.create(
             admin=self.request.user,

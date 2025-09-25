@@ -61,13 +61,21 @@ def health_check(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-@csrf_exempt
 def csrf_token(request):
     """Get CSRF token for the current session"""
-    from django.middleware.csrf import get_token
+    try:
+        from django.middleware.csrf import get_token
 
-    token = get_token(request)
-    return Response({"csrf_token": token}, status=status.HTTP_200_OK)
+        token = get_token(request)
+        return Response({"csrf_token": token}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print(f"Error in csrf_token view: {e}")
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": f"Failed to generate CSRF token: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 import requests

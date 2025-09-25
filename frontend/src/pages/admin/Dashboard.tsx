@@ -15,15 +15,25 @@ import { transformBackendChartData } from "@/utils/chartUtils";
 import { formatCurrency } from "@/utils/numberUtils";
 
 // Fallback data for charts when backend data is not available
-const generateFallbackChartData = (type: 'revenue' | 'growth' | 'orders', days: number = 30) => {
+const generateFallbackChartData = (type: 'revenue' | 'growth' | 'orders' | 'weekly', days: number = 30) => {
   const labels = [];
   const data = [];
   const currentDate = new Date();
   
-  for (let i = days - 1; i >= 0; i--) {
+  // For weekly performance, generate 7 days of data
+  const dataDays = type === 'weekly' ? 7 : days;
+  
+  for (let i = dataDays - 1; i >= 0; i--) {
     const date = new Date(currentDate);
     date.setDate(date.getDate() - i);
-    labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    
+    if (type === 'weekly') {
+      // For weekly performance, use day names
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      labels.push(dayNames[date.getDay()]);
+    } else {
+      labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    }
     
     // Generate realistic sample data
     if (type === 'revenue') {
@@ -32,11 +42,13 @@ const generateFallbackChartData = (type: 'revenue' | 'growth' | 'orders', days: 
       data.push(Math.floor(Math.random() * 20) + 5);
     } else if (type === 'orders') {
       data.push(Math.floor(Math.random() * 50) + 10);
+    } else if (type === 'weekly') {
+      data.push(Math.floor(Math.random() * 30) + 5);
     }
   }
   
   return {
-    chart_type: "line",
+    chart_type: type === 'revenue' ? 'area' : type === 'growth' ? 'bar' : type === 'orders' ? 'line' : 'pie',
     title: `${type.charAt(0).toUpperCase() + type.slice(1)} Trend`,
     data: {
       labels,
@@ -44,11 +56,13 @@ const generateFallbackChartData = (type: 'revenue' | 'growth' | 'orders', days: 
         label: type.charAt(0).toUpperCase() + type.slice(1),
         data,
         backgroundColor: type === 'revenue' ? 'rgba(34, 197, 94, 0.2)' : 
-                        type === 'growth' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(168, 85, 247, 0.2)',
+                        type === 'growth' ? 'rgba(59, 130, 246, 0.2)' : 
+                        type === 'orders' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255, 99, 132, 0.2)',
         borderColor: type === 'revenue' ? '#22c55e' : 
-                    type === 'growth' ? '#3b82f6' : '#a855f7',
+                    type === 'growth' ? '#3b82f6' : 
+                    type === 'orders' ? '#a855f7' : '#ff6384',
         borderWidth: 2,
-        fill: type === 'growth'
+        fill: type === 'revenue'
       }]
     }
   };
@@ -56,6 +70,7 @@ const generateFallbackChartData = (type: 'revenue' | 'growth' | 'orders', days: 
 import {
   Activity,
   BarChart3,
+  Bell,
   ChefHat,
   Clock,
   DollarSign,
@@ -223,20 +238,20 @@ const Dashboard: React.FC = () => {
       route: "/admin/analytics",
     },
     {
-      title: "Unread Complaints",
-      value: Math.floor((stats?.unread_notifications || 0) / 2), // Placeholder - split notifications
+      title: "Pending Communications",
+      value: stats?.pending_communications || 0,
       subtitle: "Need attention",
       icon: <Activity />,
       color: "red" as const,
-      route: "/admin/complaints",
+      route: "/admin/communications",
     },
     {
-      title: "Unread Feedback",
-      value: Math.floor((stats?.unread_notifications || 0) / 2), // Placeholder - split notifications
-      subtitle: "Customer reviews",
-      icon: <Activity />,
+      title: "Unread Notifications",
+      value: stats?.unread_notifications || 0,
+      subtitle: "System alerts",
+      icon: <Bell />,
       color: "indigo" as const,
-      route: "/admin/complaints",
+      route: "/admin/notifications",
     },
   ];
 
@@ -381,8 +396,11 @@ const Dashboard: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
                     <DollarSign className="h-5 w-5 text-primary dark:text-primary-light" />
-                    Revenue Trends
+                    Revenue Trends (30 Days)
                   </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Total revenue from orders over the past 30 days
+                  </p>
                 </CardHeader>
                 <CardContent>
                   {error ? (
@@ -424,9 +442,10 @@ const Dashboard: React.FC = () => {
                           }));
                         }
                       })()}
-                      type="bar"
+                      type="area"
                       height={200}
                       showLegend={false}
+                      showGrid={true}
                     />
                   ) : (
                     <div className="h-32 flex items-center justify-center text-muted-foreground">
@@ -439,8 +458,11 @@ const Dashboard: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
                     <Users className="h-5 w-5 text-accent dark:text-accent-light" />
-                    User Growth Trends
+                    User Growth Trends (30 Days)
                   </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    New user registrations per day for the past 30 days
+                  </p>
                 </CardHeader>
                 <CardContent>
                   {error ? (
@@ -482,9 +504,10 @@ const Dashboard: React.FC = () => {
                           }));
                         }
                       })()}
-                      type="area"
+                      type="bar"
                       height={200}
                       showLegend={true}
+                      showGrid={true}
                     />
                   ) : (
                     <div className="h-32 flex items-center justify-center text-muted-foreground">
@@ -497,8 +520,11 @@ const Dashboard: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
                     <ShoppingCart className="h-5 w-5 text-success dark:text-success-light" />
-                    Orders Trends
+                    Orders Trends (30 Days)
                   </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Total number of orders per day for the past 30 days
+                  </p>
                 </CardHeader>
                 <CardContent>
                   {error ? (
@@ -516,6 +542,7 @@ const Dashboard: React.FC = () => {
                       type="line"
                       height={200}
                       showLegend={false}
+                      showGrid={true}
                     />
                   ) : (
                     <div className="h-32 flex items-center justify-center text-muted-foreground">
@@ -528,8 +555,11 @@ const Dashboard: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-foreground dark:text-foreground">
                     <BarChart3 className="h-5 w-5 text-warning dark:text-warning-light" />
-                    Weekly Food Performance
+                    Weekly Food Performance (7 Days)
                   </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Distribution of orders across weekdays for the current month
+                  </p>
                 </CardHeader>
                 <CardContent>
                   {error ? (
@@ -539,14 +569,42 @@ const Dashboard: React.FC = () => {
                   ) : weeklyPerformance ? (
                     <InteractiveChart
                       title=""
-                      data={transformBackendChartData(weeklyPerformance).map(item => ({
-                        name: item.name,
-                        value: item.value || 0,
-                        ...item
-                      }))}
-                      type="bar"
+                      data={(() => {
+                        try {
+                          const transformedData = transformBackendChartData(weeklyPerformance);
+                          console.log("Weekly Performance Data:", weeklyPerformance);
+                          console.log("Transformed Weekly Data:", transformedData);
+                          
+                          if (transformedData.length === 0) {
+                            console.log("No weekly performance data, using fallback");
+                            const fallbackData = generateFallbackChartData('weekly');
+                            return transformBackendChartData(fallbackData).map(item => ({
+                              name: item.name,
+                              value: item.value || 0,
+                              ...item
+                            }));
+                          }
+                          
+                          return transformedData.map(item => ({
+                            name: item.name,
+                            value: item.value || 0,
+                            ...item
+                          }));
+                        } catch (error) {
+                          console.error("Error transforming weekly performance data:", error);
+                          console.log("Using fallback weekly performance data");
+                          const fallbackData = generateFallbackChartData('weekly');
+                          return transformBackendChartData(fallbackData).map(item => ({
+                            name: item.name,
+                            value: item.value || 0,
+                            ...item
+                          }));
+                        }
+                      })()}
+                      type="pie"
                       height={200}
-                      showLegend={false}
+                      showLegend={true}
+                      showGrid={false}
                     />
                   ) : (
                     <div className="h-32 flex items-center justify-center text-muted-foreground">

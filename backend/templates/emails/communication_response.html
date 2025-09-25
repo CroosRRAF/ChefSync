@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChefSync - Response to Your {{ communication_type }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 50%, #1e40af 100%);
+            padding: 50px 40px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="2" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100%" height="100%" fill="url(%23pattern)"/></svg>');
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(-20px) rotate(0deg); }
+            50% { transform: translateY(20px) rotate(180deg); }
+        }
+
+        .brand-container {
+            position: relative;
+            z-index: 2;
+        }
+
+        .status-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            display: block;
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .brand-title {
+            font-size: 42px;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            letter-spacing: -1px;
+        }
+
+        .brand-subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .content {
+            padding: 60px 50px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 30px;
+            border: 2px solid;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            color: #1e40af;
+            border-color: #3b82f6;
+        }
+
+        .greeting {
+            font-size: 32px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .message {
+            font-size: 18px;
+            color: #5a6c7d;
+            line-height: 1.8;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .communication-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border: 2px solid #cbd5e1;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+
+        .communication-card h3 {
+            color: #334155;
+            font-size: 20px;
+            margin-bottom: 15px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .communication-card .original-message {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .communication-card .original-message h4 {
+            color: #475569;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .communication-card .original-message p {
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .response-section {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            margin: 40px 0;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .response-section::before {
+            content: '💬✨📧';
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 24px;
+            opacity: 0.3;
+        }
+
+        .response-section::after {
+            content: '👨‍💼💭🎯';
+            position: absolute;
+            bottom: 20px;
+            left: 30px;
+            font-size: 24px;
+            opacity: 0.3;
+        }
+
+        .response-label {
+            font-size: 16px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+
+        .response-content {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 25px 30px;
+            border-radius: 15px;
+            display: inline-block;
+            min-width: 300px;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            text-align: left;
+        }
+
+        .response-content p {
+            color: white;
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .responder-info {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 15px;
+            text-align: right;
+        }
+
+        .info-card {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border: 2px solid #3b82f6;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .info-card h3 {
+            color: #1e40af;
+            font-size: 20px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .info-card p {
+            color: #1e40af;
+            font-size: 16px;
+            margin: 8px 0;
+            font-weight: 500;
+        }
+
+        .cta-section {
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            text-decoration: none;
+            padding: 18px 40px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(59, 130, 246, 0.6);
+        }
+
+        .divider {
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #3b82f6, #1d4ed8, #1e40af, transparent);
+            margin: 40px 0;
+            border-radius: 2px;
+        }
+
+        .help-section {
+            text-align: center;
+            margin: 40px 0;
+            padding: 30px;
+            background: rgba(59, 130, 246, 0.05);
+            border-radius: 15px;
+        }
+
+        .help-section h3 {
+            color: #2c3e50;
+            font-size: 22px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .help-section p {
+            color: #5a6c7d;
+            font-size: 16px;
+            margin: 8px 0;
+        }
+
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 50px 40px;
+            text-align: center;
+        }
+
+        .footer-brand {
+            font-size: 28px;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .footer-tagline {
+            font-size: 16px;
+            opacity: 0.8;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: #60a5fa;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            padding: 8px 16px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .footer-links a:hover {
+            background: rgba(96, 165, 250, 0.2);
+            border-color: #60a5fa;
+        }
+
+        .footer-disclaimer {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            line-height: 1.6;
+        }
+
+        /* Mobile Responsive */
+        @media only screen and (max-width: 600px) {
+            body { padding: 10px; }
+            .email-container { border-radius: 16px; }
+            .header { padding: 40px 30px; }
+            .content { padding: 40px 30px; }
+            .footer { padding: 40px 30px; }
+            .brand-title { font-size: 32px; }
+            .greeting { font-size: 26px; }
+            .response-content {
+                min-width: 260px;
+                padding: 20px 25px;
+            }
+            .footer-links {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .cta-button {
+                padding: 16px 35px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="brand-container">
+                <span class="status-icon">💬</span>
+                <h1 class="brand-title">ChefSync</h1>
+                <p class="brand-subtitle">Your Voice Matters</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="status-badge">
+                📧 Response Received
+            </div>
+
+            <div class="greeting">
+                Hello {{ user_name }}!
+            </div>
+
+            <div class="message">
+                <p><strong>We've received your {{ communication_type|lower }} and have a response for you! 🎯</strong></p>
+                <p>Thank you for reaching out to us. Our team has reviewed your message and provided a detailed response below.</p>
+            </div>
+
+            <div class="communication-card">
+                <h3>Your Original {{ communication_type }}</h3>
+                <div class="original-message">
+                    <h4>Subject: {{ subject }}</h4>
+                    <p>{{ original_message }}</p>
+                </div>
+            </div>
+
+            <div class="response-section">
+                <div class="response-label">Official Response</div>
+                <div class="response-content">
+                    <p>{{ response }}</p>
+                    <div class="responder-info">
+                        — {{ responder_name }} ({{ responder_role }})<br>
+                        {{ response_date }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <h3>📋 Response Details</h3>
+                <p><strong>Reference Number:</strong> {{ reference_number }}</p>
+                <p><strong>Response Date:</strong> {{ response_date }}</p>
+                <p><strong>Responded By:</strong> {{ responder_name }} ({{ responder_role }})</p>
+            </div>
+
+            <div class="cta-section">
+                <a href="{{ site_url }}/communications" class="cta-button">View Full Conversation</a>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="help-section">
+                <h3>Need More Help? 🤝</h3>
+                <p>If you have additional questions or need further clarification, please don't hesitate to reach out to us again.</p>
+                <p>We're here to help make your ChefSync experience amazing!</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="footer-brand">ChefSync Team</div>
+            <div class="footer-tagline">Connecting Culinary Talents Worldwide</div>
+
+            <div class="footer-links">
+                <a href="{{ site_url }}">Visit Website</a>
+                <a href="{{ site_url }}/contact">Contact Support</a>
+                <a href="{{ site_url }}/help">Help Center</a>
+                <a href="{{ site_url }}/feedback">Leave Feedback</a>
+            </div>
+
+            <div class="footer-disclaimer">
+                This email was sent to <strong>{{ user_email }}</strong><br>
+                You received this email because you submitted a {{ communication_type|lower }} to ChefSync.<br>
+                Reference: {{ reference_number }}<br>
+                © 2025 ChefSync. All rights reserved.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

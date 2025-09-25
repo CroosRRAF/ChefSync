@@ -31,6 +31,9 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -78,6 +81,34 @@ const FoodManagement: React.FC = () => {
   const [showCuisineForm, setShowCuisineForm] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
+
+  // Form states
+  const [foodFormData, setFoodFormData] = useState({
+    name: '',
+    description: '',
+    category: '',
+    cuisine: '',
+    is_vegetarian: false,
+    is_vegan: false,
+    is_gluten_free: false,
+    is_available: true,
+    preparation_time: '',
+    calories_per_serving: '',
+    allergens: ''
+  });
+  const [cuisineFormData, setCuisineFormData] = useState({
+    name: '',
+    description: '',
+    image: null as File | null
+  });
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: '',
+    description: '',
+    cuisine: '',
+    image: null as File | null
+  });
+  const [formErrors, setFormErrors] = useState<any>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Preview and detail view states
   const [showFoodDetail, setShowFoodDetail] = useState(false);
@@ -142,6 +173,34 @@ const FoodManagement: React.FC = () => {
 
   const handleAddNew = () => {
     setEditItem(null);
+    setFormErrors({});
+    
+    // Reset form data
+    setFoodFormData({
+      name: '',
+      description: '',
+      category: '',
+      cuisine: '',
+      is_vegetarian: false,
+      is_vegan: false,
+      is_gluten_free: false,
+      is_available: true,
+      preparation_time: '',
+      calories_per_serving: '',
+      allergens: ''
+    });
+    setCuisineFormData({
+      name: '',
+      description: '',
+      image: null
+    });
+    setCategoryFormData({
+      name: '',
+      description: '',
+      cuisine: '',
+      image: null
+    });
+    
     switch (activeTab) {
       case "foods":
         setShowFoodForm(true);
@@ -159,23 +218,239 @@ const FoodManagement: React.FC = () => {
     setEditItem(item);
     switch (activeTab) {
       case "foods":
+        setFoodFormData({
+          name: item.name || '',
+          description: item.description || '',
+          category: item.food_category?.id?.toString() || '',
+          cuisine: item.food_category?.cuisine?.id?.toString() || '',
+          is_vegetarian: item.is_vegetarian || false,
+          is_vegan: item.is_vegan || false,
+          is_gluten_free: item.is_gluten_free || false,
+          is_available: item.is_available !== false,
+          preparation_time: item.preparation_time?.toString() || '',
+          calories_per_serving: item.calories_per_serving?.toString() || '',
+          allergens: Array.isArray(item.allergens) ? item.allergens.join(', ') : (item.allergens || '')
+        });
         setShowFoodForm(true);
         break;
       case "cuisines":
+        setCuisineFormData({
+          name: item.name || '',
+          description: item.description || '',
+          image: null
+        });
         setShowCuisineForm(true);
         break;
       case "categories":
+        setCategoryFormData({
+          name: item.name || '',
+          description: item.description || '',
+          cuisine: item.cuisine?.id?.toString() || '',
+          image: null
+        });
         setShowCategoryForm(true);
         break;
     }
   };
 
-  const handleFormSubmit = () => {
-    setShowFoodForm(false);
-    setShowCuisineForm(false);
-    setShowCategoryForm(false);
-    setEditItem(null);
-    loadData();
+  const validateFoodForm = () => {
+    const errors: any = {};
+    
+    if (!foodFormData.name.trim()) {
+      errors.name = 'Food name is required';
+    }
+    if (!foodFormData.description.trim()) {
+      errors.description = 'Description is required';
+    }
+    if (!foodFormData.category) {
+      errors.category = 'Category is required';
+    }
+    if (!foodFormData.cuisine) {
+      errors.cuisine = 'Cuisine is required';
+    }
+    if (foodFormData.preparation_time && isNaN(Number(foodFormData.preparation_time))) {
+      errors.preparation_time = 'Preparation time must be a number';
+    }
+    if (foodFormData.calories_per_serving && isNaN(Number(foodFormData.calories_per_serving))) {
+      errors.calories_per_serving = 'Calories must be a number';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateCuisineForm = () => {
+    const errors: any = {};
+    
+    if (!cuisineFormData.name.trim()) {
+      errors.name = 'Cuisine name is required';
+    }
+    if (!cuisineFormData.description.trim()) {
+      errors.description = 'Description is required';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateCategoryForm = () => {
+    const errors: any = {};
+    
+    if (!categoryFormData.name.trim()) {
+      errors.name = 'Category name is required';
+    }
+    if (!categoryFormData.description.trim()) {
+      errors.description = 'Description is required';
+    }
+    if (!categoryFormData.cuisine) {
+      errors.cuisine = 'Cuisine is required';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleFormSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      if (activeTab === 'foods' && validateFoodForm()) {
+        // Handle food form submission
+        const formData = new FormData();
+        Object.entries(foodFormData).forEach(([key, value]) => {
+          if (value !== null && value !== '') {
+            formData.append(key, value.toString());
+          }
+        });
+        
+        if (editItem) {
+          // Update existing food
+          await fetch(`/api/food/foods/${editItem.id}/`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: formData
+          });
+        } else {
+          // Create new food
+          await fetch('/api/food/foods/', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: formData
+          });
+        }
+        
+        toast({
+          title: "Success",
+          description: `Food item ${editItem ? 'updated' : 'created'} successfully`,
+        });
+      } else if (activeTab === 'cuisines' && validateCuisineForm()) {
+        // Handle cuisine form submission
+        const formData = new FormData();
+        Object.entries(cuisineFormData).forEach(([key, value]) => {
+          if (value !== null && value !== '') {
+            formData.append(key, value.toString());
+          }
+        });
+        
+        if (editItem) {
+          await fetch(`/api/food/cuisines/${editItem.id}/`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: formData
+          });
+        } else {
+          await fetch('/api/food/cuisines/', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: formData
+          });
+        }
+        
+        toast({
+          title: "Success",
+          description: `Cuisine ${editItem ? 'updated' : 'created'} successfully`,
+        });
+      } else if (activeTab === 'categories' && validateCategoryForm()) {
+        // Handle category form submission
+        const formData = new FormData();
+        Object.entries(categoryFormData).forEach(([key, value]) => {
+          if (value !== null && value !== '') {
+            formData.append(key, value.toString());
+          }
+        });
+        
+        if (editItem) {
+          await fetch(`/api/food/categories/${editItem.id}/`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: formData
+          });
+        } else {
+          await fetch('/api/food/categories/', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: formData
+          });
+        }
+        
+        toast({
+          title: "Success",
+          description: `Category ${editItem ? 'updated' : 'created'} successfully`,
+        });
+      }
+      
+      // Reset forms and close dialogs
+      setShowFoodForm(false);
+      setShowCuisineForm(false);
+      setShowCategoryForm(false);
+      setEditItem(null);
+      setFormErrors({});
+      setFoodFormData({
+        name: '',
+        description: '',
+        category: '',
+        cuisine: '',
+        is_vegetarian: false,
+        is_vegan: false,
+        is_gluten_free: false,
+        is_available: true,
+        preparation_time: '',
+        calories_per_serving: '',
+        allergens: ''
+      });
+      setCuisineFormData({
+        name: '',
+        description: '',
+        image: null
+      });
+      setCategoryFormData({
+        name: '',
+        description: '',
+        cuisine: '',
+        image: null
+      });
+      loadData();
+    } catch (error) {
+      console.error('Form submission error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit form. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -234,7 +509,6 @@ const FoodManagement: React.FC = () => {
             </TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Cuisine</TableHead>
-            <TableHead>Price</TableHead>
             <TableHead>
               <div className="flex items-center space-x-1">
                 <span>Status</span>
@@ -247,14 +521,14 @@ const FoodManagement: React.FC = () => {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8">
+              <TableCell colSpan={6} className="text-center py-8">
                 <RefreshCw className="h-8 w-8 animate-spin mx-auto" />
                 <span className="mt-2 block">Loading data...</span>
               </TableCell>
             </TableRow>
           ) : foods.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8">
+              <TableCell colSpan={6} className="text-center py-8">
                 <p className="text-muted-foreground">No food items found</p>
                 <Button
                   variant="outline"
@@ -332,14 +606,6 @@ const FoodManagement: React.FC = () => {
                       </div>
                       <Separator className="my-2" />
                       <div className="grid grid-cols-2 gap-1 text-xs">
-                        <div className="text-muted-foreground">Price:</div>
-                        <div className="font-medium">
-                          $
-                          {typeof food.price === "number"
-                            ? food.price.toFixed(2)
-                            : parseFloat(food.price).toFixed(2)}
-                        </div>
-
                         <div className="text-muted-foreground">Category:</div>
                         <div>{food.category_name || "Uncategorized"}</div>
 
@@ -371,12 +637,6 @@ const FoodManagement: React.FC = () => {
                 </TableCell>
                 <TableCell>{food.category_name || "Uncategorized"}</TableCell>
                 <TableCell>{food.cuisine_name || "N/A"}</TableCell>
-                <TableCell>
-                  $
-                  {typeof food.price === "number"
-                    ? food.price.toFixed(2)
-                    : parseFloat(food.price).toFixed(2)}
-                </TableCell>
                 <TableCell>
                   <Badge
                     variant={food.is_available ? "default" : "destructive"}
@@ -978,59 +1238,344 @@ const FoodManagement: React.FC = () => {
 
       {/* Food Form Dialog */}
       <Dialog open={showFoodForm} onOpenChange={setShowFoodForm}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
           <DialogTitle>
             {editItem ? "Edit Food Item" : "Add New Food Item"}
           </DialogTitle>
           <DialogDescription>
-            Fill in the details to {editItem ? "update" : "create"} a food item
+            Fill in the details to {editItem ? "update" : "create"} a food item. Note: Chefs will set their own prices for this food item.
           </DialogDescription>
-          <div className="p-8 text-center">
-            <Info className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Food Form</h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Food management functionality is under development.
-            </p>
+          
+          <div className="space-y-6">
+            {/* Basic Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="food-name">Food Name *</Label>
+                <Input
+                  id="food-name"
+                  value={foodFormData.name}
+                  onChange={(e) => setFoodFormData({...foodFormData, name: e.target.value})}
+                  placeholder="Enter food name"
+                  className={formErrors.name ? "border-red-500" : ""}
+                />
+                {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="food-category">Category *</Label>
+                <Select 
+                  value={foodFormData.category} 
+                  onValueChange={(value) => setFoodFormData({...foodFormData, category: value})}
+                >
+                  <SelectTrigger className={formErrors.category ? "border-red-500" : ""}>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id.toString()}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formErrors.category && <p className="text-sm text-red-500">{formErrors.category}</p>}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="food-description">Description *</Label>
+              <Textarea
+                id="food-description"
+                value={foodFormData.description}
+                onChange={(e) => setFoodFormData({...foodFormData, description: e.target.value})}
+                placeholder="Describe the food item"
+                className={formErrors.description ? "border-red-500" : ""}
+                rows={3}
+              />
+              {formErrors.description && <p className="text-sm text-red-500">{formErrors.description}</p>}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="food-cuisine">Cuisine *</Label>
+                <Select 
+                  value={foodFormData.cuisine} 
+                  onValueChange={(value) => setFoodFormData({...foodFormData, cuisine: value})}
+                >
+                  <SelectTrigger className={formErrors.cuisine ? "border-red-500" : ""}>
+                    <SelectValue placeholder="Select cuisine" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cuisines.map((cuisine) => (
+                      <SelectItem key={cuisine.id} value={cuisine.id.toString()}>
+                        {cuisine.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formErrors.cuisine && <p className="text-sm text-red-500">{formErrors.cuisine}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="preparation-time">Preparation Time (minutes)</Label>
+                <Input
+                  id="preparation-time"
+                  type="number"
+                  value={foodFormData.preparation_time}
+                  onChange={(e) => setFoodFormData({...foodFormData, preparation_time: e.target.value})}
+                  placeholder="e.g., 30"
+                  className={formErrors.preparation_time ? "border-red-500" : ""}
+                />
+                {formErrors.preparation_time && <p className="text-sm text-red-500">{formErrors.preparation_time}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="calories">Calories per Serving</Label>
+                <Input
+                  id="calories"
+                  type="number"
+                  value={foodFormData.calories_per_serving}
+                  onChange={(e) => setFoodFormData({...foodFormData, calories_per_serving: e.target.value})}
+                  placeholder="e.g., 250"
+                  className={formErrors.calories_per_serving ? "border-red-500" : ""}
+                />
+                {formErrors.calories_per_serving && <p className="text-sm text-red-500">{formErrors.calories_per_serving}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="allergens">Allergens</Label>
+                <Input
+                  id="allergens"
+                  value={foodFormData.allergens}
+                  onChange={(e) => setFoodFormData({...foodFormData, allergens: e.target.value})}
+                  placeholder="e.g., Nuts, Dairy, Gluten"
+                />
+              </div>
+            </div>
+
+            {/* Dietary Information */}
+            <div className="space-y-4">
+              <Label>Dietary Information</Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="vegetarian"
+                    checked={foodFormData.is_vegetarian}
+                    onCheckedChange={(checked) => setFoodFormData({...foodFormData, is_vegetarian: !!checked})}
+                  />
+                  <Label htmlFor="vegetarian">Vegetarian</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="vegan"
+                    checked={foodFormData.is_vegan}
+                    onCheckedChange={(checked) => setFoodFormData({...foodFormData, is_vegan: !!checked})}
+                  />
+                  <Label htmlFor="vegan">Vegan</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="gluten-free"
+                    checked={foodFormData.is_gluten_free}
+                    onCheckedChange={(checked) => setFoodFormData({...foodFormData, is_gluten_free: !!checked})}
+                  />
+                  <Label htmlFor="gluten-free">Gluten Free</Label>
+                </div>
+              </div>
+            </div>
+
+            {/* Availability */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="available"
+                checked={foodFormData.is_available}
+                onCheckedChange={(checked) => setFoodFormData({...foodFormData, is_available: !!checked})}
+              />
+              <Label htmlFor="available">Available for ordering</Label>
+            </div>
           </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFoodForm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleFormSubmit} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  {editItem ? "Updating..." : "Creating..."}
+                </>
+              ) : (
+                editItem ? "Update Food Item" : "Create Food Item"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Cuisine Form Dialog */}
       <Dialog open={showCuisineForm} onOpenChange={setShowCuisineForm}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogTitle>
             {editItem ? "Edit Cuisine" : "Add New Cuisine"}
           </DialogTitle>
           <DialogDescription>
             Fill in the details to {editItem ? "update" : "create"} a cuisine
           </DialogDescription>
-          <div className="p-8 text-center">
-            <Info className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Cuisine Form</h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Cuisine management functionality is under development.
-            </p>
+          
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="cuisine-name">Cuisine Name *</Label>
+              <Input
+                id="cuisine-name"
+                value={cuisineFormData.name}
+                onChange={(e) => setCuisineFormData({...cuisineFormData, name: e.target.value})}
+                placeholder="e.g., Italian, Chinese, Mexican"
+                className={formErrors.name ? "border-red-500" : ""}
+              />
+              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cuisine-description">Description *</Label>
+              <Textarea
+                id="cuisine-description"
+                value={cuisineFormData.description}
+                onChange={(e) => setCuisineFormData({...cuisineFormData, description: e.target.value})}
+                placeholder="Describe the cuisine style and characteristics"
+                className={formErrors.description ? "border-red-500" : ""}
+                rows={4}
+              />
+              {formErrors.description && <p className="text-sm text-red-500">{formErrors.description}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cuisine-image">Cuisine Image</Label>
+              <Input
+                id="cuisine-image"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setCuisineFormData({...cuisineFormData, image: file});
+                  }
+                }}
+                className="cursor-pointer"
+              />
+              <p className="text-sm text-gray-500">Upload an image representing this cuisine (optional)</p>
+            </div>
           </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCuisineForm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleFormSubmit} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  {editItem ? "Updating..." : "Creating..."}
+                </>
+              ) : (
+                editItem ? "Update Cuisine" : "Create Cuisine"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Category Form Dialog */}
       <Dialog open={showCategoryForm} onOpenChange={setShowCategoryForm}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogTitle>
             {editItem ? "Edit Category" : "Add New Category"}
           </DialogTitle>
           <DialogDescription>
-            Fill in the details to {editItem ? "update" : "create"} a food
-            category
+            Fill in the details to {editItem ? "update" : "create"} a food category
           </DialogDescription>
-          <div className="p-8 text-center">
-            <Info className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Category Form</h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Category management functionality is under development.
-            </p>
+          
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="category-name">Category Name *</Label>
+              <Input
+                id="category-name"
+                value={categoryFormData.name}
+                onChange={(e) => setCategoryFormData({...categoryFormData, name: e.target.value})}
+                placeholder="e.g., Appetizers, Main Course, Desserts"
+                className={formErrors.name ? "border-red-500" : ""}
+              />
+              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category-description">Description *</Label>
+              <Textarea
+                id="category-description"
+                value={categoryFormData.description}
+                onChange={(e) => setCategoryFormData({...categoryFormData, description: e.target.value})}
+                placeholder="Describe the category and what types of food it includes"
+                className={formErrors.description ? "border-red-500" : ""}
+                rows={4}
+              />
+              {formErrors.description && <p className="text-sm text-red-500">{formErrors.description}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category-cuisine">Cuisine *</Label>
+              <Select 
+                value={categoryFormData.cuisine} 
+                onValueChange={(value) => setCategoryFormData({...categoryFormData, cuisine: value})}
+              >
+                <SelectTrigger className={formErrors.cuisine ? "border-red-500" : ""}>
+                  <SelectValue placeholder="Select cuisine" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cuisines.map((cuisine) => (
+                    <SelectItem key={cuisine.id} value={cuisine.id.toString()}>
+                      {cuisine.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formErrors.cuisine && <p className="text-sm text-red-500">{formErrors.cuisine}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category-image">Category Image</Label>
+              <Input
+                id="category-image"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setCategoryFormData({...categoryFormData, image: file});
+                  }
+                }}
+                className="cursor-pointer"
+              />
+              <p className="text-sm text-gray-500">Upload an image representing this category (optional)</p>
+            </div>
           </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCategoryForm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleFormSubmit} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  {editItem ? "Updating..." : "Creating..."}
+                </>
+              ) : (
+                editItem ? "Update Category" : "Create Category"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

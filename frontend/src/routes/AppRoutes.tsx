@@ -60,7 +60,7 @@ import Users from '@/pages/admin/Users';
 import Orders from '@/pages/admin/Orders';
 import Foods from '@/pages/admin/Foods';
 import Analytics from '@/pages/admin/Analytics';
-import Complaints from '@/pages/admin/Complaints';
+import Communications from '@/pages/admin/Communications';
 import Notifications from '@/pages/admin/Notifications';
 import Settings from '@/pages/admin/Settings';
 
@@ -416,10 +416,10 @@ const InnerRoutes: React.FC = () => {
             </AdminLayout>
           </ProtectedRoute>
         } />
-        <Route path="/admin/complaints" element={
+        <Route path="/admin/communications" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout>
-              <Complaints />
+              <Communications />
             </AdminLayout>
           </ProtectedRoute>
         } />

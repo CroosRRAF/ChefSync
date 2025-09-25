@@ -313,23 +313,24 @@ class AdminDashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"])
     def weekly_performance(self, request):
-        """Get weekly performance data for pie chart (last 30 days)"""
+        """Get weekly performance data for pie chart (last 7 days)"""
         try:
-            # Get date range (default 30 days)
-            days = int(request.GET.get("days", 30))
+            # Get date range (last 7 days)
+            days = int(request.GET.get("days", 7))
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
 
             from apps.orders.models import Order
 
-            # Get order status distribution
-            status_counts = (
+            # Get order counts by day of week
+            day_counts = (
                 Order.objects.filter(
                     created_at__gte=start_date, created_at__lte=end_date
                 )
-                .values("status")
+                .extra(select={"day_of_week": "DAYOFWEEK(created_at)"})
+                .values("day_of_week")
                 .annotate(count=Count("id"))
-                .order_by("-count")
+                .order_by("day_of_week")
             )
 
             # Prepare pie chart data
@@ -337,23 +338,28 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             data = []
             colors = []
 
-            status_colors = {
-                "delivered": "#10B981",  # green
-                "confirmed": "#3B82F6",  # blue
-                "preparing": "#F59E0B",  # yellow
-                "ready": "#8B5CF6",  # purple
-                "out_for_delivery": "#06B6D4",  # cyan
-                "pending": "#F97316",  # orange
-                "cancelled": "#EF4444",  # red
-                "refunded": "#6B7280",  # gray
-            }
+            day_names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+            day_colors = [
+                "#10B981",  # green - Sunday
+                "#3B82F6",  # blue - Monday
+                "#F59E0B",  # yellow - Tuesday
+                "#8B5CF6",  # purple - Wednesday
+                "#06B6D4",  # cyan - Thursday
+                "#F97316",  # orange - Friday
+                "#EF4444",  # red - Saturday
+            ]
 
-            for item in status_counts:
-                status = item["status"]
-                count = item["count"]
-                labels.append(status.replace("_", " ").title())
-                data.append(count)
-                colors.append(status_colors.get(status, "#6B7280"))
+            # Initialize all days with 0 (MySQL DAYOFWEEK: 1=Sunday, 2=Monday, ..., 7=Saturday)
+            day_dict = {i: 0 for i in range(1, 8)}
+            for item in day_counts:
+                day_dict[item["day_of_week"]] = item["count"]
+
+            # Map MySQL day numbers to our array indices (1=Sunday -> 0, 2=Monday -> 1, etc.)
+            for mysql_day in range(1, 8):
+                array_index = (mysql_day - 1) % 7  # Convert 1-7 to 0-6
+                labels.append(day_names[array_index])
+                data.append(day_dict[mysql_day])
+                colors.append(day_colors[array_index])
 
             chart_data = {
                 "labels": labels,
@@ -365,7 +371,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             return Response(
                 {
                     "chart_type": "pie",
-                    "title": f"Order Status Distribution (Last {days} Days)",
+                    "title": f"Weekly Order Performance (Last {days} Days)",
                     "data": chart_data,
                     "total_orders": sum(data),
                 }
@@ -388,14 +394,15 @@ class AdminDashboardViewSet(viewsets.ViewSet):
 
             from apps.orders.models import Order
 
-            # Get daily revenue data
+            # Get daily revenue data (include all orders, not just paid ones)
+            # Use TruncDate instead of extra select for better compatibility
+            from django.db.models.functions import TruncDate
             revenue_data = (
                 Order.objects.filter(
                     created_at__gte=start_date,
                     created_at__lte=end_date,
-                    payment_status="paid",
                 )
-                .extra(select={"date": "DATE(created_at)"})
+                .annotate(date=TruncDate("created_at"))
                 .values("date")
                 .annotate(revenue=Sum("total_amount"))
                 .order_by("date")
@@ -457,11 +464,12 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             start_date = end_date - timedelta(days=days)
 
             # Get user registration growth
+            from django.db.models.functions import TruncDate
             user_growth = (
                 User.objects.filter(
                     date_joined__gte=start_date, date_joined__lte=end_date
                 )
-                .extra(select={"date": "DATE(date_joined)"})
+                .annotate(date=TruncDate("date_joined"))
                 .values("date")
                 .annotate(new_users=Count("user_id"))
                 .order_by("date")
@@ -474,7 +482,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 Order.objects.filter(
                     created_at__gte=start_date, created_at__lte=end_date
                 )
-                .extra(select={"date": "DATE(created_at)"})
+                .annotate(date=TruncDate("created_at"))
                 .values("date")
                 .annotate(new_orders=Count("id"))
                 .order_by("date")

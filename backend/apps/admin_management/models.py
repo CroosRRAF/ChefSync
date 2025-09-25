@@ -66,6 +66,8 @@ class AdminNotification(models.Model):
         ('maintenance', 'Maintenance'),
         ('backup', 'Backup'),
         ('performance', 'Performance'),
+        ('communication_response', 'Communication Response'),
+        ('communication_received', 'Communication Received'),
     ]
     
     PRIORITY_CHOICES = [
@@ -77,7 +79,7 @@ class AdminNotification(models.Model):
     
     title = models.CharField(max_length=200)
     message = models.TextField()
-    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
+    notification_type = models.CharField(max_length=25, choices=NOTIFICATION_TYPES)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
     is_read = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
