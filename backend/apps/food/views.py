@@ -70,13 +70,13 @@ def upload_image(request):
 class CuisineViewSet(viewsets.ModelViewSet):
     queryset = Cuisine.objects.all()
     serializer_class = CuisineSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []  # Allow access to all users for viewing cuisines
 
 
 class FoodCategoryViewSet(viewsets.ModelViewSet):
     queryset = FoodCategory.objects.all()
     serializer_class = FoodCategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []  # Allow access to all users for viewing categories
 
 
 class ChefFoodViewSet(viewsets.ModelViewSet):
@@ -177,30 +177,6 @@ class ChefFoodPriceViewSet(viewsets.ModelViewSet):
             'message': 'Price added successfully.',
             'price': FoodPriceSerializer(price).data
         }, status=status.HTTP_201_CREATED)
-
-
-class CustomerFoodViewSet(viewsets.ReadOnlyModelViewSet):
-    """Customers can view approved foods only"""
-    serializer_class = FoodSerializer
-    permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        return Food.objects.filter(status='Approved').prefetch_related('prices')
-
-    @action(detail=False, methods=['get'])
-    def search(self, request):
-        """Search approved foods for customers"""
-        query = request.query_params.get('q', '').strip()
-        if not query:
-            return Response([])
-        
-        foods = Food.objects.filter(
-            Q(name__icontains=query) | Q(description__icontains=query) | Q(category__icontains=query),
-            status='Approved'
-        ).distinct()[:20]
-        
-        serializer = self.get_serializer(foods, many=True)
-        return Response(serializer.data)
 
 
 class FoodReviewViewSet(viewsets.ModelViewSet):
@@ -314,12 +290,14 @@ class OfferViewSet(viewsets.ModelViewSet):
 class CustomerFoodViewSet(viewsets.ReadOnlyModelViewSet):
     """Customers can view approved foods - /api/customer/foods/"""
     serializer_class = FoodSerializer
+    permission_classes = []  # Allow access to all users including guests
+    pagination_class = None  # Disable pagination to show all foods
     
     def get_queryset(self):
         queryset = Food.objects.filter(
-            approval_status='approved', 
+            status='Approved', 
             is_available=True
-        ).prefetch_related('prices').select_related('chef', 'category')
+        ).prefetch_related('prices').select_related('chef', 'food_category')
         
         # Search functionality
         search = self.request.query_params.get('search', None)
@@ -327,7 +305,7 @@ class CustomerFoodViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(
                 Q(name__icontains=search) | 
                 Q(description__icontains=search) |
-                Q(category__name__icontains=search) |
+                Q(food_category__name__icontains=search) |
                 Q(chef__first_name__icontains=search) |
                 Q(chef__last_name__icontains=search)
             )
@@ -335,12 +313,12 @@ class CustomerFoodViewSet(viewsets.ReadOnlyModelViewSet):
         # Filter by category
         category = self.request.query_params.get('category', None)
         if category:
-            queryset = queryset.filter(category_id=category)
+            queryset = queryset.filter(food_category_id=category)
         
         # Filter by cuisine
         cuisine = self.request.query_params.get('cuisine', None)
         if cuisine:
-            queryset = queryset.filter(category__cuisine_id=cuisine)
+            queryset = queryset.filter(food_category__cuisine_id=cuisine)
         
         # Filter by chef
         chef = self.request.query_params.get('chef', None)
@@ -359,6 +337,25 @@ class CustomerFoodViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(price_filter).distinct()
         
         return queryset.order_by('-created_at')
+
+    @action(detail=True, methods=['get'], url_path='prices')
+    def get_prices(self, request, pk=None):
+        """Get prices for a specific food"""
+        food = self.get_object()
+        lat = request.query_params.get('lat')
+        lng = request.query_params.get('lng')
+        
+        # Get prices for this food
+        prices = food.prices.all()
+        
+        # If location is provided, calculate distance and delivery time
+        if lat and lng:
+            # Here you could add distance calculation logic
+            # For now, just return the prices as is
+            pass
+            
+        serializer = FoodPriceSerializer(prices, many=True)
+        return Response(serializer.data)
 
 
 class FoodPriceViewSet(viewsets.ModelViewSet):

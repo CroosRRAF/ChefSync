@@ -1,138 +1,71 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
-import { useOrderStore } from '@/store/orderStore';
-import { useNavigate } from 'react-router-dom';
+import { customerService, Order } from '@/services/customerService';
 import { 
   Package, 
   Clock, 
-  CheckCircle, 
-  XCircle,
+  MapPin, 
+  Phone, 
+  Search, 
+  Filter,
+  Eye,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Truck,
+  ChefHat,
+  Star,
+  ArrowLeft,
   Home,
   LayoutDashboard,
-  MapPin,
-  Calendar,
-  DollarSign,
-  Truck,
-  Plus,
-  Check,
-  Eye,
-  RotateCcw
+  Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
 
-const Orders: React.FC = () => {
-  const { user } = useAuth();
-  const { orders, getOrdersByCustomer, setOrders } = useOrderStore();
+const CustomerOrders: React.FC = () => {
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
 
-  // Get customer's orders
-  const customerOrders = user ? getOrdersByCustomer(user.id) : [];
-
-  // Add demo orders for testing
+  // Redirect if not authenticated
   useEffect(() => {
-    if (user && orders.length === 0) {
-      const demoOrders = [
-        {
-          id: '1',
-          customer_id: user.id,
-          customer_name: user.name || 'Customer',
-          items: [
-            { id: '1', name: 'Chicken Biryani', quantity: 2, price: 15.99 },
-            { id: '2', name: 'Garlic Naan', quantity: 3, price: 3.99 }
-          ],
-          total_amount: 47.95,
-          status: 'delivered' as const,
-          delivery_address: '123 Main St, City, State 12345',
-          created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          estimated_delivery_time: '30-45 mins'
-        },
-        {
-          id: '2',
-          customer_id: user.id,
-          customer_name: user.name || 'Customer',
-          items: [
-            { id: '3', name: 'Mutton Curry', quantity: 1, price: 18.99 },
-            { id: '4', name: 'Rice', quantity: 2, price: 4.99 }
-          ],
-          total_amount: 28.97,
-          status: 'preparing' as const,
-          delivery_address: '123 Main St, City, State 12345',
-          created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-          estimated_delivery_time: '45-60 mins'
-        }
-      ];
-      setOrders(demoOrders);
+    if (!isAuthenticated || user?.role !== 'customer') {
+      navigate('/auth/login');
+      return;
     }
-  }, [user, orders.length, setOrders]);
-  
-  const totalOrders = customerOrders.length;
-  const pendingOrders = customerOrders.filter(order => 
-    ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
-  ).length;
-  const completedOrders = customerOrders.filter(order => order.status === 'delivered').length;
-  const totalSpent = customerOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
-  const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
+  }, [isAuthenticated, user, navigate]);
 
-  const recentOrders = customerOrders
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 3);
+  // Fetch orders
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await customerService.getOrders({ page_size: 50 });
+        setOrders(response.results || response);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        toast.error('Failed to load orders');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Generate demo orders data for display
-  const demoOrders = [
-    {
-      id: '1',
-      orderNumber: 'ORD-001',
-      date: '2024-01-15',
-      status: 'delivered',
-      total: 45.99,
-      items: [
-        { name: 'Margherita Pizza', quantity: 1, price: 22.99 },
-        { name: 'Caesar Salad', quantity: 1, price: 12.99 },
-        { name: 'Garlic Bread', quantity: 1, price: 6.99 },
-        { name: 'Soft Drink', quantity: 1, price: 3.02 }
-      ]
-    },
-    {
-      id: '2',
-      orderNumber: 'ORD-002',
-      date: '2024-01-20',
-      status: 'preparing',
-      total: 32.50,
-      items: [
-        { name: 'Chicken Curry', quantity: 1, price: 18.99 },
-        { name: 'Basmati Rice', quantity: 2, price: 6.50 },
-        { name: 'Naan Bread', quantity: 1, price: 4.99 },
-        { name: 'Mango Lassi', quantity: 1, price: 4.52 }
-      ]
-    },
-    {
-      id: '3',
-      orderNumber: 'ORD-003',
-      date: '2024-01-22',
-      status: 'out_for_delivery',
-      total: 28.75,
-      items: [
-        { name: 'Beef Burger', quantity: 1, price: 15.99 },
-        { name: 'French Fries', quantity: 1, price: 7.99 },
-        { name: 'Milkshake', quantity: 1, price: 4.77 }
-      ]
+    if (isAuthenticated && user?.role === 'customer') {
+      fetchOrders();
     }
-  ];
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading your orders...</p>
-        </div>
-      </div>
-    );
-  }
+  }, [isAuthenticated, user]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -141,178 +74,340 @@ const Orders: React.FC = () => {
       case 'preparing': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
       case 'out_for_delivery': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800';
       case 'ready': return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800';
       default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <Card className="border-none shadow-sm dark:bg-gray-800">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                My Orders
-              </h1>
-              <p className="text-gray-600 dark:text-gray-300 mt-2">
-                Track and manage your food orders
-              </p>
-            </div>
-            <Button 
-              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-              onClick={() => navigate('/menu')}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Order
-            </Button>
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'delivered': return <CheckCircle className="h-4 w-4" />;
+      case 'cancelled': return <X className="h-4 w-4" />;
+      case 'preparing': return <ChefHat className="h-4 w-4" />;
+      case 'out_for_delivery': return <Truck className="h-4 w-4" />;
+      case 'ready': return <Package className="h-4 w-4" />;
+      case 'pending': return <Clock className="h-4 w-4" />;
+      default: return <AlertCircle className="h-4 w-4" />;
+    }
+  };
+
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         order.chef.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleViewOrder = (order: Order) => {
+    setSelectedOrder(order);
+    setShowOrderDetails(true);
+  };
+
+  const handleCancelOrder = async (orderId: number) => {
+    if (window.confirm('Are you sure you want to cancel this order?')) {
+      try {
+        await customerService.cancelOrder(orderId, 'Cancelled by customer');
+        toast.success('Order cancelled successfully');
+        // Refresh orders
+        const response = await customerService.getOrders({ page_size: 50 });
+        setOrders(response.results || response);
+      } catch (error) {
+        console.error('Error cancelling order:', error);
+        toast.error('Failed to cancel order');
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-16">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+            <span className="ml-2 text-gray-600">Loading orders...</span>
           </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-none shadow-lg bg-gradient-to-r from-green-500 to-green-600 text-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-100 text-sm font-medium">Delivered Orders</p>
-                <p className="text-3xl font-bold">{demoOrders.filter(o => o.status === 'delivered').length}</p>
-              </div>
-              <Check className="h-10 w-10 text-green-200" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm font-medium">Active Orders</p>
-                <p className="text-3xl font-bold">{demoOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length}</p>
-              </div>
-              <Clock className="h-10 w-10 text-blue-200" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-purple-100 text-sm font-medium">Total Spent</p>
-                <p className="text-3xl font-bold">${demoOrders.reduce((sum, order) => sum + order.total, 0).toFixed(2)}</p>
-              </div>
-              <DollarSign className="h-10 w-10 text-purple-200" />
-            </div>
-          </CardContent>
-        </Card>
+        </div>
       </div>
+    );
+  }
 
-      <Card className="border-none shadow-md dark:bg-gray-800">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-white">
-            <Package className="h-5 w-5 text-orange-500" />
-            <span>Order History</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {demoOrders.length > 0 ? (
-            demoOrders.map((order) => (
-              <Card key={order.id} className="border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
-                          Order #{order.orderNumber}
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-16">
+      <div className="container mx-auto px-4 py-8">
+        {/* Navigation */}
+        <div className="mb-6 flex items-center space-x-4">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/customer/dashboard')}
+            className="hover:bg-blue-50"
+          >
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            Dashboard
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/')}
+            className="hover:bg-green-50"
+          >
+            <Home className="h-4 w-4 mr-2" />
+            Home
+          </Button>
+        </div>
+
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            My Orders
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Track and manage your food orders
+          </p>
+        </div>
+
+        {/* Filters */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search orders by number or chef name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="md:w-48">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Orders</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="preparing">Preparing</SelectItem>
+                    <SelectItem value="ready">Ready</SelectItem>
+                    <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Orders List */}
+        {filteredOrders.length === 0 ? (
+          <Card className="text-center py-12">
+            <CardContent>
+              <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No orders found</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                {searchTerm || statusFilter !== 'all' 
+                  ? 'No orders match your current filters' 
+                  : 'You haven\'t placed any orders yet'
+                }
+              </p>
+              {!searchTerm && statusFilter === 'all' && (
+                <Button
+                  onClick={() => navigate('/menu')}
+                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                >
+                  Browse Menu
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {filteredOrders.map((order) => (
+              <Card key={order.id} className="hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
+                        <Package className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                          Order #{order.order_number}
                         </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          by {order.chef.name} • {new Date(order.created_at).toLocaleDateString()}
+                        </p>
+                        <div className="flex items-center space-x-4 mt-1">
+                          <div className="flex items-center space-x-1 text-sm text-gray-500">
+                            <MapPin className="h-3 w-3" />
+                            <span>{order.delivery_address}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-sm text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>{new Date(order.created_at).toLocaleTimeString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          LKR {Math.round(order.total_amount)}
+                        </p>
                         <Badge className={getStatusColor(order.status)}>
-                          {order.status.replace('_', ' ')}
+                          <span className="flex items-center space-x-1">
+                            {getStatusIcon(order.status)}
+                            <span>{order.status.replace('_', ' ')}</span>
+                          </span>
                         </Badge>
                       </div>
-                      <p className="text-gray-600 dark:text-gray-300 text-sm">
-                        {new Date(order.date).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })}
-                      </p>
+                      
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewOrder(order)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                        
+                        {order.status === 'pending' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCancelOrder(order.id)}
+                            className="text-red-600 border-red-300 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xl font-bold text-gray-900 dark:text-white">
-                        ${order.total.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
-                    <h4 className="font-medium text-gray-900 dark:text-white mb-2">Order Items:</h4>
-                    <div className="space-y-1">
-                      {order.items.map((item, index) => (
-                        <div key={index} className="flex justify-between items-center text-sm">
-                          <span className="text-gray-600 dark:text-gray-300">
-                            {item.quantity}x {item.name}
-                          </span>
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            ${item.price.toFixed(2)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
-                      onClick={() => navigate(`/customer/orders/${order.id}`)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View Details
-                    </Button>
-                    
-                    {order.status === 'delivered' && (
-                      <Button 
-                        size="sm"
-                        className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Reorder
-                      </Button>
-                    )}
-
-                    {(order.status === 'preparing' || order.status === 'out_for_delivery') && (
-                      <Button 
-                        size="sm"
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                      >
-                        <MapPin className="h-4 w-4 mr-1" />
-                        Track Order
-                      </Button>
-                    )}
                   </div>
                 </CardContent>
               </Card>
-            ))
-          ) : (
-            <div className="text-center py-12">
-              <Package className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Orders Yet</h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">
-                Start exploring our delicious menu and place your first order!
-              </p>
-              <Button 
-                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                onClick={() => navigate('/menu')}
-              >
-                Browse Menu
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Order Details Modal */}
+        {showOrderDetails && selectedOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowOrderDetails(false)} />
+            <Card className="relative w-full max-w-2xl mx-4 max-h-[80vh] bg-white dark:bg-gray-900">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Order #{selectedOrder.order_number}</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowOrderDetails(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="max-h-96">
+                  <div className="space-y-4">
+                    {/* Order Status */}
+                    <div className="flex items-center space-x-2">
+                      <Badge className={getStatusColor(selectedOrder.status)}>
+                        <span className="flex items-center space-x-1">
+                          {getStatusIcon(selectedOrder.status)}
+                          <span>{selectedOrder.status.replace('_', ' ')}</span>
+                        </span>
+                      </Badge>
+                    </div>
+
+                    {/* Chef Info */}
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                      <h4 className="font-semibold mb-2">Chef Information</h4>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
+                          <ChefHat className="h-5 w-5 text-orange-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{selectedOrder.chef.name}</p>
+                          <p className="text-sm text-gray-600">Chef</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order Items */}
+                    <div>
+                      <h4 className="font-semibold mb-2">Order Items</h4>
+                      <div className="space-y-2">
+                        {selectedOrder.items.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div>
+                              <p className="font-medium">{item.food_name}</p>
+                              <p className="text-sm text-gray-600">by {item.cook_name} - {item.size}</p>
+                              {item.special_instructions && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Note: {item.special_instructions}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold">LKR {Math.round(item.total_price)}</p>
+                              <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Delivery Info */}
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                      <h4 className="font-semibold mb-2">Delivery Information</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm">{selectedOrder.delivery_address}</span>
+                        </div>
+                        {selectedOrder.delivery_instructions && (
+                          <div className="flex items-center space-x-2">
+                            <Clock className="h-4 w-4 text-gray-500" />
+                            <span className="text-sm">{selectedOrder.delivery_instructions}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Order Summary */}
+                    <div className="border-t pt-4">
+                      <div className="flex justify-between text-sm mb-2">
+                        <span>Subtotal</span>
+                        <span>LKR {Math.round(selectedOrder.subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span>Delivery Fee</span>
+                        <span>LKR {Math.round(selectedOrder.delivery_fee)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span>Tax</span>
+                        <span>LKR {Math.round(selectedOrder.tax_amount)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                        <span>Total</span>
+                        <span>LKR {Math.round(selectedOrder.total_amount)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-export default Orders;
+export default CustomerOrders;

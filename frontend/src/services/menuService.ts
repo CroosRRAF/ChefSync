@@ -61,24 +61,35 @@ export interface FoodItem {
   total_orders: number;
   images: FoodImage[];
   primary_image: string;
-  image_url: string;
-  thumbnail_url: string;
+  image_url?: string; // Additional image URL field
+  thumbnail_url?: string; // Thumbnail URL field
   available_cooks_count: number;
+  prices?: FoodPriceSimple[]; // Add prices array
   created_at: string;
   updated_at: string;
 }
 
 export interface FoodImage {
   id: number;
-  image_url: string;
-  thumbnail_url: string;
-  cloudinary_public_id: string;
+  image: string;
+  thumbnail: string;
   caption: string;
   is_primary: boolean;
   sort_order: number;
-  alt_text: string;
-  optimized_url: string;
-  thumbnail: string;
+}
+
+export interface FoodPriceSimple {
+  price_id: number;
+  size: string;
+  price: string; // Price comes as string from API
+  preparation_time: number;
+  image_url: string | null;
+  image_data_url: string | null;
+  food: number;
+  food_name: string;
+  cook: number;
+  cook_name: string;
+  cook_rating: number;
   created_at: string;
   updated_at: string;
 }
@@ -88,12 +99,12 @@ export interface FoodPrice {
   size: string;
   price: number;
   image_url: string;
-  image_data_url: string;
   cook: {
     id: number;
     name: string;
     rating: number;
     is_active: boolean;
+    profile_image?: string;
   };
   distance?: number;
   estimated_delivery_time?: number;
@@ -166,23 +177,18 @@ export const menuService = {
       }
     });
 
-    const response = await apiClient.get(`/api/food/foods/?${searchParams}`);
+    const response = await apiClient.get(`/api/food/customer/foods/?${searchParams}`);
     return response.data;
   },
 
   // Get food prices for a specific food
   getFoodPrices: async (foodId: number, lat?: number, lng?: number) => {
-    try {
-      const params = new URLSearchParams();
-      if (lat !== undefined) params.append('lat', lat.toString());
-      if (lng !== undefined) params.append('lng', lng.toString());
+    const params = new URLSearchParams();
+    if (lat !== undefined) params.append('lat', lat.toString());
+    if (lng !== undefined) params.append('lng', lng.toString());
 
-      const response = await apiClient.get(`/api/food/foods/${foodId}/prices/?${params}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching food prices:', error);
-      throw error;
-    }
+    const response = await apiClient.get(`/api/food/customer/foods/${foodId}/prices/?${params}`);
+    return response.data;
   },
 
   // Get cuisines

@@ -73,6 +73,7 @@ class FoodPriceSerializer(serializers.ModelSerializer):
     cook_name = serializers.CharField(source='cook.name', read_only=True)
     cook_rating = serializers.SerializerMethodField()
     image_data_url = serializers.SerializerMethodField()
+    cook = serializers.SerializerMethodField()
     
     class Meta:
         model = FoodPrice
@@ -85,6 +86,26 @@ class FoodPriceSerializer(serializers.ModelSerializer):
     def get_cook_rating(self, obj):
         # You might want to calculate this from reviews
         return getattr(obj.cook, 'rating', 4.5)
+    
+    def get_cook(self, obj):
+        """Return cook information in the expected format"""
+        profile_image_url = None
+        if obj.cook.profile_image:
+            # Convert binary image to base64 data URL
+            import base64
+            try:
+                encoded_image = base64.b64encode(obj.cook.profile_image).decode('utf-8')
+                profile_image_url = f"data:image/jpeg;base64,{encoded_image}"
+            except Exception:
+                profile_image_url = None
+        
+        return {
+            'id': obj.cook.pk,  # Use pk instead of id
+            'name': obj.cook.name,
+            'rating': getattr(obj.cook, 'rating', 4.5),
+            'is_active': getattr(obj.cook, 'is_active', True),
+            'profile_image': profile_image_url
+        }
     
     def get_image_data_url(self, obj):
         """Return optimized Cloudinary URL"""

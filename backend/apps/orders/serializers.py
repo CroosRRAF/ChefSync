@@ -17,7 +17,7 @@ class FoodPriceSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = FoodPrice
-        fields = ['id', 'price', 'size', 'food_name', 'food_description', 'food_category', 'food_image']
+        fields = ['price_id', 'price', 'size', 'food_name', 'food_description', 'food_category', 'food_image']
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -150,9 +150,9 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'order_number', 'status', 'status_display','order_type',
+            'id', 'order_number', 'status', 'status_display', 'order_type',
             'total_amount', 'delivery_fee', 'tax_amount', 'discount_amount',
-            'delivery_address', 'delivery_instructions', 'payment_method',
+            'delivery_address', 'delivery_instructions', 'customer_notes', 'payment_method',
             'payment_status', 'estimated_delivery_time', 'actual_delivery_time',
             'created_at', 'updated_at', 'customer', 'chef', 'items',
             'status_history', 'total_items', 'estimated_prep_time',
@@ -215,18 +215,23 @@ class OrderDetailSerializer(serializers.ModelSerializer):
 
 
 class CartItemSerializer(serializers.ModelSerializer):
-    """Enhanced cart item serializer"""
-    price_details = FoodPriceSerializer(source='price', read_only=True)
-    item_total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    """Enhanced cart item serializer with all required fields for frontend"""
+    food_name = serializers.CharField(source='price.food.name', read_only=True)
+    cook_name = serializers.CharField(source='price.cook.get_full_name', read_only=True)
+    size = serializers.CharField(source='price.size', read_only=True)
+    unit_price = serializers.DecimalField(source='price.price', max_digits=10, decimal_places=2, read_only=True)
+    total_price = serializers.SerializerMethodField()
+    food_image = serializers.CharField(source='price.food.image', read_only=True)
     
     class Meta:
         model = CartItem
-        fields = ['id', 'quantity', 'special_instructions', 'price_details', 'item_total', 'created_at', 'updated_at']
+        fields = [
+            'id', 'quantity', 'special_instructions', 'food_name', 'cook_name', 
+            'size', 'unit_price', 'total_price', 'food_image', 'created_at', 'updated_at'
+        ]
         
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data['item_total'] = instance.total_price
-        return data
+    def get_total_price(self, obj):
+        return obj.total_price
 
 
 class OrderStatsSerializer(serializers.Serializer):
