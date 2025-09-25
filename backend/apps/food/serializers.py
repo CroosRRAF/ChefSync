@@ -108,13 +108,13 @@ class FoodSerializer(serializers.ModelSerializer):
     class Meta:
         model = Food
         fields = [
-            'food_id', 'name', 'description', 'category', 'food_category', 'category_name', 'cuisine_name',
+            'id', 'name', 'description', 'category', 'food_category', 'category_name', 'cuisine_name',
             'is_available', 'is_featured', 'preparation_time', 'calories_per_serving', 'ingredients',
             'allergens', 'nutritional_info', 'is_vegetarian', 'is_vegan', 'is_gluten_free', 'spice_level',
             'rating_average', 'total_reviews', 'total_orders', 'images', 'primary_image', 'available_cooks_count',
             'image_url', 'thumbnail_url', 'status', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['food_id', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at']
     
     def get_primary_image(self, obj):
         """Return the primary image URL"""

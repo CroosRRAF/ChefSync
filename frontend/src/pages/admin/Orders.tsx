@@ -454,11 +454,11 @@ const OrderManagement: React.FC = () => {
               [assignmentType === 'chef' ? 'chef' : 'delivery_partner']: {
                 id: resourceId,
                 name: assignmentType === 'chef' 
-                  ? availableChefs.find(c => c.id === resourceId)?.name
-                  : availablePartners.find(p => p.id === resourceId)?.name,
+                  ? availableChefs.find(c => (c.user_id || c.id) === resourceId)?.name
+                  : availablePartners.find(p => (p.user_id || p.id) === resourceId)?.name,
                 email: assignmentType === 'chef'
-                  ? availableChefs.find(c => c.id === resourceId)?.email
-                  : availablePartners.find(p => p.id === resourceId)?.email
+                  ? availableChefs.find(c => (c.user_id || c.id) === resourceId)?.email
+                  : availablePartners.find(p => (p.user_id || p.id) === resourceId)?.email
               }
             } : order
           )
@@ -756,12 +756,12 @@ const OrderManagement: React.FC = () => {
                     >
                       {(assignmentType === 'chef' ? availableChefs : availablePartners).map((resource: any) => (
                         <div
-                          key={resource.id}
+                          key={resource.user_id || resource.id}
                           className="p-3 border-b last:border-b-0 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                           style={{
                             borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
                           }}
-                          onClick={() => confirmAssignment(resource.id)}
+                          onClick={() => confirmAssignment(resource.user_id || resource.id)}
                         >
                           <div 
                             className="font-medium"

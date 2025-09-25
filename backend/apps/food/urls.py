@@ -4,6 +4,7 @@ from . import views
 
 # Create router for ViewSets
 router = DefaultRouter()
+router.register(r'foods', views.CustomerFoodViewSet, basename='foods')  # General foods endpoint
 router.register(r'chef/foods', views.ChefFoodViewSet, basename='chef-foods')
 router.register(r'chef/prices', views.ChefFoodPriceViewSet, basename='chef-prices')
 router.register(r'customer/foods', views.CustomerFoodViewSet, basename='customer-foods')

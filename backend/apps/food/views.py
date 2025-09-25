@@ -317,39 +317,38 @@ class CustomerFoodViewSet(viewsets.ReadOnlyModelViewSet):
     
     def get_queryset(self):
         queryset = Food.objects.filter(
-            approval_status='approved', 
+            status='Approved', 
             is_available=True
-        ).prefetch_related('prices').select_related('chef', 'category')
+        ).prefetch_related('prices').select_related('chef', 'food_category')
         
         # Search functionality
-        search = self.request.query_params.get('search', None)
+        search = self.request.GET.get('search', None)
         if search:
             queryset = queryset.filter(
                 Q(name__icontains=search) | 
                 Q(description__icontains=search) |
-                Q(category__name__icontains=search) |
-                Q(chef__first_name__icontains=search) |
-                Q(chef__last_name__icontains=search)
+                Q(food_category__name__icontains=search) |
+                Q(chef__name__icontains=search)
             )
         
         # Filter by category
-        category = self.request.query_params.get('category', None)
+        category = self.request.GET.get('category', None)
         if category:
-            queryset = queryset.filter(category_id=category)
+            queryset = queryset.filter(food_category_id=category)
         
         # Filter by cuisine
-        cuisine = self.request.query_params.get('cuisine', None)
+        cuisine = self.request.GET.get('cuisine', None)
         if cuisine:
-            queryset = queryset.filter(category__cuisine_id=cuisine)
+            queryset = queryset.filter(food_category__cuisine_id=cuisine)
         
         # Filter by chef
-        chef = self.request.query_params.get('chef', None)
+        chef = self.request.GET.get('chef', None)
         if chef:
             queryset = queryset.filter(chef_id=chef)
         
         # Price range filtering
-        min_price = self.request.query_params.get('min_price', None)
-        max_price = self.request.query_params.get('max_price', None)
+        min_price = self.request.GET.get('min_price', None)
+        max_price = self.request.GET.get('max_price', None)
         if min_price or max_price:
             price_filter = Q()
             if min_price:

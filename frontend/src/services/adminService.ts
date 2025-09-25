@@ -474,8 +474,8 @@ class AdminService {
     try {
       console.log(`🔄 AdminService: Assigning delivery partner ${partnerId} to order ${orderId}`);
       
-      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/assign_delivery/`, {
-        delivery_partner_id: partnerId
+      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/assign_delivery_partner/`, {
+        partner_id: partnerId
       });
       
       console.log(`✅ AdminService: Delivery partner assignment response:`, response.data);
@@ -489,6 +489,46 @@ class AdminService {
         url: error?.config?.url,
       });
       throw new Error(`Failed to assign delivery partner: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  async getAvailableChefs(): Promise<any[]> {
+    try {
+      console.log(`🔄 AdminService: Fetching available chefs`);
+      
+      const response = await apiClient.get(`${this.baseUrl}/orders/available_chefs/`);
+      
+      console.log(`✅ AdminService: Available chefs response:`, response.data);
+      
+      return response.data.chefs || [];
+    } catch (error: any) {
+      console.error("❌ AdminService: Error fetching available chefs:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to fetch available chefs: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  async getAvailableDeliveryPartners(): Promise<any[]> {
+    try {
+      console.log(`🔄 AdminService: Fetching available delivery partners`);
+      
+      const response = await apiClient.get(`${this.baseUrl}/orders/available_delivery_partners/`);
+      
+      console.log(`✅ AdminService: Available delivery partners response:`, response.data);
+      
+      return response.data.partners || [];
+    } catch (error: any) {
+      console.error("❌ AdminService: Error fetching available delivery partners:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      throw new Error(`Failed to fetch available delivery partners: ${error?.message || 'Unknown error'}`);
     }
   }
 

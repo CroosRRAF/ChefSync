@@ -1549,6 +1549,10 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
         """Get paginated list of orders with filters - standard list endpoint"""
         return self.list_orders(request)
 
+    def retrieve(self, request, pk=None):
+        """Get detailed order information - standard retrieve endpoint"""
+        return self.details(request, pk)
+
     @action(detail=False, methods=["get"])
     def list_orders(self, request):
         """Get paginated list of orders with filters"""
@@ -1707,7 +1711,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                 for item in order.items.select_related("price__food").all():  # type: ignore
                     items.append(
                         {
-                            "id": item.id,
+                            "id": item.order_item_id,
                             "food_name": item.food_name,
                             "quantity": item.quantity,
                             "unit_price": float(item.unit_price),
@@ -1916,7 +1920,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
         """Get list of available chefs for order assignment"""
         try:
             chefs = User.objects.filter(role="cook", status="active").values(
-                "id", "name", "email"
+                "user_id", "name", "email"
             )
 
             return Response({"chefs": list(chefs)})
@@ -1933,7 +1937,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
         try:
             partners = User.objects.filter(
                 role="DeliveryAgent", status="active"
-            ).values("id", "name", "email")
+            ).values("user_id", "name", "email")
 
             return Response({"partners": list(partners)})
 
