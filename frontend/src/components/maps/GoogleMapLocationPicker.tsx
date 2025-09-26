@@ -1,11 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { MapPin, Search, Loader2, X } from 'lucide-react';
-import { toast } from 'sonner';
+import React, { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { MapPin, Search, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
 
 interface GoogleMapLocationPickerProps {
-  onLocationSelect: (location: { lat: number; lng: number; address: string }) => void;
+  onLocationSelect: (location: {
+    lat: number;
+    lng: number;
+    address: string;
+  }) => void;
   initialLocation?: { lat: number; lng: number };
   isOpen: boolean;
   onClose: () => void;
@@ -22,15 +26,15 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
   onLocationSelect,
   initialLocation,
   isOpen,
-  onClose
+  onClose,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const marker = useRef<any>(null);
   const geocoder = useRef<any>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [currentAddress, setCurrentAddress] = useState('');
+  const [currentAddress, setCurrentAddress] = useState("");
 
   // Initialize Google Maps
   useEffect(() => {
@@ -57,20 +61,20 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
     mapInstance.current = new window.google.maps.Map(mapRef.current, {
       center: defaultLocation,
       zoom: 15,
-      mapTypeId: 'roadmap',
+      mapTypeId: "roadmap",
       styles: [
         {
-          featureType: 'poi',
-          elementType: 'labels',
-          stylers: [{ visibility: 'off' }]
-        }
-      ]
+          featureType: "poi",
+          elementType: "labels",
+          stylers: [{ visibility: "off" }],
+        },
+      ],
     });
 
     geocoder.current = new window.google.maps.Geocoder();
 
     // Add click listener to map
-    mapInstance.current.addListener('click', (event: any) => {
+    mapInstance.current.addListener("click", (event: any) => {
       const lat = event.latLng.lat();
       const lng = event.latLng.lng();
       updateMarker(lat, lng);
@@ -90,26 +94,67 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
       marker.current.setMap(null);
     }
 
-    // Add new marker
-    marker.current = new window.google.maps.Marker({
-      position: { lat, lng },
-      map: mapInstance.current,
-      draggable: true,
-      title: 'Selected Location'
-    });
+    // Add new marker using AdvancedMarkerElement if available
+    if (window.google.maps.marker?.AdvancedMarkerElement) {
+      const markerElement = document.createElement("div");
+      markerElement.innerHTML = `
+        <div style="
+          width: 32px; 
+          height: 32px; 
+          background: #EF4444; 
+          border-radius: 50% 50% 50% 0; 
+          border: 3px solid white; 
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          transform: rotate(-45deg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        ">
+          <div style="color: white; transform: rotate(45deg); font-size: 16px;">📍</div>
+        </div>
+      `;
+
+      const advancedMarker =
+        new window.google.maps.marker.AdvancedMarkerElement({
+          map: mapInstance.current,
+          position: { lat, lng },
+          title: "Selected Location",
+          content: markerElement,
+          gmpDraggable: true,
+        });
+
+      // Store reference differently for AdvancedMarkerElement
+      (marker as any).current = advancedMarker;
+
+      // Add drag listener for AdvancedMarkerElement
+      advancedMarker.addListener("dragend", (event: any) => {
+        const newLat = event.latLng.lat();
+        const newLng = event.latLng.lng();
+        getAddressFromCoordinates(newLat, newLng);
+      });
+    } else {
+      // Fallback to regular Marker
+      marker.current = new window.google.maps.Marker({
+        position: { lat, lng },
+        map: mapInstance.current,
+        draggable: true,
+        title: "Selected Location",
+      });
+
+      // Add drag listener to marker
+      marker.current.addListener("dragend", (event: any) => {
+        const newLat = event.latLng.lat();
+        const newLng = event.latLng.lng();
+        getAddressFromCoordinates(newLat, newLng);
+      });
+    }
 
     // Update map center
     mapInstance.current.setCenter({ lat, lng });
 
     // Get address from coordinates
     getAddressFromCoordinates(lat, lng);
-
-    // Add drag listener to marker
-    marker.current.addListener('dragend', (event: any) => {
-      const newLat = event.latLng.lat();
-      const newLng = event.latLng.lng();
-      getAddressFromCoordinates(newLat, newLng);
-    });
   };
 
   const getAddressFromCoordinates = async (lat: number, lng: number) => {
@@ -121,10 +166,10 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
         geocoder.current.geocode(
           { location: { lat, lng } },
           (results: any[], status: string) => {
-            if (status === 'OK' && results[0]) {
+            if (status === "OK" && results[0]) {
               resolve(results[0]);
             } else {
-              reject(new Error('Geocoding failed'));
+              reject(new Error("Geocoding failed"));
             }
           }
         );
@@ -133,7 +178,7 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
       const address = (result as any).formatted_address;
       setCurrentAddress(address);
     } catch (error) {
-      console.error('Reverse geocoding error:', error);
+      console.error("Reverse geocoding error:", error);
       setCurrentAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
     } finally {
       setIsLoading(false);
@@ -149,10 +194,10 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
         geocoder.current.geocode(
           { address: searchQuery },
           (results: any[], status: string) => {
-            if (status === 'OK' && results[0]) {
+            if (status === "OK" && results[0]) {
               resolve(results[0]);
             } else {
-              reject(new Error('Geocoding failed'));
+              reject(new Error("Geocoding failed"));
             }
           }
         );
@@ -161,13 +206,13 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
       const location = (result as any).geometry.location;
       const lat = location.lat();
       const lng = location.lng();
-      
+
       updateMarker(lat, lng);
       setCurrentAddress((result as any).formatted_address);
-      toast.success('Location found!');
+      toast.success("Location found!");
     } catch (error) {
-      console.error('Geocoding error:', error);
-      toast.error('Could not find the address. Please try again.');
+      console.error("Geocoding error:", error);
+      toast.error("Could not find the address. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -178,11 +223,11 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
       const position = marker.current.getPosition();
       const lat = position.lat();
       const lng = position.lng();
-      
+
       onLocationSelect({
         lat,
         lng,
-        address: currentAddress
+        address: currentAddress,
       });
       onClose();
     }
@@ -190,7 +235,7 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
 
   const handleUseCurrentLocation = () => {
     if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by this browser.');
+      toast.error("Geolocation is not supported by this browser.");
       return;
     }
 
@@ -201,17 +246,17 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
         const lng = position.coords.longitude;
         updateMarker(lat, lng);
         setIsLoading(false);
-        toast.success('Current location set!');
+        toast.success("Current location set!");
       },
       (error) => {
-        console.error('Geolocation error:', error);
-        toast.error('Could not get your current location.');
+        console.error("Geolocation error:", error);
+        toast.error("Could not get your current location.");
         setIsLoading(false);
       },
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 300000
+        maximumAge: 300000,
       }
     );
   };
@@ -239,11 +284,18 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                onKeyPress={(e) => e.key === "Enter" && handleSearch()}
               />
             </div>
-            <Button onClick={handleSearch} disabled={isLoading || !searchQuery.trim()}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
+            <Button
+              onClick={handleSearch}
+              disabled={isLoading || !searchQuery.trim()}
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Search"
+              )}
             </Button>
           </div>
         </div>
@@ -251,7 +303,7 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
         {/* Map Container */}
         <div className="flex-1 relative">
           <div ref={mapRef} className="w-full h-full" />
-          
+
           {/* Current Location Button */}
           <div className="absolute top-4 right-4">
             <Button
@@ -282,13 +334,15 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Selected Address:</p>
-              <p className="font-medium">{currentAddress || 'Click on the map to select a location'}</p>
+              <p className="font-medium">
+                {currentAddress || "Click on the map to select a location"}
+              </p>
             </div>
             <div className="flex gap-2 ml-4">
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleConfirmLocation}
                 disabled={!marker.current}
               >

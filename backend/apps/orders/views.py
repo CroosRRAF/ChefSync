@@ -464,7 +464,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         new_status = request.data.get('status')
         
         # Define valid status transitions for delivery agents
-        valid_delivery_statuses = ['picked_up', 'in_transit', 'delivered']
+        valid_delivery_statuses = ['picked_up', 'delivered']
         
         if new_status not in valid_delivery_statuses:
             return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
@@ -476,11 +476,9 @@ class OrderViewSet(viewsets.ModelViewSet):
         # Validate status transitions
         current_status = order.status
         if new_status == 'picked_up' and current_status not in ['out_for_delivery', 'ready']:
-            return Response({"error": "Invalid status transition"}, status=status.HTTP_400_BAD_REQUEST)
-        elif new_status == 'in_transit' and current_status not in ['picked_up', 'out_for_delivery']:
-            return Response({"error": "Invalid status transition"}, status=status.HTTP_400_BAD_REQUEST)
-        elif new_status == 'delivered' and current_status not in ['in_transit']:
-            return Response({"error": "Invalid status transition"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": f"Cannot mark picked_up from {current_status}"}, status=status.HTTP_400_BAD_REQUEST)
+        elif new_status == 'delivered' and current_status not in ['picked_up', 'out_for_delivery', 'ready']:
+            return Response({"error": f"Cannot mark delivered from {current_status}"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get additional data
         notes = request.data.get('notes', f'Status changed to {new_status}')
@@ -594,6 +592,71 @@ class OrderViewSet(viewsets.ModelViewSet):
             "avg_delivery_time_min": round(avg_time_minutes, 1)
         })
 
+    @action(detail=True, methods=['post'])
+    def mark_picked_up(self, request, pk=None):
+        """Delivery agent marks order as picked up from chef"""
+        order = self.get_object()
+        
+        # Check if user is the assigned delivery partner
+        if order.delivery_partner != request.user:
+            return Response({"error": "You are not authorized to update this order"}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Check if order is in correct status
+        if order.status not in ['out_for_delivery', 'ready']:
+            return Response({"error": "Order cannot be marked as picked up in current status"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        notes = request.data.get('notes', 'Order picked up from chef')
+        
+        # Transition: ready/out_for_delivery -> picked_up
+        order.status = 'picked_up'
+        order.save(update_fields=['status', 'updated_at'])
+        OrderStatusHistory.objects.create(
+            order=order,
+            status='picked_up',
+            changed_by=request.user,
+            notes=notes
+        )
+        
+        return Response({
+            "success": "Order marked as picked up successfully",
+            "order_id": order.id,
+            "status": "picked_up"
+        })
+    
+    @action(detail=True, methods=['get'])
+    def chef_location(self, request, pk=None):
+        """Get chef location details for navigation (delivery agent only)"""
+        order = self.get_object()
+        
+        # Check if user is the assigned delivery partner
+        if order.delivery_partner != request.user:
+            return Response({"error": "You are not authorized to access this information"}, status=status.HTTP_403_FORBIDDEN)
+        
+        chef = order.chef
+        if not chef:
+            return Response({"error": "No chef assigned to this order"}, status=status.HTTP_404_NOT_FOUND)
+        
+        chef_location = {}
+        if getattr(chef, 'address', None):
+            chef_location['address'] = chef.address
+        if hasattr(chef, 'chef_profile'):
+            profile = chef.chef_profile
+            if getattr(profile, 'service_location', None):
+                chef_location['service_location'] = profile.service_location
+        
+        chef_info = {
+            'id': chef.id,
+            'name': chef.name or f"{chef.first_name} {chef.last_name}".strip() or chef.username,
+            'phone': getattr(chef, 'phone_no', None),
+            'email': chef.email,
+            'location': chef_location
+        }
+        
+        return Response({
+            'chef': chef_info,
+            'order_id': order.id,
+            'pickup_address': chef_location.get('address') or chef_location.get('service_location', 'Address not available')
+        })
 
 # Temporarily disabled other ViewSets to fix 500 error
 # Will be re-enabled once serializers are fixed
@@ -956,7 +1019,7 @@ def chef_recent_activity(request):
         
         # Get basic chef info
         chef_info = {
-            'id': chef.user_id,
+            'id': chef.id,
             'name': chef.name or f"{chef.first_name} {chef.last_name}".strip() or chef.username,
             'phone': chef.phone_no,
             'email': chef.email,
@@ -968,264 +1031,3 @@ def chef_recent_activity(request):
             'order_id': order.id,
             'pickup_address': chef_location.get('address') or chef_location.get('service_location', 'Address not available')
         })
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def calculate_checkout(request):
-    """Calculate delivery fee, tax, and total for checkout"""
-    try:
-        # Get cart items
-        cart_items = CartItem.objects.filter(customer=request.user)
-        if not cart_items.exists():
-            return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Calculate subtotal
-        subtotal = sum(item.total_price for item in cart_items)
-        
-        # Get delivery address coordinates
-        delivery_lat = request.data.get('delivery_latitude')
-        delivery_lng = request.data.get('delivery_longitude')
-        
-        if not delivery_lat or not delivery_lng:
-            return Response({'error': 'Delivery coordinates required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get chef location (assuming single chef for now)
-        chef_id = request.data.get('chef_id')
-        # Fallback: derive chef_id from first cart item's price.cook
-        if not chef_id:
-            first_item = cart_items.first()
-            if first_item and getattr(first_item.price, 'cook_id', None):
-                chef_id = first_item.price.cook.user_id
-            else:
-                return Response({'error': 'Chef ID required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            chef = User.objects.get(user_id=chef_id)
-            # Resolve chef location with fallback to request-provided coordinates
-            chef_lat, chef_lng = _resolve_chef_location(chef, request.data)
-            if chef_lat is None or chef_lng is None:
-                return Response({'error': 'Chef location not available'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Calculate distance using Haversine formula
-            def haversine_distance(lat1, lon1, lat2, lon2):
-                R = 6371  # Earth's radius in kilometers
-                lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-                dlat = lat2 - lat1
-                dlon = lon2 - lon1
-                a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-                c = 2 * math.asin(math.sqrt(a))
-                return R * c
-            
-            # Compute distance
-            distance_km = haversine_distance(float(chef_lat), float(chef_lng), float(delivery_lat), float(delivery_lng))
-            
-            # Validate distance to avoid DB out-of-range and unrealistic deliveries
-            MAX_DELIVERY_KM = 50.0  # business rule: serviceable radius
-            if math.isnan(distance_km) or distance_km <= 0:
-                return Response({'error': 'Invalid distance calculation. Please verify addresses.'}, status=status.HTTP_400_BAD_REQUEST)
-            if distance_km > MAX_DELIVERY_KM:
-                return Response({
-                    'error': f'Delivery distance {round(distance_km, 2)} km is out of service range (max {int(MAX_DELIVERY_KM)} km).'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            # Calculate delivery fee
-            from decimal import Decimal, ROUND_HALF_UP
-            
-            if distance_km <= 5.0:
-                delivery_fee = Decimal('50.00')
-            else:
-                extra_km = math.ceil(distance_km - 5.0)
-                delivery_fee = Decimal('50.00') + (Decimal(extra_km) * Decimal('15.00'))
-            
-            # Calculate tax (10%)
-            tax_amount = (Decimal(subtotal) * Decimal('0.10')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            
-            # Calculate total
-            total_amount = Decimal(subtotal) + tax_amount + delivery_fee
-            
-            return Response({
-                'subtotal': float(subtotal),
-                'tax_amount': float(tax_amount),
-                'delivery_fee': float(delivery_fee),
-                'distance_km': float(Decimal(distance_km).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
-                'total_amount': float(total_amount),
-                'breakdown': {
-                    'base_delivery_fee': 50.00,
-                    'extra_km': max(0, math.ceil(distance_km - 5.0)),
-                    'extra_km_rate': 15.00,
-                    'extra_km_fee': max(0, math.ceil(distance_km - 5.0) * 15.00)
-                }
-            })
-            
-        except User.DoesNotExist:
-            return Response({'error': 'Chef not found'}, status=status.HTTP_404_NOT_FOUND)
-            
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def place_order(request):
-    """Place an order from cart"""
-    try:
-        print(f"Place order request data: {request.data}")
-        print(f"User: {request.user}")
-        print(f"User authenticated: {request.user.is_authenticated}")
-        print(f"User ID: {request.user.pk if request.user.is_authenticated else 'None'}")
-        print(f"User user_id: {request.user.user_id if hasattr(request.user, 'user_id') and request.user.is_authenticated else 'None'}")
-        
-        if not request.user or not request.user.is_authenticated or request.user.is_anonymous:
-            print(f"User not authenticated: user={request.user}, authenticated={request.user.is_authenticated if request.user else 'N/A'}")
-            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        # Get cart items
-        cart_items = CartItem.objects.filter(customer=request.user)
-        print(f"Cart items count: {cart_items.count()}")
-        
-        if not cart_items.exists():
-            return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get order data
-        chef_id = request.data.get('chef_id')
-        delivery_address_id = request.data.get('delivery_address_id')
-        delivery_lat = request.data.get('delivery_latitude')
-        delivery_lng = request.data.get('delivery_longitude')
-        promo_code = request.data.get('promo_code')
-        customer_notes = request.data.get('customer_notes', '')
-        
-        # Fallback: derive chef_id from cart if not provided
-        if not chef_id:
-            first_item = cart_items.first()
-            if first_item and getattr(first_item.price, 'cook_id', None):
-                chef_id = first_item.price.cook.user_id
-            else:
-                return Response({'error': 'Chef ID required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get chef
-        print(f"Looking for chef with ID: {chef_id}")
-        try:
-            chef = User.objects.get(user_id=chef_id)
-            print(f"Found chef: {chef.username}")
-        except User.DoesNotExist:
-            print(f"Chef with ID {chef_id} not found")
-            return Response({'error': 'Chef not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Get delivery address
-        delivery_address = None
-        if delivery_address_id and delivery_address_id != 0:
-            try:
-                delivery_address = UserAddress.objects.get(id=delivery_address_id, user=request.user)
-                delivery_lat = float(delivery_address.latitude)
-                delivery_lng = float(delivery_address.longitude)
-            except UserAddress.DoesNotExist:
-                return Response({'error': 'Address not found'}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            # Create a new delivery address from coordinates
-            address_text = request.data.get('delivery_address', f'Lat: {delivery_lat}, Lng: {delivery_lng}')
-            delivery_address = UserAddress.objects.create(
-                user=request.user,
-                label='Delivery Address',
-                address_line1=address_text,
-                city='Unknown',  # Could be improved with reverse geocoding
-                latitude=delivery_lat,
-                longitude=delivery_lng,
-                is_default=False
-            )
-            print(f"Created new delivery address: {delivery_address}")
-        
-        if not delivery_lat or not delivery_lng:
-            return Response({'error': 'Delivery coordinates required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Calculate totals (reuse calculation logic)
-        subtotal = sum(item.total_price for item in cart_items)
-        
-        # Get chef location and calculate distance (with resolution/persist fallback)
-        chef_lat, chef_lng = _resolve_chef_location(chef, request.data)
-        if chef_lat is None or chef_lng is None:
-            return Response({'error': 'Chef location not available'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Calculate distance and fees
-        def haversine_distance(lat1, lon1, lat2, lon2):
-            R = 6371
-            lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-            dlat = lat2 - lat1
-            dlon = lon2 - lon1
-            a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-            c = 2 * math.asin(math.sqrt(a))
-            return R * c
-        
-        distance_km = haversine_distance(
-            float(chef_lat), float(chef_lng),
-            float(delivery_lat), float(delivery_lng)
-        )
-        # Validate distance to avoid DB out-of-range and unrealistic deliveries
-        MAX_DELIVERY_KM = 50.0  # business rule: serviceable radius
-        if math.isnan(distance_km) or distance_km <= 0:
-            return Response({'error': 'Invalid distance calculation. Please verify addresses.'}, status=status.HTTP_400_BAD_REQUEST)
-        if distance_km > MAX_DELIVERY_KM:
-            return Response({
-                'error': f'Delivery distance {round(distance_km, 2)} km is out of service range (max {int(MAX_DELIVERY_KM)} km).'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        from decimal import Decimal, ROUND_HALF_UP
-        
-        if distance_km <= 5.0:
-            delivery_fee = Decimal('50.00')
-        else:
-            extra_km = math.ceil(distance_km - 5.0)
-            delivery_fee = Decimal('50.00') + (Decimal(extra_km) * Decimal('15.00'))
-        
-        tax_amount = (Decimal(subtotal) * Decimal('0.10')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        total_amount = Decimal(subtotal) + tax_amount + delivery_fee
-        
-        # Create order
-        order = Order.objects.create(
-            customer=request.user,
-            chef=chef,
-            status='pending',
-            payment_method='cash',
-            subtotal=subtotal,
-            tax_amount=tax_amount,
-            delivery_fee=delivery_fee,
-            total_amount=total_amount,
-            delivery_address_ref=delivery_address,
-            delivery_latitude=delivery_lat,
-            delivery_longitude=delivery_lng,
-            distance_km=float(Decimal(distance_km).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
-            promo_code=promo_code,
-            customer_notes=customer_notes
-        )
-        
-        print(f"Order created: id={order.id}, customer={order.customer}, customer_id={order.customer_id}")
-        
-        # Create order items from cart
-        for cart_item in cart_items:
-            OrderItem.objects.create(
-                order=order,
-                price=cart_item.price,
-                quantity=cart_item.quantity,
-                special_instructions=cart_item.special_instructions
-            )
-        
-        # Clear cart
-        cart_items.delete()
-        
-        # Create status history
-        OrderStatusHistory.objects.create(
-            order=order,
-            status='pending',
-            changed_by=request.user,
-            notes='Order placed by customer'
-        )
-        
-        return Response({
-            'success': 'Order placed successfully',
-            'order_id': order.id,
-            'order_number': order.order_number,
-            'status': order.status,
-            'total_amount': float(total_amount)
-        })
-        
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
