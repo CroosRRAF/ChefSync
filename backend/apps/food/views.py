@@ -296,7 +296,8 @@ class CustomerFoodViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = Food.objects.filter(
             status='Approved', 
-            is_available=True
+            is_available=True,
+            chef__chef_profile__is_available=True  # Only show foods from available chefs
         ).prefetch_related('prices').select_related('chef', 'food_category')
         
         # Search functionality

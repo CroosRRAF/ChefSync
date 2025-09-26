@@ -31,6 +31,9 @@ class ChefProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChefProfile
         fields = '__all__'
+        extra_kwargs = {
+            'is_available': {'help_text': 'Whether the chef is currently available for orders'}
+        }
 
 
 class DeliveryProfileSerializer(serializers.ModelSerializer):

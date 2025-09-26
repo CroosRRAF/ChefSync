@@ -52,6 +52,7 @@ class ChefProfile(models.Model):
     total_orders = models.PositiveIntegerField(default=0)
     total_reviews = models.PositiveIntegerField(default=0)
     is_featured = models.BooleanField(default=False)
+    is_available = models.BooleanField(default=True, help_text="Whether the chef is currently available for orders")
     
     def __str__(self):
         return f"Chef {self.user.username}"

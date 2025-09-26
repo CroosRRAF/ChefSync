@@ -29,7 +29,10 @@ import {
   EyeOff,
   DollarSign,
   Clock,
-  Users
+  Users,
+  CheckCircle,
+  ClockIcon,
+  XCircle
 } from 'lucide-react';
 
 // Types
@@ -490,9 +493,125 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
       );
 
       console.log("✅ New food creation response:", response.data);
-      // ... rest of your logic (variants + success handling)
+      
+      // If there are additional variants, create them
+      if (priceVariants.length > 1) {
+        const foodId = response.data.food?.food_id || response.data.food_id;
+        if (foodId) {
+          for (let i = 1; i < priceVariants.length; i++) {
+            const variant = priceVariants[i];
+            try {
+              await axios.post(
+                `http://127.0.0.1:8000/api/food/chef/prices/`,
+                {
+                  food: foodId,
+                  size: variant.size,
+                  price: variant.price,
+                  preparation_time: variant.preparation_time
+                },
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                  },
+                }
+              );
+              console.log(`✅ Added variant ${i}: ${variant.size}`);
+            } catch (variantError) {
+              console.error(`❌ Error adding variant ${i}:`, variantError);
+              console.error('Error response:', variantError.response?.data);
+              console.error('Error status:', variantError.response?.status);
+              console.error('Variant data sent:', {
+                food: foodId,
+                size: variant.size,
+                price: variant.price,
+                preparation_time: variant.preparation_time
+              });
+            }
+          }
+        }
+      }
+      
+      showSuccess("New food item submitted for approval!");
     } else {
-      // ... existing food variant logic (unchanged)
+      // Chef wants to create their own version of an existing food
+      console.log("Creating chef's version of existing food:", selectedFood);
+      
+      const foodFormData = new FormData();
+      foodFormData.append("name", selectedFood.name);
+      foodFormData.append("category", selectedFood.category);
+      foodFormData.append("description", selectedFood.description);
+      
+      // Set default dietary options (chef can modify these if needed)
+      foodFormData.append("is_vegetarian", "false");
+      foodFormData.append("is_vegan", "false");
+      foodFormData.append("is_available", "true");
+      
+      // Handle image upload (optional - chef can add their own image)
+      const imageFile = formData.get("image") as File;
+      if (imageFile && imageFile.size > 0) {
+        foodFormData.append("image", imageFile);
+        console.log("✅ Chef's image attached:", imageFile.name);
+      }
+      
+      // Add primary price variant
+      const primaryVariant = priceVariants[0];
+      foodFormData.append("price", primaryVariant.price.toString());
+      foodFormData.append("size", primaryVariant.size);
+      foodFormData.append("preparation_time", primaryVariant.preparation_time.toString());
+
+      response = await axios.post(
+        "http://127.0.0.1:8000/api/food/chef/foods/",
+        foodFormData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      console.log("✅ Chef's version creation response:", response.data);
+      
+      // If there are additional variants, create them
+      if (priceVariants.length > 1) {
+        const foodId = response.data.food?.food_id || response.data.food_id;
+        if (foodId) {
+          for (let i = 1; i < priceVariants.length; i++) {
+            const variant = priceVariants[i];
+            try {
+              await axios.post(
+                `http://127.0.0.1:8000/api/food/chef/prices/`,
+                {
+                  food: foodId,
+                  size: variant.size,
+                  price: variant.price,
+                  preparation_time: variant.preparation_time
+                },
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                  },
+                }
+              );
+              console.log(`✅ Added variant ${i}: ${variant.size}`);
+            } catch (variantError) {
+              console.error(`❌ Error adding variant ${i}:`, variantError);
+              console.error('Error response:', variantError.response?.data);
+              console.error('Error status:', variantError.response?.status);
+              console.error('Variant data sent:', {
+                food: foodId,
+                size: variant.size,
+                price: variant.price,
+                preparation_time: variant.preparation_time
+              });
+            }
+          }
+        }
+      }
+      
+      showSuccess(`Your version of "${selectedFood.name}" has been submitted for approval!`);
     }
 
     resetForm();
@@ -829,7 +948,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
               <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">{selectedFood.category}</p>
               <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{selectedFood.description}</p>
               <div className="mt-2 p-2 bg-blue-100 dark:bg-blue-900 rounded text-xs text-blue-800 dark:text-blue-200">
-                <strong>Note:</strong> You can only set price, size, and preparation time for existing foods.
+                <strong>Creating Your Version:</strong> You're creating your own version of this dish with your prices and preparation times. The name, category, and description will be used as a starting point.
               </div>
             </div>
           </div>
@@ -1175,12 +1294,15 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
                     variant={food.status === 'Approved' ? "default" : food.status === 'Pending' ? "secondary" : "destructive"}
                     className={
                       food.status === 'Approved' 
-                        ? "bg-green-600" 
+                        ? "bg-green-600 flex items-center gap-1" 
                         : food.status === 'Pending' 
-                          ? "bg-yellow-600" 
-                          : "bg-red-600"
+                          ? "bg-yellow-600 flex items-center gap-1" 
+                          : "bg-red-600 flex items-center gap-1"
                     }
                   >
+                    {food.status === 'Approved' && <CheckCircle size={14} />}
+                    {food.status === 'Pending' && <ClockIcon size={14} />}
+                    {food.status === 'Rejected' && <XCircle size={14} />}
                     {food.status}
                   </Badge>
                 </div>

@@ -46,7 +46,6 @@ import DeliveryProfile from '@/pages/delivery/Profile';
 
 import CookDashboard from '@/pages/cook/Dashboard';
 import CookBulkOrders from '@/pages/cook/BulkOrders';
-import CookHome from '@/pages/cook/Home';
 import CookMenu from '@/pages/cook/MenuNew';
 import CookOrders from '@/pages/cook/Order';
 import CookNotifications from '@/pages/cook/Notifications';
@@ -318,7 +317,6 @@ const InnerRoutes: React.FC = () => {
   <Route index element={<Navigate to="dashboard" replace />} />
   <Route path="dashboard" element={<CookDashboard />} />
   <Route path="bulk-orders" element={<CookBulkOrders />} />
-  <Route path="home" element={<CookHome />} />
   <Route path="menu" element={<CookMenu />} />
   <Route path="orders" element={<CookOrders />} />
   <Route path="notifications" element={<CookNotifications />} />

@@ -6,6 +6,7 @@ from .models import (
     CommunicationTemplate,
     CommunicationCategory,
     CommunicationTag,
+    Notification,
 )
 
 
@@ -110,3 +111,16 @@ class CommunicationListSerializer(serializers.ModelSerializer):
     
     def get_response_count(self, obj):
         return obj.responses.count()
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    """Serializer for user notifications"""
+    user_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Notification
+        fields = '__all__'
+        read_only_fields = ('notification_id', 'time')
+    
+    def get_user_name(self, obj):
+        return obj.user.first_name or obj.user.username if obj.user else None

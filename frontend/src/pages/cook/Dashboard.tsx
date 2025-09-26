@@ -11,7 +11,9 @@ import {
   Activity,
   RefreshCw
 } from "lucide-react";
-import { ChefDashboardStats, useOrderService } from '@/services/orderService';
+import { ChefDashboardStats, useOrderService, OrderService } from '@/services/orderService';
+import { useAuth } from '@/context/AuthContext';
+import { userService } from '@/services/userService';
 
 export default function Dashboard() {
   // State for API data
@@ -21,13 +23,39 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [chefName, setChefName] = useState<string>('Chef');
 
-  // Use orderService hook
+  // Use auth context and orderService hook
+  const { user } = useAuth();
   const { loadDashboardStats } = useOrderService();
+
+  // Get time-based greeting
+  const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 11) return 'Good Morning';
+    if (hour >= 11 && hour < 17) return 'Good Afternoon';
+    if (hour >= 17 && hour < 21) return 'Good Evening';
+    return 'Good Night';
+  };
 
   // No sample data - all data loaded from API
 
   // API Loading Functions
+  const fetchChefName = async () => {
+    try {
+      if (user?.name) {
+        setChefName(user.name);
+      } else {
+        // Fallback to fetching from profile API
+        const profile = await userService.getUserProfile();
+        setChefName(profile.name || 'Chef');
+      }
+    } catch (error) {
+      console.error('Error loading chef name:', error);
+      setChefName('Chef'); // Fallback name
+    }
+  };
+
   const fetchDashboardStats = async () => {
     try {
       const dashboardStats = await loadDashboardStats();
@@ -40,23 +68,50 @@ export default function Dashboard() {
 
   const fetchReviews = async () => {
     try {
-      // const reviewsData = await loadReviews();
-      // setReviews(reviewsData);
-      setReviews([]); // No reviews API yet
+      // Use existing OrderService method for recent reviews
+      const reviewsData = await OrderService.getChefRecentReviews();
+      setReviews(reviewsData.slice(0, 5)); // Get last 5 reviews
     } catch (error) {
       console.error('Error loading reviews:', error);
-      throw error;
+      setReviews([]); // Fallback to empty array
     }
   };
 
   const fetchRecentActivity = async () => {
     try {
-      // const activityData = await loadRecentActivity();
-      // setRecentActivity(activityData);
-      setRecentActivity([]); // No activity API yet
+      // Use existing OrderService method for recent activity
+      const activityData = await OrderService.getChefRecentActivity();
+      // Map activity data to include proper icon components
+      const processedActivity = activityData.slice(0, 3).map((activity: any) => ({
+        ...activity,
+        icon: getActivityIcon(activity.type || activity.action)
+      }));
+      setRecentActivity(processedActivity);
     } catch (error) {
       console.error('Error loading recent activity:', error);
-      throw error;
+      setRecentActivity([]); // Fallback to empty array
+    }
+  };
+
+  // Helper function to get activity icons
+  const getActivityIcon = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case 'order':
+      case 'order_created':
+      case 'new_order':
+        return ClipboardList;
+      case 'review':
+      case 'review_received':
+        return Star;
+      case 'payment':
+      case 'payment_received':
+        return TrendingUp;
+      case 'food':
+      case 'food_added':
+      case 'menu_update':
+        return Activity;
+      default:
+        return Activity;
     }
   };
 
@@ -66,6 +121,7 @@ export default function Dashboard() {
       setError(null);
       
       await Promise.all([
+        fetchChefName(),
         fetchDashboardStats(),
         fetchReviews(),
         fetchRecentActivity()
@@ -95,7 +151,7 @@ export default function Dashboard() {
     {
       title: "Completed Orders",
       value: stats.orders_completed.toString(),
-      change: `+${Math.floor(Math.random() * 5)} today`, // Can be calculated from API later
+      change: `${stats.monthly_orders} this month`,
       icon: CheckCircle2,
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-50 dark:bg-green-900/20"
@@ -103,7 +159,7 @@ export default function Dashboard() {
     {
       title: "Active Orders",
       value: stats.orders_active.toString(),
-      change: `+${Math.floor(Math.random() * 3)} pending`,
+      change: "currently processing",
       icon: ClipboardList,
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-50 dark:bg-blue-900/20"
@@ -119,7 +175,7 @@ export default function Dashboard() {
     {
       title: "Today Revenue",
       value: `$${stats.today_revenue.toFixed(2)}`,
-      change: `${stats.average_rating}/5 rating`,
+      change: `${stats.average_rating.toFixed(1)}/5 rating`,
       icon: TrendingUp,
       color: "text-primary",
       bgColor: "bg-primary/10"
@@ -131,7 +187,7 @@ export default function Dashboard() {
       {/* Welcome Section */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Good Morning, Chef!</h1>
+          <h1 className="text-3xl font-bold text-foreground">{getTimeBasedGreeting()}, {chefName}!</h1>
           <p className="text-muted-foreground mt-1">
             {error ? '⚠️ ' + error : "Here's what's happening in your kitchen today"}
           </p>

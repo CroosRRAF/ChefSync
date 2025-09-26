@@ -24,12 +24,39 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
         return BulkOrderDetailSerializer
     
     def get_queryset(self):
-        """Get bulk orders with filtering"""
+        """Get bulk orders with filtering based on user role"""
+        user = self.request.user
         queryset = BulkOrder.objects.select_related('created_by', 'order').prefetch_related(
             'assignments__chef', 'order__items'
         )
         
-        # Filter by status
+        # Role-based filtering
+        if not user.is_authenticated:
+            return queryset.none()
+        
+        # For chefs, show bulk orders that are:
+        # 1. Assigned to them (through BulkOrderAssignment)
+        # 2. Related to their regular orders (order.chef = user)
+        # 3. Available for collaboration (pending status and not yet assigned)
+        if (hasattr(user, 'chef_profile') or 
+            user.groups.filter(name='Chefs').exists() or 
+            (hasattr(user, 'role') and user.role.lower() in ['cook', 'chef'])):
+            
+            queryset = queryset.filter(
+                Q(assignments__chef=user) |  # Assigned to this chef
+                Q(order__chef=user) |       # Their regular order became bulk
+                Q(status='pending')         # Available for collaboration
+            ).distinct()
+        
+        # For admins, show all bulk orders
+        elif user.is_staff or user.is_superuser or (hasattr(user, 'role') and user.role.lower() == 'admin'):
+            pass  # No filtering for admins
+        
+        # For customers, show only bulk orders they created
+        else:
+            queryset = queryset.filter(created_by=user)
+        
+        # Apply additional filters
         status_filter = self.request.query_params.get('status')
         if status_filter and status_filter != 'all':
             queryset = queryset.filter(status=status_filter)

@@ -9,6 +9,7 @@ from .models import Order, OrderItem, OrderStatusHistory, CartItem
 from .serializers import CartItemSerializer
 from apps.food.models import FoodReview
 from apps.payments.models import Payment
+from apps.communications.models import Notification
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
@@ -66,7 +67,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter orders based on user role"""
         user = self.request.user
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().order_by('-created_at')  # Order by newest first
         
         # Handle anonymous users (return empty queryset for security)
         if not user.is_authenticated:
@@ -75,25 +76,21 @@ class OrderViewSet(viewsets.ModelViewSet):
         # For chefs, only show their own orders
         if (hasattr(user, 'chef_profile') or 
             user.groups.filter(name='Chefs').exists() or 
-            (hasattr(user, 'role') and user.role == 'cook')):
+            (hasattr(user, 'role') and user.role.lower() in ['cook', 'chef'])):
             return queryset.filter(chef=user)
         # For delivery partners, show available and assigned orders
         elif (hasattr(user, 'delivery_profile') or 
               user.groups.filter(name='Delivery').exists() or 
-              (hasattr(user, 'role') and user.role == 'delivery_agent')):
+              (hasattr(user, 'role') and user.role.lower() == 'delivery_agent')):
             return queryset.filter(
                 Q(delivery_partner=user) | Q(status='ready', delivery_partner=None)
             )
         # For admins, show all orders
-        elif user.is_staff or user.is_superuser or (hasattr(user, 'role') and user.role == 'admin'):
+        elif user.is_staff or user.is_superuser or (hasattr(user, 'role') and user.role.lower() == 'admin'):
             return queryset
         # For customers, show their own orders
         else:
             return queryset.filter(customer=user)
-
-    def get_queryset(self):
-        """Filter orders to only show the current user's orders"""
-        return Order.objects.filter(customer=self.request.user).order_by('-created_at')
 
     @action(detail=False, methods=['get'])
     def available(self, request):
@@ -243,6 +240,46 @@ class OrderViewSet(viewsets.ModelViewSet):
             changed_by=request.user,
             notes=chef_notes or f'Status updated to {new_status}'
         )
+        
+        # Send notification to admin for important status changes
+        if new_status == 'ready':
+            try:
+                # Get all admin users
+                admin_users = User.objects.filter(role='admin')
+                
+                # Create notification for each admin
+                for admin in admin_users:
+                    Notification.objects.create(
+                        subject=f"Order #{order.order_number} is Ready for Pickup",
+                        message=f"Chef {request.user.first_name or request.user.username} has marked order #{order.order_number} as ready for pickup/delivery. Customer: {order.customer.first_name or order.customer.username}. Total: ${order.total_amount}",
+                        user=admin,
+                        status='Unread'
+                    )
+                
+                print(f"Admin notifications sent for order {order.order_number} marked as ready")
+                
+            except Exception as e:
+                # Don't fail the status update if notification fails
+                print(f"Failed to send admin notification for order {order.order_number}: {str(e)}")
+        
+        elif new_status == 'out_for_delivery':
+            try:
+                # Get all admin users
+                admin_users = User.objects.filter(role='admin')
+                
+                # Create notification for each admin
+                for admin in admin_users:
+                    Notification.objects.create(
+                        subject=f"Order #{order.order_number} Out for Delivery",
+                        message=f"Order #{order.order_number} has been sent out for delivery. Customer: {order.customer.first_name or order.customer.username}. Chef: {order.chef.first_name or order.chef.username}",
+                        user=admin,
+                        status='Unread'
+                    )
+                
+                print(f"Admin notifications sent for order {order.order_number} out for delivery")
+                
+            except Exception as e:
+                print(f"Failed to send admin notification for order {order.order_number}: {str(e)}")
         
         return Response({"success": f"Order status updated to {new_status}", "status": new_status})
 
@@ -560,3 +597,98 @@ def chef_recent_activity(request):
         
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def admin_notifications(request):
+    """
+    GET: Get notifications for admin users
+    PATCH: Mark notifications as read
+    """
+    # Only allow admin users
+    if request.user.role != 'admin':
+        return JsonResponse({"error": "Only admin users can access notifications"}, status=403)
+    
+    try:
+        if request.method == 'GET':
+            # Get query parameters
+            status_filter = request.GET.get('status', None)  # 'read', 'unread', or None for all
+            limit = int(request.GET.get('limit', 50))
+            
+            # Build query
+            notifications = Notification.objects.filter(user=request.user).order_by('-time')
+            
+            if status_filter:
+                status_value = 'Read' if status_filter.lower() == 'read' else 'Unread'
+                notifications = notifications.filter(status=status_value)
+            
+            # Apply limit
+            notifications = notifications[:limit]
+            
+            # Serialize notifications
+            notifications_data = []
+            for notification in notifications:
+                notifications_data.append({
+                    'id': notification.notification_id,
+                    'subject': notification.subject,
+                    'message': notification.message,
+                    'time': notification.time.isoformat(),
+                    'status': notification.status,
+                    'time_ago': get_time_ago(notification.time)
+                })
+            
+            return JsonResponse({
+                'notifications': notifications_data,
+                'total_count': len(notifications_data),
+                'unread_count': Notification.objects.filter(user=request.user, status='Unread').count()
+            })
+        
+        elif request.method == 'PATCH':
+            # Mark notifications as read
+            notification_ids = request.data.get('notification_ids', [])
+            mark_all = request.data.get('mark_all', False)
+            
+            if mark_all:
+                # Mark all notifications as read
+                updated_count = Notification.objects.filter(
+                    user=request.user, 
+                    status='Unread'
+                ).update(status='Read')
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'{updated_count} notifications marked as read'
+                })
+            
+            elif notification_ids:
+                # Mark specific notifications as read
+                updated_count = Notification.objects.filter(
+                    notification_id__in=notification_ids,
+                    user=request.user,
+                    status='Unread'
+                ).update(status='Read')
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'{updated_count} notifications marked as read'
+                })
+            
+            else:
+                return JsonResponse({"error": "No notification IDs provided"}, status=400)
+    
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+def get_time_ago(timestamp):
+    """Helper function to format time ago string"""
+    time_ago = timezone.now() - timestamp
+    if time_ago.days > 0:
+        return f"{time_ago.days} day{'s' if time_ago.days > 1 else ''} ago"
+    elif time_ago.seconds > 3600:
+        hours = time_ago.seconds // 3600
+        return f"{hours} hour{'s' if hours > 1 else ''} ago"
+    else:
+        minutes = time_ago.seconds // 60
+        return f"{minutes} minute{'s' if minutes > 1 else ''} ago"

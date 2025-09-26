@@ -305,10 +305,7 @@ export default function Profile() {
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <Star className="h-4 w-4 text-yellow-500" />
               <span>
-                {profileData?.rating_average ? 
-                  `${profileData.rating_average.toFixed(1)} rating • ${profileData.total_reviews || 0} reviews` :
-                  "No reviews yet"
-                }
+                {`${(profileData?.rating_average || 0).toFixed(1)} rating • ${profileData?.total_reviews || 0} reviews`}
               </span>
             </div>
           </CardHeader>

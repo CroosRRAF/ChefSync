@@ -108,10 +108,12 @@ class FoodPrice(models.Model):
         ('Small', 'Small'),
         ('Medium', 'Medium'),
         ('Large', 'Large'),
+        ('Extra Large', 'Extra Large'),
+        ('Family Size', 'Family Size'),
     ]
     
     price_id = models.AutoField(primary_key=True)
-    size = models.CharField(max_length=10, choices=SIZE_CHOICES)
+    size = models.CharField(max_length=15, choices=SIZE_CHOICES)
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
     preparation_time = models.PositiveIntegerField(help_text='Preparation time in minutes for this size', default=15)
     image_url = models.CharField(max_length=255, blank=True, null=True)
