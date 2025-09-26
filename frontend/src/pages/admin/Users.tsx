@@ -4,7 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { adminService, type AdminUser } from "@/services/adminService";
+import {
+  adminService,
+  type AdminUser,
+  type ApprovalDocument,
+  type PendingApprovalUser,
+} from "@/services/adminService";
 import {
   Activity,
   AlertTriangle,
@@ -27,9 +32,16 @@ import {
   UserX,
   XCircle,
 } from "lucide-react";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+
+type DocumentPreviewState = {
+  doc: ApprovalDocument;
+  url: string;
+  type: "image" | "pdf" | "other";
+  displayName: string;
+};
 
 const EnhancedUserManagement: React.FC = () => {
   const { user } = useAuth();
@@ -60,10 +72,336 @@ const EnhancedUserManagement: React.FC = () => {
 
   // Approval state
   const [activeTab, setActiveTab] = useState("users");
-  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<
+    PendingApprovalUser[]
+  >([]);
   const [approvalLoading, setApprovalLoading] = useState(false);
-  const [selectedApprovalUser, setSelectedApprovalUser] = useState<any>(null);
+  const [selectedApprovalUser, setSelectedApprovalUser] =
+    useState<PendingApprovalUser | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [documentPreview, setDocumentPreview] =
+    useState<DocumentPreviewState | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const previewUrlRef = useRef<string | null>(null);
+  const [documentReviewLoading, setDocumentReviewLoading] = useState<
+    number | null
+  >(null);
+
+  const guessMimeType = useCallback((extension: string): string => {
+    switch (extension) {
+      case "jpg":
+      case "jpeg":
+      case "jfif":
+        return "image/jpeg";
+      case "png":
+        return "image/png";
+      case "gif":
+        return "image/gif";
+      case "bmp":
+        return "image/bmp";
+      case "webp":
+        return "image/webp";
+      case "svg":
+        return "image/svg+xml";
+      case "heic":
+      case "heif":
+        return "image/heic";
+      case "avif":
+        return "image/avif";
+      case "pdf":
+        return "application/pdf";
+      default:
+        return "application/octet-stream";
+    }
+  }, []);
+
+  const resolveDocumentUrl = useCallback((filePath: string): string => {
+    if (!filePath) return "";
+    if (/^https?:\/\//i.test(filePath)) {
+      return filePath;
+    }
+
+    const baseUrl =
+      import.meta.env.VITE_MEDIA_BASE_URL ||
+      import.meta.env.VITE_BACKEND_URL ||
+      (typeof window !== "undefined"
+        ? window.location.origin
+        : "http://localhost:8000");
+
+    try {
+      return new URL(filePath, baseUrl).toString();
+    } catch (error) {
+      console.warn("Failed to resolve document URL", {
+        filePath,
+        baseUrl,
+        error,
+      });
+      return filePath;
+    }
+  }, []);
+
+  const handleDocumentPreview = useCallback(
+    async (doc: ApprovalDocument) => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+
+      const sanitizedPath = (doc.file || "").split("?")[0];
+      const extension = sanitizedPath.split(".").pop()?.toLowerCase() ?? "";
+      const imageExtensions = [
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "bmp",
+        "webp",
+        "svg",
+        "heic",
+        "heif",
+        "jfif",
+        "avif",
+      ];
+
+      let type: DocumentPreviewState["type"] = "other";
+      if (imageExtensions.includes(extension)) {
+        type = "image";
+      } else if (extension === "pdf") {
+        type = "pdf";
+      }
+
+      const displayName =
+        doc.file_name ||
+        doc.document_type?.name ||
+        doc.file?.split("/").pop() ||
+        "Document";
+
+      setPreviewLoading(true);
+      setDocumentPreview({
+        doc,
+        url: "",
+        type,
+        displayName,
+      });
+
+      try {
+        const blob = await adminService.fetchDocumentBlob(doc.id, {
+          preview: true,
+          fileUrl: doc.file,
+        });
+
+        const blobType =
+          blob.type && blob.type !== "application/octet-stream"
+            ? blob.type
+            : guessMimeType(extension);
+        const typedBlob =
+          blobType === blob.type ? blob : new Blob([blob], { type: blobType });
+
+        const objectUrl = URL.createObjectURL(typedBlob);
+
+        if (previewUrlRef.current) {
+          URL.revokeObjectURL(previewUrlRef.current);
+        }
+        previewUrlRef.current = objectUrl;
+
+        setDocumentPreview((current) =>
+          current && current.doc.id === doc.id
+            ? { ...current, url: objectUrl }
+            : {
+                doc,
+                url: objectUrl,
+                type,
+                displayName,
+              }
+        );
+      } catch (error) {
+        console.error("Failed to load document preview via proxy:", error);
+        const fallbackUrl = resolveDocumentUrl(doc.file);
+
+        if (fallbackUrl) {
+          setDocumentPreview({
+            doc,
+            url: fallbackUrl,
+            type,
+            displayName,
+          });
+        } else {
+          setDocumentPreview(null);
+          alert(
+            "Unable to preview this document. Please try downloading it instead."
+          );
+        }
+
+        previewUrlRef.current = null;
+      } finally {
+        setPreviewLoading(false);
+      }
+    },
+    [guessMimeType, resolveDocumentUrl]
+  );
+
+  const handleDocumentDownload = useCallback(
+    async (doc: ApprovalDocument) => {
+      try {
+        const blob = await adminService.fetchDocumentBlob(doc.id, {
+          preview: false,
+          fileUrl: doc.file,
+        });
+        const sanitizedPath = (doc.file || "").split("?")[0];
+        const extension = sanitizedPath.split(".").pop()?.toLowerCase() ?? "";
+        const blobType =
+          blob.type && blob.type !== "application/octet-stream"
+            ? blob.type
+            : guessMimeType(extension);
+        const typedBlob =
+          blobType === blob.type ? blob : new Blob([blob], { type: blobType });
+
+        const downloadUrl = URL.createObjectURL(typedBlob);
+
+        if (typeof document !== "undefined") {
+          const link = document.createElement("a");
+          link.href = downloadUrl;
+          link.download =
+            doc.file_name ||
+            doc.document_type?.name ||
+            doc.file?.split("/").pop() ||
+            "document";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+
+        URL.revokeObjectURL(downloadUrl);
+      } catch (error) {
+        console.error("Failed to download document via proxy:", error);
+        const fallbackUrl = resolveDocumentUrl(doc.file);
+
+        if (fallbackUrl && typeof window !== "undefined") {
+          window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+        } else {
+          alert("Unable to download document. Please try again later.");
+        }
+      }
+    },
+    [guessMimeType, resolveDocumentUrl]
+  );
+
+  const handleDocumentReview = useCallback(
+    async (
+      doc: ApprovalDocument,
+      status: ApprovalDocument["status"],
+      requireNotes: boolean = false
+    ) => {
+      let notes = doc.admin_notes ?? "";
+
+      if (status !== "approved") {
+        const promptMessage =
+          status === "rejected"
+            ? "Please provide a reason for rejecting this document"
+            : "Optional notes for the applicant (leave blank to skip)";
+        const result = window.prompt(promptMessage, notes);
+        if (result === null) {
+          return;
+        }
+        notes = result.trim();
+
+        if (requireNotes && !notes) {
+          alert("Notes are required for this action.");
+          return;
+        }
+      }
+
+      setDocumentReviewLoading(doc.id);
+
+      try {
+        const updatedDoc = await adminService.reviewDocument(doc.id, {
+          status,
+          notes,
+        });
+
+        setSelectedApprovalUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                documents: prev.documents.map((item) =>
+                  item.id === updatedDoc.id ? { ...item, ...updatedDoc } : item
+                ),
+              }
+            : prev
+        );
+
+        setPendingApprovals((prev) =>
+          prev.map((user) => {
+            if (!user.documents?.length) {
+              return user;
+            }
+
+            if (!user.documents.some((item) => item.id === updatedDoc.id)) {
+              return user;
+            }
+
+            return {
+              ...user,
+              documents: user.documents.map((item) =>
+                item.id === updatedDoc.id ? { ...item, ...updatedDoc } : item
+              ),
+            };
+          })
+        );
+
+        setDocumentPreview((prev) =>
+          prev && prev.doc.id === updatedDoc.id
+            ? { ...prev, doc: { ...prev.doc, ...updatedDoc } }
+            : prev
+        );
+      } catch (error) {
+        console.error("Failed to update document status:", error);
+        alert(
+          error instanceof Error
+            ? error.message
+            : "Failed to update document status"
+        );
+      } finally {
+        setDocumentReviewLoading(null);
+      }
+    },
+    []
+  );
+
+  const closeDocumentPreview = useCallback(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    setPreviewLoading(false);
+    setDocumentPreview(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      showApprovalModal &&
+      selectedApprovalUser?.documents?.length &&
+      !documentPreview &&
+      !previewLoading
+    ) {
+      void handleDocumentPreview(selectedApprovalUser.documents[0]);
+    }
+  }, [
+    showApprovalModal,
+    selectedApprovalUser,
+    documentPreview,
+    previewLoading,
+    handleDocumentPreview,
+  ]);
 
   // Fetch users
   const fetchUsers = useCallback(
@@ -473,6 +811,12 @@ const EnhancedUserManagement: React.FC = () => {
         prev.filter((user) => user.user_id !== userId)
       );
 
+      if (selectedApprovalUser?.user_id === userId) {
+        setShowApprovalModal(false);
+        setSelectedApprovalUser(null);
+        closeDocumentPreview();
+      }
+
       // Refresh approvals
       fetchPendingApprovals();
 
@@ -489,11 +833,12 @@ const EnhancedUserManagement: React.FC = () => {
   };
 
   // Handle approval user detail view
-  const handleApprovalUserDetail = async (user: any) => {
+  const handleApprovalUserDetail = async (user: PendingApprovalUser) => {
     try {
       const userDetails = await adminService.getUserForApproval(user.user_id);
       setSelectedApprovalUser(userDetails);
       setShowApprovalModal(true);
+      setDocumentPreview(null);
     } catch (err) {
       console.error("Failed to fetch user details for approval:", err);
       setError(
@@ -2092,23 +2437,24 @@ const EnhancedUserManagement: React.FC = () => {
                             </span>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {user.documents
+                            {(user.documents ?? [])
                               .slice(0, 4)
-                              .map((doc: any, index: number) => (
+                              .map((doc, index) => (
                                 <div
-                                  key={index}
+                                  key={`${doc.id}-${index}`}
                                   className="flex items-center space-x-2 p-2 bg-muted rounded"
                                 >
                                   <FileText className="h-4 w-4" />
                                   <span className="text-sm truncate">
-                                    {doc.document_type.name}
+                                    {doc.document_type?.name || doc.file_name}
                                   </span>
                                 </div>
                               ))}
-                            {user.documents.length > 4 && (
+                            {(user.documents?.length ?? 0) > 4 && (
                               <div className="flex items-center space-x-2 p-2 bg-muted rounded">
                                 <span className="text-sm text-muted-foreground">
-                                  +{user.documents.length - 4} more documents
+                                  +{(user.documents?.length ?? 0) - 4} more
+                                  documents
                                 </span>
                               </div>
                             )}
@@ -2169,6 +2515,7 @@ const EnhancedUserManagement: React.FC = () => {
                     onClick={() => {
                       setShowApprovalModal(false);
                       setSelectedApprovalUser(null);
+                      closeDocumentPreview();
                     }}
                   >
                     ✕
@@ -2242,29 +2589,47 @@ const EnhancedUserManagement: React.FC = () => {
                 </Card>
 
                 {/* Documents */}
-                {selectedApprovalUser.documents &&
-                  selectedApprovalUser.documents.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center">
-                          <FileText className="h-5 w-5 mr-2" />
-                          Submitted Documents (
-                          {selectedApprovalUser.documents.length})
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {selectedApprovalUser.documents.map(
-                            (doc: any, index: number) => (
-                              <Card key={index} className="p-4">
-                                <div className="flex items-center space-x-3">
-                                  <FileText className="h-8 w-8 text-muted-foreground" />
-                                  <div className="flex-1">
+                {(selectedApprovalUser.documents?.length ?? 0) > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <FileText className="h-5 w-5 mr-2" />
+                        Submitted Documents (
+                        {selectedApprovalUser.documents?.length ?? 0})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {(selectedApprovalUser.documents ?? []).map((doc) => {
+                          const statusStyles: Record<string, string> = {
+                            pending:
+                              "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-200",
+                            approved:
+                              "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-200",
+                            rejected:
+                              "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200",
+                            needs_resubmission:
+                              "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-200",
+                          };
+
+                          const statusLabel =
+                            doc.status_display ||
+                            doc.status
+                              .replace(/_/g, " ")
+                              .replace(/\b\w/g, (c) => c.toUpperCase());
+
+                          return (
+                            <Card key={doc.id} className="p-4 space-y-4">
+                              <div className="flex items-start space-x-3">
+                                <FileText className="h-8 w-8 text-muted-foreground mt-1" />
+                                <div className="flex-1 space-y-2">
+                                  <div>
                                     <h4 className="font-medium">
-                                      {doc.document_type.name}
+                                      {doc.document_type?.name || doc.file_name}
                                     </h4>
                                     <p className="text-sm text-muted-foreground">
-                                      {doc.document_type.description}
+                                      {doc.document_type?.description ||
+                                        doc.file_name}
                                     </p>
                                     <p className="text-xs text-muted-foreground mt-1">
                                       Uploaded{" "}
@@ -2273,24 +2638,99 @@ const EnhancedUserManagement: React.FC = () => {
                                       ).toLocaleDateString()}
                                     </p>
                                   </div>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      window.open(doc.file, "_blank")
-                                    }
-                                  >
-                                    <Eye className="h-4 w-4 mr-1" />
-                                    View
-                                  </Button>
+
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span
+                                      className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                                        statusStyles[doc.status]
+                                      }`}
+                                    >
+                                      {statusLabel}
+                                    </span>
+                                    {doc.reviewed_by_name && (
+                                      <span className="text-xs text-muted-foreground">
+                                        Reviewed by {doc.reviewed_by_name}
+                                        {doc.reviewed_at
+                                          ? ` on ${new Date(
+                                              doc.reviewed_at
+                                            ).toLocaleDateString()}`
+                                          : ""}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {doc.admin_notes && (
+                                    <p className="text-xs italic text-muted-foreground">
+                                      Notes: {doc.admin_notes}
+                                    </p>
+                                  )}
                                 </div>
-                              </Card>
-                            )
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDocumentPreview(doc)}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  Preview
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDocumentDownload(doc)}
+                                >
+                                  <Download className="h-4 w-4 mr-1" />
+                                  Download
+                                </Button>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                  disabled={documentReviewLoading === doc.id}
+                                  onClick={() =>
+                                    handleDocumentReview(doc, "approved")
+                                  }
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Mark Approved
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  disabled={documentReviewLoading === doc.id}
+                                  onClick={() =>
+                                    handleDocumentReview(doc, "rejected", true)
+                                  }
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Reject Document
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={documentReviewLoading === doc.id}
+                                  onClick={() =>
+                                    handleDocumentReview(
+                                      doc,
+                                      "needs_resubmission"
+                                    )
+                                  }
+                                >
+                                  <RefreshCw className="h-4 w-4 mr-1" />
+                                  Needs Resubmission
+                                </Button>
+                              </div>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Approval Actions */}
                 <Card>
@@ -2337,6 +2777,90 @@ const EnhancedUserManagement: React.FC = () => {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {documentPreview && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] animate-in fade-in-0 duration-200 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {documentPreview.displayName}
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {documentPreview.doc.document_type?.name || "Document"}
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={previewLoading}
+                  onClick={() => handleDocumentDownload(documentPreview.doc)}
+                >
+                  {previewLoading ? (
+                    <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-1" />
+                  )}
+                  Download
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={closeDocumentPreview}
+                >
+                  ✕
+                </Button>
+              </div>
+            </div>
+            <div
+              className="bg-gray-50 dark:bg-gray-950 p-4 flex items-center justify-center overflow-auto"
+              style={{ maxHeight: "calc(90vh - 100px)" }}
+            >
+              {previewLoading || !documentPreview.url ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400 space-y-3">
+                  <RefreshCw className="h-8 w-8 animate-spin" />
+                  <p className="text-sm">Loading document preview...</p>
+                </div>
+              ) : (
+                <>
+                  {documentPreview.type === "image" && (
+                    <img
+                      src={documentPreview.url}
+                      alt={documentPreview.displayName}
+                      className="max-h-full max-w-full object-contain rounded-lg shadow-lg"
+                    />
+                  )}
+                  {documentPreview.type === "pdf" && (
+                    <iframe
+                      src={documentPreview.url}
+                      title={documentPreview.displayName}
+                      className="w-full h-[70vh] rounded-lg border border-gray-200 dark:border-gray-700"
+                    />
+                  )}
+                  {documentPreview.type === "other" && (
+                    <div className="text-center space-y-4 text-gray-700 dark:text-gray-300">
+                      <FileText className="h-12 w-12 mx-auto text-gray-400" />
+                      <p>
+                        Preview not available for this file type. You can
+                        download the file using the button above.
+                      </p>
+                      <Button
+                        onClick={() =>
+                          handleDocumentDownload(documentPreview.doc)
+                        }
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Document
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>

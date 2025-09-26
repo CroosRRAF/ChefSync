@@ -71,14 +71,16 @@ def csrf_token(request):
     except Exception as e:
         print(f"Error in csrf_token view: {e}")
         import traceback
+
         traceback.print_exc()
         return Response(
             {"error": f"Failed to generate CSRF token: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
 import requests
+
 # Google OAuth imports removed - using direct API calls instead
 
 
@@ -651,10 +653,11 @@ def google_oauth_login(request):
 
         email = user_info.get("email")
         name = user_info.get("name", "")
-        
+
         if not email:
             return Response(
-                {"error": "Email is required in user info"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "Email is required in user info"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Get or create user
@@ -1610,6 +1613,60 @@ def proxy_document_download(request):
         )
 
 
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def review_document(request, document_id):
+    """Update the verification status of a user document"""
+
+    try:
+        document = UserDocument.objects.select_related("user", "document_type").get(
+            id=document_id
+        )
+    except UserDocument.DoesNotExist:
+        return Response(
+            {"error": "Document not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+
+    status_value = request.data.get("status")
+    notes = request.data.get("notes", "")
+
+    valid_statuses = {choice[0] for choice in UserDocument.STATUS_CHOICES}
+    if status_value not in valid_statuses:
+        return Response(
+            {
+                "error": "Invalid status value",
+                "valid_statuses": list(valid_statuses),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    document.status = status_value
+    document.admin_notes = notes
+    document.reviewed_by = request.user
+    document.reviewed_at = timezone.now()
+    document.is_visible_to_admin = True
+    document.save(
+        update_fields=[
+            "status",
+            "admin_notes",
+            "reviewed_by",
+            "reviewed_at",
+            "is_visible_to_admin",
+            "updated_at",
+        ]
+    )
+
+    serializer = UserDocumentSerializer(document, context={"request": request})
+
+    return Response(
+        {
+            "message": "Document status updated successfully",
+            "document": serializer.data,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
 # Admin Approval Endpoints
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdminUser])
@@ -2402,9 +2459,7 @@ def get_user_stats(request):
         # Role distribution
         admins = User.objects.filter(role__in=["admin", "Admin"]).count()
         cooks = User.objects.filter(role__in=["cook", "Cook"]).count()
-        delivery_agents = User.objects.filter(
-            role="DeliveryAgent"
-        ).count()
+        delivery_agents = User.objects.filter(role="DeliveryAgent").count()
         customers = User.objects.filter(role__in=["customer", "Customer"]).count()
 
         stats = {

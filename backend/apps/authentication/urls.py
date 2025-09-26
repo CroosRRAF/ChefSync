@@ -82,6 +82,11 @@ urlpatterns = [
         name="delete_document",
     ),
     path(
+        "documents/<int:document_id>/review/",
+        views.review_document,
+        name="review_document",
+    ),
+    path(
         "documents/proxy-download/",
         views.proxy_document_download,
         name="proxy_document_download",

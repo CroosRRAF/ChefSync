@@ -200,6 +200,38 @@ export interface AdminActivityLog {
   metadata: Record<string, unknown>;
 }
 
+export interface ApprovalDocument {
+  id: number;
+  file_name: string;
+  file: string;
+  file_size?: number;
+  file_type?: string;
+  document_type: {
+    id: number;
+    name: string;
+    description: string;
+  };
+  uploaded_at: string;
+  updated_at?: string;
+  is_visible_to_admin: boolean;
+  status: "pending" | "approved" | "rejected" | "needs_resubmission";
+  status_display?: string;
+  admin_notes?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by_name?: string | null;
+}
+
+export interface PendingApprovalUser {
+  user_id: number;
+  name: string;
+  email: string;
+  role: string;
+  phone_no?: string;
+  address?: string;
+  created_at: string;
+  approval_status: string;
+  documents: ApprovalDocument[];
+}
 
 export interface PaginationInfo {
   page: number;
@@ -220,6 +252,53 @@ export interface OrderListResponse {
 
 class AdminService {
   private baseUrl = "/admin";
+
+  async fetchDocumentBlob(
+    documentId: number,
+    options: { preview?: boolean; fileUrl?: string } = {}
+  ): Promise<Blob> {
+    try {
+      const response = await apiClient.post(
+        `/auth/documents/proxy-download/`,
+        {
+          document_id: documentId,
+          preview: options.preview ?? false,
+          file_url: options.fileUrl ?? undefined,
+        },
+        {
+          responseType: "blob",
+        }
+      );
+
+      return response.data as Blob;
+    } catch (error) {
+      console.error("Error fetching document blob:", error);
+      throw new Error("Failed to retrieve document content");
+    }
+  }
+
+  async reviewDocument(
+    documentId: number,
+    payload: {
+      status: "pending" | "approved" | "rejected" | "needs_resubmission";
+      notes?: string;
+    }
+  ): Promise<ApprovalDocument> {
+    try {
+      const response = await apiClient.patch(
+        `/auth/documents/${documentId}/review/`,
+        {
+          status: payload.status,
+          notes: payload.notes ?? "",
+        }
+      );
+
+      return response.data.document as ApprovalDocument;
+    } catch (error) {
+      console.error("Error updating document status:", error);
+      throw new Error("Failed to update document status");
+    }
+  }
 
   // Dashboard Statistics
   async getDashboardStats(): Promise<DashboardStats> {
@@ -310,15 +389,17 @@ class AdminService {
     }
   }
 
-  async getOrders(params: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    payment_status?: string;
-    search?: string;
-    sort_by?: string;
-    sort_order?: 'asc' | 'desc';
-  } = {}): Promise<{
+  async getOrders(
+    params: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      payment_status?: string;
+      search?: string;
+      sort_by?: string;
+      sort_order?: "asc" | "desc";
+    } = {}
+  ): Promise<{
     orders: AdminOrder[];
     pagination: {
       page: number;
@@ -329,22 +410,22 @@ class AdminService {
   }> {
     try {
       console.log(`🔄 AdminService: Fetching orders with params:`, params);
-      
+
       const response = await apiClient.get(`${this.baseUrl}/orders/`, {
         params: {
           page: params.page || 1,
           limit: params.limit || 20,
-          status: params.status || '',
-          payment_status: params.payment_status || '',
-          search: params.search || '',
-          sort_by: params.sort_by || 'created_at',
-          sort_order: params.sort_order || 'desc',
+          status: params.status || "",
+          payment_status: params.payment_status || "",
+          search: params.search || "",
+          sort_by: params.sort_by || "created_at",
+          sort_order: params.sort_order || "desc",
         },
       });
 
       console.log(`✅ AdminService: Orders response:`, {
         ordersCount: response.data.orders?.length || 0,
-        pagination: response.data.pagination
+        pagination: response.data.pagination,
       });
 
       // Transform data to ensure type safety
@@ -387,18 +468,22 @@ class AdminService {
         status: error?.response?.status,
         url: error?.config?.url,
       });
-      throw new Error(`Failed to fetch orders: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to fetch orders: ${error?.message || "Unknown error"}`
+      );
     }
   }
 
   async getOrderDetails(orderId: number): Promise<any> {
     try {
       console.log(`🔄 AdminService: Fetching order details for ID: ${orderId}`);
-      
-      const response = await apiClient.get(`${this.baseUrl}/orders/${orderId}/`);
-      
+
+      const response = await apiClient.get(
+        `${this.baseUrl}/orders/${orderId}/details/`
+      );
+
       console.log(`✅ AdminService: Order details response:`, response.data);
-      
+
       return response.data;
     } catch (error: any) {
       console.error("❌ AdminService: Error fetching order details:", {
@@ -407,20 +492,30 @@ class AdminService {
         status: error?.response?.status,
         url: error?.config?.url,
       });
-      throw new Error(`Failed to fetch order details: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to fetch order details: ${error?.message || "Unknown error"}`
+      );
     }
   }
 
   async updateOrderStatus(orderId: number, newStatus: string): Promise<any> {
     try {
-      console.log(`🔄 AdminService: Updating order ${orderId} status to ${newStatus}`);
-      
-      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/update_status/`, {
-        status: newStatus
-      });
-      
-      console.log(`✅ AdminService: Order status update response:`, response.data);
-      
+      console.log(
+        `🔄 AdminService: Updating order ${orderId} status to ${newStatus}`
+      );
+
+      const response = await apiClient.patch(
+        `${this.baseUrl}/orders/${orderId}/update_status/`,
+        {
+          status: newStatus,
+        }
+      );
+
+      console.log(
+        `✅ AdminService: Order status update response:`,
+        response.data
+      );
+
       return response.data;
     } catch (error: any) {
       console.error("❌ AdminService: Error updating order status:", {
@@ -429,20 +524,27 @@ class AdminService {
         status: error?.response?.status,
         url: error?.config?.url,
       });
-      throw new Error(`Failed to update order status: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to update order status: ${error?.message || "Unknown error"}`
+      );
     }
   }
 
   async assignChef(orderId: number, chefId: number): Promise<any> {
     try {
-      console.log(`🔄 AdminService: Assigning chef ${chefId} to order ${orderId}`);
-      
-      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/assign_chef/`, {
-        chef_id: chefId
-      });
-      
+      console.log(
+        `🔄 AdminService: Assigning chef ${chefId} to order ${orderId}`
+      );
+
+      const response = await apiClient.patch(
+        `${this.baseUrl}/orders/${orderId}/assign_chef/`,
+        {
+          chef_id: chefId,
+        }
+      );
+
       console.log(`✅ AdminService: Chef assignment response:`, response.data);
-      
+
       return response.data;
     } catch (error: any) {
       console.error("❌ AdminService: Error assigning chef:", {
@@ -451,20 +553,33 @@ class AdminService {
         status: error?.response?.status,
         url: error?.config?.url,
       });
-      throw new Error(`Failed to assign chef: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to assign chef: ${error?.message || "Unknown error"}`
+      );
     }
   }
 
-  async assignDeliveryPartner(orderId: number, partnerId: number): Promise<any> {
+  async assignDeliveryPartner(
+    orderId: number,
+    partnerId: number
+  ): Promise<any> {
     try {
-      console.log(`🔄 AdminService: Assigning delivery partner ${partnerId} to order ${orderId}`);
-      
-      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/assign_delivery_partner/`, {
-        partner_id: partnerId
-      });
-      
-      console.log(`✅ AdminService: Delivery partner assignment response:`, response.data);
-      
+      console.log(
+        `🔄 AdminService: Assigning delivery partner ${partnerId} to order ${orderId}`
+      );
+
+      const response = await apiClient.patch(
+        `${this.baseUrl}/orders/${orderId}/assign_delivery_partner/`,
+        {
+          partner_id: partnerId,
+        }
+      );
+
+      console.log(
+        `✅ AdminService: Delivery partner assignment response:`,
+        response.data
+      );
+
       return response.data;
     } catch (error: any) {
       console.error("❌ AdminService: Error assigning delivery partner:", {
@@ -473,18 +588,24 @@ class AdminService {
         status: error?.response?.status,
         url: error?.config?.url,
       });
-      throw new Error(`Failed to assign delivery partner: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to assign delivery partner: ${
+          error?.message || "Unknown error"
+        }`
+      );
     }
   }
 
   async getAvailableChefs(): Promise<any[]> {
     try {
       console.log(`🔄 AdminService: Fetching available chefs`);
-      
-      const response = await apiClient.get(`${this.baseUrl}/orders/available_chefs/`);
-      
+
+      const response = await apiClient.get(
+        `${this.baseUrl}/orders/available_chefs/`
+      );
+
       console.log(`✅ AdminService: Available chefs response:`, response.data);
-      
+
       return response.data.chefs || [];
     } catch (error: any) {
       console.error("❌ AdminService: Error fetching available chefs:", {
@@ -493,27 +614,41 @@ class AdminService {
         status: error?.response?.status,
         url: error?.config?.url,
       });
-      throw new Error(`Failed to fetch available chefs: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to fetch available chefs: ${error?.message || "Unknown error"}`
+      );
     }
   }
 
   async getAvailableDeliveryPartners(): Promise<any[]> {
     try {
       console.log(`🔄 AdminService: Fetching available delivery partners`);
-      
-      const response = await apiClient.get(`${this.baseUrl}/orders/available_delivery_partners/`);
-      
-      console.log(`✅ AdminService: Available delivery partners response:`, response.data);
-      
+
+      const response = await apiClient.get(
+        `${this.baseUrl}/orders/available_delivery_partners/`
+      );
+
+      console.log(
+        `✅ AdminService: Available delivery partners response:`,
+        response.data
+      );
+
       return response.data.partners || [];
     } catch (error: any) {
-      console.error("❌ AdminService: Error fetching available delivery partners:", {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        url: error?.config?.url,
-      });
-      throw new Error(`Failed to fetch available delivery partners: ${error?.message || 'Unknown error'}`);
+      console.error(
+        "❌ AdminService: Error fetching available delivery partners:",
+        {
+          message: error?.message,
+          response: error?.response?.data,
+          status: error?.response?.status,
+          url: error?.config?.url,
+        }
+      );
+      throw new Error(
+        `Failed to fetch available delivery partners: ${
+          error?.message || "Unknown error"
+        }`
+      );
     }
   }
 
@@ -904,7 +1039,10 @@ class AdminService {
   async updateUser(userId: number, updates: Partial<AdminUser>): Promise<void> {
     try {
       console.log(`🔄 AdminService: Updating user ${userId} with:`, updates);
-      await apiClient.patch(`${this.baseUrl}/users/${userId}/update_user/`, updates);
+      await apiClient.patch(
+        `${this.baseUrl}/users/${userId}/update_user/`,
+        updates
+      );
       console.log(`✅ AdminService: Update successful`);
     } catch (error: any) {
       console.error("❌ AdminService: Error updating user:", error);
@@ -913,14 +1051,15 @@ class AdminService {
         statusText: error.response?.statusText,
         data: error.response?.data,
         url: error.config?.url,
-        method: error.config?.method
+        method: error.config?.method,
       });
-      
+
       // Re-throw with more specific error message
-      const errorMessage = error.response?.data?.error || 
-                         error.response?.data?.detail || 
-                         error.message || 
-                         "Failed to update user";
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to update user";
       throw new Error(errorMessage);
     }
   }
@@ -939,14 +1078,15 @@ class AdminService {
         statusText: error.response?.statusText,
         data: error.response?.data,
         url: error.config?.url,
-        method: error.config?.method
+        method: error.config?.method,
       });
-      
+
       // Re-throw with more specific error message
-      const errorMessage = error.response?.data?.error || 
-                         error.response?.data?.detail || 
-                         error.message || 
-                         "Failed to fetch user stats";
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to fetch user stats";
       throw new Error(errorMessage);
     }
   }
@@ -967,14 +1107,15 @@ class AdminService {
         statusText: error.response?.statusText,
         data: error.response?.data,
         url: error.config?.url,
-        method: error.config?.method
+        method: error.config?.method,
       });
-      
+
       // Re-throw with more specific error message
-      const errorMessage = error.response?.data?.error || 
-                         error.response?.data?.detail || 
-                         error.message || 
-                         "Failed to activate user";
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to activate user";
       throw new Error(errorMessage);
     }
   }
@@ -994,14 +1135,15 @@ class AdminService {
         statusText: error.response?.statusText,
         data: error.response?.data,
         url: error.config?.url,
-        method: error.config?.method
+        method: error.config?.method,
       });
-      
+
       // Re-throw with more specific error message
-      const errorMessage = error.response?.data?.error || 
-                         error.response?.data?.detail || 
-                         error.message || 
-                         "Failed to deactivate user";
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to deactivate user";
       throw new Error(errorMessage);
     }
   }
@@ -1113,30 +1255,7 @@ class AdminService {
     params: {
       role?: string;
     } = {}
-  ): Promise<
-    {
-      user_id: number;
-      name: string;
-      email: string;
-      role: string;
-      phone_no?: string;
-      address?: string;
-      created_at: string;
-      approval_status: string;
-      documents: Array<{
-        id: number;
-        file_name: string;
-        file: string;
-        document_type: {
-          id: number;
-          name: string;
-          description: string;
-        };
-        uploaded_at: string;
-        is_visible_to_admin: boolean;
-      }>;
-    }[]
-  > {
+  ): Promise<PendingApprovalUser[]> {
     try {
       console.log(
         "🔄 AdminService: Fetching pending approvals with params:",
@@ -1158,38 +1277,17 @@ class AdminService {
         config
       );
       console.log("✅ API Response received:", response.status, response.data);
-      return response.data.users || []; // Extract users array from response
+      return (response.data.users || []) as PendingApprovalUser[]; // Extract users array from response
     } catch (error) {
       console.error("❌ Error fetching pending approvals:", error);
       throw new Error("Failed to fetch pending approvals");
     }
   }
 
-  async getUserForApproval(userId: number): Promise<{
-    user_id: number;
-    name: string;
-    email: string;
-    role: string;
-    phone_no?: string;
-    address?: string;
-    created_at: string;
-    approval_status: string;
-    documents: Array<{
-      id: number;
-      file_name: string;
-      file: string;
-      document_type: {
-        id: number;
-        name: string;
-        description: string;
-      };
-      uploaded_at: string;
-      is_visible_to_admin: boolean;
-    }>;
-  }> {
+  async getUserForApproval(userId: number): Promise<PendingApprovalUser> {
     try {
       const response = await apiClient.get(`/auth/admin/user/${userId}/`);
-      return response.data;
+      return response.data as PendingApprovalUser;
     } catch (error) {
       console.error("Error fetching user for approval:", error);
       throw new Error("Failed to fetch user details");
@@ -1261,13 +1359,16 @@ class AdminService {
   ): Promise<Blob> {
     try {
       console.log(`🔄 AdminService: Exporting users with params:`, params);
-      const response = await apiClient.get(`${this.baseUrl}/users/export_users/`, {
-        params: {
-          role: params.role || "",
-          status: params.status || "",
-        },
-        responseType: "blob",
-      });
+      const response = await apiClient.get(
+        `${this.baseUrl}/users/export_users/`,
+        {
+          params: {
+            role: params.role || "",
+            status: params.status || "",
+          },
+          responseType: "blob",
+        }
+      );
       console.log(`✅ AdminService: Export successful`);
       return response.data;
     } catch (error: any) {
@@ -1277,14 +1378,15 @@ class AdminService {
         statusText: error.response?.statusText,
         data: error.response?.data,
         url: error.config?.url,
-        method: error.config?.method
+        method: error.config?.method,
       });
-      
+
       // Re-throw with more specific error message
-      const errorMessage = error.response?.data?.error || 
-                         error.response?.data?.detail || 
-                         error.message || 
-                         "Failed to export users";
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to export users";
       throw new Error(errorMessage);
     }
   }
@@ -1355,20 +1457,26 @@ class AdminService {
   // System Settings
   async getSystemSettings(category?: string): Promise<SystemSetting[]> {
     try {
-      console.log(`🔄 AdminService: Fetching system settings${category ? ` for category: ${category}` : ''}`);
-      
+      console.log(
+        `🔄 AdminService: Fetching system settings${
+          category ? ` for category: ${category}` : ""
+        }`
+      );
+
       const params = category ? { category } : {};
-      const response = await apiClient.get(`${this.baseUrl}/settings/`, { params });
-      
+      const response = await apiClient.get(`${this.baseUrl}/settings/`, {
+        params,
+      });
+
       console.log(`✅ AdminService: System settings response:`, response.data);
-      
+
       // Handle paginated response - return results array
       if (response.data && Array.isArray(response.data.results)) {
         return response.data.results;
       } else if (Array.isArray(response.data)) {
         return response.data;
       } else {
-        throw new Error('Invalid response format from server');
+        throw new Error("Invalid response format from server");
       }
     } catch (error: any) {
       console.error("❌ AdminService: Error fetching system settings:", {
@@ -1377,20 +1485,34 @@ class AdminService {
         status: error?.response?.status,
         url: error?.config?.url,
       });
-      throw new Error(`Failed to fetch system settings: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to fetch system settings: ${error?.message || "Unknown error"}`
+      );
     }
   }
 
-  async updateSystemSetting(key: string, value: string | number | boolean): Promise<SystemSetting> {
+  async updateSystemSetting(
+    key: string,
+    value: string | number | boolean
+  ): Promise<SystemSetting> {
     try {
-      console.log(`🔄 AdminService: Updating system setting ${key} with value:`, value);
-      
-      const response = await apiClient.patch(`${this.baseUrl}/settings/${key}/`, {
-        value: value.toString()
-      });
-      
-      console.log(`✅ AdminService: System setting update response:`, response.data);
-      
+      console.log(
+        `🔄 AdminService: Updating system setting ${key} with value:`,
+        value
+      );
+
+      const response = await apiClient.patch(
+        `${this.baseUrl}/settings/${key}/`,
+        {
+          value: value.toString(),
+        }
+      );
+
+      console.log(
+        `✅ AdminService: System setting update response:`,
+        response.data
+      );
+
       return response.data;
     } catch (error: any) {
       console.error("❌ AdminService: Error updating system setting:", {
@@ -1399,18 +1521,28 @@ class AdminService {
         status: error?.response?.status,
         url: error?.config?.url,
       });
-      throw new Error(`Failed to update system setting: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to update system setting: ${error?.message || "Unknown error"}`
+      );
     }
   }
 
-  async createSystemSetting(setting: Partial<SystemSetting>): Promise<SystemSetting> {
+  async createSystemSetting(
+    setting: Partial<SystemSetting>
+  ): Promise<SystemSetting> {
     try {
       console.log(`🔄 AdminService: Creating system setting:`, setting);
-      
-      const response = await apiClient.post(`${this.baseUrl}/settings/`, setting);
-      
-      console.log(`✅ AdminService: System setting creation response:`, response.data);
-      
+
+      const response = await apiClient.post(
+        `${this.baseUrl}/settings/`,
+        setting
+      );
+
+      console.log(
+        `✅ AdminService: System setting creation response:`,
+        response.data
+      );
+
       return response.data;
     } catch (error: any) {
       console.error("❌ AdminService: Error creating system setting:", {
@@ -1419,16 +1551,18 @@ class AdminService {
         status: error?.response?.status,
         url: error?.config?.url,
       });
-      throw new Error(`Failed to create system setting: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to create system setting: ${error?.message || "Unknown error"}`
+      );
     }
   }
 
   async deleteSystemSetting(key: string): Promise<void> {
     try {
       console.log(`🔄 AdminService: Deleting system setting: ${key}`);
-      
+
       await apiClient.delete(`${this.baseUrl}/settings/${key}/`);
-      
+
       console.log(`✅ AdminService: System setting deleted successfully`);
     } catch (error: any) {
       console.error("❌ AdminService: Error deleting system setting:", {
@@ -1437,7 +1571,9 @@ class AdminService {
         status: error?.response?.status,
         url: error?.config?.url,
       });
-      throw new Error(`Failed to delete system setting: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to delete system setting: ${error?.message || "Unknown error"}`
+      );
     }
   }
 }
