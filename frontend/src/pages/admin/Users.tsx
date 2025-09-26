@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { adminService, type AdminUser } from "@/services/adminService";
 import {
+  Activity,
   AlertTriangle,
   Calendar,
   CheckCircle,
   Clock,
+  Clock3,
   DollarSign,
   Download,
   Eye,
@@ -17,21 +19,13 @@ import {
   Filter,
   RefreshCw,
   Search,
+  Shield,
   Trash2,
+  TrendingUp,
   UserCheck,
   Users,
   UserX,
   XCircle,
-  Shield,
-  Mail,
-  Phone,
-  MapPin,
-  Activity,
-  TrendingUp,
-  AlertCircle,
-  CheckCircle2,
-  XCircle as XCircleIcon,
-  Clock3,
 } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
@@ -108,45 +102,10 @@ const EnhancedUserManagement: React.FC = () => {
     [user, pagination.limit]
   );
 
-  // Get user stats
-  // Get stats from backend instead of calculating from current page
-  const [userStats, setUserStats] = useState({
-    total: 0,
-    active: 0,
-    inactive: 0,
-    newThisWeek: 0,
-    adminCount: 0,
-    cookCount: 0,
-    customerCount: 0,
-    deliveryCount: 0,
-    pendingApprovals: 0,
-  });
-
-  // Fetch user stats from backend
-  const fetchUserStats = useCallback(async () => {
-    try {
-      const stats = await adminService.getUserStats();
-      setUserStats({
-        total: stats.total_users || 0,
-        active: stats.active_users || 0,
-        inactive: (stats.total_users || 0) - (stats.active_users || 0),
-        newThisWeek: stats.new_users_this_week || 0,
-        adminCount: stats.admin_count || 0,
-        cookCount: stats.total_chefs || 0,
-        customerCount: stats.customer_count || 0,
-        deliveryCount: stats.delivery_agent_count || 0,
-        pendingApprovals: stats.pending_user_approvals || 0,
-      });
-    } catch (error) {
-      console.error("Failed to fetch user stats:", error);
-    }
-  }, []);
-
   // Initial fetch
   useEffect(() => {
     fetchUsers();
-    fetchUserStats();
-  }, [fetchUsers, fetchUserStats]);
+  }, [fetchUsers]);
 
   // Enhanced search with debouncing
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(
@@ -246,7 +205,8 @@ const EnhancedUserManagement: React.FC = () => {
   const handleUserPreview = (user: AdminUser, event: React.MouseEvent) => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+    const scrollLeft =
+      window.pageXOffset || document.documentElement.scrollLeft;
 
     const previewWidth = 384; // w-96 = 384px
     const previewHeight = 250; // approximate height
@@ -410,17 +370,12 @@ const EnhancedUserManagement: React.FC = () => {
   const handleUserActivation = async (user: AdminUser) => {
     try {
       const action = user.is_active ? "deactivate" : "activate";
-      console.log(`🔄 Attempting to ${action} user ${user.id} (${user.email})`);
 
       // Use the correct adminService methods for activation
       if (user.is_active) {
-        console.log("📤 Calling deactivateUser API...");
         await adminService.deactivateUser(user.id);
-        console.log("✅ Deactivate API call successful");
       } else {
-        console.log("📤 Calling activateUser API...");
         await adminService.activateUser(user.id);
-        console.log("✅ Activate API call successful");
       }
 
       // Update local state - only change is_active status
@@ -448,29 +403,13 @@ const EnhancedUserManagement: React.FC = () => {
       );
     } catch (error: any) {
       console.error(
-        `❌ Error ${user.is_active ? "deactivate" : "activate"}ing user:`,
+        `Error ${user.is_active ? "deactivate" : "activate"}ing user:`,
         error
       );
-      
-      // Enhanced error handling
-      let errorMessage = "Unknown error occurred";
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      console.error("Error details:", {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      
       alert(
-        `Failed to ${user.is_active ? "deactivate" : "activate"} user: ${errorMessage}`
+        `Failed to ${user.is_active ? "deactivate" : "activate"} user: ${
+          error.response?.data?.detail || error.message
+        }`
       );
     }
   };
@@ -569,6 +508,23 @@ const EnhancedUserManagement: React.FC = () => {
       fetchPendingApprovals();
     }
   }, [activeTab, fetchPendingApprovals]);
+
+  // Get user stats
+  const userStats = {
+    total: pagination.total,
+    active: users.filter((u) => u.is_active).length,
+    inactive: users.filter((u) => !u.is_active).length,
+    newThisWeek: users.filter((u) => {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return new Date(u.date_joined) > weekAgo;
+    }).length,
+    // Calculate role counts from all users (not filtered)
+    adminCount: users.filter((u) => u.role === "admin").length,
+    cookCount: users.filter((u) => u.role === "cook").length,
+    customerCount: users.filter((u) => u.role === "customer").length,
+    deliveryCount: users.filter((u) => u.role === "delivery_agent").length,
+  };
 
   // Table columns
   const columns = [
@@ -945,7 +901,9 @@ const EnhancedUserManagement: React.FC = () => {
             <AdvancedStatsCard
               title="Active Users"
               value={userStats.active}
-              subtitle={`${Math.round((userStats.active / userStats.total) * 100)}% of total`}
+              subtitle={`${Math.round(
+                (userStats.active / userStats.total) * 100
+              )}% of total`}
               icon={<UserCheck className="h-6 w-6" />}
               color="green"
               onRefresh={() => fetchUsers()}
@@ -998,9 +956,13 @@ const EnhancedUserManagement: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-3">
                   {activeFilterCount > 0 && (
-                    <Badge variant="secondary" className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                    <Badge
+                      variant="secondary"
+                      className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                    >
                       <Filter className="h-3 w-3 mr-1" />
-                      {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""} active
+                      {activeFilterCount} filter
+                      {activeFilterCount > 1 ? "s" : ""} active
                     </Badge>
                   )}
                 </div>
@@ -1065,7 +1027,9 @@ const EnhancedUserManagement: React.FC = () => {
                     Cooks ({userStats.cookCount})
                   </Button>
                   <Button
-                    variant={filters.role === "customer" ? "default" : "outline"}
+                    variant={
+                      filters.role === "customer" ? "default" : "outline"
+                    }
                     size="sm"
                     onClick={() =>
                       handleFilterChange(
@@ -1090,7 +1054,9 @@ const EnhancedUserManagement: React.FC = () => {
                     onClick={() =>
                       handleFilterChange(
                         "role",
-                        filters.role === "delivery_agent" ? "" : "delivery_agent"
+                        filters.role === "delivery_agent"
+                          ? ""
+                          : "delivery_agent"
                       )
                     }
                     className={`transition-all duration-200 ${
@@ -1362,7 +1328,8 @@ const EnhancedUserManagement: React.FC = () => {
                 </div>
 
                 {/* Document Preview for Cooks and Delivery Agents */}
-                {(previewUser.role === "cook" || previewUser.role === "delivery_agent") && (
+                {(previewUser.role === "cook" ||
+                  previewUser.role === "delivery_agent") && (
                   <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex items-center space-x-2 mb-2">
                       <FileText className="h-4 w-4 text-blue-500" />
@@ -1414,9 +1381,7 @@ const EnhancedUserManagement: React.FC = () => {
           {/* Enhanced User Detail Modal */}
           {showUserDetail && selectedUser && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in-0 duration-300">
-              <div
-                className="rounded-2xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-y-auto shadow-2xl border-2 border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 animate-in zoom-in-95 duration-300"
-              >
+              <div className="rounded-2xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-y-auto shadow-2xl border-2 border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 animate-in zoom-in-95 duration-300">
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h2
@@ -1433,17 +1398,8 @@ const EnhancedUserManagement: React.FC = () => {
                         size="sm"
                         onClick={() =>
                           userDetails &&
-                          handleUserActivation({
-                            id: userDetails.id,
-                            is_active: userDetails.is_active,
-                            email: userDetails.email,
-                            name: userDetails.name,
-                            role: userDetails.role,
-                            approval_status: userDetails.approval_status || "approved",
-                            last_login: userDetails.last_login,
-                            date_joined: userDetails.date_joined,
-                            total_orders: userDetails.statistics?.total_orders || 0,
-                            total_spent: userDetails.statistics?.total_spent || 0,
+                          handleUserUpdate(userDetails.id, {
+                            is_active: !userDetails.is_active,
                           })
                         }
                         disabled={!userDetails || userDetailLoading}
@@ -1581,17 +1537,8 @@ const EnhancedUserManagement: React.FC = () => {
                                   className="ml-2"
                                   onClick={() =>
                                     userDetails &&
-                                    handleUserActivation({
-                                      id: userDetails.id,
-                                      is_active: userDetails.is_active,
-                                      email: userDetails.email,
-                                      name: userDetails.name,
-                                      role: userDetails.role,
-                                      approval_status: userDetails.approval_status || "approved",
-                                      last_login: userDetails.last_login,
-                                      date_joined: userDetails.date_joined,
-                                      total_orders: userDetails.statistics?.total_orders || 0,
-                                      total_spent: userDetails.statistics?.total_spent || 0,
+                                    handleUserUpdate(userDetails.id, {
+                                      is_active: !userDetails.is_active,
                                     })
                                   }
                                   disabled={!userDetails || userDetailLoading}
@@ -1769,54 +1716,6 @@ const EnhancedUserManagement: React.FC = () => {
                           </CardContent>
                         </Card>
                       </div>
-
-                      {/* User Documents for Cooks and Delivery Agents */}
-                      {userDetails?.documents && userDetails.documents.length > 0 && (
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="flex items-center">
-                              <FileText className="h-5 w-5 mr-2" />
-                              Submitted Documents ({userDetails.documents.length})
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {userDetails.documents.map((doc: any, index: number) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                                  style={{
-                                    borderColor:
-                                      theme === "dark" ? "#374151" : "#E5E7EB",
-                                  }}
-                                >
-                                  <FileText className="h-8 w-8 text-blue-500" />
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                                      {doc.document_type.name}
-                                    </h4>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                      {doc.document_type.description}
-                                    </p>
-                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                      Uploaded {new Date(doc.uploaded_at).toLocaleDateString()}
-                                    </p>
-                                  </div>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => window.open(doc.file, "_blank")}
-                                    className="hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                  >
-                                    <Eye className="h-4 w-4 mr-1" />
-                                    View
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
 
                       {/* Recent Orders */}
                       {userDetails?.recent_orders &&
@@ -2228,9 +2127,7 @@ const EnhancedUserManagement: React.FC = () => {
       {/* Enhanced Approval User Detail Modal */}
       {showApprovalModal && selectedApprovalUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in-0 duration-300">
-          <div
-            className="rounded-2xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-y-auto shadow-2xl border-2 border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 animate-in zoom-in-95 duration-300"
-          >
+          <div className="rounded-2xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-y-auto shadow-2xl border-2 border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 animate-in zoom-in-95 duration-300">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2

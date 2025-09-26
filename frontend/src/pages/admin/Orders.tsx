@@ -65,6 +65,7 @@ const OrderManagement: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [previewOrder, setPreviewOrder] = useState<AdminOrder | null>(null);
   const [previewPosition, setPreviewPosition] = useState({ x: 0, y: 0 });
+  const [previewTimeout, setPreviewTimeout] = useState<NodeJS.Timeout | null>(null);
   
   // Order details modal states
   const [showOrderDetail, setShowOrderDetail] = useState(false);
@@ -496,21 +497,115 @@ const OrderManagement: React.FC = () => {
 
   // Handle order preview on hover
   const handleOrderPreview = (order: AdminOrder, event: React.MouseEvent) => {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+    // Clear any existing timeout
+    if (previewTimeout) {
+      clearTimeout(previewTimeout);
+      setPreviewTimeout(null);
+    }
+    
+    const mouseX = event.clientX;
+    const mouseY = event.clientY;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Preview dimensions
+    const previewWidth = 320;
+    const previewHeight = 200;
+    const offset = 15;
+    
+    // Calculate position relative to mouse
+    let x = mouseX + offset;
+    let y = mouseY - offset;
+    
+    // Adjust horizontal position if would go off screen
+    if (x + previewWidth > viewportWidth) {
+      x = mouseX - previewWidth - offset;
+    }
+    
+    // Ensure not off left edge
+    if (x < 0) {
+      x = offset;
+    }
+    
+    // Adjust vertical position if would go off screen
+    if (y < 0) {
+      y = mouseY + offset;
+    }
+    
+    // Ensure not off bottom
+    if (y + previewHeight > viewportHeight) {
+      y = viewportHeight - previewHeight - offset;
+    }
+    
+    // Ensure not off top
+    if (y < 0) {
+      y = offset;
+    }
     
     setPreviewOrder(order);
     setShowPreview(true);
-    setPreviewPosition({
-      x: rect.left + rect.width / 2 + scrollLeft,
-      y: rect.top + scrollTop - 10
-    });
+    setPreviewPosition({ x, y });
   };
 
   const handlePreviewClose = () => {
-    setShowPreview(false);
-    setPreviewOrder(null);
+    // Clear any existing timeout
+    if (previewTimeout) {
+      clearTimeout(previewTimeout);
+    }
+    
+    // Add a small delay to prevent flickering when moving between cells
+    const timeout = setTimeout(() => {
+      setShowPreview(false);
+      setPreviewOrder(null);
+    }, 100);
+    
+    setPreviewTimeout(timeout);
+  };
+
+  // Handle mouse move to update preview position
+  const handleMouseMove = (event: React.MouseEvent) => {
+    if (showPreview) {
+      const mouseX = event.clientX;
+      const mouseY = event.clientY;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Preview dimensions
+      const previewWidth = 320;
+      const previewHeight = 200;
+      const offset = 15;
+      
+      // Calculate position relative to mouse
+      let x = mouseX + offset;
+      let y = mouseY - offset;
+      
+      // Adjust horizontal position if would go off screen
+      if (x + previewWidth > viewportWidth) {
+        x = mouseX - previewWidth - offset;
+      }
+      
+      // Ensure not off left edge
+      if (x < 0) {
+        x = offset;
+      }
+      
+      // Adjust vertical position if would go off screen
+      if (y < 0) {
+        y = mouseY + offset;
+      }
+      
+      // Ensure not off bottom
+      if (y + previewHeight > viewportHeight) {
+        y = viewportHeight - previewHeight - offset;
+      }
+      
+      // Ensure not off top
+      if (y < 0) {
+        y = offset;
+      }
+      
+      setPreviewPosition({ x, y });
+    }
   };
 
   // Handle order detail view
@@ -843,6 +938,7 @@ const OrderManagement: React.FC = () => {
                   key={order.id}
                   className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors relative group"
                   onMouseEnter={(e) => handleOrderPreview(order, e)}
+                  onMouseMove={handleMouseMove}
                   onMouseLeave={handlePreviewClose}
                 >
                   <TableCell 
@@ -1077,20 +1173,22 @@ const OrderManagement: React.FC = () => {
       {/* Order Preview Popup */}
       {showPreview && previewOrder && (
         <div 
-          className="fixed z-50 pointer-events-none animate-in fade-in-0 zoom-in-95"
+          className="fixed z-50 pointer-events-auto animate-in fade-in-0 zoom-in-95 cursor-pointer"
           style={{
             left: `${previewPosition.x}px`,
             top: `${previewPosition.y}px`,
-            transform: 'translate(-50%, -100%)'
+            transform: 'none'
           }}
+          onClick={() => handleOrderDetail(previewOrder)}
         >
           <div 
-            className="border rounded-xl shadow-xl p-4 w-80 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95"
+            className="border rounded-xl shadow-2xl p-4 w-80 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95 hover:shadow-3xl transition-all duration-200 hover:scale-105"
             style={{
               backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
               borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
             }}
           >
+            {/* Header */}
             <div className="flex items-center space-x-3 mb-4">
               <div 
                 className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg"
@@ -1104,7 +1202,7 @@ const OrderManagement: React.FC = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 
-                  className="font-semibold truncate"
+                  className="font-semibold text-lg truncate"
                   style={{
                     color: theme === 'dark' ? '#F9FAFB' : '#111827'
                   }}
@@ -1122,7 +1220,8 @@ const OrderManagement: React.FC = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+            {/* Status and Payment */}
+            <div className="grid grid-cols-2 gap-3 text-sm mb-4">
               <div className="flex items-center space-x-2">
                 <span 
                   className="font-medium"
@@ -1177,8 +1276,9 @@ const OrderManagement: React.FC = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
+            {/* Order Details */}
+            <div className="space-y-3 text-sm mb-4">
+              <div className="flex justify-between items-center">
                 <span 
                   className="font-medium"
                   style={{
@@ -1188,7 +1288,7 @@ const OrderManagement: React.FC = () => {
                   Items:
                 </span>
                 <span 
-                  className="ml-2 font-semibold"
+                  className="font-semibold"
                   style={{
                     color: theme === 'dark' ? '#F9FAFB' : '#111827'
                   }}
@@ -1196,17 +1296,17 @@ const OrderManagement: React.FC = () => {
                   {previewOrder.items_count}
                 </span>
               </div>
-              <div>
+              <div className="flex justify-between items-center">
                 <span 
                   className="font-medium"
                   style={{
                     color: theme === 'dark' ? '#D1D5DB' : '#374151'
                   }}
                 >
-                  Total:
+                  Total Amount:
                 </span>
                 <span 
-                  className="ml-2 font-semibold"
+                  className="font-semibold text-lg"
                   style={{
                     color: theme === 'dark' ? '#F9FAFB' : '#111827'
                   }}
@@ -1214,16 +1314,35 @@ const OrderManagement: React.FC = () => {
                   ${previewOrder.total_amount.toFixed(2)}
                 </span>
               </div>
+              <div className="flex justify-between items-center">
+                <span 
+                  className="font-medium"
+                  style={{
+                    color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                  }}
+                >
+                  Customer Email:
+                </span>
+                <span 
+                  className="text-xs truncate max-w-32"
+                  style={{
+                    color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                  }}
+                >
+                  {previewOrder.customer_email}
+                </span>
+              </div>
             </div>
             
+            {/* Footer */}
             <div 
-              className="mt-4 pt-3 border-t"
+              className="pt-3 border-t"
               style={{
                 borderColor: theme === 'dark' ? '#374151' : '#E5E7EB'
               }}
             >
               <div 
-                className="flex items-center justify-between text-xs"
+                className="flex items-center justify-between text-xs mb-2"
                 style={{
                   color: theme === 'dark' ? '#9CA3AF' : '#6B7280'
                 }}
@@ -1235,6 +1354,15 @@ const OrderManagement: React.FC = () => {
                 <div className="flex items-center space-x-1">
                   <span>Updated: {new Date(previewOrder.updated_at).toLocaleDateString()}</span>
                 </div>
+              </div>
+              <div 
+                className="flex items-center justify-center text-xs font-medium"
+                style={{
+                  color: theme === 'dark' ? '#3B82F6' : '#2563EB'
+                }}
+              >
+                <Eye className="h-3 w-3 mr-1" />
+                Click to view full details
               </div>
             </div>
           </div>

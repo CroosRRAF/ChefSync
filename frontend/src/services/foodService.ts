@@ -183,3 +183,39 @@ export const updateFoodReview = async (id: number, data: Partial<FoodReview>): P
 export const deleteFoodReview = async (id: number): Promise<void> => {
   await api.delete(`/food/reviews/${id}/`);
 };
+
+// Admin Food Management API endpoints
+export const fetchAdminFoods = async (params: FoodFilterParams): Promise<PaginatedResponse<Food>> => {
+  const response = await api.get(`/food/admin/foods/`, { params });
+  
+  // Handle both paginated and non-paginated responses
+  if (Array.isArray(response.data)) {
+    return {
+      count: response.data.length,
+      next: null,
+      previous: null,
+      results: response.data
+    };
+  }
+  
+  return response.data;
+};
+
+export const fetchAdminFood = async (id: number): Promise<Food> => {
+  const response = await api.get(`/food/admin/foods/${id}/`);
+  return response.data;
+};
+
+export const createAdminFood = async (data: Partial<Food>): Promise<Food> => {
+  const response = await api.post(`/food/admin/foods/`, data);
+  return response.data;
+};
+
+export const updateAdminFood = async (id: number, data: Partial<Food>): Promise<Food> => {
+  const response = await api.patch(`/food/admin/foods/${id}/`, data);
+  return response.data;
+};
+
+export const deleteAdminFood = async (id: number): Promise<void> => {
+  await api.delete(`/food/admin/foods/${id}/`);
+};

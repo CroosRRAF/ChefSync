@@ -25,16 +25,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -44,12 +43,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import {
+  createAdminFood,
+  fetchAdminFoods,
   fetchCuisines,
   fetchFood,
   fetchFoodCategories,
-  fetchFoods,
+  updateAdminFood,
 } from "@/services/foodService";
 import { Cuisine, Food, FoodCategory } from "@/types/food";
 import {
@@ -84,28 +86,28 @@ const FoodManagement: React.FC = () => {
 
   // Form states
   const [foodFormData, setFoodFormData] = useState({
-    name: '',
-    description: '',
-    category: '',
-    cuisine: '',
+    name: "",
+    description: "",
+    category: "",
+    cuisine: "",
     is_vegetarian: false,
     is_vegan: false,
     is_gluten_free: false,
     is_available: true,
-    preparation_time: '',
-    calories_per_serving: '',
-    allergens: ''
+    preparation_time: "",
+    calories_per_serving: "",
+    allergens: "",
   });
   const [cuisineFormData, setCuisineFormData] = useState({
-    name: '',
-    description: '',
-    image: null as File | null
+    name: "",
+    description: "",
+    image: null as File | null,
   });
   const [categoryFormData, setCategoryFormData] = useState({
-    name: '',
-    description: '',
-    cuisine: '',
-    image: null as File | null
+    name: "",
+    description: "",
+    cuisine: "",
+    image: null as File | null,
   });
   const [formErrors, setFormErrors] = useState<any>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -130,12 +132,142 @@ const FoodManagement: React.FC = () => {
     loadData();
   }, [activeTab, currentPage, searchTerm]);
 
+  // Update form data when categories/cuisines are loaded and we're editing
+  useEffect(() => {
+    if (
+      editItem &&
+      activeTab === "foods" &&
+      categories.length > 0 &&
+      cuisines.length > 0
+    ) {
+      // Enhanced category ID detection with multiple fallback methods
+      let categoryId = "";
+
+      // Method 1: Direct category field
+      if (editItem.category) {
+        categoryId = editItem.category.toString();
+      }
+      // Method 2: Via food_category object
+      else if (editItem.food_category?.id) {
+        categoryId = editItem.food_category.id.toString();
+      }
+      // Method 3: Find by category name
+      else if (editItem.category_name) {
+        const foundCategory = categories.find(
+          (cat) => cat.name === editItem.category_name
+        );
+        if (foundCategory) {
+          categoryId = foundCategory.id.toString();
+        }
+      }
+
+      // Enhanced cuisine ID detection with multiple fallback methods
+      let cuisineId = "";
+
+      // Method 1: Via category relationship
+      if (categoryId) {
+        const categoryObj = categories.find(
+          (cat) => cat.id.toString() === categoryId
+        );
+        if (categoryObj?.cuisine) {
+          cuisineId = categoryObj.cuisine.toString();
+        }
+      }
+
+      // Method 2: Via food_category.cuisine
+      if (!cuisineId && editItem.food_category?.cuisine) {
+        if (
+          typeof editItem.food_category.cuisine === "object" &&
+          editItem.food_category.cuisine.id
+        ) {
+          cuisineId = editItem.food_category.cuisine.id.toString();
+        } else {
+          cuisineId = editItem.food_category.cuisine.toString();
+        }
+      }
+
+      // Method 3: Find by cuisine name
+      if (!cuisineId && editItem.cuisine_name) {
+        const foundCuisine = cuisines.find(
+          (cuisine) => cuisine.name === editItem.cuisine_name
+        );
+        if (foundCuisine) {
+          cuisineId = foundCuisine.id.toString();
+        }
+      }
+
+      console.log("Form data update - editItem:", editItem);
+      console.log(
+        "Form data update - categoryId:",
+        categoryId,
+        "cuisineId:",
+        cuisineId
+      );
+      console.log(
+        "Form data update - categories available:",
+        categories.length
+      );
+
+      // Re-populate form data with proper values now that categories/cuisines are loaded
+      const formData = {
+        name: editItem.name || "",
+        description: editItem.description || "",
+        category: categoryId,
+        cuisine: cuisineId,
+        is_vegetarian: editItem.is_vegetarian || false,
+        is_vegan: editItem.is_vegan || false,
+        is_gluten_free: editItem.is_gluten_free || false,
+        is_available: editItem.is_available !== false,
+        preparation_time: editItem.preparation_time?.toString() || "",
+        calories_per_serving: editItem.calories_per_serving?.toString() || "",
+        allergens: Array.isArray(editItem.allergens)
+          ? editItem.allergens.join(", ")
+          : editItem.allergens || "",
+      };
+
+      console.log(
+        "Updating form data after categories/cuisines loaded:",
+        formData
+      );
+      setFoodFormData(formData);
+    }
+  }, [categories, cuisines, editItem, activeTab]);
+
+  // Filter categories based on selected cuisine
+  const filteredCategories = categories.filter(
+    (category) =>
+      !foodFormData.cuisine ||
+      category.cuisine?.toString() === foodFormData.cuisine
+  );
+
+  // Handle cuisine change - clear category if it doesn't belong to new cuisine
+  const handleCuisineChange = (cuisineId: string) => {
+    const newCuisine = cuisines.find((c) => c.id.toString() === cuisineId);
+    const currentCategory = categories.find(
+      (c) => c.id.toString() === foodFormData.category
+    );
+
+    // If current category doesn't belong to the new cuisine, clear it
+    if (currentCategory && currentCategory.cuisine?.toString() !== cuisineId) {
+      setFoodFormData({
+        ...foodFormData,
+        cuisine: cuisineId,
+        category: "", // Clear category if it doesn't belong to new cuisine
+      });
+    } else {
+      setFoodFormData({
+        ...foodFormData,
+        cuisine: cuisineId,
+      });
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
       switch (activeTab) {
         case "foods":
-          const foodData = await fetchFoods({
+          const foodData = await fetchAdminFoods({
             page: currentPage,
             search: searchTerm,
           });
@@ -175,20 +307,21 @@ const FoodManagement: React.FC = () => {
     try {
       // Load categories if not already loaded
       if (categories.length === 0) {
-        const categoryData = await fetchFoodCategories({ page: 1, search: '' });
+        const categoryData = await fetchFoodCategories({ page: 1, search: "" });
         setCategories(categoryData.results || []);
       }
-      
+
       // Load cuisines if not already loaded
       if (cuisines.length === 0) {
-        const cuisineData = await fetchCuisines({ page: 1, search: '' });
+        const cuisineData = await fetchCuisines({ page: 1, search: "" });
         setCuisines(cuisineData.results || []);
       }
     } catch (error) {
       console.error("Error loading categories and cuisines:", error);
       toast({
         title: "Error",
-        description: "Failed to load categories and cuisines. Please try again.",
+        description:
+          "Failed to load categories and cuisines. Please try again.",
         variant: "destructive",
       });
     }
@@ -197,87 +330,206 @@ const FoodManagement: React.FC = () => {
   const handleAddNew = () => {
     setEditItem(null);
     setFormErrors({});
-    
+
     // Reset form data
     setFoodFormData({
-      name: '',
-      description: '',
-      category: '',
-      cuisine: '',
+      name: "",
+      description: "",
+      category: "",
+      cuisine: "",
       is_vegetarian: false,
       is_vegan: false,
       is_gluten_free: false,
       is_available: true,
-      preparation_time: '',
-      calories_per_serving: '',
-      allergens: ''
+      preparation_time: "",
+      calories_per_serving: "",
+      allergens: "",
     });
     setCuisineFormData({
-      name: '',
-      description: '',
-      image: null
+      name: "",
+      description: "",
+      image: null,
     });
     setCategoryFormData({
-      name: '',
-      description: '',
-      cuisine: '',
-      image: null
+      name: "",
+      description: "",
+      cuisine: "",
+      image: null,
     });
-    
+
     switch (activeTab) {
       case "foods":
-        // Load categories and cuisines if not already loaded
-        if (categories.length === 0 || cuisines.length === 0) {
-          loadCategoriesAndCuisines();
-        }
-        setShowFoodForm(true);
+        // Always load categories and cuisines when creating new food items
+        loadCategoriesAndCuisines().then(() => {
+          setShowFoodForm(true);
+        });
         break;
       case "cuisines":
         setShowCuisineForm(true);
         break;
       case "categories":
-        setShowCategoryForm(true);
+        // Load cuisines for category creation
+        if (cuisines.length === 0) {
+          fetchCuisines({ page: 1, search: "" }).then((data) => {
+            setCuisines(data.results || []);
+            setShowCategoryForm(true);
+          });
+        } else {
+          setShowCategoryForm(true);
+        }
         break;
     }
   };
 
   const handleEdit = (item: any) => {
     setEditItem(item);
+    setFormErrors({}); // Clear any existing errors
+
     switch (activeTab) {
       case "foods":
-        // Load categories and cuisines if not already loaded
+        // Load categories and cuisines if not already loaded, then set form data
         if (categories.length === 0 || cuisines.length === 0) {
-          loadCategoriesAndCuisines();
+          // Load data first, then form will be populated via useEffect
+          loadCategoriesAndCuisines().then(() => {
+            setShowFoodForm(true);
+          });
+        } else {
+          // Data is already loaded, set form data immediately
+          console.log("🔍 DEBUG: Editing food item:", item);
+          console.log("🔍 DEBUG: Available categories:", categories);
+          console.log("🔍 DEBUG: Available cuisines:", cuisines);
+
+          // Try multiple ways to get category ID
+          let categoryId = "";
+
+          // Method 1: Direct category field (number)
+          if (item.category) {
+            categoryId = item.category.toString();
+            console.log("🔍 Found category ID via item.category:", categoryId);
+          }
+
+          // Method 2: Via food_category object
+          else if (item.food_category?.id) {
+            categoryId = item.food_category.id.toString();
+            console.log(
+              "🔍 Found category ID via item.food_category.id:",
+              categoryId
+            );
+          }
+
+          // Method 3: Find category by name
+          else if (item.category_name) {
+            const foundCategory = categories.find(
+              (cat) => cat.name === item.category_name
+            );
+            if (foundCategory) {
+              categoryId = foundCategory.id.toString();
+              console.log(
+                "🔍 Found category ID via name matching:",
+                categoryId,
+                "for name:",
+                item.category_name
+              );
+            }
+          }
+
+          // Try multiple ways to get cuisine ID
+          let cuisineId = "";
+
+          // Method 1: Find cuisine via category relationship
+          if (categoryId) {
+            const categoryObj = categories.find(
+              (cat) => cat.id.toString() === categoryId
+            );
+            if (categoryObj?.cuisine) {
+              cuisineId = categoryObj.cuisine.toString();
+              console.log(
+                "🔍 Found cuisine ID via category relationship:",
+                cuisineId
+              );
+            }
+          }
+
+          // Method 2: Via food_category.cuisine
+          if (!cuisineId && item.food_category?.cuisine) {
+            if (
+              typeof item.food_category.cuisine === "object" &&
+              item.food_category.cuisine.id
+            ) {
+              cuisineId = item.food_category.cuisine.id.toString();
+            } else {
+              cuisineId = item.food_category.cuisine.toString();
+            }
+            console.log(
+              "🔍 Found cuisine ID via item.food_category.cuisine:",
+              cuisineId
+            );
+          }
+
+          // Method 3: Find cuisine by name
+          if (!cuisineId && item.cuisine_name) {
+            const foundCuisine = cuisines.find(
+              (cuisine) => cuisine.name === item.cuisine_name
+            );
+            if (foundCuisine) {
+              cuisineId = foundCuisine.id.toString();
+              console.log(
+                "🔍 Found cuisine ID via name matching:",
+                cuisineId,
+                "for name:",
+                item.cuisine_name
+              );
+            }
+          }
+
+          const formData = {
+            name: item.name || "",
+            description: item.description || "",
+            category: categoryId,
+            cuisine: cuisineId,
+            is_vegetarian: item.is_vegetarian || false,
+            is_vegan: item.is_vegan || false,
+            is_gluten_free: item.is_gluten_free || false,
+            is_available: item.is_available !== false,
+            preparation_time: item.preparation_time?.toString() || "",
+            calories_per_serving: item.calories_per_serving?.toString() || "",
+            allergens: Array.isArray(item.allergens)
+              ? item.allergens.join(", ")
+              : item.allergens || "",
+          };
+
+          console.log("✅ Final form data being set:", formData);
+          console.log(
+            "📊 Form will show - Category:",
+            categoryId
+              ? categories.find((c) => c.id.toString() === categoryId)?.name
+              : "NOT FOUND"
+          );
+          console.log(
+            "📊 Form will show - Cuisine:",
+            cuisineId
+              ? cuisines.find((c) => c.id.toString() === cuisineId)?.name
+              : "NOT FOUND"
+          );
+
+          setFoodFormData(formData);
+          setShowFoodForm(true);
         }
-        setFoodFormData({
-          name: item.name || '',
-          description: item.description || '',
-          category: item.food_category?.id?.toString() || '',
-          cuisine: item.food_category?.cuisine?.id?.toString() || '',
-          is_vegetarian: item.is_vegetarian || false,
-          is_vegan: item.is_vegan || false,
-          is_gluten_free: item.is_gluten_free || false,
-          is_available: item.is_available !== false,
-          preparation_time: item.preparation_time?.toString() || '',
-          calories_per_serving: item.calories_per_serving?.toString() || '',
-          allergens: Array.isArray(item.allergens) ? item.allergens.join(', ') : (item.allergens || '')
-        });
-        setShowFoodForm(true);
         break;
       case "cuisines":
         setCuisineFormData({
-          name: item.name || '',
-          description: item.description || '',
-          image: null
+          name: item.name || "",
+          description: item.description || "",
+          image: null,
         });
         setShowCuisineForm(true);
         break;
       case "categories":
         setCategoryFormData({
-          name: item.name || '',
-          description: item.description || '',
-          cuisine: item.cuisine?.id?.toString() || '',
-          image: null
+          name: item.name || "",
+          description: item.description || "",
+          cuisine: item.cuisine?.id?.toString() || "",
+          image: null,
         });
         setShowCategoryForm(true);
         break;
@@ -286,57 +538,69 @@ const FoodManagement: React.FC = () => {
 
   const validateFoodForm = () => {
     const errors: any = {};
-    
+
     if (!foodFormData.name.trim()) {
-      errors.name = 'Food name is required';
+      errors.name = "Food name is required";
     }
     if (!foodFormData.description.trim()) {
-      errors.description = 'Description is required';
+      errors.description = "Description is required";
     }
+
+    // Always validate category and cuisine for both new and existing items
     if (!foodFormData.category) {
-      errors.category = 'Category is required';
+      errors.category = "Category is required";
     }
     if (!foodFormData.cuisine) {
-      errors.cuisine = 'Cuisine is required';
+      errors.cuisine = "Cuisine is required";
     }
-    if (foodFormData.preparation_time && isNaN(Number(foodFormData.preparation_time))) {
-      errors.preparation_time = 'Preparation time must be a number';
+
+    if (
+      foodFormData.preparation_time &&
+      isNaN(Number(foodFormData.preparation_time))
+    ) {
+      errors.preparation_time = "Preparation time must be a number";
     }
-    if (foodFormData.calories_per_serving && isNaN(Number(foodFormData.calories_per_serving))) {
-      errors.calories_per_serving = 'Calories must be a number';
+    if (
+      foodFormData.calories_per_serving &&
+      isNaN(Number(foodFormData.calories_per_serving))
+    ) {
+      errors.calories_per_serving = "Calories must be a number";
     }
-    
+
+    console.log("Validation errors:", errors);
+    console.log("Form data being validated:", foodFormData);
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const validateCuisineForm = () => {
     const errors: any = {};
-    
+
     if (!cuisineFormData.name.trim()) {
-      errors.name = 'Cuisine name is required';
+      errors.name = "Cuisine name is required";
     }
     if (!cuisineFormData.description.trim()) {
-      errors.description = 'Description is required';
+      errors.description = "Description is required";
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const validateCategoryForm = () => {
     const errors: any = {};
-    
+
     if (!categoryFormData.name.trim()) {
-      errors.name = 'Category name is required';
+      errors.name = "Category name is required";
     }
     if (!categoryFormData.description.trim()) {
-      errors.description = 'Description is required';
+      errors.description = "Description is required";
     }
     if (!categoryFormData.cuisine) {
-      errors.cuisine = 'Cuisine is required';
+      errors.cuisine = "Cuisine is required";
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -344,7 +608,7 @@ const FoodManagement: React.FC = () => {
   const handleFormSubmit = async () => {
     setIsSubmitting(true);
     try {
-      if (activeTab === 'foods' && validateFoodForm()) {
+      if (activeTab === "foods" && validateFoodForm()) {
         // Handle food form submission
         const foodData = {
           name: foodFormData.name,
@@ -354,163 +618,156 @@ const FoodManagement: React.FC = () => {
           is_vegan: foodFormData.is_vegan,
           is_gluten_free: foodFormData.is_gluten_free,
           is_available: foodFormData.is_available,
-          preparation_time: foodFormData.preparation_time ? parseInt(foodFormData.preparation_time) : null,
-          calories_per_serving: foodFormData.calories_per_serving ? parseInt(foodFormData.calories_per_serving) : null,
-          allergens: foodFormData.allergens ? foodFormData.allergens.split(',').map(a => a.trim()) : []
+          preparation_time: foodFormData.preparation_time
+            ? parseInt(foodFormData.preparation_time)
+            : null,
+          calories_per_serving: foodFormData.calories_per_serving
+            ? parseInt(foodFormData.calories_per_serving)
+            : null,
+          allergens: foodFormData.allergens
+            ? foodFormData.allergens.split(",").map((a) => a.trim())
+            : [],
         };
-        
-        let response;
+
+        let result;
         if (editItem) {
-          // Update existing food
-          response = await fetch(`/api/food/foods/${editItem.id}/`, {
-            method: 'PATCH',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(foodData)
-          });
+          // Update existing food using admin service
+          result = await updateAdminFood(editItem.id, foodData);
         } else {
-          // Create new food
-          response = await fetch('/api/food/foods/', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(foodData)
-          });
+          // Create new food using admin service
+          result = await createAdminFood(foodData);
         }
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to save food item');
-        }
-        
+
         toast({
           title: "Success",
-          description: `Food item ${editItem ? 'updated' : 'created'} successfully`,
+          description: `Food item ${
+            editItem ? "updated" : "created"
+          } successfully`,
         });
-        
+
         // Reset form and close dialog
         setShowFoodForm(false);
         setEditItem(null);
         setFormErrors({});
         setFoodFormData({
-          name: '',
-          description: '',
-          category: '',
-          cuisine: '',
+          name: "",
+          description: "",
+          category: "",
+          cuisine: "",
           is_vegetarian: false,
           is_vegan: false,
           is_gluten_free: false,
           is_available: true,
-          preparation_time: '',
-          calories_per_serving: '',
-          allergens: ''
+          preparation_time: "",
+          calories_per_serving: "",
+          allergens: "",
         });
         loadData();
-      } else if (activeTab === 'cuisines' && validateCuisineForm()) {
+      } else if (activeTab === "cuisines" && validateCuisineForm()) {
         // Handle cuisine form submission
         const cuisineData = {
           name: cuisineFormData.name,
-          description: cuisineFormData.description
+          description: cuisineFormData.description,
         };
-        
+
         let response;
         if (editItem) {
           response = await fetch(`/api/food/cuisines/${editItem.id}/`, {
-            method: 'PATCH',
+            method: "PATCH",
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-              'Content-Type': 'application/json'
+              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+              "Content-Type": "application/json",
             },
-            body: JSON.stringify(cuisineData)
+            body: JSON.stringify(cuisineData),
           });
         } else {
-          response = await fetch('/api/food/cuisines/', {
-            method: 'POST',
+          response = await fetch("/api/food/cuisines/", {
+            method: "POST",
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-              'Content-Type': 'application/json'
+              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+              "Content-Type": "application/json",
             },
-            body: JSON.stringify(cuisineData)
+            body: JSON.stringify(cuisineData),
           });
         }
-        
+
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to save cuisine');
+          throw new Error(errorData.detail || "Failed to save cuisine");
         }
-        
+
         toast({
           title: "Success",
-          description: `Cuisine ${editItem ? 'updated' : 'created'} successfully`,
+          description: `Cuisine ${
+            editItem ? "updated" : "created"
+          } successfully`,
         });
-        
+
         // Reset form and close dialog
         setShowCuisineForm(false);
         setEditItem(null);
         setFormErrors({});
         setCuisineFormData({
-          name: '',
-          description: '',
-          image: null
+          name: "",
+          description: "",
+          image: null,
         });
         loadData();
-      } else if (activeTab === 'categories' && validateCategoryForm()) {
+      } else if (activeTab === "categories" && validateCategoryForm()) {
         // Handle category form submission
         const categoryData = {
           name: categoryFormData.name,
           description: categoryFormData.description,
-          cuisine: parseInt(categoryFormData.cuisine)
+          cuisine: parseInt(categoryFormData.cuisine),
         };
-        
+
         let response;
         if (editItem) {
           response = await fetch(`/api/food/categories/${editItem.id}/`, {
-            method: 'PATCH',
+            method: "PATCH",
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-              'Content-Type': 'application/json'
+              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+              "Content-Type": "application/json",
             },
-            body: JSON.stringify(categoryData)
+            body: JSON.stringify(categoryData),
           });
         } else {
-          response = await fetch('/api/food/categories/', {
-            method: 'POST',
+          response = await fetch("/api/food/categories/", {
+            method: "POST",
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-              'Content-Type': 'application/json'
+              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+              "Content-Type": "application/json",
             },
-            body: JSON.stringify(categoryData)
+            body: JSON.stringify(categoryData),
           });
         }
-        
+
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to save category');
+          throw new Error(errorData.detail || "Failed to save category");
         }
-        
+
         toast({
           title: "Success",
-          description: `Category ${editItem ? 'updated' : 'created'} successfully`,
+          description: `Category ${
+            editItem ? "updated" : "created"
+          } successfully`,
         });
-        
+
         // Reset form and close dialog
         setShowCategoryForm(false);
         setEditItem(null);
         setFormErrors({});
         setCategoryFormData({
-          name: '',
-          description: '',
-          cuisine: '',
-          image: null
+          name: "",
+          description: "",
+          cuisine: "",
+          image: null,
         });
         loadData();
       }
     } catch (error) {
-      console.error('Form submission error:', error);
+      console.error("Form submission error:", error);
       toast({
         title: "Error",
         description: "Failed to submit form. Please try again.",
@@ -524,6 +781,113 @@ const FoodManagement: React.FC = () => {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
+  };
+
+  // Quick action functions for toggling availability
+  const toggleFoodAvailability = async (food: Food) => {
+    try {
+      const newStatus = !food.is_available;
+      await updateAdminFood(food.id, { is_available: newStatus });
+
+      // Update the local foods array
+      setFoods((prevFoods) =>
+        prevFoods.map((f) =>
+          f.id === food.id ? { ...f, is_available: newStatus } : f
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: `${food.name} is now ${
+          newStatus ? "available" : "unavailable"
+        }`,
+      });
+    } catch (error) {
+      console.error("Error toggling food availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update food availability",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleCuisineAvailability = async (cuisine: Cuisine) => {
+    try {
+      const newStatus = !cuisine.is_active;
+      const response = await fetch(`/api/food/cuisines/${cuisine.id}/`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ is_active: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update cuisine");
+      }
+
+      // Update the local cuisines array
+      setCuisines((prevCuisines) =>
+        prevCuisines.map((c) =>
+          c.id === cuisine.id ? { ...c, is_active: newStatus } : c
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: `${cuisine.name} is now ${
+          newStatus ? "active" : "inactive"
+        }`,
+      });
+    } catch (error) {
+      console.error("Error toggling cuisine availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update cuisine status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleCategoryAvailability = async (category: FoodCategory) => {
+    try {
+      const newStatus = !category.is_active;
+      const response = await fetch(`/api/food/categories/${category.id}/`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ is_active: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update category");
+      }
+
+      // Update the local categories array
+      setCategories((prevCategories) =>
+        prevCategories.map((c) =>
+          c.id === category.id ? { ...c, is_active: newStatus } : c
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: `${category.name} is now ${
+          newStatus ? "active" : "inactive"
+        }`,
+      });
+    } catch (error) {
+      console.error("Error toggling category availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update category status",
+        variant: "destructive",
+      });
+    }
   };
 
   // Handle food detail view
@@ -614,103 +978,32 @@ const FoodManagement: React.FC = () => {
                   <Checkbox />
                 </TableCell>
                 <TableCell className="font-medium">
-                  <HoverCard>
-                    <HoverCardTrigger asChild>
-                      <Button
-                        variant="link"
-                        className="p-0"
-                        onClick={() => handleFoodDetail(food)}
-                      >
-                        {food.name}
-                      </Button>
-                    </HoverCardTrigger>
-                    <HoverCardContent className="w-80">
-                      <div className="flex justify-between space-x-4">
-                        {food.images && food.images.length > 0 ? (
-                          <div className="w-16 h-16 rounded-md overflow-hidden">
-                            <img
-                              src={food.images[0].image}
-                              alt={food.name}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-16 h-16 rounded-md bg-gray-100 flex items-center justify-center">
-                            <span className="text-gray-400">No image</span>
-                          </div>
-                        )}
-                        <div className="space-y-1 flex-1">
-                          <h4 className="text-sm font-semibold">{food.name}</h4>
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {food.description || "No description available"}
-                          </p>
-                          <div className="flex gap-2 flex-wrap">
-                            {food.is_vegetarian && (
-                              <Badge
-                                variant="outline"
-                                className="text-green-600 bg-green-50"
-                              >
-                                Vegetarian
-                              </Badge>
-                            )}
-                            {food.is_vegan && (
-                              <Badge
-                                variant="outline"
-                                className="text-green-700 bg-green-50"
-                              >
-                                Vegan
-                              </Badge>
-                            )}
-                            {food.is_gluten_free && (
-                              <Badge
-                                variant="outline"
-                                className="text-amber-600 bg-amber-50"
-                              >
-                                Gluten-Free
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <Separator className="my-2" />
-                      <div className="grid grid-cols-2 gap-1 text-xs">
-                        <div className="text-muted-foreground">Category:</div>
-                        <div>{food.category_name || "Uncategorized"}</div>
-
-                        <div className="text-muted-foreground">Cuisine:</div>
-                        <div>{food.cuisine_name || "N/A"}</div>
-
-                        <div className="text-muted-foreground">Prep Time:</div>
-                        <div>{food.preparation_time} mins</div>
-
-                        <div className="text-muted-foreground">Rating:</div>
-                        <div>
-                          {typeof food.rating_average === "number"
-                            ? food.rating_average.toFixed(1)
-                            : parseFloat(String(food.rating_average)).toFixed(
-                                1
-                              )}{" "}
-                          ⭐ ({food.total_reviews} reviews)
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="w-full mt-3"
-                        onClick={() => handleFoodDetail(food)}
-                      >
-                        View Details
-                      </Button>
-                    </HoverCardContent>
-                  </HoverCard>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto font-medium"
+                    onClick={() => handleFoodDetail(food)}
+                  >
+                    {food.name}
+                  </Button>
                 </TableCell>
                 <TableCell>{food.category_name || "Uncategorized"}</TableCell>
                 <TableCell>{food.cuisine_name || "N/A"}</TableCell>
                 <TableCell>
-                  <Badge
-                    variant={food.is_available ? "default" : "destructive"}
-                  >
-                    {food.is_available ? "Available" : "Unavailable"}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Badge
+                      variant={food.is_available ? "default" : "destructive"}
+                    >
+                      {food.is_available ? "Available" : "Unavailable"}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleFoodAvailability(food)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      {food.is_available ? "Disable" : "Enable"}
+                    </Button>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-1">
@@ -810,76 +1103,33 @@ const FoodManagement: React.FC = () => {
                   <Checkbox />
                 </TableCell>
                 <TableCell className="font-medium">
-                  <HoverCard>
-                    <HoverCardTrigger asChild>
-                      <Button
-                        variant="link"
-                        className="p-0"
-                        onClick={() => handleCuisineDetail(cuisine)}
-                      >
-                        {cuisine.name}
-                      </Button>
-                    </HoverCardTrigger>
-                    <HoverCardContent className="w-80">
-                      <div className="flex justify-between space-x-4">
-                        {cuisine.image ? (
-                          <div className="w-16 h-16 rounded-md overflow-hidden">
-                            <img
-                              src={cuisine.image}
-                              alt={cuisine.name}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-16 h-16 rounded-md bg-gray-100 flex items-center justify-center">
-                            <span className="text-gray-400">No image</span>
-                          </div>
-                        )}
-                        <div className="space-y-1 flex-1">
-                          <h4 className="text-sm font-semibold">
-                            {cuisine.name}
-                          </h4>
-                          <p className="text-xs text-muted-foreground line-clamp-3">
-                            {cuisine.description || "No description available"}
-                          </p>
-                        </div>
-                      </div>
-                      <Separator className="my-2" />
-                      <div className="grid grid-cols-2 gap-1 text-xs">
-                        <div className="text-muted-foreground">Status:</div>
-                        <div>
-                          <Badge
-                            variant={
-                              cuisine.is_active ? "default" : "destructive"
-                            }
-                            className="text-xs"
-                          >
-                            {cuisine.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-
-                        <div className="text-muted-foreground">Sort Order:</div>
-                        <div>{cuisine.sort_order}</div>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="w-full mt-3"
-                        onClick={() => handleCuisineDetail(cuisine)}
-                      >
-                        View Details
-                      </Button>
-                    </HoverCardContent>
-                  </HoverCard>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto font-medium"
+                    onClick={() => handleCuisineDetail(cuisine)}
+                  >
+                    {cuisine.name}
+                  </Button>
                 </TableCell>
                 <TableCell className="max-w-[300px] truncate">
                   {cuisine.description || "No description"}
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant={cuisine.is_active ? "default" : "destructive"}
-                  >
-                    {cuisine.is_active ? "Active" : "Inactive"}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Badge
+                      variant={cuisine.is_active ? "default" : "destructive"}
+                    >
+                      {cuisine.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleCuisineAvailability(cuisine)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      {cuisine.is_active ? "Disable" : "Enable"}
+                    </Button>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-1">
@@ -980,80 +1230,34 @@ const FoodManagement: React.FC = () => {
                   <Checkbox />
                 </TableCell>
                 <TableCell className="font-medium">
-                  <HoverCard>
-                    <HoverCardTrigger asChild>
-                      <Button
-                        variant="link"
-                        className="p-0"
-                        onClick={() => handleCategoryDetail(category)}
-                      >
-                        {category.name}
-                      </Button>
-                    </HoverCardTrigger>
-                    <HoverCardContent className="w-80">
-                      <div className="flex justify-between space-x-4">
-                        {category.image ? (
-                          <div className="w-16 h-16 rounded-md overflow-hidden">
-                            <img
-                              src={category.image}
-                              alt={category.name}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-16 h-16 rounded-md bg-gray-100 flex items-center justify-center">
-                            <span className="text-gray-400">No image</span>
-                          </div>
-                        )}
-                        <div className="space-y-1 flex-1">
-                          <h4 className="text-sm font-semibold">
-                            {category.name}
-                          </h4>
-                          <p className="text-xs text-muted-foreground line-clamp-3">
-                            {category.description || "No description available"}
-                          </p>
-                        </div>
-                      </div>
-                      <Separator className="my-2" />
-                      <div className="grid grid-cols-2 gap-1 text-xs">
-                        <div className="text-muted-foreground">Cuisine:</div>
-                        <div>{category.cuisine_name || "N/A"}</div>
-
-                        <div className="text-muted-foreground">Status:</div>
-                        <div>
-                          <Badge
-                            variant={
-                              category.is_active ? "default" : "destructive"
-                            }
-                            className="text-xs"
-                          >
-                            {category.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-
-                        <div className="text-muted-foreground">Sort Order:</div>
-                        <div>{category.sort_order}</div>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="w-full mt-3"
-                        onClick={() => handleCategoryDetail(category)}
-                      >
-                        View Details
-                      </Button>
-                    </HoverCardContent>
-                  </HoverCard>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto font-medium"
+                    onClick={() => handleCategoryDetail(category)}
+                  >
+                    {category.name}
+                  </Button>
                 </TableCell>
                 <TableCell>{category.cuisine_name || "N/A"}</TableCell>
                 <TableCell className="max-w-[300px] truncate">
                   {category.description || "No description"}
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant={category.is_active ? "default" : "destructive"}
-                  >
-                    {category.is_active ? "Active" : "Inactive"}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Badge
+                      variant={category.is_active ? "default" : "destructive"}
+                    >
+                      {category.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleCategoryAvailability(category)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      {category.is_active ? "Disable" : "Enable"}
+                    </Button>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-1">
@@ -1311,9 +1515,10 @@ const FoodManagement: React.FC = () => {
             {editItem ? "Edit Food Item" : "Add New Food Item"}
           </DialogTitle>
           <DialogDescription>
-            Fill in the details to {editItem ? "update" : "create"} a food item. Note: Chefs will set their own prices for this food item.
+            Fill in the details to {editItem ? "update" : "create"} a food item.
+            Note: Chefs will set their own prices for this food item.
           </DialogDescription>
-          
+
           <div className="space-y-6">
             {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1322,31 +1527,52 @@ const FoodManagement: React.FC = () => {
                 <Input
                   id="food-name"
                   value={foodFormData.name}
-                  onChange={(e) => setFoodFormData({...foodFormData, name: e.target.value})}
+                  onChange={(e) =>
+                    setFoodFormData({ ...foodFormData, name: e.target.value })
+                  }
                   placeholder="Enter food name"
                   className={formErrors.name ? "border-red-500" : ""}
                 />
-                {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+                {formErrors.name && (
+                  <p className="text-sm text-red-500">{formErrors.name}</p>
+                )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="food-category">Category *</Label>
-                <Select 
-                  value={foodFormData.category} 
-                  onValueChange={(value) => setFoodFormData({...foodFormData, category: value})}
+                <Select
+                  value={foodFormData.category}
+                  onValueChange={(value) =>
+                    setFoodFormData({ ...foodFormData, category: value })
+                  }
                 >
-                  <SelectTrigger className={formErrors.category ? "border-red-500" : ""}>
-                    <SelectValue placeholder="Select category" />
+                  <SelectTrigger
+                    className={formErrors.category ? "border-red-500" : ""}
+                  >
+                    <SelectValue
+                      placeholder={
+                        foodFormData.category
+                          ? categories.find(
+                              (c) => c.id.toString() === foodFormData.category
+                            )?.name || "Select category"
+                          : "Select category"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
+                    {filteredCategories.map((category) => (
+                      <SelectItem
+                        key={category.id}
+                        value={category.id.toString()}
+                      >
                         {category.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {formErrors.category && <p className="text-sm text-red-500">{formErrors.category}</p>}
+                {formErrors.category && (
+                  <p className="text-sm text-red-500">{formErrors.category}</p>
+                )}
               </div>
             </div>
 
@@ -1355,46 +1581,81 @@ const FoodManagement: React.FC = () => {
               <Textarea
                 id="food-description"
                 value={foodFormData.description}
-                onChange={(e) => setFoodFormData({...foodFormData, description: e.target.value})}
+                onChange={(e) =>
+                  setFoodFormData({
+                    ...foodFormData,
+                    description: e.target.value,
+                  })
+                }
                 placeholder="Describe the food item"
                 className={formErrors.description ? "border-red-500" : ""}
                 rows={3}
               />
-              {formErrors.description && <p className="text-sm text-red-500">{formErrors.description}</p>}
+              {formErrors.description && (
+                <p className="text-sm text-red-500">{formErrors.description}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="food-cuisine">Cuisine *</Label>
-                <Select 
-                  value={foodFormData.cuisine} 
-                  onValueChange={(value) => setFoodFormData({...foodFormData, cuisine: value})}
+                <Select
+                  value={foodFormData.cuisine}
+                  onValueChange={handleCuisineChange}
                 >
-                  <SelectTrigger className={formErrors.cuisine ? "border-red-500" : ""}>
-                    <SelectValue placeholder="Select cuisine" />
+                  <SelectTrigger
+                    className={formErrors.cuisine ? "border-red-500" : ""}
+                  >
+                    <SelectValue
+                      placeholder={
+                        foodFormData.cuisine
+                          ? cuisines.find(
+                              (c) => c.id.toString() === foodFormData.cuisine
+                            )?.name || "Select cuisine"
+                          : "Select cuisine"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {cuisines.map((cuisine) => (
-                      <SelectItem key={cuisine.id} value={cuisine.id.toString()}>
+                      <SelectItem
+                        key={cuisine.id}
+                        value={cuisine.id.toString()}
+                      >
                         {cuisine.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {formErrors.cuisine && <p className="text-sm text-red-500">{formErrors.cuisine}</p>}
+                {formErrors.cuisine && (
+                  <p className="text-sm text-red-500">{formErrors.cuisine}</p>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="preparation-time">Preparation Time (minutes)</Label>
+                <Label htmlFor="preparation-time">
+                  Preparation Time (minutes)
+                </Label>
                 <Input
                   id="preparation-time"
                   type="number"
                   value={foodFormData.preparation_time}
-                  onChange={(e) => setFoodFormData({...foodFormData, preparation_time: e.target.value})}
+                  onChange={(e) =>
+                    setFoodFormData({
+                      ...foodFormData,
+                      preparation_time: e.target.value,
+                    })
+                  }
                   placeholder="e.g., 30"
-                  className={formErrors.preparation_time ? "border-red-500" : ""}
+                  className={
+                    formErrors.preparation_time ? "border-red-500" : ""
+                  }
                 />
-                {formErrors.preparation_time && <p className="text-sm text-red-500">{formErrors.preparation_time}</p>}
+                {formErrors.preparation_time && (
+                  <p className="text-sm text-red-500">
+                    {formErrors.preparation_time}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1405,11 +1666,22 @@ const FoodManagement: React.FC = () => {
                   id="calories"
                   type="number"
                   value={foodFormData.calories_per_serving}
-                  onChange={(e) => setFoodFormData({...foodFormData, calories_per_serving: e.target.value})}
+                  onChange={(e) =>
+                    setFoodFormData({
+                      ...foodFormData,
+                      calories_per_serving: e.target.value,
+                    })
+                  }
                   placeholder="e.g., 250"
-                  className={formErrors.calories_per_serving ? "border-red-500" : ""}
+                  className={
+                    formErrors.calories_per_serving ? "border-red-500" : ""
+                  }
                 />
-                {formErrors.calories_per_serving && <p className="text-sm text-red-500">{formErrors.calories_per_serving}</p>}
+                {formErrors.calories_per_serving && (
+                  <p className="text-sm text-red-500">
+                    {formErrors.calories_per_serving}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1417,7 +1689,12 @@ const FoodManagement: React.FC = () => {
                 <Input
                   id="allergens"
                   value={foodFormData.allergens}
-                  onChange={(e) => setFoodFormData({...foodFormData, allergens: e.target.value})}
+                  onChange={(e) =>
+                    setFoodFormData({
+                      ...foodFormData,
+                      allergens: e.target.value,
+                    })
+                  }
                   placeholder="e.g., Nuts, Dairy, Gluten"
                 />
               </div>
@@ -1431,7 +1708,12 @@ const FoodManagement: React.FC = () => {
                   <Checkbox
                     id="vegetarian"
                     checked={foodFormData.is_vegetarian}
-                    onCheckedChange={(checked) => setFoodFormData({...foodFormData, is_vegetarian: !!checked})}
+                    onCheckedChange={(checked) =>
+                      setFoodFormData({
+                        ...foodFormData,
+                        is_vegetarian: !!checked,
+                      })
+                    }
                   />
                   <Label htmlFor="vegetarian">Vegetarian</Label>
                 </div>
@@ -1439,7 +1721,9 @@ const FoodManagement: React.FC = () => {
                   <Checkbox
                     id="vegan"
                     checked={foodFormData.is_vegan}
-                    onCheckedChange={(checked) => setFoodFormData({...foodFormData, is_vegan: !!checked})}
+                    onCheckedChange={(checked) =>
+                      setFoodFormData({ ...foodFormData, is_vegan: !!checked })
+                    }
                   />
                   <Label htmlFor="vegan">Vegan</Label>
                 </div>
@@ -1447,7 +1731,12 @@ const FoodManagement: React.FC = () => {
                   <Checkbox
                     id="gluten-free"
                     checked={foodFormData.is_gluten_free}
-                    onCheckedChange={(checked) => setFoodFormData({...foodFormData, is_gluten_free: !!checked})}
+                    onCheckedChange={(checked) =>
+                      setFoodFormData({
+                        ...foodFormData,
+                        is_gluten_free: !!checked,
+                      })
+                    }
                   />
                   <Label htmlFor="gluten-free">Gluten Free</Label>
                 </div>
@@ -1459,7 +1748,9 @@ const FoodManagement: React.FC = () => {
               <Checkbox
                 id="available"
                 checked={foodFormData.is_available}
-                onCheckedChange={(checked) => setFoodFormData({...foodFormData, is_available: !!checked})}
+                onCheckedChange={(checked) =>
+                  setFoodFormData({ ...foodFormData, is_available: !!checked })
+                }
               />
               <Label htmlFor="available">Available for ordering</Label>
             </div>
@@ -1475,8 +1766,10 @@ const FoodManagement: React.FC = () => {
                   <RefreshCw className="h-4 w-4 animate-spin mr-2" />
                   {editItem ? "Updating..." : "Creating..."}
                 </>
+              ) : editItem ? (
+                "Update Food Item"
               ) : (
-                editItem ? "Update Food Item" : "Create Food Item"
+                "Create Food Item"
               )}
             </Button>
           </DialogFooter>
@@ -1492,18 +1785,25 @@ const FoodManagement: React.FC = () => {
           <DialogDescription>
             Fill in the details to {editItem ? "update" : "create"} a cuisine
           </DialogDescription>
-          
+
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="cuisine-name">Cuisine Name *</Label>
               <Input
                 id="cuisine-name"
                 value={cuisineFormData.name}
-                onChange={(e) => setCuisineFormData({...cuisineFormData, name: e.target.value})}
+                onChange={(e) =>
+                  setCuisineFormData({
+                    ...cuisineFormData,
+                    name: e.target.value,
+                  })
+                }
                 placeholder="e.g., Italian, Chinese, Mexican"
                 className={formErrors.name ? "border-red-500" : ""}
               />
-              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+              {formErrors.name && (
+                <p className="text-sm text-red-500">{formErrors.name}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1511,12 +1811,19 @@ const FoodManagement: React.FC = () => {
               <Textarea
                 id="cuisine-description"
                 value={cuisineFormData.description}
-                onChange={(e) => setCuisineFormData({...cuisineFormData, description: e.target.value})}
+                onChange={(e) =>
+                  setCuisineFormData({
+                    ...cuisineFormData,
+                    description: e.target.value,
+                  })
+                }
                 placeholder="Describe the cuisine style and characteristics"
                 className={formErrors.description ? "border-red-500" : ""}
                 rows={4}
               />
-              {formErrors.description && <p className="text-sm text-red-500">{formErrors.description}</p>}
+              {formErrors.description && (
+                <p className="text-sm text-red-500">{formErrors.description}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1528,12 +1835,14 @@ const FoodManagement: React.FC = () => {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    setCuisineFormData({...cuisineFormData, image: file});
+                    setCuisineFormData({ ...cuisineFormData, image: file });
                   }
                 }}
                 className="cursor-pointer"
               />
-              <p className="text-sm text-gray-500">Upload an image representing this cuisine (optional)</p>
+              <p className="text-sm text-gray-500">
+                Upload an image representing this cuisine (optional)
+              </p>
             </div>
           </div>
 
@@ -1547,8 +1856,10 @@ const FoodManagement: React.FC = () => {
                   <RefreshCw className="h-4 w-4 animate-spin mr-2" />
                   {editItem ? "Updating..." : "Creating..."}
                 </>
+              ) : editItem ? (
+                "Update Cuisine"
               ) : (
-                editItem ? "Update Cuisine" : "Create Cuisine"
+                "Create Cuisine"
               )}
             </Button>
           </DialogFooter>
@@ -1562,20 +1873,28 @@ const FoodManagement: React.FC = () => {
             {editItem ? "Edit Category" : "Add New Category"}
           </DialogTitle>
           <DialogDescription>
-            Fill in the details to {editItem ? "update" : "create"} a food category
+            Fill in the details to {editItem ? "update" : "create"} a food
+            category
           </DialogDescription>
-          
+
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="category-name">Category Name *</Label>
               <Input
                 id="category-name"
                 value={categoryFormData.name}
-                onChange={(e) => setCategoryFormData({...categoryFormData, name: e.target.value})}
+                onChange={(e) =>
+                  setCategoryFormData({
+                    ...categoryFormData,
+                    name: e.target.value,
+                  })
+                }
                 placeholder="e.g., Appetizers, Main Course, Desserts"
                 className={formErrors.name ? "border-red-500" : ""}
               />
-              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+              {formErrors.name && (
+                <p className="text-sm text-red-500">{formErrors.name}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1583,21 +1902,32 @@ const FoodManagement: React.FC = () => {
               <Textarea
                 id="category-description"
                 value={categoryFormData.description}
-                onChange={(e) => setCategoryFormData({...categoryFormData, description: e.target.value})}
+                onChange={(e) =>
+                  setCategoryFormData({
+                    ...categoryFormData,
+                    description: e.target.value,
+                  })
+                }
                 placeholder="Describe the category and what types of food it includes"
                 className={formErrors.description ? "border-red-500" : ""}
                 rows={4}
               />
-              {formErrors.description && <p className="text-sm text-red-500">{formErrors.description}</p>}
+              {formErrors.description && (
+                <p className="text-sm text-red-500">{formErrors.description}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="category-cuisine">Cuisine *</Label>
-              <Select 
-                value={categoryFormData.cuisine} 
-                onValueChange={(value) => setCategoryFormData({...categoryFormData, cuisine: value})}
+              <Select
+                value={categoryFormData.cuisine}
+                onValueChange={(value) =>
+                  setCategoryFormData({ ...categoryFormData, cuisine: value })
+                }
               >
-                <SelectTrigger className={formErrors.cuisine ? "border-red-500" : ""}>
+                <SelectTrigger
+                  className={formErrors.cuisine ? "border-red-500" : ""}
+                >
                   <SelectValue placeholder="Select cuisine" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1608,7 +1938,9 @@ const FoodManagement: React.FC = () => {
                   ))}
                 </SelectContent>
               </Select>
-              {formErrors.cuisine && <p className="text-sm text-red-500">{formErrors.cuisine}</p>}
+              {formErrors.cuisine && (
+                <p className="text-sm text-red-500">{formErrors.cuisine}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1620,17 +1952,22 @@ const FoodManagement: React.FC = () => {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    setCategoryFormData({...categoryFormData, image: file});
+                    setCategoryFormData({ ...categoryFormData, image: file });
                   }
                 }}
                 className="cursor-pointer"
               />
-              <p className="text-sm text-gray-500">Upload an image representing this category (optional)</p>
+              <p className="text-sm text-gray-500">
+                Upload an image representing this category (optional)
+              </p>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCategoryForm(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowCategoryForm(false)}
+            >
               Cancel
             </Button>
             <Button onClick={handleFormSubmit} disabled={isSubmitting}>
@@ -1639,8 +1976,10 @@ const FoodManagement: React.FC = () => {
                   <RefreshCw className="h-4 w-4 animate-spin mr-2" />
                   {editItem ? "Updating..." : "Creating..."}
                 </>
+              ) : editItem ? (
+                "Update Category"
               ) : (
-                editItem ? "Update Category" : "Create Category"
+                "Create Category"
               )}
             </Button>
           </DialogFooter>

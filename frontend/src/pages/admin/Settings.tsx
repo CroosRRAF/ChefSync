@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
 import { Settings, Save, RefreshCw, Shield, Bell, Globe, AlertCircle, CheckCircle, User, Mail, Phone, MapPin } from 'lucide-react';
-import { adminService, type SystemSetting } from '@/services/adminService';
+import { adminService } from '@/services/adminService';
+import { SystemSetting } from '@/types/admin';
 import { authService } from '@/services/authService';
 import { toast } from 'sonner';
 

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { SystemSetting } from "../types/admin";
 
 // Use Vite dev proxy by default to avoid protocol mismatches in development.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -199,22 +200,6 @@ export interface AdminActivityLog {
   metadata: Record<string, unknown>;
 }
 
-export interface SystemSetting {
-  id: number;
-  key: string;
-  value: string;
-  typed_value: string | number | boolean;
-  setting_type: string;
-  category: string;
-  description: string;
-  is_public: boolean;
-  is_encrypted: boolean;
-  default_value: string;
-  validation_rules: Record<string, unknown>;
-  updated_by: number | null;
-  updated_at: string;
-  created_at: string;
-}
 
 export interface PaginationInfo {
   page: number;
@@ -1377,7 +1362,14 @@ class AdminService {
       
       console.log(`✅ AdminService: System settings response:`, response.data);
       
-      return response.data;
+      // Handle paginated response - return results array
+      if (response.data && Array.isArray(response.data.results)) {
+        return response.data.results;
+      } else if (Array.isArray(response.data)) {
+        return response.data;
+      } else {
+        throw new Error('Invalid response format from server');
+      }
     } catch (error: any) {
       console.error("❌ AdminService: Error fetching system settings:", {
         message: error?.message,

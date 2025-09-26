@@ -313,24 +313,23 @@ class AdminDashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"])
     def weekly_performance(self, request):
-        """Get weekly performance data for pie chart (last 7 days)"""
+        """Get weekly performance data for pie chart (last 30 days)"""
         try:
-            # Get date range (last 7 days)
-            days = int(request.GET.get("days", 7))
+            # Get date range (default 30 days)
+            days = int(request.query_params.get("days", 30))
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
 
             from apps.orders.models import Order
 
-            # Get order counts by day of week
-            day_counts = (
+            # Get order status distribution
+            status_counts = (
                 Order.objects.filter(
                     created_at__gte=start_date, created_at__lte=end_date
                 )
-                .extra(select={"day_of_week": "DAYOFWEEK(created_at)"})
-                .values("day_of_week")
+                .values("status")
                 .annotate(count=Count("id"))
-                .order_by("day_of_week")
+                .order_by("-count")
             )
 
             # Prepare pie chart data
@@ -338,28 +337,23 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             data = []
             colors = []
 
-            day_names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-            day_colors = [
-                "#10B981",  # green - Sunday
-                "#3B82F6",  # blue - Monday
-                "#F59E0B",  # yellow - Tuesday
-                "#8B5CF6",  # purple - Wednesday
-                "#06B6D4",  # cyan - Thursday
-                "#F97316",  # orange - Friday
-                "#EF4444",  # red - Saturday
-            ]
+            status_colors = {
+                "delivered": "#10B981",  # green
+                "confirmed": "#3B82F6",  # blue
+                "preparing": "#F59E0B",  # yellow
+                "ready": "#8B5CF6",  # purple
+                "out_for_delivery": "#06B6D4",  # cyan
+                "pending": "#F97316",  # orange
+                "cancelled": "#EF4444",  # red
+                "refunded": "#6B7280",  # gray
+            }
 
-            # Initialize all days with 0 (MySQL DAYOFWEEK: 1=Sunday, 2=Monday, ..., 7=Saturday)
-            day_dict = {i: 0 for i in range(1, 8)}
-            for item in day_counts:
-                day_dict[item["day_of_week"]] = item["count"]
-
-            # Map MySQL day numbers to our array indices (1=Sunday -> 0, 2=Monday -> 1, etc.)
-            for mysql_day in range(1, 8):
-                array_index = (mysql_day - 1) % 7  # Convert 1-7 to 0-6
-                labels.append(day_names[array_index])
-                data.append(day_dict[mysql_day])
-                colors.append(day_colors[array_index])
+            for item in status_counts:
+                status = item["status"]
+                count = item["count"]
+                labels.append(status.replace("_", " ").title())
+                data.append(count)
+                colors.append(status_colors.get(status, "#6B7280"))
 
             chart_data = {
                 "labels": labels,
@@ -371,7 +365,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             return Response(
                 {
                     "chart_type": "pie",
-                    "title": f"Weekly Order Performance (Last {days} Days)",
+                    "title": f"Order Status Distribution (Last {days} Days)",
                     "data": chart_data,
                     "total_orders": sum(data),
                 }
@@ -388,21 +382,20 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get revenue trend data for bar chart (last 30 days)"""
         try:
             # Get date range (default 30 days)
-            days = int(request.GET.get("days", 30))
+            days = int(request.query_params.get("days", 30))
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
 
             from apps.orders.models import Order
 
-            # Get daily revenue data (include all orders, not just paid ones)
-            # Use TruncDate instead of extra select for better compatibility
-            from django.db.models.functions import TruncDate
+            # Get daily revenue data
             revenue_data = (
                 Order.objects.filter(
                     created_at__gte=start_date,
                     created_at__lte=end_date,
+                    payment_status="paid",
                 )
-                .annotate(date=TruncDate("created_at"))
+                .extra(select={"date": "DATE(created_at)"})
                 .values("date")
                 .annotate(revenue=Sum("total_amount"))
                 .order_by("date")
@@ -459,17 +452,16 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get growth analytics data for area chart (last 30 days)"""
         try:
             # Get date range (default 30 days)
-            days = int(request.GET.get("days", 30))
+            days = int(request.query_params.get("days", 30))
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
 
             # Get user registration growth
-            from django.db.models.functions import TruncDate
             user_growth = (
                 User.objects.filter(
                     date_joined__gte=start_date, date_joined__lte=end_date
                 )
-                .annotate(date=TruncDate("date_joined"))
+                .extra(select={"date": "DATE(date_joined)"})
                 .values("date")
                 .annotate(new_users=Count("user_id"))
                 .order_by("date")
@@ -482,7 +474,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 Order.objects.filter(
                     created_at__gte=start_date, created_at__lte=end_date
                 )
-                .annotate(date=TruncDate("created_at"))
+                .extra(select={"date": "DATE(created_at)"})
                 .values("date")
                 .annotate(new_orders=Count("id"))
                 .order_by("date")
@@ -550,7 +542,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get orders trend data for line chart (last 30 days)"""
         try:
             # Get date range (default 30 days)
-            days = int(request.GET.get("days", 30))
+            days = int(request.query_params.get("days", 30))
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
 
@@ -728,49 +720,6 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
     """Complete user management for admins"""
 
     permission_classes = [IsAdminUser]
-
-    @action(detail=False, methods=["get"])
-    def stats(self, request):
-        """Get user statistics"""
-        try:
-            # Get all user counts
-            total_users = User.objects.count()
-            active_users = User.objects.filter(status="active").count()
-            inactive_users = User.objects.filter(status="inactive").count()
-            
-            # Get role counts
-            admin_count = User.objects.filter(role="admin").count()
-            cook_count = User.objects.filter(role="cook").count()
-            customer_count = User.objects.filter(role="customer").count()
-            delivery_agent_count = User.objects.filter(role="DeliveryAgent").count()
-            
-            # Get new users this week
-            from datetime import datetime, timedelta
-            week_ago = datetime.now() - timedelta(days=7)
-            new_users_this_week = User.objects.filter(date_joined__gte=week_ago).count()
-            
-            # Get pending approvals
-            pending_user_approvals = User.objects.filter(
-                role__in=["cook", "DeliveryAgent"], 
-                approval_status="pending"
-            ).count()
-            
-            return Response({
-                "total_users": total_users,
-                "active_users": active_users,
-                "inactive_users": inactive_users,
-                "new_users_this_week": new_users_this_week,
-                "admin_count": admin_count,
-                "total_chefs": cook_count,
-                "customer_count": customer_count,
-                "delivery_agent_count": delivery_agent_count,
-                "pending_user_approvals": pending_user_approvals,
-            })
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to fetch user statistics: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
     @action(detail=False, methods=["get"])
     def list_users(self, request):
@@ -1117,25 +1066,6 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     }
                 )
 
-            # Get user documents (for cooks and delivery agents)
-            documents_data = []
-            if user.role in ["cook", "DeliveryAgent"]:
-                from apps.users.models import UserDocument
-                documents = UserDocument.objects.filter(user=user, is_visible_to_admin=True)
-                for doc in documents:
-                    documents_data.append({
-                        "id": doc.id,
-                        "file_name": doc.file_name,
-                        "file": doc.file.url if doc.file else "",
-                        "document_type": {
-                            "id": doc.document_type.id,
-                            "name": doc.document_type.name,
-                            "description": doc.document_type.description,
-                        },
-                        "uploaded_at": doc.uploaded_at,
-                        "is_visible_to_admin": doc.is_visible_to_admin,
-                    })
-
             user_data = {
                 "id": user.user_id,  # type: ignore
                 "email": user.email,
@@ -1155,7 +1085,6 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 },
                 "recent_orders": recent_orders_data,
                 "activity_logs": activity_data,
-                "documents": documents_data,
             }
 
             return Response(user_data)
@@ -1486,15 +1415,15 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
             # Approval status for cooks and delivery agents
             pending_approvals = User.objects.filter(
-                role__in=["cook", "DeliveryAgent"], approval_status="pending"
+                role__in=["cook", "delivery_agent"], approval_status="pending"
             ).count()
 
             approved_users = User.objects.filter(
-                role__in=["cook", "DeliveryAgent"], approval_status="approved"
+                role__in=["cook", "delivery_agent"], approval_status="approved"
             ).count()
 
             rejected_users = User.objects.filter(
-                role__in=["cook", "DeliveryAgent"], approval_status="rejected"
+                role__in=["cook", "delivery_agent"], approval_status="rejected"
             ).count()
 
             # Recent registrations (last 30 days)
@@ -1506,7 +1435,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             # Recent approvals (last 7 days)
             seven_days_ago = timezone.now() - timedelta(days=7)
             recent_approvals = User.objects.filter(
-                role__in=["cook", "DeliveryAgent"],
+                role__in=["cook", "delivery_agent"],
                 approval_status="approved",
                 approved_at__gte=seven_days_ago,
             ).count()
@@ -1554,12 +1483,8 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
     permission_classes = [IsAdminUser]
 
     def list(self, request):
-        """Get paginated list of orders with filters - standard list endpoint"""
+        """Get paginated list of orders with filters - main endpoint"""
         return self.list_orders(request)
-
-    def retrieve(self, request, pk=None):
-        """Get detailed order information - standard retrieve endpoint"""
-        return self.details(request, pk)
 
     @action(detail=False, methods=["get"])
     def list_orders(self, request):
@@ -1568,13 +1493,13 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
             from apps.orders.models import Order
 
             # Get query parameters
-            page = int(request.GET.get("page", 1))  # type: ignore
-            limit = int(request.GET.get("limit", 25))  # type: ignore
-            search = request.GET.get("search", "")  # type: ignore
-            order_status = request.GET.get("status", "")  # type: ignore
-            payment_status = request.GET.get("payment_status", "")  # type: ignore
-            sort_by = request.GET.get("sort_by", "created_at")  # type: ignore
-            sort_order = request.GET.get("sort_order", "desc")  # type: ignore
+            page = int(request.query_params.get("page", 1))  # type: ignore
+            limit = int(request.query_params.get("limit", 25))  # type: ignore
+            search = request.query_params.get("search", "")  # type: ignore
+            order_status = request.query_params.get("status", "")  # type: ignore
+            payment_status = request.query_params.get("payment_status", "")  # type: ignore
+            sort_by = request.query_params.get("sort_by", "created_at")  # type: ignore
+            sort_order = request.query_params.get("sort_order", "desc")  # type: ignore
 
             # Build query
             queryset = Order.objects.select_related("customer").all()
@@ -1719,7 +1644,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                 for item in order.items.select_related("price__food").all():  # type: ignore
                     items.append(
                         {
-                            "id": item.order_item_id,
+                            "id": item.id,
                             "food_name": item.food_name,
                             "quantity": item.quantity,
                             "unit_price": float(item.unit_price),
@@ -1874,7 +1799,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
 
             # Verify delivery partner exists and has correct role
             partner = User.objects.get(
-                pk=partner_id, role="DeliveryAgent", status="active"
+                pk=partner_id, role="delivery_agent", status="active"
             )
 
             # Update order
@@ -1928,7 +1853,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
         """Get list of available chefs for order assignment"""
         try:
             chefs = User.objects.filter(role="cook", status="active").values(
-                "user_id", "name", "email"
+                "id", "name", "email"
             )
 
             return Response({"chefs": list(chefs)})
@@ -1944,8 +1869,8 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
         """Get list of available delivery partners for order assignment"""
         try:
             partners = User.objects.filter(
-                role="DeliveryAgent", status="active"
-            ).values("user_id", "name", "email")
+                role="delivery_agent", status="active"
+            ).values("id", "name", "email")
 
             return Response({"partners": list(partners)})
 
@@ -2055,12 +1980,12 @@ class AdminSystemSettingsViewSet(viewsets.ModelViewSet):
         queryset = self.queryset
 
         # Filter by category
-        category = self.request.GET.get("category")
+        category = self.request.query_params.get("category")  # type: ignore
         if category:
             queryset = queryset.filter(category=category)
 
         # Filter by public settings
-        is_public = self.request.GET.get("is_public")
+        is_public = self.request.query_params.get("is_public")  # type: ignore
         if is_public is not None:
             queryset = queryset.filter(is_public=is_public.lower() == "true")
 

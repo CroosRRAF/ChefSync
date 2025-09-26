@@ -398,6 +398,77 @@ class FoodImageViewSet(viewsets.ModelViewSet):
 # ADMIN FOOD APPROVAL SYSTEM
 # ================================
 
+class AdminFoodManagementViewSet(viewsets.ModelViewSet):
+    """Admin endpoints for full food management - CRUD operations"""
+    
+    serializer_class = FoodSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Only admin users can access all foods"""
+        if not self.request.user.is_staff:
+            return Food.objects.none()
+        
+        # Get all foods for admin management
+        queryset = Food.objects.all().prefetch_related('prices').select_related('chef', 'food_category', 'admin')
+        
+        # Filter by status if provided
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+            
+        # Filter by chef if provided
+        chef_filter = self.request.query_params.get('chef')
+        if chef_filter:
+            queryset = queryset.filter(chef_id=chef_filter)
+            
+        # Search functionality
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(description__icontains=search) |
+                Q(chef__first_name__icontains=search) |
+                Q(chef__last_name__icontains=search)
+            )
+        
+        return queryset.order_by('-created_at')
+    
+    def update(self, request, *args, **kwargs):
+        """Update food item - admin can update all fields"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        food = self.get_object()
+        serializer = self.get_serializer(food, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        updated_food = serializer.save()
+        
+        return Response({
+            'message': 'Food updated successfully',
+            'food': FoodSerializer(updated_food, context={'request': request}).data
+        })
+    
+    def destroy(self, request, *args, **kwargs):
+        """Delete food item - admin can delete any food"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        food = self.get_object()
+        food_name = food.name
+        food.delete()
+        
+        return Response({
+            'message': f'Food "{food_name}" has been deleted successfully'
+        }, status=status.HTTP_200_OK)
+
+
 class AdminFoodApprovalViewSet(viewsets.ReadOnlyModelViewSet):
     """Admin endpoints for food approval workflow"""
 

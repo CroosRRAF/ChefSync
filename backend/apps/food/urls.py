@@ -14,7 +14,8 @@ router.register(r'reviews', views.FoodReviewViewSet, basename='reviews')
 router.register(r'offers', views.OfferViewSet, basename='offers')
 router.register(r'images', views.FoodImageViewSet, basename='images')
 
-# Admin approval endpoints
+# Admin endpoints
+router.register(r'admin/foods', views.AdminFoodManagementViewSet, basename='admin-foods')
 router.register(r'admin/approvals', views.AdminFoodApprovalViewSet, basename='admin-approvals')
 
 urlpatterns = [
