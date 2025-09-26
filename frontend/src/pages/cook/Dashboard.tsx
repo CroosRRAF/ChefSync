@@ -11,7 +11,8 @@ import {
   Activity,
   RefreshCw
 } from "lucide-react";
-import { ChefDashboardStats, useOrderService } from '@/services/orderService';
+import { useOrderService } from '@/hooks/useOrderService';
+import { ChefDashboardStats } from '@/hooks/useOrderService';
 
 export default function Dashboard() {
   // State for API data

@@ -155,7 +155,7 @@ const CartPopup: React.FC<CartPopupProps> = ({
                       {/* Item Image */}
                       <div className="w-12 h-12 flex-shrink-0">
                         <img
-                          src={item.food_image || 'https://via.placeholder.com/48x48?text=No+Image'}
+                          src={item.food_image || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxjaXJjbGUgY3g9IjI0IiBjeT0iMjQiIHI9IjgiIGZpbGw9IiM5Q0E5QjAiLz4KPHR5cGU+Tm88L3RleHQ+Cjwvc3ZnPg=='}
                           alt={item.food_name}
                           className="w-full h-full object-cover rounded-lg"
                         />

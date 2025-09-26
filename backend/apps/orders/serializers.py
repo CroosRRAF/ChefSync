@@ -1,11 +1,24 @@
 from rest_framework import serializers
 from django.db.models import Sum, Count
-from .models import Order, OrderItem, OrderStatusHistory, CartItem, BulkOrder, BulkOrderAssignment
+from .models import Order, OrderItem, OrderStatusHistory, CartItem, BulkOrder, BulkOrderAssignment, UserAddress
 from apps.food.models import Food, FoodPrice
 from django.contrib.auth import get_user_model
 from apps.users.models import ChefProfile
 
 User = get_user_model()
+
+
+class UserAddressSerializer(serializers.ModelSerializer):
+    """Serializer for user saved addresses"""
+    
+    class Meta:
+        model = UserAddress
+        fields = [
+            'id', 'label', 'address_line1', 'address_line2', 
+            'city', 'pincode', 'latitude', 'longitude', 
+            'is_default', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class FoodPriceSerializer(serializers.ModelSerializer):
@@ -247,6 +260,7 @@ class CartItemSerializer(serializers.ModelSerializer):
     """Enhanced cart item serializer with all required fields for frontend"""
     food_name = serializers.CharField(source='price.food.name', read_only=True)
     cook_name = serializers.CharField(source='price.cook.get_full_name', read_only=True)
+    chef_id = serializers.SerializerMethodField()
     size = serializers.CharField(source='price.size', read_only=True)
     unit_price = serializers.DecimalField(source='price.price', max_digits=10, decimal_places=2, read_only=True)
     total_price = serializers.SerializerMethodField()
@@ -255,9 +269,17 @@ class CartItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = CartItem
         fields = [
-            'id', 'quantity', 'special_instructions', 'food_name', 'cook_name', 
+            'id', 'quantity', 'special_instructions', 'food_name', 'cook_name', 'chef_id',
             'size', 'unit_price', 'total_price', 'food_image', 'created_at', 'updated_at'
         ]
+        
+    def get_chef_id(self, obj):
+        """Get chef ID from the price's cook"""
+        try:
+            # Custom User model uses user_id as primary key
+            return obj.price.cook.user_id
+        except:
+            return None
         
     def get_total_price(self, obj):
         return obj.total_price
@@ -387,7 +409,7 @@ class BulkOrderListSerializer(serializers.ModelSerializer):
         assignments = obj.assignments.select_related('chef')
         return [
             {
-                'id': assignment.chef.id,
+                'id': assignment.chef.user_id,
                 'name': assignment.chef.name if assignment.chef.name else assignment.chef.username,
                 'email': assignment.chef.email,
                 'role': 'chef'

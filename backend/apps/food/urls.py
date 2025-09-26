@@ -11,7 +11,6 @@ router.register(r'cuisines', views.CuisineViewSet, basename='cuisines')
 router.register(r'categories', views.FoodCategoryViewSet, basename='categories')
 router.register(r'reviews', views.FoodReviewViewSet, basename='reviews')
 router.register(r'offers', views.OfferViewSet, basename='offers')
-router.register(r'images', views.FoodImageViewSet, basename='images')
 
 # Admin approval endpoints
 router.register(r'admin/approvals', views.AdminFoodApprovalViewSet, basename='admin-approvals')

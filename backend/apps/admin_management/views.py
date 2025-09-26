@@ -712,7 +712,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
     def details(self, request, pk=None):
         """Get detailed user information"""
         try:
-            user = User.objects.get(pk=pk)
+            user = User.objects.get(user_id=pk)
             
             # Get user statistics
             from apps.orders.models import Order
@@ -1095,12 +1095,12 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                     'phone': order.customer.phone_no,
                 } if order.customer else None,
                 'chef': {
-                    'id': order.chef.id,
+                    'id': order.chef.user_id,
                     'name': order.chef.name,
                     'email': order.chef.email,
                 } if order.chef else None,
                 'delivery_partner': {
-                    'id': order.delivery_partner.id,
+                    'id': order.delivery_partner.user_id,
                     'name': order.delivery_partner.name,
                     'email': order.delivery_partner.email,
                 } if order.delivery_partner else None,
@@ -1152,7 +1152,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                 )
             
             # Verify chef exists and has correct role
-            chef = User.objects.get(pk=chef_id, role='cook', is_active=True)
+            chef = User.objects.get(user_id=chef_id, role__in=['cook','Cook'], is_active=True)
             
             # Update order
             old_chef = order.chef
@@ -1176,7 +1176,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                     'id': order.id,
                     'order_number': order.order_number,
                     'chef': {
-                        'id': chef.id,
+                        'id': chef.user_id,
                         'name': chef.name,
                         'email': chef.email,
                     }

@@ -108,7 +108,7 @@ class CommunicationViewSet(viewsets.ModelViewSet):
         try:
             from django.contrib.auth import get_user_model
             User = get_user_model()
-            assignee = User.objects.get(id=assignee_id)
+            assignee = User.objects.get(user_id=assignee_id)
             
             communication.assign_to(assignee)
             

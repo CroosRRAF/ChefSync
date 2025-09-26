@@ -52,7 +52,11 @@ class Food(models.Model):
     name = models.CharField(max_length=100, null=False)
     category = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    image = CloudinaryImageField(blank=True, null=True, help_text='Food image')
+    image = CloudinaryImageField(
+        blank=True, 
+        null=True, 
+        help_text='Primary food image - uploaded to Cloudinary'
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     admin = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
@@ -96,6 +100,34 @@ class Food(models.Model):
     def is_approved(self):
         return self.status == 'Approved'
     
+    @property
+    def image_url(self):
+        """Get the primary image URL from CloudinaryImageField"""
+        if self.image:
+            return str(self.image)
+        return None
+    
+    @property
+    def primary_image(self):
+        """Alias for image_url for compatibility"""
+        return self.image_url
+    
+    @property
+    def optimized_image_url(self):
+        """Get optimized Cloudinary URL for the primary image"""
+        if self.image:
+            from utils.cloudinary_utils import get_optimized_url
+            return get_optimized_url(str(self.image))
+        return None
+    
+    @property
+    def thumbnail_url(self):
+        """Get thumbnail URL - generate from primary image"""
+        if self.image:
+            from utils.cloudinary_utils import get_optimized_url
+            return get_optimized_url(str(self.image), width=200, height=200)
+        return None
+    
     class Meta:
         db_table = 'Food'
         ordering = ['-created_at']
@@ -132,47 +164,6 @@ class FoodPrice(models.Model):
         db_table = 'FoodPrice'
         ordering = ['food', 'size']
         unique_together = ['food', 'size', 'cook']
-
-
-class FoodImage(models.Model):
-    """Images for food items using Cloudinary URLs"""
-    
-    food = models.ForeignKey(Food, on_delete=models.CASCADE, related_name='images')
-    image_url = models.URLField(max_length=500, blank=True, null=True, help_text="Cloudinary URL for the main image")
-    thumbnail_url = models.URLField(max_length=500, blank=True, null=True, help_text="Cloudinary URL for thumbnail")
-    cloudinary_public_id = models.CharField(max_length=200, blank=True, help_text="Cloudinary public ID for management")
-    caption = models.CharField(max_length=200, blank=True)
-    is_primary = models.BooleanField(default=False)
-    sort_order = models.PositiveIntegerField(default=0)
-    alt_text = models.CharField(max_length=100, blank=True, help_text="Alt text for accessibility")
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"Image for {self.food.name}"
-    
-    @property
-    def optimized_url(self):
-        """Get optimized Cloudinary URL"""
-        if self.image_url and 'cloudinary.com' in self.image_url:
-            from utils.cloudinary_utils import get_optimized_url
-            return get_optimized_url(self.image_url)
-        return self.image_url
-    
-    @property
-    def thumbnail(self):
-        """Get thumbnail URL, generate if not exists"""
-        if self.thumbnail_url:
-            return self.thumbnail_url
-        elif self.image_url and 'cloudinary.com' in self.image_url:
-            from utils.cloudinary_utils import get_optimized_url
-            return get_optimized_url(self.image_url, width=200, height=200)
-        return self.image_url
-    
-    class Meta:
-        db_table = 'food_images'
-        ordering = ['sort_order', 'created_at']
 
 
 class Offer(models.Model):

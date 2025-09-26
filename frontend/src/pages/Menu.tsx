@@ -18,6 +18,8 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { getPlaceholderImage } from '../utils/placeholders';
+import { ErrorHandler } from '../utils/errorHandler';
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -55,22 +57,8 @@ const useGeolocation = () => {
         setLoading(false);
       },
       (error) => {
-        console.error('Geolocation error:', error);
-        let errorMessage = 'Unable to get your location.';
-        
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied. Please enable location permissions.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information is unavailable.';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Location request timed out.';
-            break;
-        }
-        
-        setError(errorMessage);
+        const userMessage = ErrorHandler.handleGeolocationError(error);
+        setError(userMessage);
         setLoading(false);
       },
       {
@@ -96,7 +84,9 @@ const useGeolocation = () => {
         onLocationChange(newLocation);
       },
       (error) => {
-        console.error('Location watch error:', error);
+        ErrorHandler.handleGeolocationError(error);
+        // Don't set a persistent error for watch errors as they're common
+        // and the app should continue functioning without live location updates
       },
       {
         enableHighAccuracy: true,
@@ -932,13 +922,14 @@ const Menu: React.FC = () => {
       <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-200 dark:border-gray-700">
         <div className="relative cursor-pointer" onClick={() => handleFoodClick(item)}>
           <img
-            src={item.primary_image || item.image_url || 'https://via.placeholder.com/300x200?text=No+Image'}
+            src={item.primary_image || item.image_url || getPlaceholderImage('card')}
             alt={item.name}
             className="w-full h-48 object-cover"
             loading="lazy"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
-              target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+              ErrorHandler.handleImageError(target.src, 'menu-food-card');
+              target.src = getPlaceholderImage('card');
             }}
           />
           <button
@@ -1712,12 +1703,13 @@ const Menu: React.FC = () => {
               {/* Food Item Details */}
               <div className="flex gap-4 p-4 bg-muted rounded-lg">
                 <img
-                  src={selectedFoodItem.primary_image || selectedFoodItem.image_url || selectedFoodItem.thumbnail_url || 'https://via.placeholder.com/80x80?text=No+Image'}
+                  src={selectedFoodItem.primary_image || selectedFoodItem.image_url || selectedFoodItem.thumbnail_url || getPlaceholderImage('medium')}
                   alt={selectedFoodItem.name}
                   className="w-20 h-20 object-cover rounded-lg"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = 'https://via.placeholder.com/80x80?text=No+Image';
+                    ErrorHandler.handleImageError(target.src, 'cart-food-preview');
+                    target.src = getPlaceholderImage('medium');
                   }}
                 />
                 <div className="flex-1">

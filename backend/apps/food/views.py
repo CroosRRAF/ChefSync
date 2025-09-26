@@ -3,11 +3,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer, FoodImage
+from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
 from .serializers import (
     CuisineSerializer, FoodCategorySerializer, FoodSerializer, 
     ChefFoodCreateSerializer, ChefFoodPriceSerializer, FoodPriceSerializer, 
-    FoodReviewSerializer, OfferSerializer, FoodImageSerializer
+    FoodReviewSerializer, OfferSerializer
 )
 
 @api_view(['GET'])
@@ -383,17 +383,6 @@ class OfferViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
-class FoodImageViewSet(viewsets.ModelViewSet):
-    queryset = FoodImage.objects.all()
-    serializer_class = FoodImageSerializer
-    permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        # Filter by food if provided
-        food_id = self.request.query_params.get('food_id')
-        if food_id:
-            return FoodImage.objects.filter(food_id=food_id)
-        return FoodImage.objects.all()
 # ================================
 # ADMIN FOOD APPROVAL SYSTEM
 # ================================

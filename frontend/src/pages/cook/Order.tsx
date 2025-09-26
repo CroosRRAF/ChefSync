@@ -13,7 +13,8 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { type Order, type ChefDashboardStats, useOrderService } from '../../services/orderService';
+import { useOrderService } from '@/hooks/useOrderService';
+import { ChefDashboardStats } from '@/hooks/useOrderService';
 import { 
   Search, Filter, RefreshCw, MoreVertical, Eye, Edit, Trash2, 
   Users, Clock, CheckCircle, AlertCircle, Package, TrendingUp,

@@ -1,6 +1,8 @@
 from rest_framework import serializers
-from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer, FoodImage
-from utils.cloudinary_utils import get_optimized_url
+from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
+from utils.cloudinary_utils import get_optimized_url, upload_image_to_cloudinary
+import base64
+import uuid
 
 
 class CuisineSerializer(serializers.ModelSerializer):
@@ -44,28 +46,6 @@ class FoodCategorySerializer(serializers.ModelSerializer):
         if obj.image:
             return get_optimized_url(str(obj.image), width=200, height=200)
         return None
-
-
-class FoodImageSerializer(serializers.ModelSerializer):
-    optimized_url = serializers.ReadOnlyField()
-    thumbnail = serializers.ReadOnlyField()
-    
-    class Meta:
-        model = FoodImage
-        fields = [
-            'id', 'image_url', 'thumbnail_url', 'cloudinary_public_id', 'caption', 
-            'is_primary', 'sort_order', 'alt_text', 'optimized_url', 'thumbnail',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['created_at', 'updated_at']
-    
-    def create(self, validated_data):
-        """Create new FoodImage with Cloudinary URL"""
-        return super().create(validated_data)
-    
-    def update(self, instance, validated_data):
-        """Update FoodImage"""
-        return super().update(instance, validated_data)
 
 
 class FoodPriceSerializer(serializers.ModelSerializer):
@@ -115,7 +95,6 @@ class FoodPriceSerializer(serializers.ModelSerializer):
 
 
 class FoodSerializer(serializers.ModelSerializer):
-    images = FoodImageSerializer(many=True, read_only=True)
     primary_image = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
     category_name = serializers.CharField(source='food_category.name', read_only=True)
@@ -125,6 +104,7 @@ class FoodSerializer(serializers.ModelSerializer):
     chef_rating = serializers.DecimalField(source="chef.chef_profile.rating_average", max_digits=3, decimal_places=2, read_only=True)
     prices = FoodPriceSerializer(many=True, read_only=True)
     image_url = serializers.SerializerMethodField()
+    optimized_image_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Food
@@ -132,52 +112,85 @@ class FoodSerializer(serializers.ModelSerializer):
             'food_id', 'name', 'description', 'category', 'food_category', 'category_name', 'cuisine_name',
             'is_available', 'is_featured', 'preparation_time', 'calories_per_serving', 'ingredients',
             'allergens', 'nutritional_info', 'is_vegetarian', 'is_vegan', 'is_gluten_free', 'spice_level',
-            'rating_average', 'total_reviews', 'total_orders', 'images', 'primary_image', 'available_cooks_count',
-            'image_url', 'thumbnail_url', 'status', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at'
+            'rating_average', 'total_reviews', 'total_orders', 'primary_image', 'available_cooks_count',
+            'image_url', 'thumbnail_url', 'optimized_image_url', 'image',
+            'status', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at'
         ]
         read_only_fields = ['food_id', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at']
     
     def get_primary_image(self, obj):
-        """Return the primary image URL"""
-        primary_img = obj.images.filter(is_primary=True).first()
-        if primary_img:
-            return primary_img.optimized_url
-        # Fallback to first image
-        first_img = obj.images.first()
-        if first_img:
-            return first_img.optimized_url
-        return None
+        """Return the primary image URL from the Food model"""
+        return obj.optimized_image_url
     
     def get_image_url(self, obj):
         """Get primary image URL for compatibility"""
-        primary_image = self.get_primary_image(obj)
-        if primary_image:
-            return primary_image
-        # Fallback to old image field if exists
-        if hasattr(obj, 'image') and obj.image:
-            return obj.image.url if hasattr(obj.image, 'url') else str(obj.image)
-        return None
+        return obj.image_url
+    
+    def get_optimized_image_url(self, obj):
+        """Get optimized Cloudinary URL"""
+        return obj.optimized_image_url
     
     def get_thumbnail_url(self, obj):
-        """Get thumbnail version of the primary image"""
-        primary_img = obj.images.filter(is_primary=True).first()
-        if primary_img:
-            return primary_img.thumbnail
-        # Fallback to first image thumbnail
-        first_img = obj.images.first()
-        if first_img:
-            return first_img.thumbnail
-        return None
+        """Get thumbnail URL"""
+        return obj.thumbnail_url
     
     def get_available_cooks_count(self, obj):
         """Get count of cooks who have prices for this food"""
         return obj.prices.values('cook').distinct().count()
 
     def create(self, validated_data):
+        # Handle image upload if provided
+        image_data = validated_data.get('image')
+        if image_data:
+            validated_data['image'] = self._handle_image_upload(image_data, validated_data.get('name', 'food'))
+        
         # Set status to pending and assign current user as chef
         validated_data['status'] = 'Pending'
         validated_data['chef'] = self.context['request'].user
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Handle image upload if provided
+        image_data = validated_data.get('image')
+        if image_data:
+            validated_data['image'] = self._handle_image_upload(image_data, instance.name)
+        
+        return super().update(instance, validated_data)
+
+    def _handle_image_upload(self, image_data, food_name):
+        """
+        Handle image upload to Cloudinary
+        Supports: file upload, base64 string, or existing URL
+        """
+        # If it's already a Cloudinary URL, return as is
+        if isinstance(image_data, str) and ('cloudinary.com' in image_data or image_data.startswith('http')):
+            return image_data
+            
+        # If it's a file upload or base64 data
+        try:
+            # Generate a unique folder and public_id based on food name
+            import re
+            clean_name = re.sub(r'[^a-zA-Z0-9_-]', '_', food_name.lower())
+            folder = 'chefsync/foods'
+            
+            # Upload to Cloudinary
+            result = upload_image_to_cloudinary(
+                image_data=image_data,
+                folder=folder,
+                public_id=f"food_{clean_name}_{uuid.uuid4().hex[:8]}",
+                tags=['food', 'chefsync']
+            )
+            
+            if result and result.get('secure_url'):
+                return result['secure_url']
+            else:
+                # If upload fails, return the original data
+                return image_data
+                
+        except Exception as e:
+            print(f"Error uploading food image: {e}")
+            # Return original data if upload fails
+            return image_data
 
 
 class ChefFoodPriceSerializer(serializers.ModelSerializer):
@@ -232,20 +245,44 @@ class ChefFoodCreateSerializer(serializers.ModelSerializer):
         """Validate and process image upload"""
         if value:
             print(f"DEBUG: Image file received in validate_image: {value.name}, size: {value.size}")
-            # Upload to Cloudinary
-            try:
-                from utils.cloudinary_utils import upload_image_to_cloudinary
-                result = upload_image_to_cloudinary(value, folder='foods')
-                if result and 'secure_url' in result:
-                    print(f"DEBUG: Image uploaded to Cloudinary: {result['secure_url']}")
-                    return result['secure_url']
-                else:
-                    print("ERROR: Cloudinary upload failed - no secure_url in result")
-                    return None
-            except Exception as e:
-                print(f"ERROR: Cloudinary upload failed: {e}")
-                return None
+            # Use the same image upload handler
+            return self._handle_image_upload(value, "new_food")
         return None
+
+    def _handle_image_upload(self, image_data, food_name):
+        """
+        Handle image upload to Cloudinary
+        Supports: file upload, base64 string, or existing URL
+        """
+        # If it's already a Cloudinary URL, return as is
+        if isinstance(image_data, str) and ('cloudinary.com' in image_data or image_data.startswith('http')):
+            return image_data
+            
+        # If it's a file upload or base64 data
+        try:
+            # Generate a unique folder and public_id based on food name
+            import re
+            clean_name = re.sub(r'[^a-zA-Z0-9_-]', '_', food_name.lower())
+            folder = 'chefsync/foods'
+            
+            # Upload to Cloudinary
+            result = upload_image_to_cloudinary(
+                image_data=image_data,
+                folder=folder,
+                public_id=f"food_{clean_name}_{uuid.uuid4().hex[:8]}",
+                tags=['food', 'chefsync']
+            )
+            
+            if result and result.get('secure_url'):
+                return result['secure_url']
+            else:
+                # If upload fails, return None
+                return None
+                
+        except Exception as e:
+            print(f"Error uploading food image: {e}")
+            # Return None if upload fails
+            return None
     
     def validate(self, data):
         """Add debug logging for all validation data"""

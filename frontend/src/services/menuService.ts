@@ -138,12 +138,15 @@ export interface CartItem {
   special_instructions: string;
   food_name: string;
   cook_name: string;
+  chef_id: number;
   size: string;
   unit_price: number;
   total_price: number;
   food_image: string;
   created_at: string;
   updated_at: string;
+  discount?: number; // Optional discount percentage
+  isVeg?: boolean;   // Optional vegetarian indicator
 }
 
 export interface CartSummary {

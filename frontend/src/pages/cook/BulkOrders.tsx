@@ -45,8 +45,8 @@ import {
   BulkOrderFilters, 
   CollaborationRequest, 
   ChefCollaborator,
-  useOrderService 
 } from '@/services/orderService';
+import { useOrderService } from '@/hooks/useOrderService';
 
 interface NotificationState {
   show: boolean;

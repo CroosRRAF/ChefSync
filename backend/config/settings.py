@@ -29,9 +29,9 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-3oo5lepmhh(qlf-m^s+ft
 JWT_SIGNING_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,testserver').split(',')
 
 
 # Application definition
@@ -353,3 +353,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Local file storage fallback for Cloudinary issues
 USE_LOCAL_STORAGE = config('USE_LOCAL_STORAGE', default=False, cast=bool)
 LOCAL_MEDIA_ROOT = BASE_DIR / 'local_media'
+
+# Silence system check warnings
+SILENCED_SYSTEM_CHECKS = [
+    'models.W036',  # MySQL does not support unique constraints with conditions
+]

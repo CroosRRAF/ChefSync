@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
+import GoogleMapsAddressPicker from '@/components/checkout/GoogleMapsAddressPicker';
 import { 
   ArrowLeft,
   CreditCard,
@@ -24,27 +25,33 @@ import {
   User,
   Home,
   LayoutDashboard,
-  AlertCircle
+  AlertCircle,
+  Navigation,
+  Edit2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CartItem } from '@/services/menuService';
+import { orderService } from '@/services/orderService';
+import { getFoodPlaceholder } from '@/utils/placeholderUtils';
 
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
-  const { cartSummary, clearCart } = useCart();
+  const { cartSummary, clearCart, refreshCart } = useCart();
   const { user, isAuthenticated } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [showAddressPicker, setShowAddressPicker] = useState(false);
 
   // Form states
   const [deliveryInfo, setDeliveryInfo] = useState({
     address: user?.address || '',
     city: 'Colombo',
     postalCode: '',
-    phone: user?.phone_no || '',
+    phone: user?.phone || '',
     instructions: ''
   });
 
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [orderNotes, setOrderNotes] = useState('');
 
@@ -80,8 +87,8 @@ const Checkout: React.FC = () => {
   const handleNextStep = () => {
     if (currentStep === 1) {
       // Validate delivery info
-      if (!deliveryInfo.address || !deliveryInfo.phone) {
-        toast.error('Please fill in all required delivery information');
+      if (!selectedAddress || !deliveryInfo.phone) {
+        toast.error('Please select a delivery address and provide phone number');
         return;
       }
       setCurrentStep(2);
@@ -97,11 +104,38 @@ const Checkout: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
+    if (!selectedAddress) {
+      toast.error('Please select a delivery address');
+      return;
+    }
+
+    if (!deliveryInfo.phone) {
+      toast.error('Please provide a phone number');
+      return;
+    }
+
     setIsProcessing(true);
     
     try {
-      // Simulate order placement
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Refresh cart items to get updated chef_id field
+      console.log('Refreshing cart items to get updated chef_id...');
+      await refreshCart();
+      
+      // Get updated cart items
+      const updatedCart = cartSummary?.cart_items || [];
+      console.log('Updated cart items:', updatedCart);
+      
+      // Format order data
+      const orderData = orderService.formatOrderData(
+        selectedAddress,
+        deliveryInfo.instructions,
+        orderNotes,
+        paymentMethod,
+        updatedCart
+      );
+
+      // Create the order
+      const order = await orderService.createOrder(orderData);
       
       // Clear cart after successful order
       await clearCart();
@@ -109,7 +143,8 @@ const Checkout: React.FC = () => {
       toast.success('Order placed successfully! 🎉');
       navigate('/customer/orders', { 
         state: { 
-          message: 'Your order has been placed successfully! You will receive a confirmation email shortly.' 
+          message: 'Your order has been placed successfully! You will receive a confirmation email shortly.',
+          orderNumber: order.order_number
         }
       });
       
@@ -204,51 +239,70 @@ const Checkout: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="address">Delivery Address *</Label>
-                      <Textarea
-                        id="address"
-                        placeholder="Enter your full address"
-                        value={deliveryInfo.address}
-                        onChange={(e) => handleInputChange('address', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        value={deliveryInfo.city}
-                        onChange={(e) => handleInputChange('city', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="phone">Phone Number *</Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        placeholder="+94 XX XXX XXXX"
-                        value={deliveryInfo.phone}
-                        onChange={(e) => handleInputChange('phone', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="postalCode">Postal Code</Label>
-                      <Input
-                        id="postalCode"
-                        value={deliveryInfo.postalCode}
-                        onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
+                  {/* Address Selection */}
+                  <div>
+                    <Label>Delivery Address *</Label>
+                    {selectedAddress ? (
+                      <Card className="mt-2 p-4 bg-green-50 border-green-200">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MapPin className="h-4 w-4 text-green-600" />
+                              <span className="font-medium text-green-900">{selectedAddress.label}</span>
+                              {selectedAddress.is_default && (
+                                <Badge variant="secondary" className="text-xs">Default</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-green-700 mb-1">{selectedAddress.address_line1}</p>
+                            {selectedAddress.address_line2 && (
+                              <p className="text-sm text-green-600 mb-1">{selectedAddress.address_line2}</p>
+                            )}
+                            <p className="text-xs text-green-600">
+                              {selectedAddress.city}, {selectedAddress.pincode}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowAddressPicker(true)}
+                            className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                          >
+                            <Edit2 className="h-3 w-3 mr-1" />
+                            Change
+                          </Button>
+                        </div>
+                      </Card>
+                    ) : (
+                      <div className="mt-2 space-y-3">
+                        <Button
+                          onClick={() => setShowAddressPicker(true)}
+                          className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                        >
+                          <MapPin className="h-4 w-4 mr-2" />
+                          Choose Delivery Address
+                        </Button>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Navigation className="h-4 w-4" />
+                          <span>Use current location, search on map, or select from saved addresses</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Phone Number */}
+                  <div>
+                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+94 XX XXX XXXX"
+                      value={deliveryInfo.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Delivery Instructions */}
                   <div>
                     <Label htmlFor="instructions">Delivery Instructions (Optional)</Label>
                     <Textarea
@@ -328,19 +382,30 @@ const Checkout: React.FC = () => {
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                       <h4 className="font-medium mb-2">Delivery Information</h4>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center gap-2 mb-1">
-                          <MapPin className="h-4 w-4" />
-                          {deliveryInfo.address}
-                        </div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Phone className="h-4 w-4" />
-                          {deliveryInfo.phone}
-                        </div>
-                        {deliveryInfo.instructions && (
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            {deliveryInfo.instructions}
-                          </div>
+                        {selectedAddress ? (
+                          <>
+                            <div className="flex items-center gap-2 mb-1">
+                              <MapPin className="h-4 w-4" />
+                              <span className="font-medium">{selectedAddress.label}</span>
+                            </div>
+                            <div className="ml-6 mb-2">
+                              <p>{selectedAddress.address_line1}</p>
+                              {selectedAddress.address_line2 && <p>{selectedAddress.address_line2}</p>}
+                              <p>{selectedAddress.city}, {selectedAddress.pincode}</p>
+                            </div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Phone className="h-4 w-4" />
+                              {deliveryInfo.phone}
+                            </div>
+                            {deliveryInfo.instructions && (
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                {deliveryInfo.instructions}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-red-500">No delivery address selected</div>
                         )}
                       </div>
                     </div>
@@ -417,9 +482,12 @@ const Checkout: React.FC = () => {
                       <div key={item.id} className="flex items-center space-x-3">
                         <div className="w-12 h-12 flex-shrink-0">
                           <img
-                            src={item.food_image || 'https://via.placeholder.com/48x48?text=No+Image'}
+                            src={item.food_image || getFoodPlaceholder(48, 48)}
                             alt={item.food_name}
                             className="w-full h-full object-cover rounded-lg"
+                            onError={(e) => {
+                              e.currentTarget.src = getFoodPlaceholder(48, 48);
+                            }}
                           />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -468,6 +536,18 @@ const Checkout: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Google Maps Address Picker Modal */}
+      <GoogleMapsAddressPicker
+        isOpen={showAddressPicker}
+        onClose={() => setShowAddressPicker(false)}
+        onAddressSelect={(address) => {
+          setSelectedAddress(address);
+          setShowAddressPicker(false);
+          toast.success(`Selected ${address.label} address`);
+        }}
+        selectedAddress={selectedAddress}
+      />
     </div>
   );
 };

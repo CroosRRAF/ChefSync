@@ -5,20 +5,118 @@ from rest_framework.response import Response
 from django.utils import timezone
 from django.http import JsonResponse
 from django.db.models import Sum, Avg, Count, Q
-from .models import Order, OrderItem, OrderStatusHistory, CartItem
-from .serializers import CartItemSerializer
-from apps.food.models import FoodReview
+from .models import Order, OrderItem, OrderStatusHistory, CartItem, UserAddress
+from .serializers import CartItemSerializer, UserAddressSerializer
+from apps.food.models import FoodReview, FoodPrice
 from apps.payments.models import Payment
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+import math
 
 User = get_user_model()
+
+# Helper to resolve and (optionally) persist a chef's location
+def _resolve_chef_location(chef, request_data):
+    """Return (lat, lng) for the given chef and persist if provided in request.
+    Resolution order:
+    1) Use chef_latitude/chef_longitude from request if provided (and persist if missing in profile)
+    2) Chef profile: authentication.Cook.kitchen_location formatted as "lat,lng"
+    3) Chef's saved UserAddress (default or most recent) with lat/lng
+
+    If coordinates are provided in request and the chef has no persisted kitchen_location,
+    we will persist them to chef.cook.kitchen_location and ensure a 'Kitchen' UserAddress exists.
+    """
+    chef_lat = request_data.get('chef_latitude')
+    chef_lng = request_data.get('chef_longitude')
+
+    # Normalize to floats if present
+    def _to_float(v):
+        try:
+            return float(v) if v is not None and v != '' else None
+        except (TypeError, ValueError):
+            return None
+
+    lat = _to_float(chef_lat)
+    lng = _to_float(chef_lng)
+
+    # 1) If request provided coords, use them first
+    if lat is not None and lng is not None:
+        # Persist if profile missing or empty
+        if hasattr(chef, 'cook'):
+            cook_profile = chef.cook
+            if not getattr(cook_profile, 'kitchen_location', None):
+                cook_profile.kitchen_location = f"{lat},{lng}"
+                cook_profile.save(update_fields=['kitchen_location'])
+
+        # Ensure a 'Kitchen' address exists/updated for chef (best effort; use placeholders where needed)
+        try:
+            kitchen_address, created = UserAddress.objects.get_or_create(
+                user=chef,
+                label='Kitchen',
+                defaults={
+                    'address_line1': request_data.get('chef_address') or 'Chef Kitchen',
+                    'city': request_data.get('chef_city') or 'Unknown',
+                    'pincode': request_data.get('chef_pincode') or '000000',
+                    'latitude': lat,
+                    'longitude': lng,
+                    'is_default': False,
+                }
+            )
+            # Update coordinates if already existed but empty or different
+            updated = False
+            if kitchen_address.latitude != lat:
+                kitchen_address.latitude = lat
+                updated = True
+            if kitchen_address.longitude != lng:
+                kitchen_address.longitude = lng
+                updated = True
+            if request_data.get('chef_address') and kitchen_address.address_line1 != request_data['chef_address']:
+                kitchen_address.address_line1 = request_data['chef_address']
+                updated = True
+            if updated:
+                kitchen_address.save()
+        except Exception:
+            # Do not block checkout/order if saving address fails
+            pass
+
+        return lat, lng
+
+    # 2) Try persisted cook profile location
+    if hasattr(chef, 'cook'):
+        cook_profile = chef.cook
+        location = getattr(cook_profile, 'kitchen_location', None)
+        if isinstance(location, str) and ',' in location:
+            try:
+                lat_str, lng_str = location.split(',')
+                lat, lng = _to_float(lat_str), _to_float(lng_str)
+                if lat is not None and lng is not None:
+                    return lat, lng
+            except Exception:
+                pass
+
+    # 3) Try chef's saved address with coordinates
+    kitchen_addr = (
+        UserAddress.objects
+        .filter(user=chef, latitude__isnull=False, longitude__isnull=False)
+        .order_by('-is_default', '-created_at')
+        .first()
+    )
+    if kitchen_addr and kitchen_addr.latitude is not None and kitchen_addr.longitude is not None:
+        try:
+            return float(kitchen_addr.latitude), float(kitchen_addr.longitude)
+        except Exception:
+            pass
+
+    # Not available
+    return None, None
 
 # Temporary simple serializer to fix the 500 error
 class SimpleOrderSerializer(serializers.ModelSerializer):
     """Simple order serializer that works"""
     customer_name = serializers.SerializerMethodField()
-    chef_name = serializers.SerializerMethodField() 
+    chef = serializers.SerializerMethodField()
+    delivery_partner = serializers.SerializerMethodField()
+    items = serializers.SerializerMethodField()
     time_since_order = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     total_items = serializers.SerializerMethodField()
@@ -28,7 +126,7 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order_number', 'status', 'status_display',
             'total_amount', 'delivery_fee', 'created_at', 'updated_at',
-            'customer_name', 'chef_name', 'time_since_order', 'total_items',
+            'customer_name', 'chef', 'delivery_partner', 'items', 'time_since_order', 'total_items',
             'delivery_address', 'customer_notes', 'chef_notes'
         ]
     
@@ -37,10 +135,27 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
             return obj.customer.name or f"{obj.customer.first_name} {obj.customer.last_name}".strip() or obj.customer.username
         return "Unknown Customer"
     
-    def get_chef_name(self, obj):
+    def get_chef(self, obj):
         if obj.chef:
-            return obj.chef.name or f"{obj.chef.first_name} {obj.chef.last_name}".strip() or obj.chef.username
-        return "Unknown Chef"
+            return {
+                'id': obj.chef.user_id,
+                'name': obj.chef.name or f"{obj.chef.first_name} {obj.chef.last_name}".strip() or obj.chef.username,
+                'profile_image': getattr(obj.chef, 'profile_image', None)
+            }
+        return {
+            'id': None,
+            'name': 'Unknown Chef',
+            'profile_image': None
+        }
+    
+    def get_delivery_partner(self, obj):
+        if obj.delivery_partner:
+            return {
+                'id': obj.delivery_partner.user_id,
+                'name': obj.delivery_partner.name or f"{obj.delivery_partner.first_name} {obj.delivery_partner.last_name}".strip() or obj.delivery_partner.username,
+                'profile_image': getattr(obj.delivery_partner, 'profile_image', None)
+            }
+        return None
     
     def get_time_since_order(self, obj):
         from django.utils import timezone
@@ -57,16 +172,33 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
     
     def get_total_items(self, obj):
         return obj.items.aggregate(total=Sum('quantity'))['total'] or 0
+    
+    def get_items(self, obj):
+        items = []
+        for order_item in obj.items.select_related('price__food', 'price__cook').all():
+            items.append({
+                'id': order_item.order_item_id,
+                'quantity': order_item.quantity,
+                'unit_price': float(order_item.unit_price or 0),
+                'total_price': float(order_item.total_price or 0),
+                'special_instructions': order_item.special_instructions or '',
+                'food_name': order_item.food_name or order_item.price.food.name if order_item.price else 'Unknown Food',
+                'food_description': order_item.food_description or (order_item.price.food.description if order_item.price else ''),
+                'food_image': order_item.price.image_url if order_item.price and order_item.price.image_url else (order_item.price.food.image_url if order_item.price and order_item.price.food.image_url else None),
+                'size': order_item.price.size if order_item.price else 'Medium',
+                'cook_name': order_item.price.cook.name or f"{order_item.price.cook.first_name} {order_item.price.cook.last_name}".strip() or order_item.price.cook.username if order_item.price else 'Unknown Cook'
+            })
+        return items
 
 class OrderViewSet(viewsets.ModelViewSet):
-    queryset = Order.objects.all()
+    queryset = Order.objects.select_related('customer', 'chef', 'delivery_partner').prefetch_related('items__price__food', 'items__price__cook').all()
     serializer_class = SimpleOrderSerializer  # Use our working simple serializer
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
         """Filter orders based on user role"""
         user = self.request.user
-        queryset = super().get_queryset().order_by('-created_at')
+        queryset = super().get_queryset().select_related('customer', 'chef', 'delivery_partner').prefetch_related('items__price__food', 'items__price__cook').order_by('-created_at')
         
         # Handle anonymous users (return empty queryset for security)
         if not user.is_authenticated:
@@ -141,6 +273,14 @@ class OrderViewSet(viewsets.ModelViewSet):
             
             distance_km = calculate_distance(float(agent_lat), float(agent_lng), float(chef_lat), float(chef_lng))
             
+            # Validate distance to avoid DB out-of-range and unrealistic deliveries
+            MAX_DELIVERY_KM = 50.0  # business rule: serviceable radius
+            if math.isnan(distance_km) or distance_km <= 0:
+                return Response({'error': 'Invalid distance calculation. Please verify addresses.'}, status=status.HTTP_400_BAD_REQUEST)
+            if distance_km > MAX_DELIVERY_KM:
+                return Response({
+                    'error': f'Delivery distance {round(distance_km, 2)} km is out of service range (max {int(MAX_DELIVERY_KM)} km).'
+                }, status=status.HTTP_400_BAD_REQUEST)
             # Check if distance is greater than 10km
             if distance_km > 10:
                 return Response({
@@ -225,6 +365,97 @@ class OrderViewSet(viewsets.ModelViewSet):
         )
         
         return Response({"success": "Order rejected successfully", "status": "cancelled"})
+
+    @action(detail=True, methods=['post'])
+    def cancel_order(self, request, pk=None):
+        """Cancel an order within 10 minutes of placement"""
+        order = self.get_object()
+        
+        # Check if user is authorized to cancel this order
+        if order.customer != request.user:
+            return Response({"error": "You are not authorized to cancel this order"}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Check if order can be cancelled
+        if order.status not in ['pending', 'confirmed']:
+            return Response({"error": "Order cannot be cancelled in current status"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if order is within 10-minute cancellation window
+        from datetime import timedelta
+        from django.utils import timezone
+        
+        time_since_order = timezone.now() - order.created_at
+        if time_since_order > timedelta(minutes=10):
+            return Response({
+                "error": "Order can only be cancelled within 10 minutes of placement",
+                "time_remaining": "0 minutes"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calculate remaining time for cancellation
+        remaining_time = timedelta(minutes=10) - time_since_order
+        remaining_minutes = int(remaining_time.total_seconds() // 60)
+        
+        cancellation_reason = request.data.get('reason', 'Customer requested cancellation')
+        
+        # Update order status
+        order.status = 'cancelled'
+        order.cancelled_at = timezone.now()
+        order.customer_notes = f"{order.customer_notes}\n\nCancelled: {cancellation_reason}".strip()
+        order.save()
+        
+        # Add status history
+        OrderStatusHistory.objects.create(
+            order=order,
+            status='cancelled',
+            changed_by=request.user,
+            notes=f"Order cancelled by customer: {cancellation_reason}"
+        )
+        
+        return Response({
+            "success": "Order cancelled successfully",
+            "status": "cancelled",
+            "refund_status": "pending",
+            "message": "Your refund will be processed within 3-5 business days"
+        })
+
+    @action(detail=True, methods=['get'])
+    def can_cancel(self, request, pk=None):
+        """Check if an order can be cancelled and return remaining time"""
+        order = self.get_object()
+        
+        # Check if user is authorized
+        if order.customer != request.user:
+            return Response({"error": "You are not authorized to view this order"}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Check if order can be cancelled based on status
+        if order.status not in ['pending', 'confirmed']:
+            return Response({
+                "can_cancel": False,
+                "reason": "Order cannot be cancelled in current status",
+                "time_remaining": "0 minutes"
+            })
+        
+        # Check time window
+        from datetime import timedelta
+        from django.utils import timezone
+        
+        time_since_order = timezone.now() - order.created_at
+        if time_since_order > timedelta(minutes=10):
+            return Response({
+                "can_cancel": False,
+                "reason": "Cancellation window has expired",
+                "time_remaining": "0 minutes"
+            })
+        
+        # Calculate remaining time
+        remaining_time = timedelta(minutes=10) - time_since_order
+        remaining_minutes = int(remaining_time.total_seconds() // 60)
+        remaining_seconds = int(remaining_time.total_seconds() % 60)
+        
+        return Response({
+            "can_cancel": True,
+            "time_remaining": f"{remaining_minutes} minutes {remaining_seconds} seconds",
+            "time_remaining_seconds": int(remaining_time.total_seconds())
+        })
 
 
     @action(detail=True, methods=['patch'])
@@ -377,6 +608,33 @@ class OrderViewSet(viewsets.ModelViewSet):
 #     queryset = OrderStatusHistory.objects.all()
 #     serializer_class = OrderStatusHistorySerializer
 #     permission_classes = [IsAuthenticated]
+
+
+class UserAddressViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing user addresses"""
+    serializer_class = UserAddressSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return UserAddress.objects.filter(user=self.request.user)
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+    
+    @action(detail=False, methods=['post'])
+    def set_default(self, request):
+        """Set an address as default"""
+        address_id = request.data.get('address_id')
+        try:
+            address = UserAddress.objects.get(id=address_id, user=request.user)
+            # Remove default from other addresses
+            UserAddress.objects.filter(user=request.user).update(is_default=False)
+            # Set this address as default
+            address.is_default = True
+            address.save()
+            return Response({'success': 'Default address updated'})
+        except UserAddress.DoesNotExist:
+            return Response({'error': 'Address not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class CartItemViewSet(viewsets.ModelViewSet):
@@ -698,7 +956,7 @@ def chef_recent_activity(request):
         
         # Get basic chef info
         chef_info = {
-            'id': chef.id,
+            'id': chef.user_id,
             'name': chef.name or f"{chef.first_name} {chef.last_name}".strip() or chef.username,
             'phone': chef.phone_no,
             'email': chef.email,
@@ -710,3 +968,264 @@ def chef_recent_activity(request):
             'order_id': order.id,
             'pickup_address': chef_location.get('address') or chef_location.get('service_location', 'Address not available')
         })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def calculate_checkout(request):
+    """Calculate delivery fee, tax, and total for checkout"""
+    try:
+        # Get cart items
+        cart_items = CartItem.objects.filter(customer=request.user)
+        if not cart_items.exists():
+            return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calculate subtotal
+        subtotal = sum(item.total_price for item in cart_items)
+        
+        # Get delivery address coordinates
+        delivery_lat = request.data.get('delivery_latitude')
+        delivery_lng = request.data.get('delivery_longitude')
+        
+        if not delivery_lat or not delivery_lng:
+            return Response({'error': 'Delivery coordinates required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get chef location (assuming single chef for now)
+        chef_id = request.data.get('chef_id')
+        # Fallback: derive chef_id from first cart item's price.cook
+        if not chef_id:
+            first_item = cart_items.first()
+            if first_item and getattr(first_item.price, 'cook_id', None):
+                chef_id = first_item.price.cook.user_id
+            else:
+                return Response({'error': 'Chef ID required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            chef = User.objects.get(user_id=chef_id)
+            # Resolve chef location with fallback to request-provided coordinates
+            chef_lat, chef_lng = _resolve_chef_location(chef, request.data)
+            if chef_lat is None or chef_lng is None:
+                return Response({'error': 'Chef location not available'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Calculate distance using Haversine formula
+            def haversine_distance(lat1, lon1, lat2, lon2):
+                R = 6371  # Earth's radius in kilometers
+                lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+                dlat = lat2 - lat1
+                dlon = lon2 - lon1
+                a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+                c = 2 * math.asin(math.sqrt(a))
+                return R * c
+            
+            # Compute distance
+            distance_km = haversine_distance(float(chef_lat), float(chef_lng), float(delivery_lat), float(delivery_lng))
+            
+            # Validate distance to avoid DB out-of-range and unrealistic deliveries
+            MAX_DELIVERY_KM = 50.0  # business rule: serviceable radius
+            if math.isnan(distance_km) or distance_km <= 0:
+                return Response({'error': 'Invalid distance calculation. Please verify addresses.'}, status=status.HTTP_400_BAD_REQUEST)
+            if distance_km > MAX_DELIVERY_KM:
+                return Response({
+                    'error': f'Delivery distance {round(distance_km, 2)} km is out of service range (max {int(MAX_DELIVERY_KM)} km).'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            # Calculate delivery fee
+            from decimal import Decimal, ROUND_HALF_UP
+            
+            if distance_km <= 5.0:
+                delivery_fee = Decimal('50.00')
+            else:
+                extra_km = math.ceil(distance_km - 5.0)
+                delivery_fee = Decimal('50.00') + (Decimal(extra_km) * Decimal('15.00'))
+            
+            # Calculate tax (10%)
+            tax_amount = (Decimal(subtotal) * Decimal('0.10')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            
+            # Calculate total
+            total_amount = Decimal(subtotal) + tax_amount + delivery_fee
+            
+            return Response({
+                'subtotal': float(subtotal),
+                'tax_amount': float(tax_amount),
+                'delivery_fee': float(delivery_fee),
+                'distance_km': float(Decimal(distance_km).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+                'total_amount': float(total_amount),
+                'breakdown': {
+                    'base_delivery_fee': 50.00,
+                    'extra_km': max(0, math.ceil(distance_km - 5.0)),
+                    'extra_km_rate': 15.00,
+                    'extra_km_fee': max(0, math.ceil(distance_km - 5.0) * 15.00)
+                }
+            })
+            
+        except User.DoesNotExist:
+            return Response({'error': 'Chef not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def place_order(request):
+    """Place an order from cart"""
+    try:
+        print(f"Place order request data: {request.data}")
+        print(f"User: {request.user}")
+        print(f"User authenticated: {request.user.is_authenticated}")
+        print(f"User ID: {request.user.pk if request.user.is_authenticated else 'None'}")
+        print(f"User user_id: {request.user.user_id if hasattr(request.user, 'user_id') and request.user.is_authenticated else 'None'}")
+        
+        if not request.user or not request.user.is_authenticated or request.user.is_anonymous:
+            print(f"User not authenticated: user={request.user}, authenticated={request.user.is_authenticated if request.user else 'N/A'}")
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Get cart items
+        cart_items = CartItem.objects.filter(customer=request.user)
+        print(f"Cart items count: {cart_items.count()}")
+        
+        if not cart_items.exists():
+            return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get order data
+        chef_id = request.data.get('chef_id')
+        delivery_address_id = request.data.get('delivery_address_id')
+        delivery_lat = request.data.get('delivery_latitude')
+        delivery_lng = request.data.get('delivery_longitude')
+        promo_code = request.data.get('promo_code')
+        customer_notes = request.data.get('customer_notes', '')
+        
+        # Fallback: derive chef_id from cart if not provided
+        if not chef_id:
+            first_item = cart_items.first()
+            if first_item and getattr(first_item.price, 'cook_id', None):
+                chef_id = first_item.price.cook.user_id
+            else:
+                return Response({'error': 'Chef ID required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get chef
+        print(f"Looking for chef with ID: {chef_id}")
+        try:
+            chef = User.objects.get(user_id=chef_id)
+            print(f"Found chef: {chef.username}")
+        except User.DoesNotExist:
+            print(f"Chef with ID {chef_id} not found")
+            return Response({'error': 'Chef not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get delivery address
+        delivery_address = None
+        if delivery_address_id and delivery_address_id != 0:
+            try:
+                delivery_address = UserAddress.objects.get(id=delivery_address_id, user=request.user)
+                delivery_lat = float(delivery_address.latitude)
+                delivery_lng = float(delivery_address.longitude)
+            except UserAddress.DoesNotExist:
+                return Response({'error': 'Address not found'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Create a new delivery address from coordinates
+            address_text = request.data.get('delivery_address', f'Lat: {delivery_lat}, Lng: {delivery_lng}')
+            delivery_address = UserAddress.objects.create(
+                user=request.user,
+                label='Delivery Address',
+                address_line1=address_text,
+                city='Unknown',  # Could be improved with reverse geocoding
+                latitude=delivery_lat,
+                longitude=delivery_lng,
+                is_default=False
+            )
+            print(f"Created new delivery address: {delivery_address}")
+        
+        if not delivery_lat or not delivery_lng:
+            return Response({'error': 'Delivery coordinates required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calculate totals (reuse calculation logic)
+        subtotal = sum(item.total_price for item in cart_items)
+        
+        # Get chef location and calculate distance (with resolution/persist fallback)
+        chef_lat, chef_lng = _resolve_chef_location(chef, request.data)
+        if chef_lat is None or chef_lng is None:
+            return Response({'error': 'Chef location not available'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calculate distance and fees
+        def haversine_distance(lat1, lon1, lat2, lon2):
+            R = 6371
+            lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+            c = 2 * math.asin(math.sqrt(a))
+            return R * c
+        
+        distance_km = haversine_distance(
+            float(chef_lat), float(chef_lng),
+            float(delivery_lat), float(delivery_lng)
+        )
+        # Validate distance to avoid DB out-of-range and unrealistic deliveries
+        MAX_DELIVERY_KM = 50.0  # business rule: serviceable radius
+        if math.isnan(distance_km) or distance_km <= 0:
+            return Response({'error': 'Invalid distance calculation. Please verify addresses.'}, status=status.HTTP_400_BAD_REQUEST)
+        if distance_km > MAX_DELIVERY_KM:
+            return Response({
+                'error': f'Delivery distance {round(distance_km, 2)} km is out of service range (max {int(MAX_DELIVERY_KM)} km).'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        from decimal import Decimal, ROUND_HALF_UP
+        
+        if distance_km <= 5.0:
+            delivery_fee = Decimal('50.00')
+        else:
+            extra_km = math.ceil(distance_km - 5.0)
+            delivery_fee = Decimal('50.00') + (Decimal(extra_km) * Decimal('15.00'))
+        
+        tax_amount = (Decimal(subtotal) * Decimal('0.10')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        total_amount = Decimal(subtotal) + tax_amount + delivery_fee
+        
+        # Create order
+        order = Order.objects.create(
+            customer=request.user,
+            chef=chef,
+            status='pending',
+            payment_method='cash',
+            subtotal=subtotal,
+            tax_amount=tax_amount,
+            delivery_fee=delivery_fee,
+            total_amount=total_amount,
+            delivery_address_ref=delivery_address,
+            delivery_latitude=delivery_lat,
+            delivery_longitude=delivery_lng,
+            distance_km=float(Decimal(distance_km).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+            promo_code=promo_code,
+            customer_notes=customer_notes
+        )
+        
+        print(f"Order created: id={order.id}, customer={order.customer}, customer_id={order.customer_id}")
+        
+        # Create order items from cart
+        for cart_item in cart_items:
+            OrderItem.objects.create(
+                order=order,
+                price=cart_item.price,
+                quantity=cart_item.quantity,
+                special_instructions=cart_item.special_instructions
+            )
+        
+        # Clear cart
+        cart_items.delete()
+        
+        # Create status history
+        OrderStatusHistory.objects.create(
+            order=order,
+            status='pending',
+            changed_by=request.user,
+            notes='Order placed by customer'
+        )
+        
+        return Response({
+            'success': 'Order placed successfully',
+            'order_id': order.id,
+            'order_number': order.order_number,
+            'status': order.status,
+            'total_amount': float(total_amount)
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -48,7 +48,7 @@ const CustomerCart: React.FC = () => {
 
   const handleQuantityChange = async (itemId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
-      await removeCartItem(itemId);
+      await removeFromCart(itemId);
     } else {
       await updateCartItem(itemId, newQuantity);
     }
@@ -156,25 +156,27 @@ const CustomerCart: React.FC = () => {
                       {/* Item Image */}
                       <div className="relative w-32 h-32 flex-shrink-0">
                         <img
-                          src={item.food_image || 'https://via.placeholder.com/128x128?text=No+Image'}
+                          src={item.food_image || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiBmaWxsPSIjRjNGNEY2Ii8+CjxjaXJjbGUgY3g9IjY0IiBjeT0iNjQiIHI9IjIwIiBmaWxsPSIjOUNBOUIwIi8+Cjx0ZXh0IHg9IjY0IiB5PSI5NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY3NzQ4MCIgZm9udC1zaXplPSIxMiI+Tm8gSW1hZ2U8L3RleHQ+Cjwvc3ZnPg=='}
                           alt={item.food_name}
                           className="w-full h-full object-cover"
                         />
-                        {item.discount && (
+                        {item.discount && item.discount > 0 && (
                           <Badge className="absolute top-2 left-2 bg-red-500 text-white text-xs">
                             {item.discount}% OFF
                           </Badge>
                         )}
                         <div className="absolute top-2 right-2">
-                          {item.isVeg ? (
-                            <div className="w-4 h-4 border border-green-500 bg-white rounded-sm flex items-center justify-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            </div>
-                          ) : (
-                            <div className="w-4 h-4 border border-red-500 bg-white rounded-sm flex items-center justify-center">
-                              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                            </div>
-                          )}
+                          {item.isVeg !== undefined ? (
+                            item.isVeg ? (
+                              <div className="w-4 h-4 border border-green-500 bg-white rounded-sm flex items-center justify-center">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              </div>
+                            ) : (
+                              <div className="w-4 h-4 border border-red-500 bg-white rounded-sm flex items-center justify-center">
+                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                              </div>
+                            )
+                          ) : null}
                         </div>
                       </div>
 

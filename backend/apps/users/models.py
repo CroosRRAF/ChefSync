@@ -78,14 +78,11 @@ class DeliveryProfile(models.Model):
     ]
     
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='delivery_profile')
-    vehicle_type = models.CharField(max_length=20, choices=VEHICLE_TYPE_CHOICES)
-    vehicle_number = models.CharField(max_length=20, blank=True)
-    license_number = models.CharField(max_length=50, blank=True)
-    insurance_info = models.JSONField(default=dict, blank=True)
+    vehicle_type = models.CharField(max_length=50, blank=True)
+    license_number = models.CharField(max_length=100, blank=True)
     is_available = models.BooleanField(default=True)
     rating_average = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
     total_deliveries = models.PositiveIntegerField(default=0)
-    total_earnings = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     approval_status = models.CharField(
         max_length=20,
         choices=APPROVAL_STATUS_CHOICES,

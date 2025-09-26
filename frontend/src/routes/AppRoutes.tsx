@@ -19,6 +19,8 @@ import Menu from "@/pages/Menu";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
 import NotFound from "@/pages/NotFound";
+import Checkout from "@/pages/Checkout";
+import DeliveryAddressTest from "@/pages/DeliveryAddressTest";
 
 // Authentication pages
 import Login from "@/pages/auth/Login";
@@ -265,6 +267,28 @@ const InnerRoutes: React.FC = () => {
                 <Navbar />
               )}
               <Contact />
+            </>
+          }
+        />
+        <Route
+          path="/checkout"
+          element={
+            <>
+              {isAuthenticated && user && user.role === "customer" ? (
+                <CustomerHomeNavbar />
+              ) : (
+                <Navbar />
+              )}
+              <Checkout />
+            </>
+          }
+        />
+        <Route
+          path="/delivery-address-test"
+          element={
+            <>
+              <Navbar />
+              <DeliveryAddressTest />
             </>
           }
         />

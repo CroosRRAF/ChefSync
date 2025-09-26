@@ -2,6 +2,30 @@ from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 import uuid
+import math
+
+
+class UserAddress(models.Model):
+    """User saved addresses for delivery"""
+    
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='addresses')
+    label = models.CharField(max_length=100, help_text='Address label (e.g., Home, Work)')
+    address_line1 = models.CharField(max_length=200)
+    address_line2 = models.CharField(max_length=200, blank=True, null=True)
+    city = models.CharField(max_length=100)
+    pincode = models.CharField(max_length=20)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.label}"
+    
+    class Meta:
+        db_table = 'user_addresses'
+        unique_together = ['user', 'label']
 
 
 class Order(models.Model):
@@ -62,9 +86,12 @@ class Order(models.Model):
     
     # Delivery Information
     delivery_address = models.TextField(default='No address provided')
+    delivery_address_ref = models.ForeignKey(UserAddress, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     delivery_instructions = models.TextField(blank=True)
     delivery_latitude = models.DecimalField(max_digits=10, decimal_places=8, null=True, blank=True)
     delivery_longitude = models.DecimalField(max_digits=11, decimal_places=8, null=True, blank=True)
+    distance_km = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text='Distance from kitchen to delivery address in km')
+    promo_code = models.CharField(max_length=50, null=True, blank=True)
     
     # Timing
     estimated_delivery_time = models.DateTimeField(null=True, blank=True)
@@ -102,6 +129,18 @@ class Order(models.Model):
     @property
     def can_be_cancelled(self):
         return self.status in ['cart', 'pending', 'confirmed']
+    
+    def calculate_delivery_fee(self, distance_km):
+        """Calculate delivery fee based on distance"""
+        if distance_km <= 5.0:
+            return 50.00
+        else:
+            extra_km = math.ceil(distance_km - 5.0)
+            return 50.00 + (extra_km * 15.00)
+    
+    def calculate_tax(self, subtotal):
+        """Calculate 10% tax on subtotal"""
+        return round(subtotal * 0.10, 2)
     
     def __str__(self):
         return f"Order {self.order_number} - {self.customer.username}"

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Cuisine, FoodCategory, Food, FoodImage, FoodPrice, Offer, FoodReview
+from .models import Cuisine, FoodCategory, Food, FoodPrice, Offer, FoodReview
 
 
 @admin.register(Cuisine)
@@ -40,12 +40,6 @@ class FoodAdmin(admin.ModelAdmin):
         updated = queryset.update(status='Rejected', admin=request.user)
         self.message_user(request, f'{updated} food item(s) rejected.')
     reject_foods.short_description = "Reject selected food items"
-
-
-@admin.register(FoodImage)
-class FoodImageAdmin(admin.ModelAdmin):
-    list_display = ['food', 'is_primary', 'sort_order', 'created_at']
-    list_filter = ['is_primary', 'created_at']
 
 
 @admin.register(FoodPrice)
