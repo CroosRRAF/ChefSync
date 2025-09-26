@@ -233,7 +233,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         new_status = request.data.get('status')
         
         # Define valid status transitions for delivery agents
-        valid_delivery_statuses = ['picked_up', 'in_transit', 'delivered']
+        valid_delivery_statuses = ['picked_up', 'delivered']
         
         if new_status not in valid_delivery_statuses:
             return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
@@ -245,11 +245,9 @@ class OrderViewSet(viewsets.ModelViewSet):
         # Validate status transitions
         current_status = order.status
         if new_status == 'picked_up' and current_status not in ['out_for_delivery', 'ready']:
-            return Response({"error": "Invalid status transition"}, status=status.HTTP_400_BAD_REQUEST)
-        elif new_status == 'in_transit' and current_status not in ['picked_up', 'out_for_delivery']:
-            return Response({"error": "Invalid status transition"}, status=status.HTTP_400_BAD_REQUEST)
-        elif new_status == 'delivered' and current_status not in ['in_transit']:
-            return Response({"error": "Invalid status transition"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": f"Cannot mark picked_up from {current_status}"}, status=status.HTTP_400_BAD_REQUEST)
+        elif new_status == 'delivered' and current_status not in ['picked_up', 'out_for_delivery', 'ready']:
+            return Response({"error": f"Cannot mark delivered from {current_status}"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get additional data
         notes = request.data.get('notes', f'Status changed to {new_status}')
@@ -363,6 +361,71 @@ class OrderViewSet(viewsets.ModelViewSet):
             "avg_delivery_time_min": round(avg_time_minutes, 1)
         })
 
+    @action(detail=True, methods=['post'])
+    def mark_picked_up(self, request, pk=None):
+        """Delivery agent marks order as picked up from chef"""
+        order = self.get_object()
+        
+        # Check if user is the assigned delivery partner
+        if order.delivery_partner != request.user:
+            return Response({"error": "You are not authorized to update this order"}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Check if order is in correct status
+        if order.status not in ['out_for_delivery', 'ready']:
+            return Response({"error": "Order cannot be marked as picked up in current status"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        notes = request.data.get('notes', 'Order picked up from chef')
+        
+        # Transition: ready/out_for_delivery -> picked_up
+        order.status = 'picked_up'
+        order.save(update_fields=['status', 'updated_at'])
+        OrderStatusHistory.objects.create(
+            order=order,
+            status='picked_up',
+            changed_by=request.user,
+            notes=notes
+        )
+        
+        return Response({
+            "success": "Order marked as picked up successfully",
+            "order_id": order.id,
+            "status": "picked_up"
+        })
+    
+    @action(detail=True, methods=['get'])
+    def chef_location(self, request, pk=None):
+        """Get chef location details for navigation (delivery agent only)"""
+        order = self.get_object()
+        
+        # Check if user is the assigned delivery partner
+        if order.delivery_partner != request.user:
+            return Response({"error": "You are not authorized to access this information"}, status=status.HTTP_403_FORBIDDEN)
+        
+        chef = order.chef
+        if not chef:
+            return Response({"error": "No chef assigned to this order"}, status=status.HTTP_404_NOT_FOUND)
+        
+        chef_location = {}
+        if getattr(chef, 'address', None):
+            chef_location['address'] = chef.address
+        if hasattr(chef, 'chef_profile'):
+            profile = chef.chef_profile
+            if getattr(profile, 'service_location', None):
+                chef_location['service_location'] = profile.service_location
+        
+        chef_info = {
+            'id': chef.id,
+            'name': chef.name or f"{chef.first_name} {chef.last_name}".strip() or chef.username,
+            'phone': getattr(chef, 'phone_no', None),
+            'email': chef.email,
+            'location': chef_location
+        }
+        
+        return Response({
+            'chef': chef_info,
+            'order_id': order.id,
+            'pickup_address': chef_location.get('address') or chef_location.get('service_location', 'Address not available')
+        })
 
 # Temporarily disabled other ViewSets to fix 500 error
 # Will be re-enabled once serializers are fixed
@@ -634,79 +697,3 @@ def chef_recent_activity(request):
         
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
-    @action(detail=True, methods=['post'])
-    def mark_picked_up(self, request, pk=None):
-        """Delivery agent marks order as picked up from chef"""
-        order = self.get_object()
-        
-        # Check if user is the assigned delivery partner
-        if order.delivery_partner != request.user:
-            return Response({"error": "You are not authorized to update this order"}, status=status.HTTP_403_FORBIDDEN)
-        
-        # Check if order is in correct status
-        if order.status not in ['out_for_delivery', 'ready']:
-            return Response({"error": "Order cannot be marked as picked up in current status"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get pickup location and notes
-        pickup_location = request.data.get('pickup_location', {})
-        notes = request.data.get('notes', 'Order picked up from chef')
-        
-        # Update order status
-        order.status = 'in_transit'
-        order.save()
-        
-        # Add status history
-        OrderStatusHistory.objects.create(
-            order=order,
-            status='in_transit',
-            changed_by=request.user,
-            notes=notes
-        )
-        
-        return Response({
-            "success": "Order marked as picked up successfully",
-            "order_id": order.id,
-            "status": "in_transit"
-        })
-    
-    @action(detail=True, methods=['get'])
-    def chef_location(self, request, pk=None):
-        """Get chef location details for navigation"""
-        order = self.get_object()
-        
-        # Check if user is the assigned delivery partner
-        if order.delivery_partner != request.user:
-            return Response({"error": "You are not authorized to access this information"}, status=status.HTTP_403_FORBIDDEN)
-        
-        chef = order.chef
-        if not chef:
-            return Response({"error": "No chef assigned to this order"}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Try to get chef's location from various sources
-        chef_location = {}
-        
-        # First, try to get from user's address
-        if chef.address:
-            chef_location['address'] = chef.address
-        
-        # Try to get from chef profile if exists
-        if hasattr(chef, 'chef_profile'):
-            profile = chef.chef_profile
-            if hasattr(profile, 'service_location') and profile.service_location:
-                chef_location['service_location'] = profile.service_location
-        
-        # Get basic chef info
-        chef_info = {
-            'id': chef.id,
-            'name': chef.name or f"{chef.first_name} {chef.last_name}".strip() or chef.username,
-            'phone': chef.phone_no,
-            'email': chef.email,
-            'location': chef_location
-        }
-        
-        return Response({
-            'chef': chef_info,
-            'order_id': order.id,
-            'pickup_address': chef_location.get('address') or chef_location.get('service_location', 'Address not available')
-        })

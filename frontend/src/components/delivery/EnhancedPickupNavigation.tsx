@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Order } from "@/types/orderType";
 import { generateNavigationUrl } from "@/utils/mapUtils";
+import IntegratedMapView from "@/components/maps/IntegratedMapView";
 
 interface EnhancedPickupNavigationProps {
   orders: Order[];
@@ -35,20 +36,18 @@ interface IntegratedMapProps {
   title: string;
 }
 
-// Integrated Map Component
-const IntegratedMap: React.FC<IntegratedMapProps> = ({
-  location,
-  coordinates,
-  title,
+const EnhancedPickupNavigation: React.FC<EnhancedPickupNavigationProps> = ({
+  orders,
 }) => {
-  const [mapLoaded, setMapLoaded] = useState(false);
+  const { toast } = useToast();
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
 
+  // Get user location on component mount
   useEffect(() => {
-    // Get user's current location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -57,89 +56,12 @@ const IntegratedMap: React.FC<IntegratedMapProps> = ({
             lng: position.coords.longitude,
           });
         },
-        () => {
-          console.log("Could not get user location");
+        (error) => {
+          console.log("Could not get user location:", error);
         }
       );
     }
   }, []);
-
-  const handleDirections = () => {
-    if (coordinates && userLocation) {
-      const navigationUrl = generateNavigationUrl(coordinates, userLocation);
-      window.open(navigationUrl, "_blank");
-    } else {
-      const encodedLocation = encodeURIComponent(location);
-      const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedLocation}`;
-      window.open(navigationUrl, "_blank");
-    }
-  };
-
-  return (
-    <div className="w-full h-96 bg-gray-100 rounded-lg overflow-hidden">
-      {/* Map Placeholder - In real implementation, this would be Google Maps or similar */}
-      <div className="relative w-full h-full bg-gradient-to-br from-blue-100 to-green-100 flex flex-col items-center justify-center">
-        <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 max-w-xs">
-          <div className="flex items-center gap-2 mb-2">
-            <MapPin className="h-4 w-4 text-red-500" />
-            <span className="font-medium text-sm">{title}</span>
-          </div>
-          <p className="text-xs text-gray-600">{location}</p>
-        </div>
-
-        {userLocation && (
-          <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="text-xs font-medium">Your Location</span>
-            </div>
-          </div>
-        )}
-
-        {/* Mock Map Elements */}
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center animate-bounce">
-            <MapPin className="h-5 w-5 text-white" />
-          </div>
-          <div className="bg-white/90 rounded-lg p-4 shadow-lg max-w-sm">
-            <h3 className="font-semibold mb-2">Quick Navigation</h3>
-            <p className="text-sm text-gray-600 mb-3">
-              Integrated map view showing the pickup location relative to your
-              current position.
-            </p>
-            <div className="space-y-2">
-              <Button onClick={handleDirections} size="sm" className="w-full">
-                <Route className="h-4 w-4 mr-2" />
-                Get Directions
-              </Button>
-              <div className="text-xs text-gray-500 text-center">
-                Distance: ~2.3 km • ETA: 8 min
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Route Line Mock */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          <path
-            d="M 80 80 Q 200 150 320 280"
-            stroke="#3B82F6"
-            strokeWidth="3"
-            strokeDasharray="5,5"
-            fill="none"
-            className="animate-pulse"
-          />
-        </svg>
-      </div>
-    </div>
-  );
-};
-
-const EnhancedPickupNavigation: React.FC<EnhancedPickupNavigationProps> = ({
-  orders,
-}) => {
-  const { toast } = useToast();
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Filter orders that are ready for pickup/delivery
   const deliveryOrders = orders.filter((order) =>
@@ -299,9 +221,13 @@ const EnhancedPickupNavigation: React.FC<EnhancedPickupNavigationProps> = ({
                             Navigate to Pickup Location
                           </DialogTitle>
                         </DialogHeader>
-                        <IntegratedMap
+                        <IntegratedMapView
                           location={getPickupLocation(order)}
                           title={`Chef ${order.chef?.name || "Kitchen"}`}
+                          userLocation={userLocation}
+                          onNavigate={() =>
+                            handleGoogleNavigation(order, "pickup")
+                          }
                         />
                         <div className="flex gap-2 mt-4">
                           <Button
@@ -384,11 +310,15 @@ const EnhancedPickupNavigation: React.FC<EnhancedPickupNavigationProps> = ({
                             Navigate to Customer
                           </DialogTitle>
                         </DialogHeader>
-                        <IntegratedMap
+                        <IntegratedMapView
                           location={order.delivery_address}
                           title={`Customer ${
                             order.customer?.name || "Location"
                           }`}
+                          userLocation={userLocation}
+                          onNavigate={() =>
+                            handleGoogleNavigation(order, "delivery")
+                          }
                         />
                         <div className="flex gap-2 mt-4">
                           <Button

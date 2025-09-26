@@ -2,7 +2,6 @@ import React, { useCallback, useState, useEffect } from "react";
 import {
   GoogleMap,
   useJsApiLoader,
-  Marker,
   DirectionsRenderer,
   InfoWindow,
 } from "@react-google-maps/api";
@@ -37,7 +36,89 @@ const defaultCenter = {
   lng: -122.4194,
 };
 
-const libraries: ("places" | "geometry")[] = ["places", "geometry"];
+const libraries: ("places" | "geometry" | "marker")[] = [
+  "places",
+  "geometry",
+  "marker",
+];
+
+// Custom marker component that uses AdvancedMarkerElement when available
+const CustomMarker: React.FC<{
+  position: { lat: number; lng: number };
+  title: string;
+  icon?: string;
+  onClick?: () => void;
+  map?: google.maps.Map | null;
+}> = ({ position, title, icon, onClick, map }) => {
+  const [marker, setMarker] = useState<
+    google.maps.Marker | google.maps.marker.AdvancedMarkerElement | null
+  >(null);
+
+  useEffect(() => {
+    if (!map) return;
+
+    // Clean up previous marker
+    if (marker) {
+      if ("setMap" in marker) {
+        marker.setMap(null);
+      }
+    }
+
+    // Create new marker using AdvancedMarkerElement if available, otherwise fallback to regular Marker
+    let newMarker:
+      | google.maps.Marker
+      | google.maps.marker.AdvancedMarkerElement;
+
+    if (window.google?.maps?.marker?.AdvancedMarkerElement) {
+      // Use new AdvancedMarkerElement
+      const markerElement = document.createElement("div");
+      markerElement.innerHTML =
+        icon ||
+        `
+        <div style="width: 24px; height: 24px; background: #3B82F6; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
+      `;
+
+      newMarker = new google.maps.marker.AdvancedMarkerElement({
+        map,
+        position,
+        title,
+        content: markerElement,
+      });
+
+      if (onClick) {
+        newMarker.addListener("click", onClick);
+      }
+    } else {
+      // Fallback to regular Marker
+      newMarker = new google.maps.Marker({
+        position,
+        map,
+        title,
+        icon: icon
+          ? {
+              url: icon,
+              scaledSize: new google.maps.Size(28, 28),
+              anchor: new google.maps.Point(14, 28),
+            }
+          : undefined,
+      });
+
+      if (onClick) {
+        newMarker.addListener("click", onClick);
+      }
+    }
+
+    setMarker(newMarker);
+
+    return () => {
+      if (newMarker && "setMap" in newMarker) {
+        newMarker.setMap(null);
+      }
+    };
+  }, [map, position, title, icon, onClick]);
+
+  return null;
+};
 
 const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
   currentLocation,
@@ -57,6 +138,8 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
     id: "google-map-script",
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
+    version: "weekly",
+    preventGoogleFontsLoading: true,
   });
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -229,21 +312,19 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
       >
         {/* Current Location Marker */}
         {currentLocation && (
-          <Marker
+          <CustomMarker
             position={{ lat: currentLocation.lat, lng: currentLocation.lng }}
-            icon={{
-              url:
-                "data:image/svg+xml;charset=UTF-8," +
-                encodeURIComponent(`
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            icon={
+              "data:image/svg+xml;charset=UTF-8," +
+              encodeURIComponent(`
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="10" r="3"/>
                   <path d="m12 21.7-4-7.2c-.7-1.5-1-3.2-1-4.8a5 5 0 0 1 10 0c0 1.6-.3 3.3-1 4.8l-4 7.2z"/>
                 </svg>
-              `),
-              scaledSize: new google.maps.Size(32, 32),
-              anchor: new google.maps.Point(16, 32),
-            }}
+              `)
+            }
             title="Your Location"
+            map={map}
           />
         )}
 
@@ -253,25 +334,23 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
           if (!position) return null;
 
           return (
-            <Marker
+            <CustomMarker
               key={order.id}
               position={position}
-              icon={{
-                url:
-                  "data:image/svg+xml;charset=UTF-8," +
-                  encodeURIComponent(`
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="${getOrderStatusColor(
+              icon={
+                "data:image/svg+xml;charset=UTF-8," +
+                encodeURIComponent(`
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="${getOrderStatusColor(
                     order.status
                   )}" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="10" r="3"/>
                     <path d="m12 21.7-4-7.2c-.7-1.5-1-3.2-1-4.8a5 5 0 0 1 10 0c0 1.6-.3 3.3-1 4.8l-4 7.2z"/>
                   </svg>
-                `),
-                scaledSize: new google.maps.Size(28, 28),
-                anchor: new google.maps.Point(14, 28),
-              }}
+                `)
+              }
               title={`Order #${order.id}`}
               onClick={() => setSelectedOrder(order)}
+              map={map}
             />
           );
         })}
