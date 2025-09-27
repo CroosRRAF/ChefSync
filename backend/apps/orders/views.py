@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from django.utils import timezone
 from django.http import JsonResponse
 from django.db.models import Sum, Avg, Count, Q
+from decimal import Decimal
 from .models import Order, OrderItem, OrderStatusHistory, CartItem, UserAddress
 from .serializers import CartItemSerializer, UserAddressSerializer
 from apps.food.models import FoodReview, FoodPrice
@@ -1031,3 +1032,141 @@ def chef_recent_activity(request):
             'order_id': order.id,
             'pickup_address': chef_location.get('address') or chef_location.get('service_location', 'Address not available')
         })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def calculate_checkout(request):
+    """Calculate delivery fee, tax, and total for checkout with comprehensive validation"""
+    try:
+        cart_items = request.data.get('cart_items', [])
+        customer_location = request.data.get('customer_location', {})
+        
+        if not cart_items:
+            return Response({
+                'error': 'Cart is empty'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Initialize calculation variables
+        subtotal = Decimal('0.00')
+        delivery_fee = Decimal('15.00')  # Base delivery fee
+        tax_rate = Decimal('0.08')  # 8% tax
+        
+        # Calculate subtotal
+        for item in cart_items:
+            # Get the price record
+            try:
+                food_price = FoodPrice.objects.select_related('food', 'cook').get(id=item['price_id'])
+            except FoodPrice.DoesNotExist:
+                return Response({
+                    'error': f'Price with ID {item["price_id"]} not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Calculate item total
+            item_total = food_price.price * item['quantity']
+            subtotal += item_total
+        
+        # Calculate tax
+        tax_amount = subtotal * tax_rate
+        
+        # Calculate total
+        total_amount = subtotal + delivery_fee + tax_amount
+        
+        return Response({
+            'subtotal': float(subtotal),
+            'delivery_fee': float(delivery_fee),
+            'tax_amount': float(tax_amount),
+            'total_amount': float(total_amount),
+            'tax_rate': float(tax_rate),
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def place_order(request):
+    """Place a comprehensive order with full validation and processing"""
+    try:
+        cart_items = request.data.get('cart_items', [])
+        customer_location = request.data.get('customer_location', {})
+        payment_method = request.data.get('payment_method', 'cash')
+        special_instructions = request.data.get('special_instructions', '')
+        
+        if not cart_items:
+            return Response({
+                'error': 'Cart is empty'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create order
+        import uuid
+        
+        order = Order.objects.create(
+            customer=request.user,
+            chef=None,  # Will be set based on first item
+            order_number=f'ORD-{uuid.uuid4().hex[:8].upper()}',
+            status='pending',
+            payment_method=payment_method,
+            special_instructions=special_instructions,
+            delivery_address=customer_location.get('formatted_address', ''),
+            delivery_latitude=customer_location.get('latitude'),
+            delivery_longitude=customer_location.get('longitude'),
+        )
+        
+        # Process cart items
+        for item_data in cart_items:
+            try:
+                food_price = FoodPrice.objects.select_related('food', 'cook').get(id=item_data['price_id'])
+                
+                # Set chef for order (from first item)
+                if not order.chef:
+                    order.chef = food_price.cook
+                    order.save()
+                
+                # Create order item
+                OrderItem.objects.create(
+                    order=order,
+                    price=food_price,
+                    quantity=item_data['quantity'],
+                    total_amount=food_price.price * item_data['quantity']
+                )
+                
+            except FoodPrice.DoesNotExist:
+                # Clean up if error
+                order.delete()
+                return Response({
+                    'error': f'Price with ID {item_data["price_id"]} not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Calculate totals
+        subtotal = sum(item.total_amount for item in order.items.all())
+        delivery_fee = Decimal('15.00')
+        tax_amount = subtotal * Decimal('0.08')
+        total_amount = subtotal + delivery_fee + tax_amount
+        
+        # Update order totals
+        order.subtotal = subtotal
+        order.delivery_fee = delivery_fee
+        order.tax_amount = tax_amount
+        order.total_amount = total_amount
+        order.save()
+        
+        # Create initial status history
+        OrderStatusHistory.objects.create(
+            order=order,
+            status='pending',
+            changed_by=request.user,
+            notes='Order placed successfully'
+        )
+        
+        return Response({
+            'success': 'Order placed successfully',
+            'order_id': order.id,
+            'order_number': order.order_number,
+            'status': order.status,
+            'total_amount': float(total_amount)
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
