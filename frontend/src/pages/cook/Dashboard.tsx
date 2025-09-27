@@ -95,16 +95,16 @@ export default function Dashboard() {
   const displayStats = stats ? [
     {
       title: "Completed Orders",
-      value: stats.orders_completed.toString(),
+      value: stats.completed_orders.toString(),
       change: `+${Math.floor(Math.random() * 5)} today`, // Can be calculated from API later
       icon: CheckCircle2,
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-50 dark:bg-green-900/20"
     },
     {
-      title: "Active Orders",
-      value: stats.orders_active.toString(),
-      change: `+${Math.floor(Math.random() * 3)} pending`,
+      title: "Total Orders",
+      value: stats.total_orders.toString(),
+      change: `+${Math.floor(Math.random() * 3)} total`,
       icon: ClipboardList,
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-50 dark:bg-blue-900/20"
@@ -118,8 +118,8 @@ export default function Dashboard() {
       bgColor: "bg-yellow-50 dark:bg-yellow-900/20"
     },
     {
-      title: "Today Revenue",
-      value: `$${stats.today_revenue.toFixed(2)}`,
+      title: "Total Revenue",
+      value: `$${stats.total_revenue.toFixed(2)}`,
       change: `${stats.average_rating}/5 rating`,
       icon: TrendingUp,
       color: "text-primary",
