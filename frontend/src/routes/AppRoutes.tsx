@@ -1,79 +1,75 @@
-import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
-import { GoogleOAuthProvider } from "@react-oauth/google";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
+import { GoogleOAuthProvider } from "@react-oauth/google";
+import React from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 // Layout components
-import Navbar from "@/components/layout/Navbar";
-import CustomerNavbar from "@/components/layout/CustomerNavbar";
-import CustomerHomeNavbar from "@/components/layout/CustomerHomeNavbar";
 import CustomerDashboardLayout from "@/components/layout/CustomerDashboardLayout";
-import AdminLayout from "@/components/layout/AdminLayout";
-import EnhancedAdminLayout from "@/components/layout/EnhancedAdminLayout";
-import UltimateAdminLayout from "@/components/layout/UltimateAdminLayout";
+import CustomerHomeNavbar from "@/components/layout/CustomerHomeNavbar";
+import Navbar from "@/components/layout/Navbar";
+// New unified admin layout
+import AdminLayout from "@/components/admin/layout/AdminLayout";
 
 // Public pages
+import About from "@/pages/About";
+import Checkout from "@/pages/Checkout";
+import Contact from "@/pages/Contact";
+import DeliveryAddressTest from "@/pages/DeliveryAddressTest";
 import Home from "@/pages/Home";
 import Menu from "@/pages/Menu";
-import About from "@/pages/About";
-import Contact from "@/pages/Contact";
 import NotFound from "@/pages/NotFound";
-import Checkout from "@/pages/Checkout";
-import DeliveryAddressTest from "@/pages/DeliveryAddressTest";
 
 // Authentication pages
+import ApprovalStatusPage from "@/pages/auth/ApprovalStatus";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
 import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
-import ForgotPassword from "@/pages/auth/ForgotPassword";
-import VerifyEmail from "@/pages/auth/VerifyEmail";
 import ResetPassword from "@/pages/auth/ResetPassword";
-import ApprovalStatusPage from "@/pages/auth/ApprovalStatus";
+import VerifyEmail from "@/pages/auth/VerifyEmail";
 
 // Profile page - removed old generic profile, now using role-specific profiles
 
 // Role-based pages
+import CustomerCart from "@/pages/customer/Cart";
 import CustomerDashboard from "@/pages/customer/Dashboard";
 import CustomerOrders from "@/pages/customer/Orders";
 import CustomerProfile from "@/pages/customer/Profile";
 import CustomerSettings from "@/pages/customer/Settings";
-import CustomerCart from "@/pages/customer/Cart";
 
+import AllOrders from "@/pages/delivery/AllOrders";
 import DeliveryDashboard from "@/pages/delivery/Dashboard";
 import DeliveryMap from "@/pages/delivery/Map";
+import DeliveryProfile from "@/pages/delivery/Profile";
 import DeliverySchedule from "@/pages/delivery/Schedule";
 import DeliverySettings from "@/pages/delivery/Settings";
-import DeliveryProfile from "@/pages/delivery/Profile";
-import AllOrders from "@/pages/delivery/AllOrders";
 import PickupNavigationDemo from "@/pages/demo/PickupNavigationDemo";
 
-import CookDashboard from "@/pages/cook/Dashboard";
+import CookLayout from "@/components/layout/CookLayout";
 import CookBulkOrders from "@/pages/cook/BulkOrders";
+import CookDashboard from "@/pages/cook/Dashboard";
 import CookHome from "@/pages/cook/Home";
 import CookMenu from "@/pages/cook/MenuNew";
-import CookOrders from "@/pages/cook/Order";
 import CookNotifications from "@/pages/cook/Notifications";
+import CookOrders from "@/pages/cook/Order";
 import CookProfile from "@/pages/cook/Profile";
 import CookSettings from "@/pages/cook/Settings";
-import CookLayout from "@/components/layout/CookLayout";
 
-// Admin pages
-import ModernDashboard from "@/pages/admin/ModernDashboard";
-import EnhancedDashboard from "@/pages/admin/EnhancedDashboard";
-import UltimateDashboard from "@/pages/admin/UltimateDashboard";
-import AdminManageUsers from "@/pages/admin/ManageUsers";
-import UltimateUserManagement from "@/pages/admin/UltimateUserManagement";
-import AdminOrders from "@/pages/admin/Orders";
+// New unified admin pages
+import AdvancedAnalytics from "@/pages/admin/AdvancedAnalytics";
+import AIReportsAutomation from "@/pages/admin/AIReportsAutomation";
 import AdminAnalytics from "@/pages/admin/Analytics";
-import AdminSettings from "@/pages/admin/Settings";
+import AdminBackendIntegration from "@/pages/admin/BackendIntegration";
+import AdminCommunication from "@/pages/admin/Communication";
+import AdminDashboard from "@/pages/admin/Dashboard";
+import AdminFeedbackManagement from "@/pages/admin/FeedbackManagement";
+import AdminFoodMenuManagement from "@/pages/admin/FoodMenuManagement";
+import MachineLearningIntegration from "@/pages/admin/MachineLearningIntegration";
+import AdminManageUser from "@/pages/admin/ManageUser";
 import AdminProfile from "@/pages/admin/Profile";
 import AdminReports from "@/pages/admin/Reports";
-import Approvals from "@/pages/admin/Approvals";
-import FoodManagement from "@/pages/admin/FoodManagement";
-import AdminNotifications from "@/pages/admin/Notifications";
-import Communications from "@/pages/admin/Communications";
+import AdminSettings from "@/pages/admin/Settings";
 
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
@@ -547,9 +543,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/dashboard"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <UltimateAdminLayout>
-                <UltimateDashboard />
-              </UltimateAdminLayout>
+              <AdminLayout>
+                <AdminDashboard />
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -557,29 +553,41 @@ const InnerRoutes: React.FC = () => {
           path="/admin/users"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <UltimateAdminLayout>
-                <UltimateUserManagement />
-              </UltimateAdminLayout>
+              <AdminLayout>
+                <AdminManageUser />
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/manage-user"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AdminManageUser />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        {/* TODO: Create AdminOrders page
         <Route
           path="/admin/orders"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <UltimateAdminLayout>
+              <AdminLayout>
                 <AdminOrders />
-              </UltimateAdminLayout>
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
+        */}
         <Route
           path="/admin/analytics"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <UltimateAdminLayout>
+              <AdminLayout>
                 <AdminAnalytics />
-              </UltimateAdminLayout>
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -587,9 +595,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/settings"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <UltimateAdminLayout>
+              <AdminLayout>
                 <AdminSettings />
-              </UltimateAdminLayout>
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -597,9 +605,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/profile"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <UltimateAdminLayout>
+              <AdminLayout>
                 <AdminProfile />
-              </UltimateAdminLayout>
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -607,9 +615,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/reports"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <UltimateAdminLayout>
+              <AdminLayout>
                 <AdminReports />
-              </UltimateAdminLayout>
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -617,9 +625,19 @@ const InnerRoutes: React.FC = () => {
           path="/admin/food"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <UltimateAdminLayout>
-                <FoodManagement />
-              </UltimateAdminLayout>
+              <AdminLayout>
+                <AdminFoodMenuManagement />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/food-menu-management"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AdminFoodMenuManagement />
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -627,19 +645,109 @@ const InnerRoutes: React.FC = () => {
           path="/admin/communications"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <UltimateAdminLayout>
-                <Communications />
-              </UltimateAdminLayout>
+              <AdminLayout>
+                <AdminCommunication />
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/admin/approvals"
+          path="/admin/communication"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <UltimateAdminLayout>
-                <Approvals />
-              </UltimateAdminLayout>
+              <AdminLayout>
+                <AdminCommunication />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/feedback-management"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AdminFeedbackManagement />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/backend-integration"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AdminBackendIntegration />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/analytics-backend"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AdminBackendIntegration />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/advanced-analytics"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AdvancedAnalytics />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ai-analytics"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AdvancedAnalytics />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ai-reports"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AIReportsAutomation />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports-automation"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AIReportsAutomation />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ml-integration"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <MachineLearningIntegration />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/machine-learning"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <MachineLearningIntegration />
+              </AdminLayout>
             </ProtectedRoute>
           }
         />

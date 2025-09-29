@@ -33,9 +33,11 @@ SECRET_KEY = config(
 JWT_SIGNING_KEY = config("JWT_SECRET_KEY", default=SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config("DEBUG", default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,testserver').split(',')
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,testserver").split(
+    ","
+)
 
 
 # Application definition
@@ -224,9 +226,19 @@ CORS_ALLOWED_ORIGINS = [
     "http://0.0.0.0:8080",
     "http://0.0.0.0:8081",
     "http://0.0.0.0:8082",
+    # HTTPS origins for development (if frontend served over HTTPS)
+    "https://localhost:5173",
+    "https://127.0.0.1:5173",
+    "https://localhost:8000",
+    "https://127.0.0.1:8000",
+    "https://localhost:8080",
+    "https://127.0.0.1:8080",
+    "https://localhost:8081",
+    "https://127.0.0.1:8081",
 ]
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins for development
+# Do not use wildcard origins when credentials are enabled. List explicit origins instead.
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_METHODS = [
     "DELETE",
     "GET",
@@ -261,6 +273,15 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8082",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    # HTTPS origins for development
+    "https://localhost:5173",
+    "https://127.0.0.1:5173",
+    "https://localhost:8000",
+    "https://127.0.0.1:8000",
+    "https://localhost:8080",
+    "https://127.0.0.1:8080",
+    "https://localhost:8081",
+    "https://127.0.0.1:8081",
 ]
 CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=False, cast=bool)
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF cookie
@@ -361,11 +382,9 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = config(
 # Leave COEP disabled unless you specifically need cross-origin isolation
 # (Setting to None means Django won't set the header)
 try:
-    SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = (
-        None
-        if config("SECURE_CROSS_ORIGIN_EMBEDDER_POLICY", default="").strip() == ""
-        else config("SECURE_CROSS_ORIGIN_EMBEDDER_POLICY")
-    )
+    _coep_raw = config("SECURE_CROSS_ORIGIN_EMBEDDER_POLICY", default="")
+    _coep_str = str(_coep_raw).strip()
+    SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None if _coep_str == "" else _coep_str
 except Exception:
     SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None
 
@@ -396,25 +415,31 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # Local file storage fallback for Cloudinary issues
-USE_LOCAL_STORAGE = config('USE_LOCAL_STORAGE', default=False, cast=bool)
-LOCAL_MEDIA_ROOT = BASE_DIR / 'local_media'
+USE_LOCAL_STORAGE = config("USE_LOCAL_STORAGE", default=False, cast=bool)
+LOCAL_MEDIA_ROOT = BASE_DIR / "local_media"
 
 # Admin Feature Flags
-ADMIN_FEATURES_V2 = config('ADMIN_FEATURES_V2', default=True, cast=bool)
-ADMIN_NOTIFICATIONS_V2 = config('ADMIN_NOTIFICATIONS_V2', default=True, cast=bool)
-ADMIN_ORDERS_TIMELINE = config('ADMIN_ORDERS_TIMELINE', default=True, cast=bool)
-ADMIN_COMMS_SENTIMENT = config('ADMIN_COMMS_SENTIMENT', default=True, cast=bool)
-ADMIN_MAPS_V1 = config('ADMIN_MAPS_V1', default=False, cast=bool)
-ADMIN_EXPORTS_AI_REPORTS = config('ADMIN_EXPORTS_AI_REPORTS', default=False, cast=bool)
+ADMIN_FEATURES_V2 = config("ADMIN_FEATURES_V2", default=True, cast=bool)
+ADMIN_NOTIFICATIONS_V2 = config("ADMIN_NOTIFICATIONS_V2", default=True, cast=bool)
+ADMIN_ORDERS_TIMELINE = config("ADMIN_ORDERS_TIMELINE", default=True, cast=bool)
+ADMIN_COMMS_SENTIMENT = config("ADMIN_COMMS_SENTIMENT", default=True, cast=bool)
+ADMIN_MAPS_V1 = config("ADMIN_MAPS_V1", default=False, cast=bool)
+ADMIN_EXPORTS_AI_REPORTS = config("ADMIN_EXPORTS_AI_REPORTS", default=False, cast=bool)
 
 # Silence system check warnings
 SILENCED_SYSTEM_CHECKS = [
-    'models.W036',  # MySQL does not support unique constraints with conditions
+    "models.W036",  # MySQL does not support unique constraints with conditions
 ]
 
 # Content Security Policy Settings (Google OAuth Enabled)
 CSP_DEFAULT_SRC = ("'self'",)
-CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com", "https://apis.google.com")
+CSP_SCRIPT_SRC = (
+    "'self'",
+    "'unsafe-inline'",
+    "'unsafe-eval'",
+    "https://accounts.google.com",
+    "https://apis.google.com",
+)
 CSP_STYLE_SRC = ("'self'", "'unsafe-inline'", "https://fonts.googleapis.com")
 CSP_FONT_SRC = ("'self'", "https://fonts.gstatic.com")
 CSP_IMG_SRC = ("'self'", "data:", "https:", "http:")
@@ -427,34 +452,34 @@ CSP_FORM_ACTION = ("'self'", "https://accounts.google.com")
 # Security Headers
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
-X_FRAME_OPTIONS = 'DENY'
-SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+X_FRAME_OPTIONS = "DENY"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 
 # Feature Policy
 FEATURE_POLICY = {
-    'camera': [],
-    'microphone': [],
-    'geolocation': [],
-    'payment': [],
-    'usb': [],
-    'magnetometer': [],
-    'gyroscope': [],
-    'accelerometer': [],
-    'ambient-light-sensor': [],
-    'autoplay': [],
-    'battery': [],
-    'bluetooth': [],
-    'display-capture': [],
-    'document-domain': [],
-    'encrypted-media': [],
-    'fullscreen': [],
-    'identity-credentials-get': [],
-    'midi': [],
-    'notifications': [],
-    'picture-in-picture': [],
-    'publickey-credentials-get': [],
-    'screen-wake-lock': [],
-    'sync-xhr': [],
-    'web-share': [],
-    'xr-spatial-tracking': [],
+    "camera": [],
+    "microphone": [],
+    "geolocation": [],
+    "payment": [],
+    "usb": [],
+    "magnetometer": [],
+    "gyroscope": [],
+    "accelerometer": [],
+    "ambient-light-sensor": [],
+    "autoplay": [],
+    "battery": [],
+    "bluetooth": [],
+    "display-capture": [],
+    "document-domain": [],
+    "encrypted-media": [],
+    "fullscreen": [],
+    "identity-credentials-get": [],
+    "midi": [],
+    "notifications": [],
+    "picture-in-picture": [],
+    "publickey-credentials-get": [],
+    "screen-wake-lock": [],
+    "sync-xhr": [],
+    "web-share": [],
+    "xr-spatial-tracking": [],
 }

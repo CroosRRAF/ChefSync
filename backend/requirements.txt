@@ -37,6 +37,7 @@ ua-parser==1.0.1
 ua-parser-builtins==0.18.0.post1
 urllib3==2.2.3
 google-generativeai==0.8.3
+psutil==7.1.0
 # PDF processing dependencies
 # Note: Poppler utilities must be installed separately on Windows
 # Download from: https://github.com/oschwartz10612/poppler-windows/releases/
