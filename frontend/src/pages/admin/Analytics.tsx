@@ -1,6 +1,6 @@
 import React from "react";
-// Import shared components (will be available once dependencies are installed)
-// import { StatsWidget, LineChart, BarChart, DataTable } from "@/components/admin/shared";
+// Import shared components
+import { BarChart, LineChart } from "@/components/admin/shared";
 import { DollarSign, ShoppingCart, TrendingUp, Users } from "lucide-react";
 
 /**
@@ -145,9 +145,15 @@ const Analytics: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Monthly Sales Trend
           </h3>
-          <div className="h-64 flex items-center justify-center text-gray-500">
-            {/* This will be replaced with LineChart component */}
-            <p>LineChart component will be rendered here</p>
+          <div className="h-64">
+            <LineChart
+              data={salesData}
+              dataKeys={["value"]}
+              xAxisDataKey="name"
+              height={240}
+              showTrend={true}
+              colors={["#3B82F6"]}
+            />
           </div>
         </div>
 
@@ -155,9 +161,14 @@ const Analytics: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Orders by Category
           </h3>
-          <div className="h-64 flex items-center justify-center text-gray-500">
-            {/* This will be replaced with BarChart component */}
-            <p>BarChart component will be rendered here</p>
+          <div className="h-64">
+            <BarChart
+              data={salesData}
+              dataKeys={["value"]}
+              xAxisDataKey="name"
+              height={240}
+              colors={["#10B981"]}
+            />
           </div>
         </div>
       </div>

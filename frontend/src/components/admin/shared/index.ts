@@ -1,8 +1,8 @@
 // Chart Components
-export * from "./charts/BarChart";
-export * from "./charts/LineChart";
-export * from "./charts/MetricCard";
-export * from "./charts/PieChart";
+export { default as BarChart } from "./charts/BarChart";
+export { default as LineChart } from "./charts/LineChart";
+export { default as MetricCard } from "./charts/MetricCard";
+export { default as PieChart } from "./charts/PieChart";
 
 // Table Components
 export { default as DataTable } from "./tables/DataTable";

@@ -1,17 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-// Import shared components (will work once dependencies are installed)
-// import {
-//   StatsWidget,
-//   LineChart,
-//   BarChart,
-//   PieChart,
-//   DataTable,
-//   ActivityWidget,
-//   QuickActionsWidget,
-//   ProgressWidget,
-//   SummaryWidget
-// } from "@/components/admin/shared";
+// Import shared components
+import { BarChart, LineChart } from "@/components/admin/shared";
 
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -69,10 +59,10 @@ interface DashboardStats {
 interface RecentOrder {
   id: number;
   order_number: string;
-  customer_name: string;
+  customer_name: string; // Backend uses snake_case
   total_amount: number;
   status: string;
-  created_at: string;
+  created_at: string; // Backend uses snake_case
   items_count: number;
   payment_status: string;
 }
@@ -131,34 +121,11 @@ const Dashboard: React.FC = () => {
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([]);
   const [timeFilter, setTimeFilter] = useState<"7d" | "30d" | "90d">("30d");
-
-  // Chart data (fallback data for demonstration)
-  const revenueData = [
-    { name: "Jan", value: 4000, growth: 12 },
-    { name: "Feb", value: 3000, growth: -8 },
-    { name: "Mar", value: 5000, growth: 25 },
-    { name: "Apr", value: 4500, growth: 15 },
-    { name: "May", value: 6000, growth: 33 },
-    { name: "Jun", value: 5500, growth: 22 },
-  ];
-
-  const ordersData = [
-    { name: "Mon", orders: 65, revenue: 1200 },
-    { name: "Tue", orders: 78, revenue: 1450 },
-    { name: "Wed", orders: 52, revenue: 980 },
-    { name: "Thu", orders: 88, revenue: 1650 },
-    { name: "Fri", orders: 95, revenue: 1800 },
-    { name: "Sat", orders: 110, revenue: 2100 },
-    { name: "Sun", orders: 85, revenue: 1600 },
-  ];
-
-  const categoryData = [
-    { name: "Pizza", value: 35, orders: 245 },
-    { name: "Burgers", value: 28, orders: 196 },
-    { name: "Salads", value: 18, orders: 126 },
-    { name: "Beverages", value: 12, orders: 84 },
-    { name: "Desserts", value: 7, orders: 49 },
-  ];
+  // Chart datasets from backend
+  const [revenueTrend, setRevenueTrend] = useState<any | null>(null);
+  const [ordersTrend, setOrdersTrend] = useState<any | null>(null);
+  const [weeklyPerformance, setWeeklyPerformance] = useState<any | null>(null);
+  const [growthAnalytics, setGrowthAnalytics] = useState<any | null>(null);
 
   // Quick Actions Configuration
   const quickActions: QuickAction[] = [
@@ -225,27 +192,44 @@ const Dashboard: React.FC = () => {
         setError(null);
 
         // Fetch real data from API
-        const [dashboardStats, recentOrdersData, recentActivitiesData] =
-          await Promise.all([
-            adminService.getDashboardStats(),
-            adminService.getRecentOrders(5),
-            adminService.getRecentActivities(5),
-          ]);
+        const days = timeFilter === "7d" ? 7 : timeFilter === "90d" ? 90 : 30;
+        const [
+          dashboardStats,
+          recentOrdersData,
+          recentActivitiesData,
+          revenueTrendRes,
+          ordersTrendRes,
+          weeklyPerformanceRes,
+          growthAnalyticsRes,
+        ] = await Promise.all([
+          adminService.getDashboardStats(),
+          adminService.getRecentOrders(5),
+          adminService.getRecentActivities(5),
+          adminService.getRevenueTrend(days),
+          adminService.getOrdersTrend(days),
+          adminService.getWeeklyPerformance(days),
+          adminService.getGrowthAnalytics(days),
+        ]);
 
         // Transform API data to match component state
         const transformedStats: DashboardStats = {
           totalRevenue: dashboardStats.total_revenue || 0,
           totalOrders: dashboardStats.total_orders || 0,
           activeUsers: dashboardStats.active_users || 0,
+          // Use backend's pending_user_approvals; keep name aligned with UI card
           pendingApprovals: dashboardStats.pending_user_approvals || 0,
           revenueGrowth: dashboardStats.revenue_growth || 0,
           ordersGrowth: dashboardStats.order_growth || 0,
           usersGrowth: dashboardStats.user_growth || 0,
-          approvalsGrowth: -5.2, // Calculated field
-          averageOrderValue: dashboardStats.avg_order_value || 0,
-          completionRate: dashboardStats.delivery_completion_rate || 0,
-          responseTime: 1.2, // From system health if available
-          systemHealth: 98.5, // From system health if available
+          // approvalsGrowth isn't provided by backend; leave synthetic for now
+          approvalsGrowth: -5.2,
+          averageOrderValue:
+            dashboardStats.total_orders > 0
+              ? dashboardStats.total_revenue / dashboardStats.total_orders
+              : 0, // Calculate from available data
+          completionRate: 94.2, // Fallback - backend doesn't provide this
+          responseTime: 1.2, // Fallback - backend doesn't provide this
+          systemHealth: dashboardStats.system_health_score || 85, // Use available system health score
         };
 
         // Transform recent orders
@@ -253,13 +237,13 @@ const Dashboard: React.FC = () => {
           (order) => ({
             id: order.id,
             order_number: order.order_number,
-            customer_name: order.customer_name,
+            customer_name: order.customer_name, // Backend uses snake_case
             total_amount:
               typeof order.total_amount === "string"
                 ? parseFloat(order.total_amount)
                 : order.total_amount,
             status: order.status,
-            created_at: order.created_at,
+            created_at: order.created_at, // Backend uses snake_case
             items_count:
               typeof order.items_count === "string"
                 ? parseInt(order.items_count)
@@ -284,6 +268,10 @@ const Dashboard: React.FC = () => {
         setStats(transformedStats);
         setRecentOrders(transformedOrders);
         setRecentActivities(transformedActivities);
+        setRevenueTrend(revenueTrendRes);
+        setOrdersTrend(ordersTrendRes);
+        setWeeklyPerformance(weeklyPerformanceRes);
+        setGrowthAnalytics(growthAnalyticsRes);
         setLastRefresh(new Date());
       } catch (error) {
         console.error("Error loading dashboard data:", error);
@@ -292,23 +280,8 @@ const Dashboard: React.FC = () => {
             ? error.message
             : "Failed to load dashboard data"
         );
-
-        // Fallback to mock data on error
-        const mockStats: DashboardStats = {
-          totalRevenue: 124500,
-          totalOrders: 1847,
-          activeUsers: 2456,
-          pendingApprovals: 16,
-          revenueGrowth: 15.3,
-          ordersGrowth: 8.7,
-          usersGrowth: 12.1,
-          approvalsGrowth: -5.2,
-          averageOrderValue: 67.45,
-          completionRate: 94.2,
-          responseTime: 1.2,
-          systemHealth: 98.5,
-        };
-        setStats(mockStats);
+        // Do not use mock fallbacks; show partial UI gracefully
+        setStats(null);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -394,7 +367,7 @@ const Dashboard: React.FC = () => {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Welcome back, {user?.firstName}!
+            Welcome back, {user?.name}!
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
             Here's what's happening with your restaurant today
@@ -547,16 +520,32 @@ const Dashboard: React.FC = () => {
               ))}
             </div>
           </div>
-          <div className="h-64 flex items-center justify-center text-gray-500">
-            {/* Placeholder - will be replaced with LineChart component */}
-            <div className="text-center">
-              <TrendingUp size={48} className="mx-auto mb-2 text-gray-400" />
-              <p>Revenue LineChart will be rendered here</p>
-              <p className="text-sm">
-                Data: $
-                {revenueData[revenueData.length - 1]?.value.toLocaleString()}
-              </p>
-            </div>
+          <div className="h-64">
+            {revenueTrend && revenueTrend.data ? (
+              <LineChart
+                data={revenueTrend.data.labels.map(
+                  (label: string, index: number) => ({
+                    name: label,
+                    revenue: revenueTrend.data.datasets[0]?.data[index] || 0,
+                  })
+                )}
+                dataKeys={["revenue"]}
+                xAxisDataKey="name"
+                height={240}
+                showTrend={true}
+                colors={["#3B82F6"]}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <TrendingUp
+                    size={48}
+                    className="mx-auto mb-2 text-gray-400"
+                  />
+                  <p>Loading revenue chart...</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -565,15 +554,28 @@ const Dashboard: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Weekly Orders
           </h3>
-          <div className="h-64 flex items-center justify-center text-gray-500">
-            {/* Placeholder - will be replaced with BarChart component */}
-            <div className="text-center">
-              <BarChart3 size={48} className="mx-auto mb-2 text-gray-400" />
-              <p>Orders BarChart will be rendered here</p>
-              <p className="text-sm">
-                Peak: {Math.max(...ordersData.map((d) => d.orders))} orders
-              </p>
-            </div>
+          <div className="h-64">
+            {ordersTrend && ordersTrend.data ? (
+              <BarChart
+                data={ordersTrend.data.labels.map(
+                  (label: string, index: number) => ({
+                    name: label,
+                    orders: ordersTrend.data.datasets[0]?.data[index] || 0,
+                  })
+                )}
+                dataKeys={["orders"]}
+                xAxisDataKey="name"
+                height={240}
+                colors={["#10B981"]}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <BarChart3 size={48} className="mx-auto mb-2 text-gray-400" />
+                  <p>Loading orders chart...</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -709,13 +711,13 @@ const Dashboard: React.FC = () => {
                       {order.id}
                     </td>
                     <td className="px-6 py-4 text-gray-900 dark:text-white">
-                      {order.customerName}
+                      {order.customer_name}
                     </td>
                     <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                      {order.items}
+                      {order.items_count}
                     </td>
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                      ${order.total.toFixed(2)}
+                      ${order.total_amount.toFixed(2)}
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -728,7 +730,7 @@ const Dashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
-                      {timeAgo(order.orderTime)}
+                      {timeAgo(new Date(order.created_at))}
                     </td>
                   </tr>
                 ))}

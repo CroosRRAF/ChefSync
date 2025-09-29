@@ -3,7 +3,6 @@ import axios, { AxiosError } from "axios";
 
 // Use Vite dev proxy by default to avoid protocol mismatches in development.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-const MOCK_SERVER_URL = "http://localhost:3001/api";
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -13,32 +12,7 @@ const apiClient = axios.create({
   },
 });
 
-// Failover to mock server if main server is down
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    // If the main server is down (network error or 404), try the mock server
-    if (
-      (error.message === "Network Error" || error.response?.status === 404) &&
-      !originalRequest._retry
-    ) {
-      originalRequest._retry = true;
-
-      // Switch to mock server
-      originalRequest.baseURL = `${MOCK_SERVER_URL}/communications`;
-
-      try {
-        return await axios(originalRequest);
-      } catch (mockError) {
-        return Promise.reject(error); // If mock fails too, return original error
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
+// No mock failover; ensure real backend errors surface
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
@@ -589,111 +563,38 @@ class CommunicationService {
 
   // Additional methods for BackendIntegration
   async getHourlyDeliveryStats(): Promise<any> {
-    try {
-      // Mock implementation for now
-      return {
-        hourly: Array.from({ length: 24 }, (_, i) => ({
-          hour: i,
-          delivered: Math.floor(Math.random() * 100),
-          failed: Math.floor(Math.random() * 10),
-        })),
-      };
-    } catch (error) {
-      return this.handleError(error, "getHourlyDeliveryStats");
-    }
+    return this.handleError(
+      new Error("Not implemented"),
+      "getHourlyDeliveryStats"
+    );
   }
 
   async getChannelPerformance(): Promise<any> {
-    try {
-      // Mock implementation for now
-      return {
-        email: { sent: 1500, delivered: 1420, opened: 850, clicked: 230 },
-        sms: { sent: 800, delivered: 790, opened: 0, clicked: 0 },
-        push: { sent: 2200, delivered: 2100, opened: 1200, clicked: 180 },
-      };
-    } catch (error) {
-      return this.handleError(error, "getChannelPerformance");
-    }
+    return this.handleError(
+      new Error("Not implemented"),
+      "getChannelPerformance"
+    );
   }
 
   async getEngagementTrends(period: string): Promise<any> {
-    try {
-      // Mock implementation for now
-      return {
-        engagementTrends: Array.from({ length: 7 }, (_, i) => ({
-          date: new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split("T")[0],
-          opens: Math.floor(Math.random() * 1000),
-          clicks: Math.floor(Math.random() * 200),
-          conversions: Math.floor(Math.random() * 50),
-        })),
-      };
-    } catch (error) {
-      return this.handleError(error, "getEngagementTrends");
-    }
+    return this.handleError(
+      new Error("Not implemented"),
+      "getEngagementTrends"
+    );
   }
 
   // Additional methods for Communication page
   async getNotifications(): Promise<any[]> {
-    try {
-      // Mock implementation for now
-      return [
-        {
-          id: 1,
-          title: "New Order Alert",
-          message: "You have 5 new orders pending approval",
-          type: "info",
-          read: false,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 2,
-          title: "System Maintenance",
-          message: "Scheduled maintenance tonight at 2 AM",
-          type: "warning",
-          read: true,
-          created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        },
-      ];
-    } catch (error) {
-      return this.handleError(error, "getNotifications");
-    }
+    // Consider using adminService.getNotifications for admin notifications instead
+    return this.handleError(new Error("Not implemented"), "getNotifications");
   }
 
   async getCampaignStats(): Promise<any> {
-    try {
-      // Mock implementation for now
-      return {
-        total_campaigns: 45,
-        active_campaigns: 8,
-        total_sent: 15000,
-        delivered: 14250,
-        opened: 8550,
-        clicked: 1710,
-        conversion_rate: 11.4,
-      };
-    } catch (error) {
-      return this.handleError(error, "getCampaignStats");
-    }
+    return this.handleError(new Error("Not implemented"), "getCampaignStats");
   }
 
   async getDeliveryStats(period: string): Promise<any> {
-    try {
-      // Mock implementation for now
-      return {
-        total_sent: 5000,
-        delivered: 4800,
-        failed: 200,
-        opened: 2880,
-        clicked: 576,
-        deliveryRate: 96.0,
-        openRate: 60.0,
-        clickRate: 12.0,
-      };
-    } catch (error) {
-      return this.handleError(error, "getDeliveryStats");
-    }
+    return this.handleError(new Error("Not implemented"), "getDeliveryStats");
   }
 
   async duplicateCommunication(id: number): Promise<any> {

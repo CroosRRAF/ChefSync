@@ -10,15 +10,13 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
-from decouple import Config, RepositoryEnv
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Load environment variables from .env file
-config = Config(RepositoryEnv(BASE_DIR / ".env"))
 
 
 # Quick-start development settings - unsuitable for production
@@ -35,9 +33,14 @@ JWT_SIGNING_KEY = config("JWT_SECRET_KEY", default=SECRET_KEY)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", default=True, cast=bool)
 
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,testserver").split(
-    ","
-)
+# Robust ALLOWED_HOSTS parsing from env (comma-separated)
+_ALLOWED_HOSTS_RAW = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,testserver")
+if isinstance(_ALLOWED_HOSTS_RAW, str):
+    ALLOWED_HOSTS = [h.strip() for h in _ALLOWED_HOSTS_RAW.split(",") if h.strip()]
+elif isinstance(_ALLOWED_HOSTS_RAW, (list, tuple)):
+    ALLOWED_HOSTS = list(_ALLOWED_HOSTS_RAW)
+else:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
 
 
 # Application definition
@@ -76,6 +79,7 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "config.middleware.SecurityHeadersMiddleware",  # Custom security headers for OAuth
+    "config.middleware.DisableCSRFMiddleware",  # Custom CSRF exemption for development
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -283,10 +287,51 @@ CSRF_TRUSTED_ORIGINS = [
     "https://localhost:8081",
     "https://127.0.0.1:8081",
 ]
-CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=False, cast=bool)
+# CSRF Cookie settings for cross-origin development
+if DEBUG:
+    # For development with different origins (localhost:8081 and 127.0.0.1:8000)
+    CSRF_COOKIE_SAMESITE = None
+    CSRF_COOKIE_SECURE = (
+        False  # Can be False in development with SameSite=None over HTTP
+    )
+else:
+    # Production settings
+    CSRF_COOKIE_SAMESITE = "Strict"
+    CSRF_COOKIE_SECURE = True
+
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF cookie
 CSRF_USE_SESSIONS = False
-CSRF_COOKIE_SAMESITE = "Lax" if DEBUG else "Strict"  # Allow cross-origin in development
+
+# Session Cookie settings to match CSRF settings
+if DEBUG:
+    # For development with different origins
+    SESSION_COOKIE_SAMESITE = None
+    SESSION_COOKIE_SECURE = False
+else:
+    # Production settings
+    SESSION_COOKIE_SAMESITE = "Strict"
+    SESSION_COOKIE_SECURE = True
+
+# Disable CSRF for API endpoints in development
+CSRF_EXEMPT_URLS = (
+    [
+        r"^/api/auth/.*$",
+        r"^/api/.*$",
+    ]
+    if DEBUG
+    else []
+)
+
+# Additional CSRF settings for development
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS.extend(
+        [
+            "http://localhost:8081",
+            "http://127.0.0.1:8081",
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+        ]
+    )
 
 # Additional CORS settings for development
 CORS_EXPOSE_HEADERS = ["*"]
@@ -294,6 +339,34 @@ CORS_PREFLIGHT_MAX_AGE = 86400
 
 # Additional CORS settings to ensure compatibility
 CORS_ALLOW_PRIVATE_NETWORK = True
+
+# In development, be more permissive with CORS
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = False  # Keep this False for security
+    # But add specific origins
+    CORS_ALLOWED_ORIGINS.extend(
+        [
+            "http://localhost:8081",
+            "http://127.0.0.1:8081",
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+        ]
+    )
+
+    # More permissive headers for development
+    CORS_ALLOW_HEADERS.extend(
+        [
+            "x-csrftoken",
+            "x-requested-with",
+            "accept",
+            "accept-encoding",
+            "authorization",
+            "content-type",
+            "dnt",
+            "origin",
+            "user-agent",
+        ]
+    )
 
 # Site ID for allauth
 SITE_ID = 1
@@ -330,11 +403,15 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@chefsync.com")
 
 # Frontend URL for email verification
-FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:8080")
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:8081")
 
 # Google OAuth Configuration
 GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")
 GOOGLE_OAUTH_CLIENT_SECRET = config("GOOGLE_OAUTH_CLIENT_SECRET", default="")
+
+# Google Gemini / Generative AI API Key
+# Used by apps.admin_management.services.ai_service.AdminAIService
+GOOGLE_AI_API_KEY = config("GOOGLE_AI_API_KEY", default="")
 
 # Google OAuth Settings
 SOCIALACCOUNT_PROVIDERS = {
@@ -392,6 +469,12 @@ except Exception:
 if DEBUG:
     SECURE_CROSS_ORIGIN_OPENER_POLICY = None
     SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None
+    # Also relax X-Frame-Options for development
+    X_FRAME_OPTIONS = "SAMEORIGIN"  # Changed from DENY for OAuth
+
+    # Disable some security headers that interfere with development
+    SECURE_CONTENT_TYPE_NOSNIFF = False
+    SECURE_BROWSER_XSS_FILTER = False
 
 # Cloudinary Configuration
 CLOUDINARY_STORAGE = {

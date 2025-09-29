@@ -252,7 +252,7 @@ const Communication: React.FC = () => {
   const communicationColumns = [
     {
       key: "title",
-      label: "Title",
+      title: "Title",
       render: (item: any) => (
         <div className="space-y-1">
           <div className="font-medium text-sm">{item.title}</div>
@@ -264,7 +264,7 @@ const Communication: React.FC = () => {
     },
     {
       key: "type",
-      label: "Type",
+      title: "Type",
       render: (item: any) => (
         <Badge
           variant={
@@ -283,7 +283,7 @@ const Communication: React.FC = () => {
     },
     {
       key: "target",
-      label: "Target",
+      title: "Target",
       render: (item: any) => (
         <div className="space-y-1">
           <div className="font-medium text-sm">{item.target_audience}</div>
@@ -295,7 +295,7 @@ const Communication: React.FC = () => {
     },
     {
       key: "status",
-      label: "Status",
+      title: "Status",
       render: (item: any) => {
         const statusColors = {
           draft: "bg-gray-100 text-gray-800",
@@ -316,7 +316,7 @@ const Communication: React.FC = () => {
     },
     {
       key: "metrics",
-      label: "Delivery",
+      title: "Delivery",
       render: (item: any) => (
         <div className="text-sm">
           <div>Sent: {item.sent_count || 0}</div>
@@ -333,7 +333,7 @@ const Communication: React.FC = () => {
     },
     {
       key: "actions",
-      label: "Actions",
+      title: "Actions",
       render: (item: any) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -579,7 +579,6 @@ const Communication: React.FC = () => {
             data={communications.slice(0, 5)}
             columns={communicationColumns}
             loading={loading}
-            showPagination={false}
           />
         </CardContent>
       </Card>
@@ -652,28 +651,28 @@ const Communication: React.FC = () => {
             columns={communicationColumns}
             loading={loading}
             selectable
-            selectedRows={selectedItems}
-            onSelectionChange={setSelectedItems}
             pagination={{
-              currentPage,
-              totalPages,
+              page: currentPage,
+              pageSize: itemsPerPage,
+              total: totalItems,
               onPageChange: setCurrentPage,
+              onPageSizeChange: () => {},
             }}
             bulkActions={[
               {
                 label: "Send Selected",
-                action: () => console.log("Send selected"),
-                icon: Send,
+                action: (rows) => console.log("Send selected", rows),
+                icon: <Send className="h-4 w-4 mr-2" />,
               },
               {
                 label: "Archive Selected",
-                action: () => console.log("Archive selected"),
-                icon: Archive,
+                action: (rows) => console.log("Archive selected", rows),
+                icon: <Archive className="h-4 w-4 mr-2" />,
               },
               {
                 label: "Delete Selected",
-                action: () => console.log("Delete selected"),
-                icon: Trash2,
+                action: (rows) => console.log("Delete selected", rows),
+                icon: <Trash2 className="h-4 w-4 mr-2" />,
                 variant: "destructive",
               },
             ]}

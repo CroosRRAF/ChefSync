@@ -34,7 +34,6 @@ import {
   Eye,
   MoreHorizontal,
   RefreshCw,
-  Search,
   Shield,
   Trash2,
   UserCheck,
@@ -46,7 +45,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 // Import shared components
 import DynamicForm from "@/components/admin/shared/forms/DynamicForm";
-import { ActionModal } from "@/components/admin/shared/modals";
+import { BaseModal } from "@/components/admin/shared/modals";
 import DataTable from "@/components/admin/shared/tables/DataTable";
 import { StatsWidget as StatsCard } from "@/components/admin/shared/widgets/index";
 import { adminService, type UserListResponse } from "@/services/adminService";
@@ -96,7 +95,7 @@ const ManageUser: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  // Selection is handled inside DataTable; we'll receive selected rows in bulk actions
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -105,7 +104,7 @@ const ManageUser: React.FC = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(25);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 25,
@@ -124,75 +123,6 @@ const ManageUser: React.FC = () => {
     deliveryCount: 0,
     pendingVerification: 0,
   });
-
-  // Mock data for demonstration
-  const mockUsers: User[] = [
-    {
-      id: 1,
-      email: "admin@foodie.com",
-      name: "Admin User",
-      role: "admin",
-      is_active: true,
-      last_login: "2024-01-15T10:30:00Z",
-      date_joined: "2023-01-01T00:00:00Z",
-      total_orders: 0,
-      total_spent: 0,
-      phone: "+1234567890",
-      verification_status: "verified",
-    },
-    {
-      id: 2,
-      email: "chef.mario@foodie.com",
-      name: "Mario Giuseppe",
-      role: "cook",
-      is_active: true,
-      last_login: "2024-01-15T14:20:00Z",
-      date_joined: "2023-02-15T00:00:00Z",
-      total_orders: 156,
-      total_spent: 0,
-      phone: "+1234567891",
-      verification_status: "verified",
-    },
-    {
-      id: 3,
-      email: "john.doe@email.com",
-      name: "John Doe",
-      role: "customer",
-      is_active: true,
-      last_login: "2024-01-15T09:15:00Z",
-      date_joined: "2024-01-10T00:00:00Z",
-      total_orders: 23,
-      total_spent: 289.5,
-      phone: "+1234567892",
-      verification_status: "verified",
-    },
-    {
-      id: 4,
-      email: "delivery@foodie.com",
-      name: "Speed Walker",
-      role: "delivery_agent",
-      is_active: true,
-      last_login: "2024-01-15T16:45:00Z",
-      date_joined: "2023-06-01T00:00:00Z",
-      total_orders: 432,
-      total_spent: 0,
-      phone: "+1234567893",
-      verification_status: "verified",
-    },
-    {
-      id: 5,
-      email: "jane.smith@email.com",
-      name: "Jane Smith",
-      role: "customer",
-      is_active: false,
-      last_login: "2024-01-10T12:30:00Z",
-      date_joined: "2024-01-05T00:00:00Z",
-      total_orders: 5,
-      total_spent: 67.25,
-      phone: "+1234567894",
-      verification_status: "pending",
-    },
-  ];
 
   // Calculate statistics
   const calculateStats = useCallback((usersList: User[]) => {
@@ -236,7 +166,18 @@ const ManageUser: React.FC = () => {
 
         // Transform API data to match component interface
         const transformedUsers: User[] = response.users.map((user) => ({
-          ...user,
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role:
+            (user.role as "admin" | "cook" | "customer" | "delivery_agent") ||
+            "customer",
+          is_active: user.is_active,
+          last_login: user.last_login,
+          date_joined: user.date_joined,
+          total_orders: user.total_orders,
+          total_spent: user.total_spent,
+          phone: (user as any).phone_no || (user as any).phone || undefined,
           verification_status: (user as any).verification_status || "verified",
         }));
 
@@ -271,27 +212,14 @@ const ManageUser: React.FC = () => {
     fetchUsers(currentPage, searchTerm, roleFilter, statusFilter);
   }, [currentPage, searchTerm, roleFilter, statusFilter, fetchUsers]);
 
-  // Filter users based on search and filters
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === "all" || user.role === roleFilter;
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "active" && user.is_active) ||
-      (statusFilter === "inactive" && !user.is_active) ||
-      statusFilter === user.verification_status;
-
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  // We rely on server-side filters; client filtering not needed
 
   // Table columns configuration
   const columns = [
     {
       key: "name",
-      label: "User",
-      render: (user: User) => (
+      title: "User",
+      render: (_: any, user: User) => (
         <div className="flex items-center space-x-3">
           <Avatar className="h-8 w-8">
             <AvatarImage src={user.avatar} alt={user.name} />
@@ -310,8 +238,8 @@ const ManageUser: React.FC = () => {
     },
     {
       key: "role",
-      label: "Role",
-      render: (user: User) => (
+      title: "Role",
+      render: (_: any, user: User) => (
         <Badge
           variant={
             user.role === "admin"
@@ -329,8 +257,8 @@ const ManageUser: React.FC = () => {
     },
     {
       key: "status",
-      label: "Status",
-      render: (user: User) => (
+      title: "Status",
+      render: (_: any, user: User) => (
         <div className="flex items-center space-x-2">
           <Badge variant={user.is_active ? "default" : "secondary"}>
             {user.is_active ? "Active" : "Inactive"}
@@ -346,8 +274,8 @@ const ManageUser: React.FC = () => {
     },
     {
       key: "activity",
-      label: "Activity",
-      render: (user: User) => (
+      title: "Activity",
+      render: (_: any, user: User) => (
         <div className="text-sm">
           <div className="text-gray-900 dark:text-gray-100">
             {user.total_orders} orders
@@ -360,8 +288,8 @@ const ManageUser: React.FC = () => {
     },
     {
       key: "joined",
-      label: "Joined",
-      render: (user: User) => (
+      title: "Joined",
+      render: (_: any, user: User) => (
         <div className="text-sm text-gray-500 dark:text-gray-400">
           {new Date(user.date_joined).toLocaleDateString()}
         </div>
@@ -369,8 +297,8 @@ const ManageUser: React.FC = () => {
     },
     {
       key: "actions",
-      label: "Actions",
-      render: (user: User) => (
+      title: "Actions",
+      render: (_: any, user: User) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -435,7 +363,7 @@ const ManageUser: React.FC = () => {
     {
       name: "phone",
       label: "Phone Number",
-      type: "tel",
+      type: "text",
       placeholder: "Enter phone number",
     },
     {
@@ -507,30 +435,33 @@ const ManageUser: React.FC = () => {
     }
   };
 
-  const handleBulkAction = async (action: string) => {
-    if (selectedUsers.length === 0) return;
+  const handleBulkAction = async (
+    action: "activate" | "deactivate" | "delete",
+    rows: User[]
+  ) => {
+    const userIds = rows.map((u) => u.id);
+    if (userIds.length === 0) return;
 
     try {
       switch (action) {
         case "activate":
-          await adminService.bulkActivateUsers(selectedUsers);
+          await adminService.bulkActivateUsers(userIds);
           break;
         case "deactivate":
-          await adminService.bulkDeactivateUsers(selectedUsers);
+          await adminService.bulkDeactivateUsers(userIds);
           break;
         case "delete":
           if (
             !confirm(
-              `Are you sure you want to delete ${selectedUsers.length} users? This action cannot be undone.`
+              `Are you sure you want to delete ${userIds.length} users? This action cannot be undone.`
             )
           ) {
             return;
           }
-          await adminService.bulkDeleteUsers(selectedUsers);
+          await adminService.bulkDeleteUsers(userIds);
           break;
       }
 
-      setSelectedUsers([]);
       await fetchUsers(currentPage, searchTerm, roleFilter, statusFilter);
     } catch (err) {
       setError(
@@ -554,7 +485,7 @@ const ManageUser: React.FC = () => {
         await adminService.createUser({
           name: data.name,
           email: data.email,
-          phone: data.phone,
+          phone_no: data.phone,
           role: data.role,
           is_active: data.is_active ?? true,
         });
@@ -621,29 +552,25 @@ const ManageUser: React.FC = () => {
         <StatsCard
           title="Total Users"
           value={userStats.total}
-          subtitle={`${userStats.active} active`}
-          icon={Users}
-          trend={{ value: 12, isPositive: true }}
+          icon={<Users className="h-5 w-5" />}
+          change={{ value: 12, type: "increase", period: "last week" }}
         />
         <StatsCard
           title="New Today"
           value={userStats.newToday}
-          subtitle="joined today"
-          icon={UserPlus}
-          trend={{ value: 8, isPositive: true }}
+          icon={<UserPlus className="h-5 w-5" />}
+          change={{ value: 8, type: "increase", period: "24h" }}
         />
         <StatsCard
           title="Pending Verification"
           value={userStats.pendingVerification}
-          subtitle="need approval"
-          icon={Clock}
-          trend={{ value: 2, isPositive: false }}
+          icon={<Clock className="h-5 w-5" />}
+          change={{ value: 2, type: "decrease", period: "24h" }}
         />
         <StatsCard
           title="Admins"
           value={userStats.adminCount}
-          subtitle="total admins"
-          icon={Shield}
+          icon={<Shield className="h-5 w-5" />}
         />
       </div>
 
@@ -707,7 +634,6 @@ const ManageUser: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-64"
-                startIcon={Search}
               />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-40">
@@ -734,32 +660,34 @@ const ManageUser: React.FC = () => {
         </CardHeader>
         <CardContent>
           <DataTable
-            data={filteredUsers}
+            data={users}
             columns={columns}
             loading={loading}
             selectable
-            selectedRows={selectedUsers}
-            onSelectionChange={setSelectedUsers}
+            searchable={false}
             pagination={{
-              currentPage,
-              totalPages: Math.ceil(filteredUsers.length / itemsPerPage),
+              page: currentPage,
+              pageSize: itemsPerPage,
+              total: pagination.total,
               onPageChange: setCurrentPage,
+              onPageSizeChange: setItemsPerPage,
             }}
             bulkActions={[
               {
                 label: "Activate Selected",
-                action: () => handleBulkAction("activate"),
-                icon: UserCheck,
+                action: (rows) => handleBulkAction("activate", rows as User[]),
+                icon: <UserCheck className="h-4 w-4 mr-2" />,
               },
               {
                 label: "Deactivate Selected",
-                action: () => handleBulkAction("deactivate"),
-                icon: UserX,
+                action: (rows) =>
+                  handleBulkAction("deactivate", rows as User[]),
+                icon: <UserX className="h-4 w-4 mr-2" />,
               },
               {
                 label: "Delete Selected",
-                action: () => handleBulkAction("delete"),
-                icon: Trash2,
+                action: (rows) => handleBulkAction("delete", rows as User[]),
+                icon: <Trash2 className="h-4 w-4 mr-2" />,
                 variant: "destructive",
               },
             ]}
@@ -768,39 +696,41 @@ const ManageUser: React.FC = () => {
       </Card>
 
       {/* Create User Modal */}
-      <ActionModal
+      <BaseModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
         title="Create New User"
         description="Add a new user to your platform"
+        size="lg"
       >
         <DynamicForm
-          fields={userFormFields}
+          fields={userFormFields as any}
           onSubmit={handleFormSubmit}
-          submitLabel="Create User"
-          cancelLabel="Cancel"
+          submitText="Create User"
+          cancelText="Cancel"
           onCancel={() => setShowCreateModal(false)}
         />
-      </ActionModal>
+      </BaseModal>
 
       {/* Edit User Modal */}
-      <ActionModal
+      <BaseModal
         open={showEditModal}
         onOpenChange={setShowEditModal}
         title="Edit User"
         description="Update user information and settings"
+        size="lg"
       >
         {selectedUser && (
           <DynamicForm
-            fields={userFormFields}
+            fields={userFormFields as any}
             initialValues={selectedUser}
             onSubmit={handleFormSubmit}
-            submitLabel="Update User"
-            cancelLabel="Cancel"
+            submitText="Update User"
+            cancelText="Cancel"
             onCancel={() => setShowEditModal(false)}
           />
         )}
-      </ActionModal>
+      </BaseModal>
 
       {/* User Detail Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>

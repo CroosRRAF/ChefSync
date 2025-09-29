@@ -62,7 +62,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
 
             # User statistics
             total_users = User.objects.count()
-            active_users = User.objects.filter(status="active").count()
+            active_users = User.objects.filter(is_active=True).count()
             new_users_today = User.objects.filter(date_joined__date=today).count()
             new_users_this_week = User.objects.filter(date_joined__gte=week_ago).count()
             new_users_this_month = User.objects.filter(
@@ -80,7 +80,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
 
             # Chef statistics
             total_chefs = User.objects.filter(role="cook").count()
-            active_chefs = User.objects.filter(role="cook", status="active").count()
+            active_chefs = User.objects.filter(role="cook", is_active=True).count()
             pending_chef_approvals = User.objects.filter(
                 role="cook", approval_status="pending"
             ).count()
@@ -1734,7 +1734,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                 )
 
             # Verify chef exists and has correct role
-            chef = User.objects.get(pk=chef_id, role='cook', is_active=True)
+            chef = User.objects.get(pk=chef_id, role="cook", is_active=True)
             chef = User.objects.get(pk=chef_id, role="cook", status="active")
 
             # Update order
@@ -2057,7 +2057,7 @@ class AdminAIServiceViewSet(viewsets.ViewSet):
 
     permission_classes = [IsAdminUser]
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=["post"])
     def analyze_sentiment(self, request):
         """
         Analyze sentiment of feedback/communication text
@@ -2066,11 +2066,10 @@ class AdminAIServiceViewSet(viewsets.ViewSet):
         """
         from .services.ai_service import AdminAIService
 
-        text = request.data.get('text', '')
+        text = request.data.get("text", "")
         if not text:
             return Response(
-                {'error': 'Text is required'},
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Text is required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         ai_service = AdminAIService()
@@ -2078,7 +2077,7 @@ class AdminAIServiceViewSet(viewsets.ViewSet):
 
         return Response(result)
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=["post"])
     def generate_report(self, request):
         """
         Generate AI-assisted report from admin data
@@ -2087,19 +2086,17 @@ class AdminAIServiceViewSet(viewsets.ViewSet):
         """
         from .services.ai_service import AdminAIService
 
-        data = request.data.get('data', {})
-        format_type = request.data.get('format', 'markdown')
+        data = request.data.get("data", {})
+        format_type = request.data.get("format", "markdown")
 
         ai_service = AdminAIService()
         report = ai_service.generate_report(data, format_type)
 
-        return Response({
-            'report': report,
-            'format': format_type,
-            'generated_at': timezone.now()
-        })
+        return Response(
+            {"report": report, "format": format_type, "generated_at": timezone.now()}
+        )
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=["get"])
     def status(self, request):
         """
         Check AI service status and availability
@@ -2109,15 +2106,17 @@ class AdminAIServiceViewSet(viewsets.ViewSet):
         ai_service = AdminAIService()
         is_available = ai_service.is_available()
 
-        return Response({
-            'ai_service_available': is_available,
-            'phase_7_ready': False,  # TODO: Set to True when Phase 7 is implemented
-            'phase_10_ready': False,  # TODO: Set to True when Phase 10 is implemented
-            'features': {
-                'sentiment_analysis': False,  # TODO: Set to True when Phase 7 is implemented
-                'report_generation': False,  # TODO: Set to True when Phase 10 is implemented
+        return Response(
+            {
+                "ai_service_available": is_available,
+                "phase_7_ready": False,  # TODO: Set to True when Phase 7 is implemented
+                "phase_10_ready": False,  # TODO: Set to True when Phase 10 is implemented
+                "features": {
+                    "sentiment_analysis": False,  # TODO: Set to True when Phase 7 is implemented
+                    "report_generation": False,  # TODO: Set to True when Phase 10 is implemented
+                },
             }
-        })
+        )
 
 
 class AdminDocumentManagementViewSet(viewsets.ViewSet):
@@ -2129,7 +2128,7 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
     def pending_documents(self, request):
         """Get list of pending documents for review"""
         try:
-            from apps.authentication.models import UserDocument, DocumentType
+            from apps.authentication.models import DocumentType, UserDocument
 
             # Get query parameters
             page = int(request.query_params.get("page", 1))
@@ -2139,8 +2138,8 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
 
             # Build query for pending documents
             queryset = UserDocument.objects.select_related(
-                'user', 'document_type', 'reviewed_by'
-            ).filter(status='pending')
+                "user", "document_type", "reviewed_by"
+            ).filter(status="pending")
 
             if user_role:
                 queryset = queryset.filter(user__role=user_role)
@@ -2149,7 +2148,7 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
                 queryset = queryset.filter(document_type__name__icontains=document_type)
 
             # Apply sorting (newest first)
-            queryset = queryset.order_by('-uploaded_at')
+            queryset = queryset.order_by("-uploaded_at")
 
             # Get total count before pagination
             total_count = queryset.count()
@@ -2162,39 +2161,43 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
             # Prepare response data
             document_data = []
             for doc in documents:
-                document_data.append({
-                    'id': doc.id,
-                    'user': {
-                        'id': doc.user.user_id,
-                        'name': doc.user.name,
-                        'email': doc.user.email,
-                        'role': doc.user.role,
-                        'approval_status': doc.user.approval_status,
-                    },
-                    'document_type': {
-                        'id': doc.document_type.id,
-                        'name': doc.document_type.name,
-                        'category': doc.document_type.category,
-                        'is_required': doc.document_type.is_required,
-                    },
-                    'file_name': doc.file_name,
-                    'file_size': doc.file_size,
-                    'file_type': doc.file_type,
-                    'uploaded_at': doc.uploaded_at,
-                    'status': doc.status,
-                    'admin_notes': doc.admin_notes,
-                    'is_visible_to_admin': doc.is_visible_to_admin,
-                })
+                document_data.append(
+                    {
+                        "id": doc.id,
+                        "user": {
+                            "id": doc.user.user_id,
+                            "name": doc.user.name,
+                            "email": doc.user.email,
+                            "role": doc.user.role,
+                            "approval_status": doc.user.approval_status,
+                        },
+                        "document_type": {
+                            "id": doc.document_type.id,
+                            "name": doc.document_type.name,
+                            "category": doc.document_type.category,
+                            "is_required": doc.document_type.is_required,
+                        },
+                        "file_name": doc.file_name,
+                        "file_size": doc.file_size,
+                        "file_type": doc.file_type,
+                        "uploaded_at": doc.uploaded_at,
+                        "status": doc.status,
+                        "admin_notes": doc.admin_notes,
+                        "is_visible_to_admin": doc.is_visible_to_admin,
+                    }
+                )
 
-            return Response({
-                'documents': document_data,
-                'pagination': {
-                    'page': page,
-                    'limit': limit,
-                    'total': total_count,
-                    'pages': (total_count + limit - 1) // limit,
-                },
-            })
+            return Response(
+                {
+                    "documents": document_data,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit,
+                    },
+                }
+            )
 
         except Exception as e:
             return Response(
@@ -2208,12 +2211,14 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
         try:
             from apps.authentication.models import UserDocument
 
-            document = UserDocument.objects.select_related('user', 'document_type').get(pk=pk)
+            document = UserDocument.objects.select_related("user", "document_type").get(
+                pk=pk
+            )
 
-            action = request.data.get('action')  # 'approve' or 'reject'
-            admin_notes = request.data.get('admin_notes', '')
+            action = request.data.get("action")  # 'approve' or 'reject'
+            admin_notes = request.data.get("admin_notes", "")
 
-            if action not in ['approve', 'reject']:
+            if action not in ["approve", "reject"]:
                 return Response(
                     {"error": "Action must be 'approve' or 'reject'"},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -2221,7 +2226,7 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
 
             # Update document
             old_status = document.status
-            document.status = 'approved' if action == 'approve' else 'rejected'
+            document.status = "approved" if action == "approve" else "rejected"
             document.admin_notes = admin_notes
             document.reviewed_by = request.user
             document.reviewed_at = timezone.now()
@@ -2232,31 +2237,33 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
             AdminActivityLog.objects.create(
                 admin=request.user,
                 action=action,
-                resource_type='document',
+                resource_type="document",
                 resource_id=str(document.id),
                 description=f"{action.title()}d document {document.file_name} for user {document.user.email}",
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT'),
+                ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT"),
             )
 
             # Check if all required documents are approved for this user
-            if action == 'approve':
+            if action == "approve":
                 self._check_user_approval_status(document.user)
 
-            return Response({
-                'message': f'Document {action}d successfully',
-                'document': {
-                    'id': document.id,
-                    'status': document.status,
-                    'admin_notes': document.admin_notes,
-                    'reviewed_by': {
-                        'id': request.user.user_id,
-                        'name': request.user.name,
-                        'email': request.user.email,
+            return Response(
+                {
+                    "message": f"Document {action}d successfully",
+                    "document": {
+                        "id": document.id,
+                        "status": document.status,
+                        "admin_notes": document.admin_notes,
+                        "reviewed_by": {
+                            "id": request.user.user_id,
+                            "name": request.user.name,
+                            "email": request.user.email,
+                        },
+                        "reviewed_at": document.reviewed_at,
                     },
-                    'reviewed_at': document.reviewed_at,
-                },
-            })
+                }
+            )
 
         except UserDocument.DoesNotExist:
             return Response(
@@ -2276,52 +2283,64 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
             from apps.authentication.models import UserDocument
 
             document = UserDocument.objects.select_related(
-                'user', 'document_type', 'reviewed_by'
+                "user", "document_type", "reviewed_by"
             ).get(pk=pk)
 
             # Check if admin can view this document
-            if not document.is_visible_to_admin and request.user.role != 'admin':
+            if not document.is_visible_to_admin and request.user.role != "admin":
                 return Response(
                     {"error": "Access denied"},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
             document_data = {
-                'id': document.id,
-                'user': {
-                    'id': document.user.user_id,
-                    'name': document.user.name,
-                    'email': document.user.email,
-                    'role': document.user.role,
-                    'approval_status': document.user.approval_status,
+                "id": document.id,
+                "user": {
+                    "id": document.user.user_id,
+                    "name": document.user.name,
+                    "email": document.user.email,
+                    "role": document.user.role,
+                    "approval_status": document.user.approval_status,
                 },
-                'document_type': {
-                    'id': document.document_type.id,
-                    'name': document.document_type.name,
-                    'category': document.document_type.category,
-                    'description': document.document_type.description,
-                    'is_required': document.document_type.is_required,
-                    'allowed_file_types': document.document_type.allowed_file_types,
-                    'max_file_size_mb': document.document_type.max_file_size_mb,
+                "document_type": {
+                    "id": document.document_type.id,
+                    "name": document.document_type.name,
+                    "category": document.document_type.category,
+                    "description": document.document_type.description,
+                    "is_required": document.document_type.is_required,
+                    "allowed_file_types": document.document_type.allowed_file_types,
+                    "max_file_size_mb": document.document_type.max_file_size_mb,
                 },
-                'file_name': document.file_name,
-                               'file_size': document.file_size,
-                'file_type': document.file_type,
-                'file_url': document.file,
-                'cloudinary_public_id': document.cloudinary_public_id,
-                'local_file_path': document.local_file_path,
-                'uploaded_at': document.uploaded_at,
-                'status': document.status,
-                'admin_notes': document.admin_notes,
-                'reviewed_by': {
-                    'id': document.reviewed_by.user_id if document.reviewed_by else None,
-                    'name': document.reviewed_by.name if document.reviewed_by else None,
-                    'email': document.reviewed_by.email if document.reviewed_by else None,
-                } if document.reviewed_by else None,
-                'reviewed_at': document.reviewed_at,
-                'is_visible_to_admin': document.is_visible_to_admin,
-                'is_pdf_converted': document.is_pdf_converted,
-                'converted_images': document.converted_images,
+                "file_name": document.file_name,
+                "file_size": document.file_size,
+                "file_type": document.file_type,
+                "file_url": document.file,
+                "cloudinary_public_id": document.cloudinary_public_id,
+                "local_file_path": document.local_file_path,
+                "uploaded_at": document.uploaded_at,
+                "status": document.status,
+                "admin_notes": document.admin_notes,
+                "reviewed_by": (
+                    {
+                        "id": (
+                            document.reviewed_by.user_id
+                            if document.reviewed_by
+                            else None
+                        ),
+                        "name": (
+                            document.reviewed_by.name if document.reviewed_by else None
+                        ),
+                        "email": (
+                            document.reviewed_by.email if document.reviewed_by else None
+                        ),
+                    }
+                    if document.reviewed_by
+                    else None
+                ),
+                "reviewed_at": document.reviewed_at,
+                "is_visible_to_admin": document.is_visible_to_admin,
+                "is_pdf_converted": document.is_pdf_converted,
+                "converted_images": document.converted_images,
             }
 
             return Response(document_data)
@@ -2343,23 +2362,25 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
         try:
             from apps.authentication.models import DocumentType
 
-            document_types = DocumentType.objects.all().order_by('category', 'name')
+            document_types = DocumentType.objects.all().order_by("category", "name")
 
             type_data = []
             for doc_type in document_types:
-                type_data.append({
-                    'id': doc_type.id,
-                    'name': doc_type.name,
-                    'category': doc_type.category,
-                    'description': doc_type.description,
-                    'is_required': doc_type.is_required,
-                    'allowed_file_types': doc_type.allowed_file_types,
-                    'max_file_size_mb': doc_type.max_file_size_mb,
-                    'is_single_page_only': doc_type.is_single_page_only,
-                    'max_pages': doc_type.max_pages,
-                })
+                type_data.append(
+                    {
+                        "id": doc_type.id,
+                        "name": doc_type.name,
+                        "category": doc_type.category,
+                        "description": doc_type.description,
+                        "is_required": doc_type.is_required,
+                        "allowed_file_types": doc_type.allowed_file_types,
+                        "max_file_size_mb": doc_type.max_file_size_mb,
+                        "is_single_page_only": doc_type.is_single_page_only,
+                        "max_pages": doc_type.max_pages,
+                    }
+                )
 
-            return Response({'document_types': type_data})
+            return Response({"document_types": type_data})
 
         except Exception as e:
             return Response(
@@ -2371,32 +2392,40 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
     def document_statistics(self, request):
         """Get document management statistics"""
         try:
-            from apps.authentication.models import UserDocument, DocumentType
+            from apps.authentication.models import DocumentType, UserDocument
             from django.db.models import Count
 
             # Overall statistics
             total_documents = UserDocument.objects.count()
-            pending_documents = UserDocument.objects.filter(status='pending').count()
-            approved_documents = UserDocument.objects.filter(status='approved').count()
-            rejected_documents = UserDocument.objects.filter(status='rejected').count()
+            pending_documents = UserDocument.objects.filter(status="pending").count()
+            approved_documents = UserDocument.objects.filter(status="approved").count()
+            rejected_documents = UserDocument.objects.filter(status="rejected").count()
 
             # Documents by user role
-            role_stats = UserDocument.objects.values('user__role').annotate(
-                total=Count('id'),
-                pending=Count('id', filter=Q(status='pending')),
-                approved=Count('id', filter=Q(status='approved')),
-                rejected=Count('id', filter=Q(status='rejected')),
-            ).order_by('user__role')
+            role_stats = (
+                UserDocument.objects.values("user__role")
+                .annotate(
+                    total=Count("id"),
+                    pending=Count("id", filter=Q(status="pending")),
+                    approved=Count("id", filter=Q(status="approved")),
+                    rejected=Count("id", filter=Q(status="rejected")),
+                )
+                .order_by("user__role")
+            )
 
             # Documents by type
-            type_stats = UserDocument.objects.values(
-                'document_type__name', 'document_type__category'
-            ).annotate(
-                total=Count('id'),
-                pending=Count('id', filter=Q(status='pending')),
-                approved=Count('id', filter=Q(status='approved')),
-                rejected=Count('id', filter=Q(status='rejected')),
-            ).order_by('document_type__category', 'document_type__name')
+            type_stats = (
+                UserDocument.objects.values(
+                    "document_type__name", "document_type__category"
+                )
+                .annotate(
+                    total=Count("id"),
+                    pending=Count("id", filter=Q(status="pending")),
+                    approved=Count("id", filter=Q(status="approved")),
+                    rejected=Count("id", filter=Q(status="rejected")),
+                )
+                .order_by("document_type__category", "document_type__name")
+            )
 
             # Recent activity (last 7 days)
             seven_days_ago = timezone.now() - timedelta(days=7)
@@ -2404,16 +2433,22 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
                 reviewed_at__gte=seven_days_ago
             ).count()
 
-            return Response({
-                'total_documents': total_documents,
-                'pending_documents': pending_documents,
-                'approved_documents': approved_documents,
-                'rejected_documents': rejected_documents,
-                'approval_rate': (approved_documents / total_documents * 100) if total_documents > 0 else 0,
-                'role_statistics': list(role_stats),
-                'type_statistics': list(type_stats),
-                'recent_reviews': recent_reviews,
-            })
+            return Response(
+                {
+                    "total_documents": total_documents,
+                    "pending_documents": pending_documents,
+                    "approved_documents": approved_documents,
+                    "rejected_documents": rejected_documents,
+                    "approval_rate": (
+                        (approved_documents / total_documents * 100)
+                        if total_documents > 0
+                        else 0
+                    ),
+                    "role_statistics": list(role_stats),
+                    "type_statistics": list(type_stats),
+                    "recent_reviews": recent_reviews,
+                }
+            )
 
         except Exception as e:
             return Response(
@@ -2424,42 +2459,41 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
     def _check_user_approval_status(self, user):
         """Check if user should be auto-approved based on document status"""
         try:
-            from apps.authentication.models import UserDocument, DocumentType
+            from apps.authentication.models import DocumentType, UserDocument
 
-            if user.role not in ['cook', 'delivery_agent']:
+            if user.role not in ["cook", "delivery_agent"]:
                 return  # Only check for cooks and delivery agents
 
             # Get all required documents for this user's role
             required_docs = DocumentType.objects.filter(
-                category=user.role,
-                is_required=True
+                category=user.role, is_required=True
             )
 
             # Check if all required documents are approved
             for doc_type in required_docs:
                 user_doc = UserDocument.objects.filter(
-                    user=user,
-                    document_type=doc_type,
-                    status='approved'
+                    user=user, document_type=doc_type, status="approved"
                 ).first()
 
                 if not user_doc:
                     return  # Missing required document
 
             # All required documents are approved - auto-approve user if pending
-            if user.approval_status == 'pending':
-                user.approval_status = 'approved'
-                user.approved_by = self.request.user if hasattr(self, 'request') else None
+            if user.approval_status == "pending":
+                user.approval_status = "approved"
+                user.approved_by = (
+                    self.request.user if hasattr(self, "request") else None
+                )
                 user.approved_at = timezone.now()
                 user.save()
 
                 # Log activity
                 AdminActivityLog.objects.create(
-                    admin=self.request.user if hasattr(self, 'request') else None,
-                    action='approve',
-                    resource_type='user',
+                    admin=self.request.user if hasattr(self, "request") else None,
+                    action="approve",
+                    resource_type="user",
                     resource_id=str(user.user_id),
-                    description=f'Auto-approved user {user.email} after all required documents were approved',
+                    description=f"Auto-approved user {user.email} after all required documents were approved",
                 )
 
         except Exception as e:

@@ -6,8 +6,9 @@ axios.defaults.xsrfCookieName = "csrftoken";
 axios.defaults.xsrfHeaderName = "X-CSRFToken";
 
 // Create axios instance with default config
+// Prefer relative '/api' in dev to route through Vite proxy; allow override via VITE_API_BASE_URL
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
@@ -41,12 +42,10 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem("refresh_token");
         if (refreshToken) {
-          const response = await axios.post(
-            `${
-              import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api"
-            }/auth/token/refresh/`,
-            { refresh: refreshToken }
-          );
+          // Use the same api instance to respect baseURL and credentials
+          const response = await api.post("/auth/token/refresh/", {
+            refresh: refreshToken,
+          });
 
           const { access } = response.data;
           localStorage.setItem("access_token", access);
@@ -128,7 +127,7 @@ export const authAPI = {
 
   // Request password reset
   requestPasswordReset: (email: string) =>
-    apiClient.post("/auth/password/reset/", { email }),
+    apiClient.post("/auth/password/reset/request/", { email }),
 
   // Confirm password reset
   confirmPasswordReset: (token: string, newPassword: string) =>
@@ -145,18 +144,19 @@ export const authAPI = {
   getProfile: () => apiClient.get("/auth/profile/"),
 
   // Update profile
-  updateProfile: (updates: any) => apiClient.patch("/auth/profile/", updates),
+  updateProfile: (updates: any) =>
+    apiClient.patch("/auth/profile/update/", updates),
 
   // Change password
   changePassword: (currentPassword: string, newPassword: string) =>
-    apiClient.post("/auth/change-password/", {
+    apiClient.post("/auth/password/change/", {
       current_password: currentPassword,
       new_password: newPassword,
     }),
 
   // Refresh token
   refreshToken: (refreshToken: string) =>
-    apiClient.post("/auth/refresh/", { refresh: refreshToken }),
+    apiClient.post("/auth/token/refresh/", { refresh: refreshToken }),
 };
 
 // Specific API functions for orders
