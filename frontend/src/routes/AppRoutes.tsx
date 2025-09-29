@@ -12,6 +12,8 @@ import CustomerNavbar from "@/components/layout/CustomerNavbar";
 import CustomerHomeNavbar from "@/components/layout/CustomerHomeNavbar";
 import CustomerDashboardLayout from "@/components/layout/CustomerDashboardLayout";
 import AdminLayout from "@/components/layout/AdminLayout";
+import EnhancedAdminLayout from "@/components/layout/EnhancedAdminLayout";
+import UltimateAdminLayout from "@/components/layout/UltimateAdminLayout";
 
 // Public pages
 import Home from "@/pages/Home";
@@ -59,7 +61,10 @@ import CookLayout from "@/components/layout/CookLayout";
 
 // Admin pages
 import ModernDashboard from "@/pages/admin/ModernDashboard";
+import EnhancedDashboard from "@/pages/admin/EnhancedDashboard";
+import UltimateDashboard from "@/pages/admin/UltimateDashboard";
 import AdminManageUsers from "@/pages/admin/ManageUsers";
+import UltimateUserManagement from "@/pages/admin/UltimateUserManagement";
 import AdminOrders from "@/pages/admin/Orders";
 import AdminAnalytics from "@/pages/admin/Analytics";
 import AdminSettings from "@/pages/admin/Settings";
@@ -75,6 +80,7 @@ const hasValidGoogleClientId = () => {
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
   return (
     clientId &&
+    clientId.trim() !== "" &&
     clientId !== "your-google-client-id" &&
     clientId !== "YOUR_NEW_GOOGLE_CLIENT_ID_HERE" &&
     clientId !==
@@ -541,9 +547,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/dashboard"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <ModernDashboard />
-              </AdminLayout>
+              <UltimateAdminLayout>
+                <UltimateDashboard />
+              </UltimateAdminLayout>
             </ProtectedRoute>
           }
         />
@@ -551,9 +557,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/users"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminManageUsers />
-              </AdminLayout>
+              <UltimateAdminLayout>
+                <UltimateUserManagement />
+              </UltimateAdminLayout>
             </ProtectedRoute>
           }
         />
@@ -561,9 +567,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/orders"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
+              <UltimateAdminLayout>
                 <AdminOrders />
-              </AdminLayout>
+              </UltimateAdminLayout>
             </ProtectedRoute>
           }
         />
@@ -571,9 +577,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/analytics"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
+              <UltimateAdminLayout>
                 <AdminAnalytics />
-              </AdminLayout>
+              </UltimateAdminLayout>
             </ProtectedRoute>
           }
         />
@@ -581,9 +587,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/settings"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
+              <UltimateAdminLayout>
                 <AdminSettings />
-              </AdminLayout>
+              </UltimateAdminLayout>
             </ProtectedRoute>
           }
         />
@@ -591,9 +597,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/profile"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
+              <UltimateAdminLayout>
                 <AdminProfile />
-              </AdminLayout>
+              </UltimateAdminLayout>
             </ProtectedRoute>
           }
         />
@@ -601,9 +607,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/reports"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
+              <UltimateAdminLayout>
                 <AdminReports />
-              </AdminLayout>
+              </UltimateAdminLayout>
             </ProtectedRoute>
           }
         />
@@ -611,9 +617,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/food"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
+              <UltimateAdminLayout>
                 <FoodManagement />
-              </AdminLayout>
+              </UltimateAdminLayout>
             </ProtectedRoute>
           }
         />
@@ -621,9 +627,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/communications"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
+              <UltimateAdminLayout>
                 <Communications />
-              </AdminLayout>
+              </UltimateAdminLayout>
             </ProtectedRoute>
           }
         />
@@ -631,9 +637,9 @@ const InnerRoutes: React.FC = () => {
           path="/admin/approvals"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
+              <UltimateAdminLayout>
                 <Approvals />
-              </AdminLayout>
+              </UltimateAdminLayout>
             </ProtectedRoute>
           }
         />

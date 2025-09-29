@@ -33,7 +33,7 @@ class AdminActivityLog(models.Model):
         ('report', 'Report'),
     ]
     
-    admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name='admin_activities')
+    admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name='admin_management_activities')
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
     resource_type = models.CharField(max_length=20, choices=RESOURCE_CHOICES)
     resource_id = models.CharField(max_length=100, blank=True, null=True)
@@ -235,7 +235,7 @@ class AdminSystemSettings(models.Model):
     is_encrypted = models.BooleanField(default=False)
     default_value = models.TextField(blank=True)
     validation_rules = models.JSONField(default=dict, blank=True)
-    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_management_system_settings')
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -298,7 +298,7 @@ class AdminBackupLog(models.Model):
     completed_at = models.DateTimeField(blank=True, null=True)
     duration = models.DurationField(blank=True, null=True)
     error_message = models.TextField(blank=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_management_backup_logs')
     metadata = models.JSONField(default=dict, blank=True)
     
     class Meta:

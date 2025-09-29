@@ -192,7 +192,7 @@ const ChefMenu: React.FC = () => {
       
       console.log('Loading menu items with token:', token.substring(0, 20) + '...');
       
-      const response = await axios.get('http://127.0.0.1:8000/api/food/chef/foods/', {
+      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -246,7 +246,7 @@ const ChefMenu: React.FC = () => {
       
       console.log('Searching for foods with query:', query);
       
-      const response = await axios.get(`http://127.0.0.1:8000/api/food/chef/foods/search/?q=${encodeURIComponent(query)}`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/search/?q=${encodeURIComponent(query)}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -479,7 +479,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
       foodFormData.append("preparation_time", primaryVariant.preparation_time.toString());
 
       response = await axios.post(
-        "http://127.0.0.1:8000/api/food/chef/foods/",
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/`,
         foodFormData,
         {
           headers: {
@@ -555,7 +555,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
 
       console.log('Updating food with data:', updateData);
 
-      const response = await axios.patch(`http://127.0.0.1:8000/api/food/chef/foods/${editingItem.food_id}/`, updateData, {
+      const response = await axios.patch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/${editingItem.food_id}/`, updateData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -570,7 +570,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
           size: price.size
         };
 
-        await axios.patch(`http://127.0.0.1:8000/api/food/chef/prices/${price.price_id}/`, priceData, {
+        await axios.patch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/prices/${price.price_id}/`, priceData, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -658,7 +658,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
 
     try {
       const token = localStorage.getItem('access_token');
-      await axios.delete(`http://127.0.0.1:8000/api/food/chef/foods/${foodId}/`, {
+      await axios.delete(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/${foodId}/`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1250,7 +1250,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
                             is_available: !food.is_available
                           };
 
-                          await axios.patch(`http://127.0.0.1:8000/api/food/chef/foods/${food.food_id}/`, updateData, {
+                          await axios.patch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/${food.food_id}/`, updateData, {
                             headers: {
                               'Authorization': `Bearer ${token}`,
                               'Content-Type': 'application/json'

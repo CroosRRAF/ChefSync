@@ -9,6 +9,8 @@ router.register(r'orders', views.AdminOrderManagementViewSet, basename='admin-or
 router.register(r'notifications', views.AdminNotificationViewSet, basename='admin-notifications')
 router.register(r'settings', views.AdminSystemSettingsViewSet, basename='admin-settings')
 router.register(r'activity-logs', views.AdminActivityLogViewSet, basename='admin-activity-logs')
+router.register(r'ai', views.AdminAIServiceViewSet, basename='admin-ai')
+router.register(r'documents', views.AdminDocumentManagementViewSet, basename='admin-documents')
 
 urlpatterns = [
     path('', include(router.urls)),

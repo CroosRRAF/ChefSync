@@ -83,8 +83,8 @@ const Login: React.FC = () => {
 
     setIsCheckingApproval(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const response = await fetch(`${apiUrl}/api/auth/check-user-status/`, {
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${apiUrl}/auth/check-user-status/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -29,7 +29,8 @@ urlpatterns = [
     # API paths
     path('api/auth/', include('apps.authentication.urls', namespace='api-auth')),
     path('api/analytics/', include('apps.analytics.urls')),
-    path('api/admin/', include('apps.admin_management.urls')),
+    path('api/admin/', include('apps.admin_panel.urls')),  # Admin panel URLs
+    path('api/admin-management/', include('apps.admin_management.urls')),  # Rename for clarity
     path('api/communications/', include('apps.communications.urls')),
     path('api/food/', include('apps.food.urls')),
     path('api/orders/', include('apps.orders.urls')),

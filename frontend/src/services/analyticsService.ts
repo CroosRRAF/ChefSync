@@ -39,6 +39,7 @@ class AnalyticsService {
       total_chefs: 45,
       active_chefs: 38,
       pending_chef_approvals: 7,
+      pending_user_approvals: 12, // New field for actual user approvals
       chef_growth: 8.2,
       
       total_orders: 2341,

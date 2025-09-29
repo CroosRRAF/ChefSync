@@ -68,8 +68,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     console.log('DocumentUpload component mounted with role:', role);
     const fetchDocumentTypes = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-        const response = await fetch(`${apiUrl}/api/auth/documents/types/?role=${role}`, {
+        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+        const response = await fetch(`${apiUrl}/auth/documents/types/?role=${role}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -348,7 +348,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       formData.append('user_email', userEmail);
       
       // Upload to backend
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
       
       // Debug logging
       console.log('Uploading file:', {
@@ -357,9 +357,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         fileType: uploadedFile.file.type,
         documentTypeId: uploadedFile.documentType.id,
         userEmail: userEmail,
-        apiUrl: `${apiUrl}/api/auth/documents/upload-registration/`
+        apiUrl: `${apiUrl}/auth/documents/upload-registration/`
       });
-      const response = await fetch(`${apiUrl}/api/auth/documents/upload-registration/`, {
+      const response = await fetch(`${apiUrl}/auth/documents/upload-registration/`, {
         method: 'POST',
         body: formData,
       });

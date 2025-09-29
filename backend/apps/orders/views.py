@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -10,11 +10,47 @@ from .models import Order, OrderItem, OrderStatusHistory, CartItem, UserAddress
 from .serializers import CartItemSerializer, UserAddressSerializer
 from apps.food.models import FoodReview, FoodPrice
 from apps.payments.models import Payment
-from rest_framework import serializers
 from django.contrib.auth import get_user_model
 import math
 
 User = get_user_model()
+
+
+class UserAddressViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing user addresses"""
+
+    serializer_class = UserAddressSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return UserAddress.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        # If this is the first address or marked as default, set it as default
+        user = self.request.user
+        if not UserAddress.objects.filter(
+            user=user
+        ).exists() or serializer.validated_data.get("is_default", False):
+            # Remove default flag from other addresses
+            UserAddress.objects.filter(user=user, is_default=True).update(
+                is_default=False
+            )
+            serializer.save(user=user, is_default=True)
+        else:
+            serializer.save(user=user)
+
+    @action(detail=True, methods=["post"])
+    def set_default(self, request, pk=None):
+        """Set an address as the default address"""
+        address = self.get_object()
+        # Remove default flag from other addresses
+        UserAddress.objects.filter(user=request.user, is_default=True).update(
+            is_default=False
+        )
+        address.is_default = True
+        address.save()
+        return Response({"message": "Address set as default"})
+
 
 # Helper to resolve and (optionally) persist a chef's location
 def _resolve_chef_location(chef, request_data):
@@ -114,14 +150,13 @@ def _resolve_chef_location(chef, request_data):
 # Temporary simple serializer to fix the 500 error
 class SimpleOrderSerializer(serializers.ModelSerializer):
     """Simple order serializer that works"""
+
     customer_name = serializers.SerializerMethodField()
-    chef = serializers.SerializerMethodField()
-    delivery_partner = serializers.SerializerMethodField()
-    items = serializers.SerializerMethodField()
+    chef_name = serializers.SerializerMethodField()
     time_since_order = serializers.SerializerMethodField()
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
     total_items = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Order
         fields = [
@@ -130,36 +165,25 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
             'customer_name', 'chef', 'delivery_partner', 'items', 'time_since_order', 'total_items',
             'delivery_address', 'customer_notes', 'chef_notes'
         ]
-    
+
+
     def get_customer_name(self, obj):
         if obj.customer:
-            return obj.customer.name or f"{obj.customer.first_name} {obj.customer.last_name}".strip() or obj.customer.username
+            return (
+                obj.customer.name
+                or f"{obj.customer.first_name} {obj.customer.last_name}".strip()
+                or obj.customer.username
+            )
         return "Unknown Customer"
-    
+
     def get_chef(self, obj):
         if obj.chef:
-            return {
-                'id': obj.chef.user_id,
-                'name': obj.chef.name or f"{obj.chef.first_name} {obj.chef.last_name}".strip() or obj.chef.username,
-                'profile_image': getattr(obj.chef, 'profile_image', None)
-            }
-        return {
-            'id': None,
-            'name': 'Unknown Chef',
-            'profile_image': None
-        }
-    
-    def get_delivery_partner(self, obj):
-        if obj.delivery_partner:
-            return {
-                'id': obj.delivery_partner.user_id,
-                'name': obj.delivery_partner.name or f"{obj.delivery_partner.first_name} {obj.delivery_partner.last_name}".strip() or obj.delivery_partner.username,
-                'profile_image': getattr(obj.delivery_partner, 'profile_image', None)
-            }
-        return None
-    
+            return obj.chef.name or f"{obj.chef.first_name} {obj.chef.last_name}".strip() or obj.chef.username
+        return "Unknown Chef"
+
     def get_time_since_order(self, obj):
         from django.utils import timezone
+
         diff = timezone.now() - obj.created_at
         minutes = int(diff.total_seconds() / 60)
         if minutes < 60:
@@ -170,10 +194,10 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
         else:
             days = int(minutes / 1440)
             return f"{days} days ago"
-    
+
     def get_total_items(self, obj):
         return obj.items.aggregate(total=Sum('quantity'))['total'] or 0
-    
+
     def get_items(self, obj):
         items = []
         for order_item in obj.items.select_related('price__food', 'price__cook').all():
@@ -195,85 +219,97 @@ class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.select_related('customer', 'chef', 'delivery_partner').prefetch_related('items__price__food', 'items__price__cook').all()
     serializer_class = SimpleOrderSerializer  # Use our working simple serializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         """Filter orders based on user role"""
         user = self.request.user
         queryset = super().get_queryset().select_related('customer', 'chef', 'delivery_partner').prefetch_related('items__price__food', 'items__price__cook').order_by('-created_at')
-        
+
         # Handle anonymous users (return empty queryset for security)
         if not user.is_authenticated:
             return queryset.none()
-        
+
         # For chefs, only show their own orders
-        if (hasattr(user, 'chef_profile') or 
-            user.groups.filter(name='Chefs').exists() or 
-            (hasattr(user, 'role') and user.role == 'cook')):
+        if (
+            hasattr(user, "chef_profile")
+            or user.groups.filter(name="Chefs").exists()
+            or (hasattr(user, "role") and user.role == "cook")
+        ):
             return queryset.filter(chef=user)
         # For delivery partners, show available and assigned orders
-        elif (hasattr(user, 'delivery_profile') or 
-              user.groups.filter(name='Delivery').exists() or 
-              (hasattr(user, 'role') and user.role == 'delivery_agent')):
+        elif (
+            hasattr(user, "delivery_profile")
+            or user.groups.filter(name="Delivery").exists()
+            or (hasattr(user, "role") and user.role == "delivery_agent")
+        ):
             return queryset.filter(
-                Q(delivery_partner=user) | Q(status='ready', delivery_partner__isnull=True)
+                Q(delivery_partner=user)
+                | Q(status="ready", delivery_partner__isnull=True)
             )
         # For admins, show all orders
-        elif user.is_staff or user.is_superuser or (hasattr(user, 'role') and user.role == 'admin'):
+        elif (
+            user.is_staff
+            or user.is_superuser
+            or (hasattr(user, "role") and user.role == "admin")
+        ):
             return queryset
         # For customers, show their own orders
         else:
             return queryset.filter(customer=user)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=["get"])
     def available(self, request):
         available_orders = Order.objects.filter(
-            status='ready',
-            delivery_partner__isnull=True
-        ).order_by('-created_at')
+            status="ready", delivery_partner__isnull=True
+        ).order_by("-created_at")
         serializer = self.get_serializer(available_orders, many=True)
         return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
+
+    @action(detail=True, methods=["post"])
     def accept(self, request, pk=None):
         order = self.get_object()
         if order.delivery_partner is not None:
-            return Response({"error": "Order already taken"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Order already taken"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Get delivery agent's current location for distance checking
-        agent_lat = request.data.get('agent_latitude')
-        agent_lng = request.data.get('agent_longitude')
-        
+        agent_lat = request.data.get("agent_latitude")
+        agent_lng = request.data.get("agent_longitude")
+
         if agent_lat is None or agent_lng is None:
-            return Response({
-                "error": "Location required", 
-                "message": "Please enable location access to accept orders"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "error": "Location required",
+                    "message": "Please enable location access to accept orders",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Get chef location (pickup location) - we'll need to get this from chef's profile
         # For now, let's assume the chef location is passed or we get a default
-        chef_lat = request.data.get('chef_latitude')
-        chef_lng = request.data.get('chef_longitude')
-        
+        chef_lat = request.data.get("chef_latitude")
+        chef_lng = request.data.get("chef_longitude")
+
         # If chef location is provided, calculate distance
         if chef_lat is not None and chef_lng is not None:
-            from math import radians, sin, cos, sqrt, atan2
-            
+            from math import atan2, cos, radians, sin, sqrt
+
             # Calculate distance using Haversine formula
             def calculate_distance(lat1, lon1, lat2, lon2):
                 R = 6371  # Earth's radius in kilometers
-                
+
                 lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
                 dlat = lat2 - lat1
                 dlon = lon2 - lon1
-                
-                a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-                c = 2 * atan2(sqrt(a), sqrt(1-a))
+
+                a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+                c = 2 * atan2(sqrt(a), sqrt(1 - a))
                 distance = R * c
-                
+
                 return distance
-            
+
             distance_km = calculate_distance(float(agent_lat), float(agent_lng), float(chef_lat), float(chef_lng))
-            
             # Validate distance to avoid DB out-of-range and unrealistic deliveries
             MAX_DELIVERY_KM = 50.0  # business rule: serviceable radius
             if math.isnan(distance_km) or distance_km <= 0:
@@ -284,125 +320,149 @@ class OrderViewSet(viewsets.ModelViewSet):
                 }, status=status.HTTP_400_BAD_REQUEST)
             # Check if distance is greater than 10km
             if distance_km > 10:
-                return Response({
-                    "warning": "Distance exceeds 10km",
-                    "distance": round(distance_km, 2),
-                    "message": f"Pickup location is {round(distance_km, 2)}km away. This is beyond the recommended 10km range.",
-                    "allow_accept": True  # Still allow acceptance but with warning
-                }, status=status.HTTP_200_OK)
+                return Response(
+                    {
+                        "warning": "Distance exceeds 10km",
+                        "distance": round(distance_km, 2),
+                        "message": f"Pickup location is {round(distance_km, 2)}km away. This is beyond the recommended 10km range.",
+                        "allow_accept": True,  # Still allow acceptance but with warning
+                    },
+                    status=status.HTTP_200_OK,
+                )
 
         order.delivery_partner = request.user
-        order.status = 'out_for_delivery'
+        order.status = "out_for_delivery"
         order.save()
 
         # Add status history
         OrderStatusHistory.objects.create(
             order=order,
-            status='out_for_delivery',
+            status="out_for_delivery",
             changed_by=request.user,
-            notes='Order accepted by delivery agent'
+            notes="Order accepted by delivery agent",
         )
 
-        return Response({
-            "success": "Order accepted successfully",
-            "order_id": order.id,
-            "status": "out_for_delivery"
-        })
-    
-    @action(detail=True, methods=['post'])
+        return Response(
+            {
+                "success": "Order accepted successfully",
+                "order_id": order.id,
+                "status": "out_for_delivery",
+            }
+        )
+
+    @action(detail=True, methods=["post"])
     def chef_accept(self, request, pk=None):
         """Chef accepts a pending order"""
         order = self.get_object()
-        
+
         # Check if user is the chef for this order
         if order.chef != request.user:
-            return Response({"error": "You are not authorized to accept this order"}, status=status.HTTP_403_FORBIDDEN)
-        
-        if order.status != 'pending':
-            return Response({"error": "Order cannot be accepted in current status"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"error": "You are not authorized to accept this order"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if order.status != "pending":
+            return Response(
+                {"error": "Order cannot be accepted in current status"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Update order status to confirmed
-        order.status = 'confirmed'
-        order.chef_notes = request.data.get('notes', 'Order accepted by chef')
+        order.status = "confirmed"
+        order.chef_notes = request.data.get("notes", "Order accepted by chef")
         order.save()
-        
+
         # Add status history
         OrderStatusHistory.objects.create(
             order=order,
-            status='confirmed',
+            status="confirmed",
             changed_by=request.user,
-            notes=order.chef_notes
+            notes=order.chef_notes,
         )
-        
-        return Response({"success": "Order accepted successfully", "status": "confirmed"})
-    
-    @action(detail=True, methods=['post'])
+
+        return Response(
+            {"success": "Order accepted successfully", "status": "confirmed"}
+        )
+
+    @action(detail=True, methods=["post"])
     def chef_reject(self, request, pk=None):
         """Chef rejects a pending order with reason"""
         order = self.get_object()
-        
+
         # Check if user is the chef for this order
         if order.chef != request.user:
-            return Response({"error": "You are not authorized to reject this order"}, status=status.HTTP_403_FORBIDDEN)
-        
-        if order.status != 'pending':
-            return Response({"error": "Order cannot be rejected in current status"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        rejection_reason = request.data.get('reason', '')
+            return Response(
+                {"error": "You are not authorized to reject this order"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if order.status != "pending":
+            return Response(
+                {"error": "Order cannot be rejected in current status"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        rejection_reason = request.data.get("reason", "")
         if not rejection_reason:
-            return Response({"error": "Rejection reason is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"error": "Rejection reason is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Update order status to cancelled
-        order.status = 'cancelled'
+        order.status = "cancelled"
         order.chef_notes = f"Order rejected: {rejection_reason}"
         order.save()
-        
+
         # Add status history
         OrderStatusHistory.objects.create(
             order=order,
-            status='cancelled',
+            status="cancelled",
             changed_by=request.user,
-            notes=order.chef_notes
+            notes=order.chef_notes,
         )
-        
-        return Response({"success": "Order rejected successfully", "status": "cancelled"})
+
+        return Response(
+            {"success": "Order rejected successfully", "status": "cancelled"}
+        )
 
     @action(detail=True, methods=['post'])
     def cancel_order(self, request, pk=None):
         """Cancel an order within 10 minutes of placement"""
         order = self.get_object()
-        
+
         # Check if user is authorized to cancel this order
         if order.customer != request.user:
             return Response({"error": "You are not authorized to cancel this order"}, status=status.HTTP_403_FORBIDDEN)
-        
+
         # Check if order can be cancelled
         if order.status not in ['pending', 'confirmed']:
             return Response({"error": "Order cannot be cancelled in current status"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Check if order is within 10-minute cancellation window
         from datetime import timedelta
         from django.utils import timezone
-        
+
         time_since_order = timezone.now() - order.created_at
         if time_since_order > timedelta(minutes=10):
             return Response({
                 "error": "Order can only be cancelled within 10 minutes of placement",
                 "time_remaining": "0 minutes"
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Calculate remaining time for cancellation
         remaining_time = timedelta(minutes=10) - time_since_order
         remaining_minutes = int(remaining_time.total_seconds() // 60)
-        
+
         cancellation_reason = request.data.get('reason', 'Customer requested cancellation')
-        
+
         # Update order status
         order.status = 'cancelled'
         order.cancelled_at = timezone.now()
         order.customer_notes = f"{order.customer_notes}\n\nCancelled: {cancellation_reason}".strip()
         order.save()
-        
+
         # Add status history
         OrderStatusHistory.objects.create(
             order=order,
@@ -410,7 +470,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             changed_by=request.user,
             notes=f"Order cancelled by customer: {cancellation_reason}"
         )
-        
+
         return Response({
             "success": "Order cancelled successfully",
             "status": "cancelled",
@@ -422,11 +482,11 @@ class OrderViewSet(viewsets.ModelViewSet):
     def can_cancel(self, request, pk=None):
         """Check if an order can be cancelled and return remaining time"""
         order = self.get_object()
-        
+
         # Check if user is authorized
         if order.customer != request.user:
             return Response({"error": "You are not authorized to view this order"}, status=status.HTTP_403_FORBIDDEN)
-        
+
         # Check if order can be cancelled based on status
         if order.status not in ['pending', 'confirmed']:
             return Response({
@@ -434,11 +494,11 @@ class OrderViewSet(viewsets.ModelViewSet):
                 "reason": "Order cannot be cancelled in current status",
                 "time_remaining": "0 minutes"
             })
-        
+
         # Check time window
         from datetime import timedelta
         from django.utils import timezone
-        
+
         time_since_order = timezone.now() - order.created_at
         if time_since_order > timedelta(minutes=10):
             return Response({
@@ -446,12 +506,12 @@ class OrderViewSet(viewsets.ModelViewSet):
                 "reason": "Cancellation window has expired",
                 "time_remaining": "0 minutes"
             })
-        
+
         # Calculate remaining time
         remaining_time = timedelta(minutes=10) - time_since_order
         remaining_minutes = int(remaining_time.total_seconds() // 60)
         remaining_seconds = int(remaining_time.total_seconds() % 60)
-        
+
         return Response({
             "can_cancel": True,
             "time_remaining": f"{remaining_minutes} minutes {remaining_seconds} seconds",
@@ -462,202 +522,252 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'])
     def status(self, request, pk=None):
         order = self.get_object()
-        new_status = request.data.get('status')
-        
+        new_status = request.data.get("status")
+
         # Define valid status transitions for delivery agents
-        valid_delivery_statuses = ['picked_up', 'delivered']
-        
+        valid_delivery_statuses = ["picked_up", "delivered"]
+
         if new_status not in valid_delivery_statuses:
-            return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Check if user is authorized to update this order
         if order.delivery_partner != request.user:
-            return Response({"error": "You are not authorized to update this order"}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"error": "You are not authorized to update this order"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Validate status transitions
         current_status = order.status
-        if new_status == 'picked_up' and current_status not in ['out_for_delivery', 'ready']:
-            return Response({"error": f"Cannot mark picked_up from {current_status}"}, status=status.HTTP_400_BAD_REQUEST)
-        elif new_status == 'delivered' and current_status not in ['picked_up', 'out_for_delivery', 'ready']:
-            return Response({"error": f"Cannot mark delivered from {current_status}"}, status=status.HTTP_400_BAD_REQUEST)
+        if new_status == "picked_up" and current_status not in [
+            "out_for_delivery",
+            "ready",
+        ]:
+            return Response(
+                {"error": f"Cannot mark picked_up from {current_status}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        elif new_status == "delivered" and current_status not in [
+            "picked_up",
+            "out_for_delivery",
+            "ready",
+        ]:
+            return Response(
+                {"error": f"Cannot mark delivered from {current_status}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Get additional data
-        notes = request.data.get('notes', f'Status changed to {new_status}')
-        location = request.data.get('location', {})
+        notes = request.data.get("notes", f"Status changed to {new_status}")
+        location = request.data.get("location", {})
 
         order.status = new_status
-        if new_status == 'delivered':
+        if new_status == "delivered":
             order.actual_delivery_time = timezone.now()
         order.save()
 
         OrderStatusHistory.objects.create(
-            order=order,
-            status=new_status,
-            changed_by=request.user,
-            notes=notes
+            order=order, status=new_status, changed_by=request.user, notes=notes
         )
 
-        return Response({
-            "success": f"Order status updated to {new_status}",
-            "order_id": order.id,
-            "status": new_status
-        })
-    
-    @action(detail=True, methods=['patch'])
+        return Response(
+            {
+                "success": f"Order status updated to {new_status}",
+                "order_id": order.id,
+                "status": new_status,
+            }
+        )
+
+    @action(detail=True, methods=["patch"])
     def chef_update_status(self, request, pk=None):
         """Chef updates order status through the kitchen workflow"""
         order = self.get_object()
-        
+
         # Check if user is the chef for this order
         if order.chef != request.user:
-            return Response({"error": "You are not authorized to update this order"}, status=status.HTTP_403_FORBIDDEN)
-        
-        new_status = request.data.get('status')
-        chef_notes = request.data.get('notes', '')
-        
+            return Response(
+                {"error": "You are not authorized to update this order"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        new_status = request.data.get("status")
+        chef_notes = request.data.get("notes", "")
+
         # Define valid status transitions for chef workflow
         valid_transitions = {
-            'confirmed': 'preparing',
-            'preparing': 'ready',
-            'ready': 'out_for_delivery'
+            "confirmed": "preparing",
+            "preparing": "ready",
+            "ready": "out_for_delivery",
         }
-        
+
         if order.status not in valid_transitions:
-            return Response({"error": "Order status cannot be updated from current state"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"error": "Order status cannot be updated from current state"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         expected_status = valid_transitions.get(order.status)
         if new_status != expected_status:
-            return Response({"error": f"Invalid status transition. Expected: {expected_status}"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"error": f"Invalid status transition. Expected: {expected_status}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Update order
         order.status = new_status
         if chef_notes:
             order.chef_notes = chef_notes
         order.save()
-        
+
         # Add status history
         OrderStatusHistory.objects.create(
             order=order,
             status=new_status,
             changed_by=request.user,
-            notes=chef_notes or f'Status updated to {new_status}'
+            notes=chef_notes or f"Status updated to {new_status}",
         )
-        
-        return Response({"success": f"Order status updated to {new_status}", "status": new_status})
 
+        return Response(
+            {"success": f"Order status updated to {new_status}", "status": new_status}
+        )
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=["get"])
     def history(self, request):
         completed_orders = Order.objects.filter(
-            delivery_partner=request.user,
-            status='delivered'
-        ).order_by('-updated_at')
+            delivery_partner=request.user, status="delivered"
+        ).order_by("-updated_at")
         serializer = self.get_serializer(completed_orders, many=True)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=["get"])
     def dashboard_summary(self, request):
         today = timezone.now().date()
-        
+
         # Get delivery partner's orders
         delivery_orders = Order.objects.filter(delivery_partner=request.user)
-        
-        active_deliveries = delivery_orders.exclude(status__in=['delivered', 'cancelled']).count()
-        completed_today = delivery_orders.filter(
-            status='delivered',
-            updated_at__date=today
+
+        active_deliveries = delivery_orders.exclude(
+            status__in=["delivered", "cancelled"]
         ).count()
-        todays_earnings = delivery_orders.filter(
-            status='delivered',
-            updated_at__date=today
-        ).aggregate(total=Sum('delivery_fee'))['total'] or 0
+        completed_today = delivery_orders.filter(
+            status="delivered", updated_at__date=today
+        ).count()
+        todays_earnings = (
+            delivery_orders.filter(
+                status="delivered", updated_at__date=today
+            ).aggregate(total=Sum("delivery_fee"))["total"]
+            or 0
+        )
 
         # Calculate average delivery time
-        completed_orders = delivery_orders.filter(
-            status='delivered'
-        ).exclude(actual_delivery_time__isnull=True)
-        
+        completed_orders = delivery_orders.filter(status="delivered").exclude(
+            actual_delivery_time__isnull=True
+        )
+
         avg_time_minutes = 0
         if completed_orders.exists():
-            total_seconds = sum([
-                (order.actual_delivery_time - order.created_at).total_seconds() 
-                for order in completed_orders 
-                if order.actual_delivery_time
-            ])
+            total_seconds = sum(
+                [
+                    (order.actual_delivery_time - order.created_at).total_seconds()
+                    for order in completed_orders
+                    if order.actual_delivery_time
+                ]
+            )
             avg_time_minutes = total_seconds / 60 / completed_orders.count()
 
-        return Response({
-            "active_deliveries": active_deliveries,
-            "completed_today": completed_today,
-            "todays_earnings": float(todays_earnings),
-            "avg_delivery_time_min": round(avg_time_minutes, 1)
-        })
+        return Response(
+            {
+                "active_deliveries": active_deliveries,
+                "completed_today": completed_today,
+                "todays_earnings": float(todays_earnings),
+                "avg_delivery_time_min": round(avg_time_minutes, 1),
+            }
+        )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def mark_picked_up(self, request, pk=None):
         """Delivery agent marks order as picked up from chef"""
         order = self.get_object()
-        
+
         # Check if user is the assigned delivery partner
         if order.delivery_partner != request.user:
-            return Response({"error": "You are not authorized to update this order"}, status=status.HTTP_403_FORBIDDEN)
-        
+            return Response(
+                {"error": "You are not authorized to update this order"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         # Check if order is in correct status
-        if order.status not in ['out_for_delivery', 'ready']:
-            return Response({"error": "Order cannot be marked as picked up in current status"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        notes = request.data.get('notes', 'Order picked up from chef')
-        
+        if order.status not in ["out_for_delivery", "ready"]:
+            return Response(
+                {"error": "Order cannot be marked as picked up in current status"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        notes = request.data.get("notes", "Order picked up from chef")
+
         # Transition: ready/out_for_delivery -> picked_up
-        order.status = 'picked_up'
-        order.save(update_fields=['status', 'updated_at'])
+        order.status = "picked_up"
+        order.save(update_fields=["status", "updated_at"])
         OrderStatusHistory.objects.create(
-            order=order,
-            status='picked_up',
-            changed_by=request.user,
-            notes=notes
+            order=order, status="picked_up", changed_by=request.user, notes=notes
         )
-        
-        return Response({
-            "success": "Order marked as picked up successfully",
-            "order_id": order.id,
-            "status": "picked_up"
-        })
-    
-    @action(detail=True, methods=['get'])
+
+        return Response(
+            {
+                "success": "Order marked as picked up successfully",
+                "order_id": order.id,
+                "status": "picked_up",
+            }
+        )
+
+    @action(detail=True, methods=["get"])
     def chef_location(self, request, pk=None):
         """Get chef location details for navigation (delivery agent only)"""
         order = self.get_object()
-        
+
         # Check if user is the assigned delivery partner
         if order.delivery_partner != request.user:
-            return Response({"error": "You are not authorized to access this information"}, status=status.HTTP_403_FORBIDDEN)
-        
+            return Response(
+                {"error": "You are not authorized to access this information"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         chef = order.chef
         if not chef:
-            return Response({"error": "No chef assigned to this order"}, status=status.HTTP_404_NOT_FOUND)
-        
+            return Response(
+                {"error": "No chef assigned to this order"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         chef_location = {}
-        if getattr(chef, 'address', None):
-            chef_location['address'] = chef.address
-        if hasattr(chef, 'chef_profile'):
+        if getattr(chef, "address", None):
+            chef_location["address"] = chef.address
+        if hasattr(chef, "chef_profile"):
             profile = chef.chef_profile
-            if getattr(profile, 'service_location', None):
-                chef_location['service_location'] = profile.service_location
-        
+            if getattr(profile, "service_location", None):
+                chef_location["service_location"] = profile.service_location
+
         chef_info = {
-            'id': chef.id,
-            'name': chef.name or f"{chef.first_name} {chef.last_name}".strip() or chef.username,
-            'phone': getattr(chef, 'phone_no', None),
-            'email': chef.email,
-            'location': chef_location
+            "id": chef.id,
+            "name": chef.name
+            or f"{chef.first_name} {chef.last_name}".strip()
+            or chef.username,
+            "phone": getattr(chef, "phone_no", None),
+            "email": chef.email,
+            "location": chef_location,
         }
-        
-        return Response({
-            'chef': chef_info,
-            'order_id': order.id,
-            'pickup_address': chef_location.get('address') or chef_location.get('service_location', 'Address not available')
-        })
+
+        return Response(
+            {
+                "chef": chef_info,
+                "order_id": order.id,
+                "pickup_address": chef_location.get("address")
+                or chef_location.get("service_location", "Address not available"),
+            }
+        )
+
 
 # Temporarily disabled other ViewSets to fix 500 error
 # Will be re-enabled once serializers are fixed
@@ -678,13 +788,13 @@ class UserAddressViewSet(viewsets.ModelViewSet):
     """ViewSet for managing user addresses"""
     serializer_class = UserAddressSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         return UserAddress.objects.filter(user=self.request.user)
-    
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
-    
+
     @action(detail=False, methods=['post'])
     def set_default(self, request):
         """Set an address as default"""
@@ -705,87 +815,84 @@ class CartItemViewSet(viewsets.ModelViewSet):
     queryset = CartItem.objects.all()
     serializer_class = CartItemSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         """Filter cart items to only show the current user's items"""
         return CartItem.objects.filter(customer=self.request.user)
-    
-    @action(detail=False, methods=['post'])
+
+    @action(detail=False, methods=["post"])
     def add_to_cart(self, request):
         """Add an item to the cart or update quantity if it already exists"""
         try:
-            price_id = request.data.get('price_id')
-            quantity = request.data.get('quantity', 1)
-            special_instructions = request.data.get('special_instructions', '')
-            
+            price_id = request.data.get("price_id")
+            quantity = request.data.get("quantity", 1)
+            special_instructions = request.data.get("special_instructions", "")
+
             if not price_id:
                 return Response(
-                    {'error': 'price_id is required'}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": "price_id is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-            
+
             # Check if item already exists in cart
             cart_item, created = CartItem.objects.get_or_create(
                 customer=request.user,
                 price_id=price_id,  # Django will automatically map this to the FoodPrice primary key
                 defaults={
-                    'quantity': quantity,
-                    'special_instructions': special_instructions
-                }
+                    "quantity": quantity,
+                    "special_instructions": special_instructions,
+                },
             )
-            
+
             if not created:
                 # Item exists, update quantity
                 cart_item.quantity += quantity
                 cart_item.save()
-            
+
             serializer = self.get_serializer(cart_item)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
+
         except Exception as e:
             return Response(
-                {'error': str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
-    @action(detail=False, methods=['get'])
+
+    @action(detail=False, methods=["get"])
     def cart_summary(self, request):
         """Get cart summary with total price and items"""
         try:
             cart_items = self.get_queryset()
             total_price = sum(item.total_price for item in cart_items)
             total_items = sum(item.quantity for item in cart_items)
-            
+
             serializer = self.get_serializer(cart_items, many=True)
-            
-            return Response({
-                'total_value': total_price,  # Changed from total_price to total_value
-                'total_items': total_items,
-                'cart_items': serializer.data
-            })
+
+            return Response(
+                {
+                    "total_value": total_price,  # Changed from total_price to total_value
+                    "total_items": total_items,
+                    "cart_items": serializer.data,
+                }
+            )
         except Exception as e:
             return Response(
-                {'error': str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
-    @action(detail=False, methods=['delete'])
+
+    @action(detail=False, methods=["delete"])
     def clear_cart(self, request):
         """Clear all items from the cart"""
         try:
             deleted_count = self.get_queryset().delete()[0]
-            return Response({
-                'message': f'Removed {deleted_count} items from cart'
-            })
+            return Response({"message": f"Removed {deleted_count} items from cart"})
         except Exception as e:
             return Response(
-                {'error': str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
 # Chef Dashboard API Views
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def chef_dashboard_stats(request):
     """
@@ -798,51 +905,50 @@ def chef_dashboard_stats(request):
         today = timezone.now().date()
         current_month = timezone.now().month
         current_year = timezone.now().year
-        
+
         # Count different order types for this chef
         chef_orders = Order.objects.filter(chef=chef)
-        
+
         # Calculate main stats
         stats = {
-            "orders_completed": chef_orders.filter(status__in=['delivered']).count(),
+            "orders_completed": chef_orders.filter(status__in=["delivered"]).count(),
             "orders_active": chef_orders.filter(
-                status__in=['confirmed', 'preparing', 'ready', 'out_for_delivery']
+                status__in=["confirmed", "preparing", "ready", "out_for_delivery"]
             ).count(),
             "bulk_orders": chef_orders.filter(
                 # Assuming bulk orders have multiple items or a specific field
                 # You can adjust this logic based on your bulk order definition
                 items__quantity__gte=5
-            ).distinct().count(),
-            "total_reviews": FoodReview.objects.filter(
-                price__cook=chef
-            ).count(),
+            )
+            .distinct()
+            .count(),
+            "total_reviews": FoodReview.objects.filter(price__cook=chef).count(),
             "average_rating": float(
-                FoodReview.objects.filter(
-                    price__cook=chef
-                ).aggregate(avg=Avg("rating"))["avg"] or 0
+                FoodReview.objects.filter(price__cook=chef).aggregate(
+                    avg=Avg("rating")
+                )["avg"]
+                or 0
             ),
             "today_revenue": float(
                 Payment.objects.filter(
-                    order__chef=chef,
-                    status='completed',
-                    created_at__date=today
-                ).aggregate(total=Sum("amount"))["total"] or 0
+                    order__chef=chef, status="completed", created_at__date=today
+                ).aggregate(total=Sum("amount"))["total"]
+                or 0
             ),
-            "pending_orders": chef_orders.filter(status='pending').count(),
+            "pending_orders": chef_orders.filter(status="pending").count(),
             "monthly_orders": chef_orders.filter(
-                created_at__month=current_month,
-                created_at__year=current_year
+                created_at__month=current_month, created_at__year=current_year
             ).count(),
             "customer_satisfaction": 94,  # Placeholder - can be calculated from reviews later
         }
-        
+
         return JsonResponse(stats)
-        
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def chef_recent_reviews(request):
     """
@@ -850,30 +956,35 @@ def chef_recent_reviews(request):
     """
     try:
         chef = request.user
-        
+
         # Get recent reviews for this chef's food items
-        reviews = FoodReview.objects.filter(
-            price__cook=chef
-        ).select_related('customer', 'price', 'order').order_by('-created_at')[:10]
-        
+        reviews = (
+            FoodReview.objects.filter(price__cook=chef)
+            .select_related("customer", "price", "order")
+            .order_by("-created_at")[:10]
+        )
+
         reviews_data = []
         for review in reviews:
-            reviews_data.append({
-                "customer": review.customer.get_full_name() or review.customer.username,
-                "rating": review.rating,
-                "comment": review.comment or "No comment provided",
-                "dish": review.price.food.name,
-                "time": review.created_at.strftime("%H:%M %d/%m/%Y"),
-                "order_id": review.order.order_number if review.order else "N/A"
-            })
-        
+            reviews_data.append(
+                {
+                    "customer": review.customer.get_full_name()
+                    or review.customer.username,
+                    "rating": review.rating,
+                    "comment": review.comment or "No comment provided",
+                    "dish": review.price.food.name,
+                    "time": review.created_at.strftime("%H:%M %d/%m/%Y"),
+                    "order_id": review.order.order_number if review.order else "N/A",
+                }
+            )
+
         return JsonResponse(reviews_data, safe=False)
-        
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def chef_recent_activity(request):
     """
@@ -882,12 +993,10 @@ def chef_recent_activity(request):
     try:
         chef = request.user
         activities = []
-        
+
         # Get recent orders
-        recent_orders = Order.objects.filter(
-            chef=chef
-        ).order_by('-created_at')[:5]
-        
+        recent_orders = Order.objects.filter(chef=chef).order_by("-created_at")[:5]
+
         for order in recent_orders:
             time_ago = timezone.now() - order.created_at
             if time_ago.days > 0:
@@ -898,18 +1007,20 @@ def chef_recent_activity(request):
             else:
                 minutes = time_ago.seconds // 60
                 time_str = f"{minutes} minute{'s' if minutes > 1 else ''} ago"
-            
-            activities.append({
-                "action": f"New order received from {order.customer.get_full_name() or order.customer.username}",
-                "time": time_str,
-                "type": "order"
-            })
-        
+
+            activities.append(
+                {
+                    "action": f"New order received from {order.customer.get_full_name() or order.customer.username}",
+                    "time": time_str,
+                    "type": "order",
+                }
+            )
+
         # Get recent reviews
-        recent_reviews = FoodReview.objects.filter(
-            price__cook=chef
-        ).order_by('-created_at')[:3]
-        
+        recent_reviews = FoodReview.objects.filter(price__cook=chef).order_by(
+            "-created_at"
+        )[:3]
+
         for review in recent_reviews:
             time_ago = timezone.now() - review.created_at
             if time_ago.days > 0:
@@ -920,19 +1031,20 @@ def chef_recent_activity(request):
             else:
                 minutes = time_ago.seconds // 60
                 time_str = f"{minutes} minute{'s' if minutes > 1 else ''} ago"
-            
-            activities.append({
-                "action": f"{review.rating}-star review received for {review.price.food.name}",
-                "time": time_str,
-                "type": "review"
-            })
-        
+
+            activities.append(
+                {
+                    "action": f"{review.rating}-star review received for {review.price.food.name}",
+                    "time": time_str,
+                    "type": "review",
+                }
+            )
+
         # Get recent completed orders
-        completed_orders = Order.objects.filter(
-            chef=chef,
-            status='delivered'
-        ).order_by('-updated_at')[:3]
-        
+        completed_orders = Order.objects.filter(chef=chef, status="delivered").order_by(
+            "-updated_at"
+        )[:3]
+
         for order in completed_orders:
             time_ago = timezone.now() - order.updated_at
             if time_ago.days > 0:
@@ -943,41 +1055,44 @@ def chef_recent_activity(request):
             else:
                 minutes = time_ago.seconds // 60
                 time_str = f"{minutes} minute{'s' if minutes > 1 else ''} ago"
-            
-            activities.append({
-                "action": f"Order #{order.order_number} marked as completed",
-                "time": time_str,
-                "type": "success"
-            })
-        
+
+            activities.append(
+                {
+                    "action": f"Order #{order.order_number} marked as completed",
+                    "time": time_str,
+                    "type": "success",
+                }
+            )
+
         # Sort activities by most recent first
         # Since we can't easily sort by actual datetime, we'll return them in order
         return JsonResponse(activities[:8], safe=False)
-        
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
 
     @action(detail=True, methods=['post'])
     def mark_picked_up(self, request, pk=None):
         """Delivery agent marks order as picked up from chef"""
         order = self.get_object()
-        
+
         # Check if user is the assigned delivery partner
         if order.delivery_partner != request.user:
             return Response({"error": "You are not authorized to update this order"}, status=status.HTTP_403_FORBIDDEN)
-        
+
         # Check if order is in correct status
         if order.status not in ['out_for_delivery', 'ready']:
             return Response({"error": "Order cannot be marked as picked up in current status"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Get pickup location and notes
         pickup_location = request.data.get('pickup_location', {})
         notes = request.data.get('notes', 'Order picked up from chef')
-        
+
         # Update order status
         order.status = 'in_transit'
         order.save()
-        
+
         # Add status history
         OrderStatusHistory.objects.create(
             order=order,
@@ -985,39 +1100,39 @@ def chef_recent_activity(request):
             changed_by=request.user,
             notes=notes
         )
-        
+
         return Response({
             "success": "Order marked as picked up successfully",
             "order_id": order.id,
             "status": "in_transit"
         })
-    
+
     @action(detail=True, methods=['get'])
     def chef_location(self, request, pk=None):
         """Get chef location details for navigation"""
         order = self.get_object()
-        
+
         # Check if user is the assigned delivery partner
         if order.delivery_partner != request.user:
             return Response({"error": "You are not authorized to access this information"}, status=status.HTTP_403_FORBIDDEN)
-        
+
         chef = order.chef
         if not chef:
             return Response({"error": "No chef assigned to this order"}, status=status.HTTP_404_NOT_FOUND)
-        
+
         # Try to get chef's location from various sources
         chef_location = {}
-        
+
         # First, try to get from user's address
         if chef.address:
             chef_location['address'] = chef.address
-        
+
         # Try to get from chef profile if exists
         if hasattr(chef, 'chef_profile'):
             profile = chef.chef_profile
             if hasattr(profile, 'service_location') and profile.service_location:
                 chef_location['service_location'] = profile.service_location
-        
+
         # Get basic chef info
         chef_info = {
             'id': chef.id,
@@ -1026,7 +1141,7 @@ def chef_recent_activity(request):
             'email': chef.email,
             'location': chef_location
         }
-        
+
         return Response({
             'chef': chef_info,
             'order_id': order.id,
@@ -1041,17 +1156,17 @@ def calculate_checkout(request):
     try:
         cart_items = request.data.get('cart_items', [])
         customer_location = request.data.get('customer_location', {})
-        
+
         if not cart_items:
             return Response({
                 'error': 'Cart is empty'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Initialize calculation variables
         subtotal = Decimal('0.00')
         delivery_fee = Decimal('15.00')  # Base delivery fee
         tax_rate = Decimal('0.08')  # 8% tax
-        
+
         # Calculate subtotal
         for item in cart_items:
             # Get the price record
@@ -1061,17 +1176,17 @@ def calculate_checkout(request):
                 return Response({
                     'error': f'Price with ID {item["price_id"]} not found'
                 }, status=status.HTTP_404_NOT_FOUND)
-            
+
             # Calculate item total
             item_total = food_price.price * item['quantity']
             subtotal += item_total
-        
+
         # Calculate tax
         tax_amount = subtotal * tax_rate
-        
+
         # Calculate total
         total_amount = subtotal + delivery_fee + tax_amount
-        
+
         return Response({
             'subtotal': float(subtotal),
             'delivery_fee': float(delivery_fee),
@@ -1079,7 +1194,7 @@ def calculate_checkout(request):
             'total_amount': float(total_amount),
             'tax_rate': float(tax_rate),
         })
-        
+
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -1093,15 +1208,15 @@ def place_order(request):
         customer_location = request.data.get('customer_location', {})
         payment_method = request.data.get('payment_method', 'cash')
         special_instructions = request.data.get('special_instructions', '')
-        
+
         if not cart_items:
             return Response({
                 'error': 'Cart is empty'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Create order
         import uuid
-        
+
         order = Order.objects.create(
             customer=request.user,
             chef=None,  # Will be set based on first item
@@ -1113,17 +1228,17 @@ def place_order(request):
             delivery_latitude=customer_location.get('latitude'),
             delivery_longitude=customer_location.get('longitude'),
         )
-        
+
         # Process cart items
         for item_data in cart_items:
             try:
                 food_price = FoodPrice.objects.select_related('food', 'cook').get(id=item_data['price_id'])
-                
+
                 # Set chef for order (from first item)
                 if not order.chef:
                     order.chef = food_price.cook
                     order.save()
-                
+
                 # Create order item
                 OrderItem.objects.create(
                     order=order,
@@ -1131,27 +1246,27 @@ def place_order(request):
                     quantity=item_data['quantity'],
                     total_amount=food_price.price * item_data['quantity']
                 )
-                
+
             except FoodPrice.DoesNotExist:
                 # Clean up if error
                 order.delete()
                 return Response({
                     'error': f'Price with ID {item_data["price_id"]} not found'
                 }, status=status.HTTP_404_NOT_FOUND)
-        
+
         # Calculate totals
         subtotal = sum(item.total_amount for item in order.items.all())
         delivery_fee = Decimal('15.00')
         tax_amount = subtotal * Decimal('0.08')
         total_amount = subtotal + delivery_fee + tax_amount
-        
+
         # Update order totals
         order.subtotal = subtotal
         order.delivery_fee = delivery_fee
         order.tax_amount = tax_amount
         order.total_amount = total_amount
         order.save()
-        
+
         # Create initial status history
         OrderStatusHistory.objects.create(
             order=order,
@@ -1159,7 +1274,7 @@ def place_order(request):
             changed_by=request.user,
             notes='Order placed successfully'
         )
-        
+
         return Response({
             'success': 'Order placed successfully',
             'order_id': order.id,
@@ -1167,6 +1282,6 @@ def place_order(request):
             'status': order.status,
             'total_amount': float(total_amount)
         })
-        
+
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

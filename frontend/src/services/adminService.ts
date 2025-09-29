@@ -95,6 +95,7 @@ export interface DashboardStats {
   total_chefs: number;
   active_chefs: number;
   pending_chef_approvals: number;
+  pending_user_approvals: number; // New field for actual user approvals
   chef_growth: number;
   
   total_orders: number;
