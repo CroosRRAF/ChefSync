@@ -62,12 +62,18 @@ import AIReportsAutomation from "@/pages/admin/AIReportsAutomation";
 import AdminAnalytics from "@/pages/admin/Analytics";
 import AdminBackendIntegration from "@/pages/admin/BackendIntegration";
 import AdminCommunication from "@/pages/admin/Communication";
+import AIInsights from "@/pages/admin/AIInsights";
 import AdminDashboard from "@/pages/admin/Dashboard";
+import AdminDeliveryDashboard from "@/pages/admin/DeliveryDashboard";
 import AdminFeedbackManagement from "@/pages/admin/FeedbackManagement";
 import AdminFoodMenuManagement from "@/pages/admin/FoodMenuManagement";
 import MachineLearningIntegration from "@/pages/admin/MachineLearningIntegration";
 import AdminManageUser from "@/pages/admin/ManageUser";
+import OfferManagement from "@/pages/admin/OfferManagement";
+import OrderManagement from "@/pages/admin/OrderManagement";
+import PaymentManagement from "@/pages/admin/PaymentManagement";
 import AdminProfile from "@/pages/admin/Profile";
+import ReferralManagement from "@/pages/admin/ReferralManagement";
 import AdminReports from "@/pages/admin/Reports";
 import AdminSettings from "@/pages/admin/Settings";
 
@@ -569,18 +575,16 @@ const InnerRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
-        {/* TODO: Create AdminOrders page
         <Route
           path="/admin/orders"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminOrders />
+                <OrderManagement />
               </AdminLayout>
             </ProtectedRoute>
           }
         />
-        */}
         <Route
           path="/admin/analytics"
           element={
@@ -717,6 +721,56 @@ const InnerRoutes: React.FC = () => {
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
                 <AIReportsAutomation />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/delivery"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AdminDeliveryDashboard />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/referrals"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <ReferralManagement />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/offers"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <OfferManagement />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/payments"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <PaymentManagement />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ai-insights"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <AIInsights />
               </AdminLayout>
             </ProtectedRoute>
           }

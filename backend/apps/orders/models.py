@@ -431,3 +431,165 @@ class BulkOrderAssignment(models.Model):
     class Meta:
         db_table = "BulkOrderAssignment"
         ordering = ["-assigned_at"]
+
+
+# ==========================================
+# DELIVERY TRACKING MODELS
+# ==========================================
+
+
+class LocationUpdate(models.Model):
+    """Real-time location tracking for delivery agents"""
+
+    delivery_agent = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="location_updates",
+    )
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="location_updates",
+        null=True,
+        blank=True,
+    )
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    address = models.TextField(blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.delivery_agent.username} - {self.timestamp}"
+
+    class Meta:
+        db_table = "location_updates"
+        ordering = ["-timestamp"]
+
+
+class DeliveryIssue(models.Model):
+    """Track delivery issues and problems"""
+
+    ISSUE_TYPE_CHOICES = [
+        ("customer_unavailable", "Customer Unavailable"),
+        ("wrong_address", "Wrong Address"),
+        ("traffic_delay", "Traffic Delay"),
+        ("vehicle_problem", "Vehicle Problem"),
+        ("order_damaged", "Order Damaged"),
+        ("payment_issue", "Payment Issue"),
+        ("other", "Other"),
+    ]
+
+    STATUS_CHOICES = [
+        ("reported", "Reported"),
+        ("acknowledged", "Acknowledged"),
+        ("in_progress", "In Progress"),
+        ("resolved", "Resolved"),
+        ("escalated", "Escalated"),
+    ]
+
+    issue_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name="delivery_issues"
+    )
+    delivery_agent = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reported_issues",
+    )
+    issue_type = models.CharField(max_length=50, choices=ISSUE_TYPE_CHOICES)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="reported")
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolution_notes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Issue {self.issue_id} - Order {self.order.order_id}"
+
+    class Meta:
+        db_table = "delivery_issues"
+        ordering = ["-created_at"]
+
+
+class DeliveryChat(models.Model):
+    """Chat messages between delivery agent and customer"""
+
+    MESSAGE_TYPE_CHOICES = [
+        ("text", "Text"),
+        ("location", "Location"),
+        ("image", "Image"),
+    ]
+
+    message_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name="chat_messages"
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sent_delivery_messages",
+    )
+    receiver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="received_delivery_messages",
+    )
+    message = models.TextField()
+    message_type = models.CharField(
+        max_length=20, choices=MESSAGE_TYPE_CHOICES, default="text"
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Message {self.message_id} - Order {self.order.order_id}"
+
+    class Meta:
+        db_table = "delivery_chats"
+        ordering = ["created_at"]
+
+
+class DeliveryLog(models.Model):
+    """Complete delivery performance logs"""
+
+    STATUS_CHOICES = [
+        ("in_progress", "In Progress"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+    ]
+
+    log_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    order = models.OneToOneField(
+        Order, on_delete=models.CASCADE, related_name="delivery_log"
+    )
+    delivery_agent = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="delivery_logs"
+    )
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField(null=True, blank=True)
+    pickup_time = models.DateTimeField(null=True, blank=True)
+    distance_km = models.DecimalField(
+        max_digits=6, decimal_places=2, help_text="Actual distance traveled in km"
+    )
+    total_time_minutes = models.IntegerField(
+        null=True, blank=True, help_text="Total delivery time in minutes"
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="in_progress"
+    )
+    notes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Log {self.log_id} - Order {self.order.order_id}"
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate total time if end_time is set
+        if self.end_time and self.start_time:
+            delta = self.end_time - self.start_time
+            self.total_time_minutes = int(delta.total_seconds() / 60)
+        super().save(*args, **kwargs)
+
+    class Meta:
+        db_table = "delivery_logs"
+        ordering = ["-start_time"]

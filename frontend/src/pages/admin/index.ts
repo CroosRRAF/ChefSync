@@ -4,12 +4,15 @@
  */
 
 // Core Admin Pages
+export { default as AIInsights } from "./AIInsights";
 export { default as Analytics } from "./Analytics";
 export { default as Communication } from "./Communication";
 export { default as Dashboard } from "./Dashboard";
 export { default as FeedbackManagement } from "./FeedbackManagement";
 export { default as FoodMenuManagement } from "./FoodMenuManagement";
 export { default as ManageUser } from "./ManageUser";
+export { default as OrderManagement } from "./OrderManagement";
+export { default as PaymentManagement } from "./PaymentManagement";
 export { default as Profile } from "./Profile";
 export { default as Reports } from "./Reports";
 export { default as Settings } from "./Settings";

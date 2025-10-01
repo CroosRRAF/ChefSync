@@ -11,4 +11,7 @@ router.register(r'maintenance', views.SystemMaintenanceViewSet, basename='mainte
 
 urlpatterns = [
     path('', include(router.urls)),
+    # Additional endpoints for frontend compatibility
+    path('orders', views.order_analytics, name='order-analytics'),
+    path('customers', views.customer_analytics, name='customer-analytics'),
 ]

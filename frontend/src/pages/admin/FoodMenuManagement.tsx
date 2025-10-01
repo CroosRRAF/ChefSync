@@ -4,9 +4,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,9 +119,17 @@ const FoodMenuManagement: React.FC = () => {
   const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
   const [showCreateCuisineModal, setShowCreateCuisineModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState<
     Food | FoodCategory | Cuisine | null
   >(null);
+  const [itemToDelete, setItemToDelete] = useState<
+    Food | FoodCategory | Cuisine | null
+  >(null);
+  const [itemsToBulkDelete, setItemsToBulkDelete] = useState<
+    Food[]
+  >([]);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -605,61 +624,52 @@ const FoodMenuManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteFood = async (food: Food) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${food.name}"? This action cannot be undone.`
-      )
-    ) {
-      return;
-    }
+  const handleDeleteFood = (food: Food) => {
+    setItemToDelete(food);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!itemToDelete) return;
 
     try {
-      await foodService.deleteFood(food.id);
+      if ("price" in itemToDelete) {
+        // It's a Food item
+        await foodService.deleteFood(itemToDelete.id);
+      } else if ("cuisine" in itemToDelete) {
+        // It's a Category
+        await foodService.deleteFoodCategory(itemToDelete.id);
+      } else if ("sort_order" in itemToDelete) {
+        // It's a Cuisine
+        await foodService.deleteCuisine(itemToDelete.id);
+      }
+
+      setShowDeleteDialog(false);
+      setItemToDelete(null);
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete food");
+      setError(err instanceof Error ? err.message : "Failed to delete item");
     }
   };
 
-  const handleDeleteCategory = async (category: FoodCategory) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${category.name}"? This action cannot be undone.`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await foodService.deleteFoodCategory(category.id);
-      await loadData();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete category"
-      );
-    }
+  const handleDeleteCategory = (category: FoodCategory) => {
+    setItemToDelete(category);
+    setShowDeleteDialog(true);
   };
 
-  const handleDeleteCuisine = async (cuisine: Cuisine) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${cuisine.name}"? This action cannot be undone.`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await foodService.deleteCuisine(cuisine.id);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete cuisine");
-    }
+  const handleDeleteCuisine = (cuisine: Cuisine) => {
+    setItemToDelete(cuisine);
+    setShowDeleteDialog(true);
   };
 
   const handleBulkAction = async (action: string) => {
     if (selectedFoods.length === 0) return;
+
+    if (action === "delete") {
+      setItemsToBulkDelete(selectedFoods);
+      setShowBulkDeleteDialog(true);
+      return;
+    }
 
     try {
       switch (action) {
@@ -669,16 +679,6 @@ const FoodMenuManagement: React.FC = () => {
         case "unavailable":
           await foodService.bulkUpdateFoodAvailability(selectedFoods, false);
           break;
-        case "delete":
-          if (
-            !confirm(
-              `Are you sure you want to delete ${selectedFoods.length} food items? This action cannot be undone.`
-            )
-          ) {
-            return;
-          }
-          await foodService.bulkDeleteFoods(selectedFoods);
-          break;
       }
 
       setSelectedFoods([]);
@@ -687,6 +687,20 @@ const FoodMenuManagement: React.FC = () => {
       setError(
         err instanceof Error ? err.message : `Failed to ${action} foods`
       );
+    }
+  };
+
+  const confirmBulkDeleteFoods = async () => {
+    if (itemsToBulkDelete.length === 0) return;
+
+    try {
+      await foodService.bulkDeleteFoods(itemsToBulkDelete);
+      setShowBulkDeleteDialog(false);
+      setItemsToBulkDelete([]);
+      setSelectedFoods([]);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete foods");
     }
   };
 
@@ -1275,6 +1289,62 @@ const FoodMenuManagement: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Item Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{itemToDelete?.name}</strong>?
+              This action cannot be undone and will permanently remove the item
+              and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowDeleteDialog(false);
+              setItemToDelete(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteItem}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Item
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Foods Confirmation Dialog */}
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Multiple Food Items</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{itemsToBulkDelete.length} food items</strong>?
+              This action cannot be undone and will permanently remove all selected food items
+              and their associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowBulkDeleteDialog(false);
+              setItemsToBulkDelete([]);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkDeleteFoods}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete {itemsToBulkDelete.length} Items
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

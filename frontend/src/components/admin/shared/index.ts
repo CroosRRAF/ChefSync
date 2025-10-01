@@ -1,3 +1,15 @@
+// Modern UI Components (2025 Trending)
+export { default as GlassCard } from "./GlassCard";
+export type { GlassCardProps } from "./GlassCard";
+
+export { default as AnimatedStats } from "./AnimatedStats";
+export type { AnimatedStatsProps } from "./AnimatedStats";
+
+export { default as GradientButton } from "./GradientButton";
+export type { GradientButtonProps } from "./GradientButton";
+
+export { default as CommandPalette } from "./CommandPalette";
+
 // Chart Components
 export { default as BarChart } from "./charts/BarChart";
 export { default as LineChart } from "./charts/LineChart";

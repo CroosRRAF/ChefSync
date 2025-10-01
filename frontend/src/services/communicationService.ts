@@ -34,6 +34,20 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     const status = error.response?.status;
     const data = error.response?.data as any;
+    const url = error.config?.url || "";
+
+    // Don't show toast for stats/analytics endpoints that might not exist yet
+    const isFallbackEndpoint =
+      url.includes("/stats") ||
+      url.includes("/sentiment-analysis") ||
+      url.includes("/notifications") ||
+      url.includes("/campaign-stats") ||
+      url.includes("/delivery-stats");
+
+    if (status === 404 && isFallbackEndpoint) {
+      // Silently handle 404s for optional endpoints
+      return Promise.reject(error);
+    }
 
     let message = "An unexpected error occurred";
     if (data?.message || data?.detail) {
@@ -132,6 +146,26 @@ export interface PaginatedResponse<T> {
   previous: string | null;
 }
 
+export interface CommunicationCategory {
+  id: number;
+  name: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CommunicationTag {
+  id: number;
+  name: string;
+  color?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CommunicationStats {
   total: number;
   pending: number;
@@ -166,7 +200,9 @@ class CommunicationService {
     } = {}
   ): Promise<PaginatedResponse<Communication>> {
     try {
-      const response = await apiClient.get("/communications/", { params });
+      const response = await apiClient.get("/communications/communications/", {
+        params,
+      });
       return response.data;
     } catch (error) {
       return this.handleError(error, "getCommunications");
@@ -175,7 +211,9 @@ class CommunicationService {
 
   async getCommunicationById(id: number): Promise<Communication> {
     try {
-      const response = await apiClient.get(`/communications/${id}/`);
+      const response = await apiClient.get(
+        `/communications/communications/${id}/`
+      );
       return response.data;
     } catch (error) {
       return this.handleError(error, "getCommunicationById");
@@ -189,7 +227,10 @@ class CommunicationService {
     >
   ): Promise<Communication> {
     try {
-      const response = await apiClient.post("/communications/", data);
+      const response = await apiClient.post(
+        "/communications/communications/",
+        data
+      );
       toast({
         title: "Success",
         description: `${data.communication_type} created successfully`,
@@ -206,7 +247,7 @@ class CommunicationService {
   ): Promise<CommunicationResponse> {
     try {
       const response = await apiClient.post(
-        `/communications/${communicationId}/responses/`,
+        `/communications/communications/${communicationId}/responses/`,
         data
       );
       toast({
@@ -225,7 +266,7 @@ class CommunicationService {
   ): Promise<Communication> {
     try {
       const response = await apiClient.patch(
-        `/communications/${communicationId}/`,
+        `/communications/communications/${communicationId}/`,
         { status }
       );
       toast({
@@ -482,7 +523,9 @@ class CommunicationService {
   // Statistics and Analytics Methods
   async getCommunicationStats(): Promise<CommunicationStats> {
     try {
-      const response = await apiClient.get("/communications/stats/");
+      const response = await apiClient.get(
+        "/communications/communications/stats/"
+      );
       return response.data;
     } catch (error) {
       return this.handleError(error, "getCommunicationStats");
@@ -497,7 +540,7 @@ class CommunicationService {
   }> {
     try {
       const response = await apiClient.get(
-        "/communications/sentiment-analysis/",
+        "/communications/communications/sentiment_analysis/",
         {
           params: { period },
         }
@@ -585,21 +628,49 @@ class CommunicationService {
 
   // Additional methods for Communication page
   async getNotifications(): Promise<any[]> {
-    // Consider using adminService.getNotifications for admin notifications instead
-    return this.handleError(new Error("Not implemented"), "getNotifications");
+    try {
+      const response = await apiClient.get(
+        "/communications/communications/notifications/"
+      );
+      return response.data.results || [];
+    } catch (error) {
+      console.error("Error in getNotifications:", error);
+      return [];
+    }
   }
 
   async getCampaignStats(): Promise<any> {
-    return this.handleError(new Error("Not implemented"), "getCampaignStats");
+    try {
+      const response = await apiClient.get(
+        "/communications/communications/campaign_stats/"
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error in getCampaignStats:", error);
+      return null;
+    }
   }
 
   async getDeliveryStats(period: string): Promise<any> {
-    return this.handleError(new Error("Not implemented"), "getDeliveryStats");
+    try {
+      const response = await apiClient.get(
+        "/communications/communications/delivery_stats/",
+        {
+          params: { period },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error in getDeliveryStats:", error);
+      return null;
+    }
   }
 
   async duplicateCommunication(id: number): Promise<any> {
     try {
-      const response = await apiClient.post(`/communications/${id}/duplicate/`);
+      const response = await apiClient.post(
+        `/communications/communications/${id}/duplicate/`
+      );
       toast({
         title: "Success",
         description: "Communication duplicated successfully",
@@ -612,7 +683,7 @@ class CommunicationService {
 
   async deleteCommunication(id: number): Promise<void> {
     try {
-      await apiClient.delete(`/communications/${id}/`);
+      await apiClient.delete(`/communications/communications/${id}/`);
       toast({
         title: "Success",
         description: "Communication deleted successfully",
@@ -624,7 +695,10 @@ class CommunicationService {
 
   async sendCommunication(payload: any): Promise<any> {
     try {
-      const response = await apiClient.post("/communications/send/", payload);
+      const response = await apiClient.post(
+        "/communications/communications/send/",
+        payload
+      );
       toast({
         title: "Success",
         description: "Communication sent successfully",
@@ -632,6 +706,26 @@ class CommunicationService {
       return response.data;
     } catch (error) {
       return this.handleError(error, "sendCommunication");
+    }
+  }
+
+  async getCategories(): Promise<CommunicationCategory[]> {
+    try {
+      const response = await apiClient.get("/communications/categories/");
+      return response.data.results || response.data || [];
+    } catch (error) {
+      console.error("Error in getCategories:", error);
+      return [];
+    }
+  }
+
+  async getTags(): Promise<CommunicationTag[]> {
+    try {
+      const response = await apiClient.get("/communications/tags/");
+      return response.data.results || response.data || [];
+    } catch (error) {
+      console.error("Error in getTags:", error);
+      return [];
     }
   }
 }

@@ -60,6 +60,12 @@ uritemplate==4.2.0
 urllib3==2.2.3
 google-generativeai==0.8.3
 psutil==7.1.0
+
+# AI/ML Dependencies (Phase 3)
+pandas==2.2.3
+numpy==1.26.4
+scikit-learn==1.5.2
+
 # PDF processing dependencies
 # Note: Poppler utilities must be installed separately on Windows
 # Download from: https://github.com/oschwartz10612/poppler-windows/releases/

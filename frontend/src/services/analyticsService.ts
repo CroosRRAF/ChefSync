@@ -249,7 +249,7 @@ class AnalyticsService {
   ): Promise<RevenueAnalytics> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/analytics/revenue?range=${timeRange}`,
+        `${this.baseUrl}/admin-management/dashboard/revenue_analytics/?range=${timeRange}`,
         {
           method: "GET",
           headers: {
@@ -361,7 +361,7 @@ class AnalyticsService {
   async getAIInsights(timeRange: string = "30d"): Promise<AIInsight[]> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/analytics/ai-insights?range=${timeRange}`,
+        `${this.baseUrl}/admin-management/dashboard/ai_insights/?range=${timeRange}`,
         {
           method: "GET",
           headers: {
@@ -390,7 +390,7 @@ class AnalyticsService {
   ): Promise<PredictiveAnalytics> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/analytics/predictions?range=${timeRange}`,
+        `${this.baseUrl}/admin-management/dashboard/predictive_analytics/?range=${timeRange}`,
         {
           method: "GET",
           headers: {
@@ -419,7 +419,7 @@ class AnalyticsService {
   ): Promise<CustomerSegmentation> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/analytics/segmentation?range=${timeRange}`,
+        `${this.baseUrl}/admin-management/dashboard/customer_segmentation/?range=${timeRange}`,
         {
           method: "GET",
           headers: {
@@ -1342,15 +1342,18 @@ class AnalyticsService {
     }
   }
 
-  async getAnomalyDetections() {
+  async getAnomalyDetections(timeRange: string = "7d") {
     try {
-      const response = await fetch(`${this.baseUrl}/admin/ml/anomalies`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-      });
+      const response = await fetch(
+        `${this.baseUrl}/admin-management/dashboard/anomaly_detection/?range=${timeRange}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

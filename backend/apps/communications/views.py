@@ -300,32 +300,460 @@ class CommunicationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def stats(self, request):
         """Get communication statistics"""
-        total = Communication.objects.count()
-        unread = Communication.objects.filter(is_read=False).count()
-        unassigned = Communication.objects.filter(assigned_to__isnull=True).count()
-        resolved = Communication.objects.filter(status="resolved").count()
+        from django.db.models import Avg
 
-        by_type = Communication.objects.values("communication_type").annotate(
-            count=Count("id")
+        queryset = self.get_queryset()
+
+        total = queryset.count()
+        unread = queryset.filter(is_read=False).count()
+        unassigned = queryset.filter(assigned_to__isnull=True).count()
+        resolved = queryset.filter(status="resolved").count()
+        pending = queryset.filter(status="pending").count()
+        in_progress = queryset.filter(status="in_progress").count()
+        closed = queryset.filter(status="closed").count()
+
+        by_type = queryset.values("communication_type").annotate(count=Count("id"))
+        by_priority = queryset.values("priority").annotate(count=Count("id"))
+        by_status = queryset.values("status").annotate(count=Count("id"))
+
+        # Calculate average rating
+        average_rating = (
+            queryset.filter(rating__isnull=False).aggregate(Avg("rating"))[
+                "rating__avg"
+            ]
+            or 0
         )
-
-        by_priority = Communication.objects.values("priority").annotate(
-            count=Count("id")
-        )
-
-        by_status = Communication.objects.values("status").annotate(count=Count("id"))
 
         return Response(
             {
                 "total": total,
                 "unread": unread,
                 "unassigned": unassigned,
+                "pending": pending,
+                "in_progress": in_progress,
                 "resolved": resolved,
-                "by_type": by_type,
-                "by_priority": by_priority,
-                "by_status": by_status,
+                "closed": closed,
+                "average_rating": round(average_rating, 2),
+                "by_type": list(by_type),
+                "by_priority": list(by_priority),
+                "by_status": list(by_status),
             }
         )
+
+    @action(detail=False, methods=["get"])
+    def sentiment_analysis(self, request):
+        """Get sentiment analysis of communications"""
+        from datetime import timedelta
+
+        period = request.GET.get("period", "30d")
+        days = int(period.replace("d", ""))
+
+        start_date = timezone.now() - timedelta(days=days)
+        queryset = self.get_queryset().filter(created_at__gte=start_date)
+
+        # Basic sentiment based on ratings and keywords
+        positive_count = (
+            queryset.filter(
+                Q(rating__gte=4)
+                | Q(message__icontains="thank")
+                | Q(message__icontains="great")
+            )
+            .distinct()
+            .count()
+        )
+
+        negative_count = (
+            queryset.filter(Q(rating__lte=2) | Q(communication_type="complaint"))
+            .distinct()
+            .count()
+        )
+
+        total = queryset.count()
+        neutral_count = max(0, total - positive_count - negative_count)
+
+        # Extract trending topics from subjects
+        trending_topics = list(
+            queryset.exclude(subject__isnull=True)
+            .exclude(subject="")
+            .values_list("subject", flat=True)[:10]
+        )
+
+        return Response(
+            {
+                "positive": positive_count,
+                "negative": negative_count,
+                "neutral": neutral_count,
+                "total": total,
+                "period_days": days,
+                "trending_topics": trending_topics,
+            }
+        )
+
+    @action(detail=False, methods=["get"])
+    def campaign_stats(self, request):
+        """Get email campaign statistics"""
+        # TODO: Integrate with email service (SendGrid, Mailgun, etc.)
+        # For now, return basic stats from communications
+
+        queryset = self.get_queryset().filter(
+            communication_type__in=["promotional", "alert", "feedback"]
+        )
+
+        total_campaigns = queryset.count()
+        active_campaigns = queryset.filter(
+            status__in=["pending", "in_progress"]
+        ).count()
+
+        # Placeholder for email tracking metrics
+        stats = {
+            "total_campaigns": total_campaigns,
+            "active_campaigns": active_campaigns,
+            "total_sent": total_campaigns,
+            "delivered": int(total_campaigns * 0.95),
+            "opened": int(total_campaigns * 0.45),
+            "clicked": int(total_campaigns * 0.12),
+            "conversion_rate": 12.5,
+        }
+
+        return Response(stats)
+
+    @action(detail=False, methods=["get"])
+    def delivery_stats(self, request):
+        """Get communication delivery statistics"""
+        from datetime import timedelta
+
+        period = request.GET.get("period", "30d")
+        days = int(period.replace("d", ""))
+
+        start_date = timezone.now() - timedelta(days=days)
+        queryset = self.get_queryset().filter(created_at__gte=start_date)
+
+        total_sent = queryset.count()
+
+        # Placeholder stats - TODO: Integrate with actual email/SMS service
+        stats = {
+            "total_sent": total_sent,
+            "delivered": int(total_sent * 0.95),
+            "opened": int(total_sent * 0.45),
+            "clicked": int(total_sent * 0.12),
+            "failed": int(total_sent * 0.05),
+            "pending": queryset.filter(status="pending").count(),
+            "period_days": days,
+        }
+
+        return Response(stats)
+
+    @action(detail=False, methods=["get"])
+    def notifications(self, request):
+        """Get communication notifications"""
+        # Return system communications that are notification type
+        queryset = (
+            self.get_queryset()
+            .filter(
+                Q(communication_type="notification") | Q(communication_type="alert")
+            )
+            .order_by("-created_at")[:50]
+        )
+
+        serializer = CommunicationListSerializer(queryset, many=True)
+        return Response({"results": serializer.data, "count": queryset.count()})
+
+    @action(detail=True, methods=["post"])
+    def duplicate(self, request, pk=None):
+        """Duplicate a communication"""
+        communication = self.get_object()
+
+        # Create a duplicate
+        duplicate = Communication.objects.create(
+            user=communication.user,
+            subject=f"[COPY] {communication.subject}",
+            message=communication.message,
+            communication_type=communication.communication_type,
+            priority=communication.priority,
+            status="pending",
+            reference_number=f"COM-{uuid.uuid4().hex[:8].upper()}",
+        )
+
+        # Copy tags and categories
+        for tag_rel in communication.tag_relations.all():
+            CommunicationTagRelation.objects.create(
+                communication=duplicate, tag=tag_rel.tag, added_by=request.user
+            )
+
+        for cat_rel in communication.category_relations.all():
+            CommunicationCategoryRelation.objects.create(
+                communication=duplicate,
+                category=cat_rel.category,
+                added_by=request.user,
+            )
+
+        # Log activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action="duplicate",
+            resource_type="communication",
+            resource_id=duplicate.reference_number,
+            description=f"Duplicated communication {communication.reference_number} to {duplicate.reference_number}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+        )
+
+        serializer = self.get_serializer(duplicate)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"])
+    def send(self, request):
+        """Send a new communication to users"""
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        user_ids = request.data.get("user_ids", [])
+        subject = request.data.get("subject")
+        message = request.data.get("message")
+        communication_type = request.data.get("type", "notification")
+        priority = request.data.get("priority", "medium")
+
+        if not subject or not message:
+            return Response(
+                {"error": "Subject and message are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not user_ids:
+            return Response(
+                {"error": "At least one user_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created_communications = []
+        for user_id in user_ids:
+            try:
+                user = User.objects.get(user_id=user_id)
+                comm = Communication.objects.create(
+                    user=user,
+                    subject=subject,
+                    message=message,
+                    communication_type=communication_type,
+                    priority=priority,
+                    reference_number=f"COM-{uuid.uuid4().hex[:8].upper()}",
+                    assigned_to=request.user,
+                )
+                created_communications.append(comm)
+            except User.DoesNotExist:
+                continue
+
+        # Log activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action="send",
+            resource_type="communication",
+            resource_id="bulk",
+            description=f"Sent {len(created_communications)} communications",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+        )
+
+        return Response(
+            {
+                "message": f"Successfully sent {len(created_communications)} communications",
+                "count": len(created_communications),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"])
+    def send_detail(self, request, pk=None):
+        """Send a specific communication to additional users"""
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        communication = self.get_object()
+
+        user_ids = request.data.get("user_ids", [])
+
+        if not user_ids:
+            return Response(
+                {"error": "At least one user_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created_communications = []
+        for user_id in user_ids:
+            try:
+                user = User.objects.get(user_id=user_id)
+                comm = Communication.objects.create(
+                    user=user,
+                    subject=communication.subject,
+                    message=communication.message,
+                    communication_type=communication.communication_type,
+                    priority=communication.priority,
+                    reference_number=f"COM-{uuid.uuid4().hex[:8].upper()}",
+                    assigned_to=request.user,
+                )
+                created_communications.append(comm)
+            except User.DoesNotExist:
+                continue
+
+        # Log activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action="send",
+            resource_type="communication",
+            resource_id=communication.reference_number,
+            description=f"Resent communication {communication.reference_number} to {len(created_communications)} users",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+        )
+
+        return Response(
+            {
+                "message": f"Successfully sent to {len(created_communications)} users",
+                "count": len(created_communications),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["post"])
+    def bulk_update(self, request):
+        """Bulk update communications"""
+        communication_ids = request.data.get("communication_ids", [])
+        update_data = request.data.get("update_data", {})
+
+        if not communication_ids:
+            return Response(
+                {"error": "communication_ids list is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not update_data:
+            return Response(
+                {"error": "update_data is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        updated_count = 0
+        for comm_id in communication_ids:
+            try:
+                comm = Communication.objects.get(id=comm_id)
+                for field, value in update_data.items():
+                    if hasattr(comm, field) and field not in [
+                        "id",
+                        "reference_number",
+                        "created_at",
+                    ]:
+                        setattr(comm, field, value)
+                comm.save()
+                updated_count += 1
+            except Communication.DoesNotExist:
+                continue
+
+        # Log activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action="bulk_update",
+            resource_type="communication",
+            resource_id="bulk",
+            description=f"Bulk updated {updated_count} communications",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+        )
+
+        return Response(
+            {
+                "message": f"Successfully updated {updated_count} communications",
+                "count": updated_count,
+            }
+        )
+
+    @action(detail=False, methods=["post"])
+    def send_email(self, request):
+        """Send email to specific users or all users"""
+        from django.conf import settings
+        from django.contrib.auth import get_user_model
+        from django.core.mail import send_mail
+
+        User = get_user_model()
+
+        user_ids = request.data.get("user_ids", [])
+        send_to_all = request.data.get("send_to_all", False)
+        subject = request.data.get("subject")
+        message = request.data.get("message")
+        html_message = request.data.get("html_message")
+
+        if not subject or not message:
+            return Response(
+                {"error": "Subject and message are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get recipients
+        if send_to_all:
+            recipients = User.objects.filter(is_active=True)
+        elif user_ids:
+            recipients = User.objects.filter(user_id__in=user_ids, is_active=True)
+        else:
+            return Response(
+                {"error": "Either user_ids or send_to_all must be provided"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        sent_count = 0
+        failed_count = 0
+
+        for user in recipients:
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+                sent_count += 1
+
+                # Create communication record
+                Communication.objects.create(
+                    user=user,
+                    subject=subject,
+                    message=message,
+                    communication_type="email",
+                    reference_number=f"COM-{uuid.uuid4().hex[:8].upper()}",
+                    assigned_to=request.user,
+                )
+            except Exception as e:
+                failed_count += 1
+                continue
+
+        # Log activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action="send_email",
+            resource_type="communication",
+            resource_id="email_bulk",
+            description=f"Sent {sent_count} emails, {failed_count} failed",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+        )
+
+        return Response(
+            {
+                "message": f"Successfully sent {sent_count} emails",
+                "sent": sent_count,
+                "failed": failed_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["get"])
+    def responses(self, request, pk=None):
+        """Get all responses for a communication"""
+        communication = self.get_object()
+        responses = communication.responses.all().order_by("-created_at")
+
+        serializer = CommunicationResponseSerializer(responses, many=True)
+        return Response({"results": serializer.data, "count": responses.count()})
 
 
 class CommunicationResponseViewSet(viewsets.ModelViewSet):

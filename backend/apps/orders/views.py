@@ -1,17 +1,30 @@
-from rest_framework import viewsets, status, serializers
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.response import Response
-from django.utils import timezone
-from django.http import JsonResponse
-from django.db.models import Sum, Avg, Count, Q
+import math
+from datetime import timedelta
 from decimal import Decimal
-from .models import Order, OrderItem, OrderStatusHistory, CartItem, UserAddress
-from .serializers import CartItemSerializer, UserAddressSerializer
-from apps.food.models import FoodReview, FoodPrice
+
+from apps.food.models import FoodPrice, FoodReview
 from apps.payments.models import Payment
 from django.contrib.auth import get_user_model
-import math
+from django.db.models import Avg, Count, F, Q, Sum
+from django.http import JsonResponse
+from django.utils import timezone
+from rest_framework import serializers, status, viewsets
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from .models import (
+    CartItem,
+    DeliveryChat,
+    DeliveryIssue,
+    DeliveryLog,
+    LocationUpdate,
+    Order,
+    OrderItem,
+    OrderStatusHistory,
+    UserAddress,
+)
+from .serializers import CartItemSerializer, UserAddressSerializer
 
 User = get_user_model()
 
@@ -63,13 +76,13 @@ def _resolve_chef_location(chef, request_data):
     If coordinates are provided in request and the chef has no persisted kitchen_location,
     we will persist them to chef.cook.kitchen_location and ensure a 'Kitchen' UserAddress exists.
     """
-    chef_lat = request_data.get('chef_latitude')
-    chef_lng = request_data.get('chef_longitude')
+    chef_lat = request_data.get("chef_latitude")
+    chef_lng = request_data.get("chef_longitude")
 
     # Normalize to floats if present
     def _to_float(v):
         try:
-            return float(v) if v is not None and v != '' else None
+            return float(v) if v is not None and v != "" else None
         except (TypeError, ValueError):
             return None
 
@@ -79,25 +92,25 @@ def _resolve_chef_location(chef, request_data):
     # 1) If request provided coords, use them first
     if lat is not None and lng is not None:
         # Persist if profile missing or empty
-        if hasattr(chef, 'cook'):
+        if hasattr(chef, "cook"):
             cook_profile = chef.cook
-            if not getattr(cook_profile, 'kitchen_location', None):
+            if not getattr(cook_profile, "kitchen_location", None):
                 cook_profile.kitchen_location = f"{lat},{lng}"
-                cook_profile.save(update_fields=['kitchen_location'])
+                cook_profile.save(update_fields=["kitchen_location"])
 
         # Ensure a 'Kitchen' address exists/updated for chef (best effort; use placeholders where needed)
         try:
             kitchen_address, created = UserAddress.objects.get_or_create(
                 user=chef,
-                label='Kitchen',
+                label="Kitchen",
                 defaults={
-                    'address_line1': request_data.get('chef_address') or 'Chef Kitchen',
-                    'city': request_data.get('chef_city') or 'Unknown',
-                    'pincode': request_data.get('chef_pincode') or '000000',
-                    'latitude': lat,
-                    'longitude': lng,
-                    'is_default': False,
-                }
+                    "address_line1": request_data.get("chef_address") or "Chef Kitchen",
+                    "city": request_data.get("chef_city") or "Unknown",
+                    "pincode": request_data.get("chef_pincode") or "000000",
+                    "latitude": lat,
+                    "longitude": lng,
+                    "is_default": False,
+                },
             )
             # Update coordinates if already existed but empty or different
             updated = False
@@ -107,8 +120,11 @@ def _resolve_chef_location(chef, request_data):
             if kitchen_address.longitude != lng:
                 kitchen_address.longitude = lng
                 updated = True
-            if request_data.get('chef_address') and kitchen_address.address_line1 != request_data['chef_address']:
-                kitchen_address.address_line1 = request_data['chef_address']
+            if (
+                request_data.get("chef_address")
+                and kitchen_address.address_line1 != request_data["chef_address"]
+            ):
+                kitchen_address.address_line1 = request_data["chef_address"]
                 updated = True
             if updated:
                 kitchen_address.save()
@@ -119,12 +135,12 @@ def _resolve_chef_location(chef, request_data):
         return lat, lng
 
     # 2) Try persisted cook profile location
-    if hasattr(chef, 'cook'):
+    if hasattr(chef, "cook"):
         cook_profile = chef.cook
-        location = getattr(cook_profile, 'kitchen_location', None)
-        if isinstance(location, str) and ',' in location:
+        location = getattr(cook_profile, "kitchen_location", None)
+        if isinstance(location, str) and "," in location:
             try:
-                lat_str, lng_str = location.split(',')
+                lat_str, lng_str = location.split(",")
                 lat, lng = _to_float(lat_str), _to_float(lng_str)
                 if lat is not None and lng is not None:
                     return lat, lng
@@ -133,12 +149,17 @@ def _resolve_chef_location(chef, request_data):
 
     # 3) Try chef's saved address with coordinates
     kitchen_addr = (
-        UserAddress.objects
-        .filter(user=chef, latitude__isnull=False, longitude__isnull=False)
-        .order_by('-is_default', '-created_at')
+        UserAddress.objects.filter(
+            user=chef, latitude__isnull=False, longitude__isnull=False
+        )
+        .order_by("-is_default", "-created_at")
         .first()
     )
-    if kitchen_addr and kitchen_addr.latitude is not None and kitchen_addr.longitude is not None:
+    if (
+        kitchen_addr
+        and kitchen_addr.latitude is not None
+        and kitchen_addr.longitude is not None
+    ):
         try:
             return float(kitchen_addr.latitude), float(kitchen_addr.longitude)
         except Exception:
@@ -146,6 +167,7 @@ def _resolve_chef_location(chef, request_data):
 
     # Not available
     return None, None
+
 
 # Temporary simple serializer to fix the 500 error
 class SimpleOrderSerializer(serializers.ModelSerializer):
@@ -160,12 +182,24 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'order_number', 'status', 'status_display',
-            'total_amount', 'delivery_fee', 'created_at', 'updated_at',
-            'customer_name', 'chef', 'delivery_partner', 'items', 'time_since_order', 'total_items',
-            'delivery_address', 'customer_notes', 'chef_notes'
+            "id",
+            "order_number",
+            "status",
+            "status_display",
+            "total_amount",
+            "delivery_fee",
+            "created_at",
+            "updated_at",
+            "customer_name",
+            "chef",
+            "delivery_partner",
+            "items",
+            "time_since_order",
+            "total_items",
+            "delivery_address",
+            "customer_notes",
+            "chef_notes",
         ]
-
 
     def get_customer_name(self, obj):
         if obj.customer:
@@ -178,7 +212,11 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
 
     def get_chef(self, obj):
         if obj.chef:
-            return obj.chef.name or f"{obj.chef.first_name} {obj.chef.last_name}".strip() or obj.chef.username
+            return (
+                obj.chef.name
+                or f"{obj.chef.first_name} {obj.chef.last_name}".strip()
+                or obj.chef.username
+            )
         return "Unknown Chef"
 
     def get_time_since_order(self, obj):
@@ -196,34 +234,66 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
             return f"{days} days ago"
 
     def get_total_items(self, obj):
-        return obj.items.aggregate(total=Sum('quantity'))['total'] or 0
+        return obj.items.aggregate(total=Sum("quantity"))["total"] or 0
 
     def get_items(self, obj):
         items = []
-        for order_item in obj.items.select_related('price__food', 'price__cook').all():
-            items.append({
-                'id': order_item.order_item_id,
-                'quantity': order_item.quantity,
-                'unit_price': float(order_item.unit_price or 0),
-                'total_price': float(order_item.total_price or 0),
-                'special_instructions': order_item.special_instructions or '',
-                'food_name': order_item.food_name or order_item.price.food.name if order_item.price else 'Unknown Food',
-                'food_description': order_item.food_description or (order_item.price.food.description if order_item.price else ''),
-                'food_image': order_item.price.image_url if order_item.price and order_item.price.image_url else (order_item.price.food.image_url if order_item.price and order_item.price.food.image_url else None),
-                'size': order_item.price.size if order_item.price else 'Medium',
-                'cook_name': order_item.price.cook.name or f"{order_item.price.cook.first_name} {order_item.price.cook.last_name}".strip() or order_item.price.cook.username if order_item.price else 'Unknown Cook'
-            })
+        for order_item in obj.items.select_related("price__food", "price__cook").all():
+            items.append(
+                {
+                    "id": order_item.order_item_id,
+                    "quantity": order_item.quantity,
+                    "unit_price": float(order_item.unit_price or 0),
+                    "total_price": float(order_item.total_price or 0),
+                    "special_instructions": order_item.special_instructions or "",
+                    "food_name": (
+                        order_item.food_name or order_item.price.food.name
+                        if order_item.price
+                        else "Unknown Food"
+                    ),
+                    "food_description": order_item.food_description
+                    or (order_item.price.food.description if order_item.price else ""),
+                    "food_image": (
+                        order_item.price.image_url
+                        if order_item.price and order_item.price.image_url
+                        else (
+                            order_item.price.food.image_url
+                            if order_item.price and order_item.price.food.image_url
+                            else None
+                        )
+                    ),
+                    "size": order_item.price.size if order_item.price else "Medium",
+                    "cook_name": (
+                        order_item.price.cook.name
+                        or f"{order_item.price.cook.first_name} {order_item.price.cook.last_name}".strip()
+                        or order_item.price.cook.username
+                        if order_item.price
+                        else "Unknown Cook"
+                    ),
+                }
+            )
         return items
 
+
 class OrderViewSet(viewsets.ModelViewSet):
-    queryset = Order.objects.select_related('customer', 'chef', 'delivery_partner').prefetch_related('items__price__food', 'items__price__cook').all()
+    queryset = (
+        Order.objects.select_related("customer", "chef", "delivery_partner")
+        .prefetch_related("items__price__food", "items__price__cook")
+        .all()
+    )
     serializer_class = SimpleOrderSerializer  # Use our working simple serializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """Filter orders based on user role"""
         user = self.request.user
-        queryset = super().get_queryset().select_related('customer', 'chef', 'delivery_partner').prefetch_related('items__price__food', 'items__price__cook').order_by('-created_at')
+        queryset = (
+            super()
+            .get_queryset()
+            .select_related("customer", "chef", "delivery_partner")
+            .prefetch_related("items__price__food", "items__price__cook")
+            .order_by("-created_at")
+        )
 
         # Handle anonymous users (return empty queryset for security)
         if not user.is_authenticated:
@@ -309,15 +379,23 @@ class OrderViewSet(viewsets.ModelViewSet):
 
                 return distance
 
-            distance_km = calculate_distance(float(agent_lat), float(agent_lng), float(chef_lat), float(chef_lng))
+            distance_km = calculate_distance(
+                float(agent_lat), float(agent_lng), float(chef_lat), float(chef_lng)
+            )
             # Validate distance to avoid DB out-of-range and unrealistic deliveries
             MAX_DELIVERY_KM = 50.0  # business rule: serviceable radius
             if math.isnan(distance_km) or distance_km <= 0:
-                return Response({'error': 'Invalid distance calculation. Please verify addresses.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "Invalid distance calculation. Please verify addresses."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             if distance_km > MAX_DELIVERY_KM:
-                return Response({
-                    'error': f'Delivery distance {round(distance_km, 2)} km is out of service range (max {int(MAX_DELIVERY_KM)} km).'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {
+                        "error": f"Delivery distance {round(distance_km, 2)} km is out of service range (max {int(MAX_DELIVERY_KM)} km)."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             # Check if distance is greater than 10km
             if distance_km > 10:
                 return Response(
@@ -427,99 +505,124 @@ class OrderViewSet(viewsets.ModelViewSet):
             {"success": "Order rejected successfully", "status": "cancelled"}
         )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def cancel_order(self, request, pk=None):
         """Cancel an order within 10 minutes of placement"""
         order = self.get_object()
 
         # Check if user is authorized to cancel this order
         if order.customer != request.user:
-            return Response({"error": "You are not authorized to cancel this order"}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"error": "You are not authorized to cancel this order"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Check if order can be cancelled
-        if order.status not in ['pending', 'confirmed']:
-            return Response({"error": "Order cannot be cancelled in current status"}, status=status.HTTP_400_BAD_REQUEST)
+        if order.status not in ["pending", "confirmed"]:
+            return Response(
+                {"error": "Order cannot be cancelled in current status"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Check if order is within 10-minute cancellation window
         from datetime import timedelta
+
         from django.utils import timezone
 
         time_since_order = timezone.now() - order.created_at
         if time_since_order > timedelta(minutes=10):
-            return Response({
-                "error": "Order can only be cancelled within 10 minutes of placement",
-                "time_remaining": "0 minutes"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "error": "Order can only be cancelled within 10 minutes of placement",
+                    "time_remaining": "0 minutes",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Calculate remaining time for cancellation
         remaining_time = timedelta(minutes=10) - time_since_order
         remaining_minutes = int(remaining_time.total_seconds() // 60)
 
-        cancellation_reason = request.data.get('reason', 'Customer requested cancellation')
+        cancellation_reason = request.data.get(
+            "reason", "Customer requested cancellation"
+        )
 
         # Update order status
-        order.status = 'cancelled'
+        order.status = "cancelled"
         order.cancelled_at = timezone.now()
-        order.customer_notes = f"{order.customer_notes}\n\nCancelled: {cancellation_reason}".strip()
+        order.customer_notes = (
+            f"{order.customer_notes}\n\nCancelled: {cancellation_reason}".strip()
+        )
         order.save()
 
         # Add status history
         OrderStatusHistory.objects.create(
             order=order,
-            status='cancelled',
+            status="cancelled",
             changed_by=request.user,
-            notes=f"Order cancelled by customer: {cancellation_reason}"
+            notes=f"Order cancelled by customer: {cancellation_reason}",
         )
 
-        return Response({
-            "success": "Order cancelled successfully",
-            "status": "cancelled",
-            "refund_status": "pending",
-            "message": "Your refund will be processed within 3-5 business days"
-        })
+        return Response(
+            {
+                "success": "Order cancelled successfully",
+                "status": "cancelled",
+                "refund_status": "pending",
+                "message": "Your refund will be processed within 3-5 business days",
+            }
+        )
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=["get"])
     def can_cancel(self, request, pk=None):
         """Check if an order can be cancelled and return remaining time"""
         order = self.get_object()
 
         # Check if user is authorized
         if order.customer != request.user:
-            return Response({"error": "You are not authorized to view this order"}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"error": "You are not authorized to view this order"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Check if order can be cancelled based on status
-        if order.status not in ['pending', 'confirmed']:
-            return Response({
-                "can_cancel": False,
-                "reason": "Order cannot be cancelled in current status",
-                "time_remaining": "0 minutes"
-            })
+        if order.status not in ["pending", "confirmed"]:
+            return Response(
+                {
+                    "can_cancel": False,
+                    "reason": "Order cannot be cancelled in current status",
+                    "time_remaining": "0 minutes",
+                }
+            )
 
         # Check time window
         from datetime import timedelta
+
         from django.utils import timezone
 
         time_since_order = timezone.now() - order.created_at
         if time_since_order > timedelta(minutes=10):
-            return Response({
-                "can_cancel": False,
-                "reason": "Cancellation window has expired",
-                "time_remaining": "0 minutes"
-            })
+            return Response(
+                {
+                    "can_cancel": False,
+                    "reason": "Cancellation window has expired",
+                    "time_remaining": "0 minutes",
+                }
+            )
 
         # Calculate remaining time
         remaining_time = timedelta(minutes=10) - time_since_order
         remaining_minutes = int(remaining_time.total_seconds() // 60)
         remaining_seconds = int(remaining_time.total_seconds() % 60)
 
-        return Response({
-            "can_cancel": True,
-            "time_remaining": f"{remaining_minutes} minutes {remaining_seconds} seconds",
-            "time_remaining_seconds": int(remaining_time.total_seconds())
-        })
+        return Response(
+            {
+                "can_cancel": True,
+                "time_remaining": f"{remaining_minutes} minutes {remaining_seconds} seconds",
+                "time_remaining_seconds": int(remaining_time.total_seconds()),
+            }
+        )
 
-
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=["patch"])
     def status(self, request, pk=None):
         order = self.get_object()
         new_status = request.data.get("status")
@@ -786,6 +889,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
 class UserAddressViewSet(viewsets.ModelViewSet):
     """ViewSet for managing user addresses"""
+
     serializer_class = UserAddressSerializer
     permission_classes = [IsAuthenticated]
 
@@ -795,10 +899,10 @@ class UserAddressViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=["post"])
     def set_default(self, request):
         """Set an address as default"""
-        address_id = request.data.get('address_id')
+        address_id = request.data.get("address_id")
         try:
             address = UserAddress.objects.get(id=address_id, user=request.user)
             # Remove default from other addresses
@@ -806,9 +910,11 @@ class UserAddressViewSet(viewsets.ModelViewSet):
             # Set this address as default
             address.is_default = True
             address.save()
-            return Response({'success': 'Default address updated'})
+            return Response({"success": "Default address updated"})
         except UserAddress.DoesNotExist:
-            return Response({'error': 'Address not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
 
 class CartItemViewSet(viewsets.ModelViewSet):
@@ -1071,114 +1177,132 @@ def chef_recent_activity(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
-
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def mark_picked_up(self, request, pk=None):
         """Delivery agent marks order as picked up from chef"""
         order = self.get_object()
 
         # Check if user is the assigned delivery partner
         if order.delivery_partner != request.user:
-            return Response({"error": "You are not authorized to update this order"}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"error": "You are not authorized to update this order"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Check if order is in correct status
-        if order.status not in ['out_for_delivery', 'ready']:
-            return Response({"error": "Order cannot be marked as picked up in current status"}, status=status.HTTP_400_BAD_REQUEST)
+        if order.status not in ["out_for_delivery", "ready"]:
+            return Response(
+                {"error": "Order cannot be marked as picked up in current status"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Get pickup location and notes
-        pickup_location = request.data.get('pickup_location', {})
-        notes = request.data.get('notes', 'Order picked up from chef')
+        pickup_location = request.data.get("pickup_location", {})
+        notes = request.data.get("notes", "Order picked up from chef")
 
         # Update order status
-        order.status = 'in_transit'
+        order.status = "in_transit"
         order.save()
 
         # Add status history
         OrderStatusHistory.objects.create(
-            order=order,
-            status='in_transit',
-            changed_by=request.user,
-            notes=notes
+            order=order, status="in_transit", changed_by=request.user, notes=notes
         )
 
-        return Response({
-            "success": "Order marked as picked up successfully",
-            "order_id": order.id,
-            "status": "in_transit"
-        })
+        return Response(
+            {
+                "success": "Order marked as picked up successfully",
+                "order_id": order.id,
+                "status": "in_transit",
+            }
+        )
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=["get"])
     def chef_location(self, request, pk=None):
         """Get chef location details for navigation"""
         order = self.get_object()
 
         # Check if user is the assigned delivery partner
         if order.delivery_partner != request.user:
-            return Response({"error": "You are not authorized to access this information"}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"error": "You are not authorized to access this information"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         chef = order.chef
         if not chef:
-            return Response({"error": "No chef assigned to this order"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "No chef assigned to this order"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         # Try to get chef's location from various sources
         chef_location = {}
 
         # First, try to get from user's address
         if chef.address:
-            chef_location['address'] = chef.address
+            chef_location["address"] = chef.address
 
         # Try to get from chef profile if exists
-        if hasattr(chef, 'chef_profile'):
+        if hasattr(chef, "chef_profile"):
             profile = chef.chef_profile
-            if hasattr(profile, 'service_location') and profile.service_location:
-                chef_location['service_location'] = profile.service_location
+            if hasattr(profile, "service_location") and profile.service_location:
+                chef_location["service_location"] = profile.service_location
 
         # Get basic chef info
         chef_info = {
-            'id': chef.id,
-            'name': chef.name or f"{chef.first_name} {chef.last_name}".strip() or chef.username,
-            'phone': chef.phone_no,
-            'email': chef.email,
-            'location': chef_location
+            "id": chef.id,
+            "name": chef.name
+            or f"{chef.first_name} {chef.last_name}".strip()
+            or chef.username,
+            "phone": chef.phone_no,
+            "email": chef.email,
+            "location": chef_location,
         }
 
-        return Response({
-            'chef': chef_info,
-            'order_id': order.id,
-            'pickup_address': chef_location.get('address') or chef_location.get('service_location', 'Address not available')
-        })
+        return Response(
+            {
+                "chef": chef_info,
+                "order_id": order.id,
+                "pickup_address": chef_location.get("address")
+                or chef_location.get("service_location", "Address not available"),
+            }
+        )
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def calculate_checkout(request):
     """Calculate delivery fee, tax, and total for checkout with comprehensive validation"""
     try:
-        cart_items = request.data.get('cart_items', [])
-        customer_location = request.data.get('customer_location', {})
+        cart_items = request.data.get("cart_items", [])
+        customer_location = request.data.get("customer_location", {})
 
         if not cart_items:
-            return Response({
-                'error': 'Cart is empty'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Initialize calculation variables
-        subtotal = Decimal('0.00')
-        delivery_fee = Decimal('15.00')  # Base delivery fee
-        tax_rate = Decimal('0.08')  # 8% tax
+        subtotal = Decimal("0.00")
+        delivery_fee = Decimal("15.00")  # Base delivery fee
+        tax_rate = Decimal("0.08")  # 8% tax
 
         # Calculate subtotal
         for item in cart_items:
             # Get the price record
             try:
-                food_price = FoodPrice.objects.select_related('food', 'cook').get(id=item['price_id'])
+                food_price = FoodPrice.objects.select_related("food", "cook").get(
+                    id=item["price_id"]
+                )
             except FoodPrice.DoesNotExist:
-                return Response({
-                    'error': f'Price with ID {item["price_id"]} not found'
-                }, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {"error": f'Price with ID {item["price_id"]} not found'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
             # Calculate item total
-            item_total = food_price.price * item['quantity']
+            item_total = food_price.price * item["quantity"]
             subtotal += item_total
 
         # Calculate tax
@@ -1187,32 +1311,34 @@ def calculate_checkout(request):
         # Calculate total
         total_amount = subtotal + delivery_fee + tax_amount
 
-        return Response({
-            'subtotal': float(subtotal),
-            'delivery_fee': float(delivery_fee),
-            'tax_amount': float(tax_amount),
-            'total_amount': float(total_amount),
-            'tax_rate': float(tax_rate),
-        })
+        return Response(
+            {
+                "subtotal": float(subtotal),
+                "delivery_fee": float(delivery_fee),
+                "tax_amount": float(tax_amount),
+                "total_amount": float(total_amount),
+                "tax_rate": float(tax_rate),
+            }
+        )
 
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def place_order(request):
     """Place a comprehensive order with full validation and processing"""
     try:
-        cart_items = request.data.get('cart_items', [])
-        customer_location = request.data.get('customer_location', {})
-        payment_method = request.data.get('payment_method', 'cash')
-        special_instructions = request.data.get('special_instructions', '')
+        cart_items = request.data.get("cart_items", [])
+        customer_location = request.data.get("customer_location", {})
+        payment_method = request.data.get("payment_method", "cash")
+        special_instructions = request.data.get("special_instructions", "")
 
         if not cart_items:
-            return Response({
-                'error': 'Cart is empty'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Create order
         import uuid
@@ -1220,19 +1346,21 @@ def place_order(request):
         order = Order.objects.create(
             customer=request.user,
             chef=None,  # Will be set based on first item
-            order_number=f'ORD-{uuid.uuid4().hex[:8].upper()}',
-            status='pending',
+            order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
+            status="pending",
             payment_method=payment_method,
             special_instructions=special_instructions,
-            delivery_address=customer_location.get('formatted_address', ''),
-            delivery_latitude=customer_location.get('latitude'),
-            delivery_longitude=customer_location.get('longitude'),
+            delivery_address=customer_location.get("formatted_address", ""),
+            delivery_latitude=customer_location.get("latitude"),
+            delivery_longitude=customer_location.get("longitude"),
         )
 
         # Process cart items
         for item_data in cart_items:
             try:
-                food_price = FoodPrice.objects.select_related('food', 'cook').get(id=item_data['price_id'])
+                food_price = FoodPrice.objects.select_related("food", "cook").get(
+                    id=item_data["price_id"]
+                )
 
                 # Set chef for order (from first item)
                 if not order.chef:
@@ -1243,21 +1371,22 @@ def place_order(request):
                 OrderItem.objects.create(
                     order=order,
                     price=food_price,
-                    quantity=item_data['quantity'],
-                    total_amount=food_price.price * item_data['quantity']
+                    quantity=item_data["quantity"],
+                    total_amount=food_price.price * item_data["quantity"],
                 )
 
             except FoodPrice.DoesNotExist:
                 # Clean up if error
                 order.delete()
-                return Response({
-                    'error': f'Price with ID {item_data["price_id"]} not found'
-                }, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {"error": f'Price with ID {item_data["price_id"]} not found'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
         # Calculate totals
         subtotal = sum(item.total_amount for item in order.items.all())
-        delivery_fee = Decimal('15.00')
-        tax_amount = subtotal * Decimal('0.08')
+        delivery_fee = Decimal("15.00")
+        tax_amount = subtotal * Decimal("0.08")
         total_amount = subtotal + delivery_fee + tax_amount
 
         # Update order totals
@@ -1270,18 +1399,682 @@ def place_order(request):
         # Create initial status history
         OrderStatusHistory.objects.create(
             order=order,
-            status='pending',
+            status="pending",
             changed_by=request.user,
-            notes='Order placed successfully'
+            notes="Order placed successfully",
         )
 
-        return Response({
-            'success': 'Order placed successfully',
-            'order_id': order.id,
-            'order_number': order.order_number,
-            'status': order.status,
-            'total_amount': float(total_amount)
-        })
+        return Response(
+            {
+                "success": "Order placed successfully",
+                "order_id": order.id,
+                "order_number": order.order_number,
+                "status": order.status,
+                "total_amount": float(total_amount),
+            }
+        )
 
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ==========================================
+# DELIVERY TRACKING VIEWSET
+# ==========================================
+
+
+class DeliveryTrackingViewSet(viewsets.ViewSet):
+    """
+    Comprehensive delivery tracking and management endpoints
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=["get"])
+    def active_deliveries(self, request):
+        """
+        Get all active deliveries with real-time tracking information
+        Admin only - for delivery tracking dashboard
+        """
+        try:
+            # Admin check
+            if not request.user.is_staff and not request.user.is_superuser:
+                return Response(
+                    {"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Get orders that are actively being delivered
+            active_orders = (
+                Order.objects.filter(
+                    status__in=["out_for_delivery", "ready", "preparing"]
+                )
+                .select_related("customer", "chef", "delivery_partner")
+                .prefetch_related(
+                    "items__price__food", "location_updates", "delivery_issues"
+                )
+                .order_by("-created_at")
+            )
+
+            deliveries = []
+            for order in active_orders:
+                # Get latest location update
+                latest_location = order.location_updates.first()
+
+                # Get open issues
+                open_issues = order.delivery_issues.filter(
+                    status__in=["reported", "acknowledged", "in_progress"]
+                ).count()
+
+                deliveries.append(
+                    {
+                        "order_id": order.order_number,
+                        "order_pk": order.pk,
+                        "status": order.status,
+                        "customer": {
+                            "id": order.customer.id if order.customer else None,
+                            "name": (
+                                f"{order.customer.first_name} {order.customer.last_name}".strip()
+                                if order.customer
+                                else "Unknown"
+                            ),
+                            "phone": (
+                                getattr(order.customer, "phone", None)
+                                if order.customer
+                                else None
+                            ),
+                        },
+                        "delivery_partner": (
+                            {
+                                "id": (
+                                    order.delivery_partner.id
+                                    if order.delivery_partner
+                                    else None
+                                ),
+                                "name": (
+                                    f"{order.delivery_partner.first_name} {order.delivery_partner.last_name}".strip()
+                                    if order.delivery_partner
+                                    else "Unassigned"
+                                ),
+                                "phone": (
+                                    getattr(order.delivery_partner, "phone", None)
+                                    if order.delivery_partner
+                                    else None
+                                ),
+                            }
+                            if order.delivery_partner
+                            else None
+                        ),
+                        "delivery_address": order.delivery_address,
+                        "delivery_latitude": (
+                            float(order.delivery_latitude)
+                            if order.delivery_latitude
+                            else None
+                        ),
+                        "delivery_longitude": (
+                            float(order.delivery_longitude)
+                            if order.delivery_longitude
+                            else None
+                        ),
+                        "current_location": (
+                            {
+                                "latitude": (
+                                    float(latest_location.latitude)
+                                    if latest_location
+                                    else None
+                                ),
+                                "longitude": (
+                                    float(latest_location.longitude)
+                                    if latest_location
+                                    else None
+                                ),
+                                "address": (
+                                    latest_location.address if latest_location else None
+                                ),
+                                "timestamp": (
+                                    latest_location.timestamp.isoformat()
+                                    if latest_location
+                                    else None
+                                ),
+                            }
+                            if latest_location
+                            else None
+                        ),
+                        "estimated_delivery_time": (
+                            order.estimated_delivery_time.isoformat()
+                            if order.estimated_delivery_time
+                            else None
+                        ),
+                        "distance_km": (
+                            float(order.distance_km) if order.distance_km else None
+                        ),
+                        "delivery_fee": (
+                            float(order.delivery_fee) if order.delivery_fee else 0
+                        ),
+                        "total_amount": float(order.total_amount),
+                        "open_issues": open_issues,
+                        "created_at": order.created_at.isoformat(),
+                        "time_elapsed": str(timezone.now() - order.created_at),
+                    }
+                )
+
+            return Response(
+                {
+                    "success": True,
+                    "count": len(deliveries),
+                    "active_deliveries": deliveries,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to retrieve active deliveries: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"])
+    def update_location(self, request, pk=None):
+        """
+        Update delivery agent's current location for an order
+        """
+        try:
+            # Get the order
+            try:
+                order = Order.objects.get(pk=pk)
+            except Order.DoesNotExist:
+                return Response(
+                    {"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Verify user is the delivery partner or admin
+            if order.delivery_partner != request.user and not request.user.is_staff:
+                return Response(
+                    {"error": "Not authorized to update location for this order"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # Get location data
+            latitude = request.data.get("latitude")
+            longitude = request.data.get("longitude")
+            address = request.data.get("address", "")
+
+            if not latitude or not longitude:
+                return Response(
+                    {"error": "Latitude and longitude are required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Create location update
+            location_update = LocationUpdate.objects.create(
+                delivery_agent=request.user,
+                order=order,
+                latitude=Decimal(str(latitude)),
+                longitude=Decimal(str(longitude)),
+                address=address,
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Location updated successfully",
+                    "location": {
+                        "latitude": float(location_update.latitude),
+                        "longitude": float(location_update.longitude),
+                        "address": location_update.address,
+                        "timestamp": location_update.timestamp.isoformat(),
+                    },
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to update location: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["get"])
+    def track(self, request, pk=None):
+        """
+        Get real-time tracking information for a specific order
+        Customer, delivery partner, or admin can access
+        """
+        try:
+            # Get the order
+            try:
+                order = (
+                    Order.objects.select_related("customer", "chef", "delivery_partner")
+                    .prefetch_related(
+                        "location_updates", "delivery_issues", "chat_messages"
+                    )
+                    .get(pk=pk)
+                )
+            except Order.DoesNotExist:
+                return Response(
+                    {"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Verify access permission
+            if not (
+                order.customer == request.user
+                or order.delivery_partner == request.user
+                or request.user.is_staff
+            ):
+                return Response(
+                    {"error": "Not authorized to track this order"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # Get latest location
+            latest_location = order.location_updates.first()
+
+            # Get recent issues
+            recent_issues = order.delivery_issues.filter(
+                status__in=["reported", "acknowledged", "in_progress"]
+            ).values("issue_id", "issue_type", "description", "status", "created_at")
+
+            # Get unread messages count
+            unread_messages = order.chat_messages.filter(
+                receiver=request.user, is_read=False
+            ).count()
+
+            return Response(
+                {
+                    "success": True,
+                    "order": {
+                        "order_number": order.order_number,
+                        "status": order.status,
+                        "delivery_address": order.delivery_address,
+                        "delivery_latitude": (
+                            float(order.delivery_latitude)
+                            if order.delivery_latitude
+                            else None
+                        ),
+                        "delivery_longitude": (
+                            float(order.delivery_longitude)
+                            if order.delivery_longitude
+                            else None
+                        ),
+                        "estimated_delivery_time": (
+                            order.estimated_delivery_time.isoformat()
+                            if order.estimated_delivery_time
+                            else None
+                        ),
+                        "distance_km": (
+                            float(order.distance_km) if order.distance_km else None
+                        ),
+                    },
+                    "delivery_partner": (
+                        {
+                            "name": (
+                                f"{order.delivery_partner.first_name} {order.delivery_partner.last_name}".strip()
+                                if order.delivery_partner
+                                else "Not assigned"
+                            ),
+                            "phone": (
+                                getattr(order.delivery_partner, "phone", None)
+                                if order.delivery_partner
+                                else None
+                            ),
+                        }
+                        if order.delivery_partner
+                        else None
+                    ),
+                    "current_location": (
+                        {
+                            "latitude": (
+                                float(latest_location.latitude)
+                                if latest_location
+                                else None
+                            ),
+                            "longitude": (
+                                float(latest_location.longitude)
+                                if latest_location
+                                else None
+                            ),
+                            "address": (
+                                latest_location.address if latest_location else None
+                            ),
+                            "timestamp": (
+                                latest_location.timestamp.isoformat()
+                                if latest_location
+                                else None
+                            ),
+                        }
+                        if latest_location
+                        else None
+                    ),
+                    "active_issues": list(recent_issues),
+                    "unread_messages": unread_messages,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to get tracking information: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    def delivery_stats(self, request):
+        """
+        Get delivery performance statistics
+        Admin only
+        """
+        try:
+            # Admin check
+            if not request.user.is_staff and not request.user.is_superuser:
+                return Response(
+                    {"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Get time range from query params
+            days = int(request.query_params.get("days", 7))
+            start_date = timezone.now() - timedelta(days=days)
+
+            # Active deliveries
+            active_count = Order.objects.filter(
+                status__in=["out_for_delivery", "ready", "preparing"]
+            ).count()
+
+            # Completed deliveries in time range
+            completed_orders = Order.objects.filter(
+                status="delivered", actual_delivery_time__gte=start_date
+            )
+            completed_count = completed_orders.count()
+
+            # Average delivery time (in minutes)
+            avg_delivery_time = None
+            if completed_count > 0:
+                completed_with_times = completed_orders.exclude(
+                    estimated_delivery_time__isnull=True,
+                    actual_delivery_time__isnull=True,
+                )
+
+                if completed_with_times.exists():
+                    total_minutes = 0
+                    count = 0
+                    for order in completed_with_times:
+                        if order.actual_delivery_time and order.created_at:
+                            delta = order.actual_delivery_time - order.created_at
+                            total_minutes += delta.total_seconds() / 60
+                            count += 1
+
+                    if count > 0:
+                        avg_delivery_time = round(total_minutes / count, 1)
+
+            # On-time delivery rate
+            on_time_count = 0
+            late_count = 0
+            for order in completed_orders:
+                if order.estimated_delivery_time and order.actual_delivery_time:
+                    if order.actual_delivery_time <= order.estimated_delivery_time:
+                        on_time_count += 1
+                    else:
+                        late_count += 1
+
+            on_time_rate = (
+                round((on_time_count / (on_time_count + late_count) * 100), 1)
+                if (on_time_count + late_count) > 0
+                else 0
+            )
+
+            # Issue statistics
+            total_issues = DeliveryIssue.objects.filter(
+                created_at__gte=start_date
+            ).count()
+
+            open_issues = DeliveryIssue.objects.filter(
+                status__in=["reported", "acknowledged", "in_progress"],
+                created_at__gte=start_date,
+            ).count()
+
+            # Revenue from deliveries
+            total_revenue = (
+                completed_orders.aggregate(total=Sum("total_amount"))["total"] or 0
+            )
+
+            delivery_fee_revenue = (
+                completed_orders.aggregate(total=Sum("delivery_fee"))["total"] or 0
+            )
+
+            # Top performing delivery partners
+            top_partners = (
+                Order.objects.filter(
+                    status="delivered",
+                    actual_delivery_time__gte=start_date,
+                    delivery_partner__isnull=False,
+                )
+                .values(
+                    "delivery_partner__id",
+                    "delivery_partner__first_name",
+                    "delivery_partner__last_name",
+                )
+                .annotate(delivery_count=Count("id"), total_earned=Sum("delivery_fee"))
+                .order_by("-delivery_count")[:5]
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "period_days": days,
+                    "stats": {
+                        "active_deliveries": active_count,
+                        "completed_deliveries": completed_count,
+                        "avg_delivery_time_minutes": avg_delivery_time,
+                        "on_time_delivery_rate": on_time_rate,
+                        "total_issues": total_issues,
+                        "open_issues": open_issues,
+                        "total_revenue": float(total_revenue),
+                        "delivery_fee_revenue": float(delivery_fee_revenue),
+                    },
+                    "top_delivery_partners": [
+                        {
+                            "id": partner["delivery_partner__id"],
+                            "name": f"{partner['delivery_partner__first_name']} {partner['delivery_partner__last_name']}".strip(),
+                            "deliveries": partner["delivery_count"],
+                            "total_earned": (
+                                float(partner["total_earned"])
+                                if partner["total_earned"]
+                                else 0
+                            ),
+                        }
+                        for partner in top_partners
+                    ],
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to retrieve delivery stats: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"])
+    def report_issue(self, request, pk=None):
+        """
+        Report a delivery issue
+        Delivery partner can report issues
+        """
+        try:
+            # Get the order
+            try:
+                order = Order.objects.get(pk=pk)
+            except Order.DoesNotExist:
+                return Response(
+                    {"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Verify user is the delivery partner
+            if order.delivery_partner != request.user:
+                return Response(
+                    {"error": "Only the assigned delivery partner can report issues"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # Get issue data
+            issue_type = request.data.get("issue_type")
+            description = request.data.get("description")
+
+            if not issue_type or not description:
+                return Response(
+                    {"error": "issue_type and description are required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Validate issue type
+            valid_types = [choice[0] for choice in DeliveryIssue.ISSUE_TYPE_CHOICES]
+            if issue_type not in valid_types:
+                return Response(
+                    {
+                        "error": f'Invalid issue_type. Must be one of: {", ".join(valid_types)}'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Create issue
+            issue = DeliveryIssue.objects.create(
+                order=order,
+                delivery_agent=request.user,
+                issue_type=issue_type,
+                description=description,
+                status="reported",
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Issue reported successfully",
+                    "issue": {
+                        "issue_id": str(issue.issue_id),
+                        "order_number": order.order_number,
+                        "issue_type": issue.issue_type,
+                        "description": issue.description,
+                        "status": issue.status,
+                        "created_at": issue.created_at.isoformat(),
+                    },
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to report issue: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["get", "post"])
+    def chat(self, request, pk=None):
+        """
+        Get or send chat messages for an order
+        GET: Retrieve chat history
+        POST: Send a new message
+        """
+        try:
+            # Get the order
+            try:
+                order = Order.objects.select_related(
+                    "customer", "delivery_partner"
+                ).get(pk=pk)
+            except Order.DoesNotExist:
+                return Response(
+                    {"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Verify access
+            if not (
+                order.customer == request.user
+                or order.delivery_partner == request.user
+                or request.user.is_staff
+            ):
+                return Response(
+                    {"error": "Not authorized to access chat for this order"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            if request.method == "GET":
+                # Get chat messages
+                messages = order.chat_messages.all().select_related(
+                    "sender", "receiver"
+                )
+
+                # Mark messages as read for current user
+                order.chat_messages.filter(receiver=request.user, is_read=False).update(
+                    is_read=True
+                )
+
+                return Response(
+                    {
+                        "success": True,
+                        "messages": [
+                            {
+                                "message_id": str(msg.message_id),
+                                "sender": {
+                                    "id": msg.sender.id,
+                                    "name": f"{msg.sender.first_name} {msg.sender.last_name}".strip()
+                                    or msg.sender.username,
+                                },
+                                "message": msg.message,
+                                "message_type": msg.message_type,
+                                "is_read": msg.is_read,
+                                "created_at": msg.created_at.isoformat(),
+                            }
+                            for msg in messages
+                        ],
+                    }
+                )
+
+            elif request.method == "POST":
+                # Send a new message
+                message_text = request.data.get("message")
+                message_type = request.data.get("message_type", "text")
+
+                if not message_text:
+                    return Response(
+                        {"error": "message is required"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Determine receiver
+                if request.user == order.customer:
+                    receiver = order.delivery_partner
+                elif request.user == order.delivery_partner:
+                    receiver = order.customer
+                else:
+                    return Response(
+                        {
+                            "error": "Only customer or delivery partner can send messages"
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
+                if not receiver:
+                    return Response(
+                        {"error": "No delivery partner assigned to this order yet"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Create message
+                chat_message = DeliveryChat.objects.create(
+                    order=order,
+                    sender=request.user,
+                    receiver=receiver,
+                    message=message_text,
+                    message_type=message_type,
+                )
+
+                return Response(
+                    {
+                        "success": True,
+                        "message": "Message sent successfully",
+                        "chat_message": {
+                            "message_id": str(chat_message.message_id),
+                            "message": chat_message.message,
+                            "message_type": chat_message.message_type,
+                            "created_at": chat_message.created_at.isoformat(),
+                        },
+                    }
+                )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Chat operation failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

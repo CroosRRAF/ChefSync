@@ -256,3 +256,88 @@ class SystemMaintenanceViewSet(viewsets.ModelViewSet):
         if status_filter:
             return self.queryset.filter(status=status_filter)
         return self.queryset
+
+
+# Additional analytics endpoints for frontend compatibility
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def order_analytics(request):
+    """Get order analytics data"""
+    try:
+        range_param = request.GET.get('range', '30d')
+        days = int(range_param.replace('d', ''))
+        
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=days)
+        
+        # Get order statistics
+        orders = Order.objects.filter(
+            created_at__gte=start_date,
+            created_at__lte=end_date
+        )
+        
+        total_orders = orders.count()
+        total_revenue = orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        
+        # Orders by status
+        status_stats = orders.values('status').annotate(count=Count('id'))
+        
+        # Daily breakdown
+        daily_stats = orders.extra(
+            select={'day': 'date(created_at)'}
+        ).values('day').annotate(
+            count=Count('id'),
+            revenue=Sum('total_amount')
+        ).order_by('day')
+        
+        return Response({
+            'total_orders': total_orders,
+            'total_revenue': float(total_revenue),
+            'status_breakdown': list(status_stats),
+            'daily_breakdown': list(daily_stats),
+            'period': range_param
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def customer_analytics(request):
+    """Get customer analytics data"""
+    try:
+        range_param = request.GET.get('range', '30d')
+        days = int(range_param.replace('d', ''))
+        
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=days)
+        
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        # Get customer statistics
+        customers = User.objects.filter(role='customer')
+        new_customers = customers.filter(date_joined__gte=start_date).count()
+        total_customers = customers.count()
+        
+        # Customer activity
+        active_customers = customers.filter(
+            order__created_at__gte=start_date
+        ).distinct().count()
+        
+        # Customer segments
+        high_value = customers.filter(
+            order__total_amount__gte=1000
+        ).distinct().count()
+        
+        return Response({
+            'total_customers': total_customers,
+            'new_customers': new_customers,
+            'active_customers': active_customers,
+            'high_value_customers': high_value,
+            'period': range_param
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

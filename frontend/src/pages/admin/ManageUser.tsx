@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -26,6 +27,16 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   AlertTriangle,
   Clock,
@@ -102,7 +113,11 @@ const ManageUser: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [selectedUsersForBulkDelete, setSelectedUsersForBulkDelete] = useState<User[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [pagination, setPagination] = useState({
@@ -416,17 +431,18 @@ const ManageUser: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async (user: User) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete ${user.name}? This action cannot be undone.`
-      )
-    ) {
-      return;
-    }
+  const handleDeleteUser = (user: User) => {
+    setUserToDelete(user);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
 
     try {
-      await adminService.deleteUser(user.id);
+      await adminService.deleteUser(userToDelete.id);
+      setShowDeleteDialog(false);
+      setUserToDelete(null);
 
       // Refresh users list
       await fetchUsers(currentPage, searchTerm, roleFilter, statusFilter);
@@ -442,6 +458,12 @@ const ManageUser: React.FC = () => {
     const userIds = rows.map((u) => u.id);
     if (userIds.length === 0) return;
 
+    if (action === "delete") {
+      setSelectedUsersForBulkDelete(rows);
+      setShowBulkDeleteDialog(true);
+      return;
+    }
+
     try {
       switch (action) {
         case "activate":
@@ -450,16 +472,6 @@ const ManageUser: React.FC = () => {
         case "deactivate":
           await adminService.bulkDeactivateUsers(userIds);
           break;
-        case "delete":
-          if (
-            !confirm(
-              `Are you sure you want to delete ${userIds.length} users? This action cannot be undone.`
-            )
-          ) {
-            return;
-          }
-          await adminService.bulkDeleteUsers(userIds);
-          break;
       }
 
       await fetchUsers(currentPage, searchTerm, roleFilter, statusFilter);
@@ -467,6 +479,21 @@ const ManageUser: React.FC = () => {
       setError(
         err instanceof Error ? err.message : `Failed to ${action} users`
       );
+    }
+  };
+
+  const confirmBulkDeleteUsers = async () => {
+    const userIds = selectedUsersForBulkDelete.map((u) => u.id);
+    if (userIds.length === 0) return;
+
+    try {
+      await adminService.bulkDeleteUsers(userIds);
+      setShowBulkDeleteDialog(false);
+      setSelectedUsersForBulkDelete([]);
+
+      await fetchUsers(currentPage, searchTerm, roleFilter, statusFilter);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete users");
     }
   };
 
@@ -867,6 +894,62 @@ const ManageUser: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{userToDelete?.name}</strong>?
+              This action cannot be undone and will permanently remove the user
+              account and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowDeleteDialog(false);
+              setUserToDelete(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteUser}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Users Confirmation Dialog */}
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Multiple Users</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{selectedUsersForBulkDelete.length} users</strong>?
+              This action cannot be undone and will permanently remove all selected user
+              accounts and their associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowBulkDeleteDialog(false);
+              setSelectedUsersForBulkDelete([]);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkDeleteUsers}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete {selectedUsersForBulkDelete.length} Users
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

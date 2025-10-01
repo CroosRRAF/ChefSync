@@ -52,6 +52,8 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 
 // Import communication service and types
 import type {
+  CommunicationCategory,
+  CommunicationTag,
   EmailTemplate,
   SystemAlert,
 } from "@/services/communicationService";
@@ -96,6 +98,8 @@ interface CommunicationFilters {
   status: string;
   type: string;
   dateRange: string;
+  category: string;
+  tag: string;
 }
 
 interface NewCommunication {
@@ -119,6 +123,8 @@ const Communication: React.FC = () => {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [categories, setCategories] = useState<CommunicationCategory[]>([]);
+  const [tags, setTags] = useState<CommunicationTag[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,6 +134,8 @@ const Communication: React.FC = () => {
     status: "all",
     type: "all",
     dateRange: "all",
+    category: "all",
+    tag: "all",
   });
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -175,6 +183,8 @@ const Communication: React.FC = () => {
       if (filters.search) params.search = filters.search;
       if (filters.status !== "all") params.status = filters.status;
       if (filters.type !== "all") params.type = filters.type;
+      if (filters.category !== "all") params.category = filters.category;
+      if (filters.tag !== "all") params.tag = filters.tag;
 
       const response = await communicationService.getCommunications(params);
       setCommunications(response.results || []);
@@ -196,6 +206,19 @@ const Communication: React.FC = () => {
       setTemplates(templatesData.results || []);
     } catch (err) {
       console.error("Error loading templates:", err);
+    }
+  }, []);
+
+  const loadCategoriesAndTags = useCallback(async () => {
+    try {
+      const [categoriesData, tagsData] = await Promise.all([
+        communicationService.getCategories(),
+        communicationService.getTags(),
+      ]);
+      setCategories(categoriesData);
+      setTags(tagsData);
+    } catch (err) {
+      console.error("Error loading categories and tags:", err);
     }
   }, []);
 
@@ -241,7 +264,14 @@ const Communication: React.FC = () => {
     loadAlerts();
     loadNotifications();
     loadStats();
-  }, [loadTemplates, loadAlerts, loadNotifications, loadStats]);
+    loadCategoriesAndTags();
+  }, [
+    loadTemplates,
+    loadAlerts,
+    loadNotifications,
+    loadStats,
+    loadCategoriesAndTags,
+  ]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -625,6 +655,38 @@ const Communication: React.FC = () => {
               <SelectItem value="notification">Notification</SelectItem>
               <SelectItem value="alert">Alert</SelectItem>
               <SelectItem value="push">Push</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.category}
+            onValueChange={(value) => handleFilterChange("category", value)}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id.toString()}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.tag}
+            onValueChange={(value) => handleFilterChange("tag", value)}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Tag" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Tags</SelectItem>
+              {tags.map((tag) => (
+                <SelectItem key={tag.id} value={tag.id.toString()}>
+                  {tag.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

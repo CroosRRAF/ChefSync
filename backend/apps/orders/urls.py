@@ -8,11 +8,16 @@ router = DefaultRouter()
 router.register(r"orders", views.OrderViewSet, basename="orders")
 # router.register(r'order-items', views.OrderItemViewSet, basename='order-items')
 # router.register(r'order-history', views.OrderStatusHistoryViewSet, basename='order-history')
-router.register(r'cart', views.CartItemViewSet, basename='cart')
-router.register(r'addresses', views.UserAddressViewSet, basename='addresses')
+router.register(r"cart", views.CartItemViewSet, basename="cart")
+router.register(r"addresses", views.UserAddressViewSet, basename="addresses")
 
 # Bulk order management
 router.register(r"bulk", BulkOrderManagementViewSet, basename="bulk-orders")
+
+# Delivery tracking
+router.register(
+    r"delivery", views.DeliveryTrackingViewSet, basename="delivery-tracking"
+)
 
 urlpatterns = [
     path("", include(router.urls)),
@@ -25,6 +30,6 @@ urlpatterns = [
         "chef/activity/recent/", views.chef_recent_activity, name="chef-recent-activity"
     ),
     # Checkout and order placement endpoints
-    path('checkout/calculate/', views.calculate_checkout, name='calculate-checkout'),
-    path('place/', views.place_order, name='place-order'),
+    path("checkout/calculate/", views.calculate_checkout, name="calculate-checkout"),
+    path("place/", views.place_order, name="place-order"),
 ]
