@@ -2,7 +2,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 import { GoogleOAuthProvider } from "@react-oauth/google";
-import React from "react";
+import React, { Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 // Layout components
@@ -56,26 +56,25 @@ import CookOrders from "@/pages/cook/Order";
 import CookProfile from "@/pages/cook/Profile";
 import CookSettings from "@/pages/cook/Settings";
 
-// New unified admin pages
-import AdvancedAnalytics from "@/pages/admin/AdvancedAnalytics";
-import AIReportsAutomation from "@/pages/admin/AIReportsAutomation";
-import AdminAnalytics from "@/pages/admin/Analytics";
-import AdminBackendIntegration from "@/pages/admin/BackendIntegration";
-import AdminCommunication from "@/pages/admin/Communication";
-import AIInsights from "@/pages/admin/AIInsights";
-import AdminDashboard from "@/pages/admin/Dashboard";
-import AdminDeliveryDashboard from "@/pages/admin/DeliveryDashboard";
-import AdminFeedbackManagement from "@/pages/admin/FeedbackManagement";
-import AdminFoodMenuManagement from "@/pages/admin/FoodMenuManagement";
-import MachineLearningIntegration from "@/pages/admin/MachineLearningIntegration";
-import AdminManageUser from "@/pages/admin/ManageUser";
-import OfferManagement from "@/pages/admin/OfferManagement";
-import OrderManagement from "@/pages/admin/OrderManagement";
-import PaymentManagement from "@/pages/admin/PaymentManagement";
-import AdminProfile from "@/pages/admin/Profile";
-import ReferralManagement from "@/pages/admin/ReferralManagement";
-import AdminReports from "@/pages/admin/Reports";
-import AdminSettings from "@/pages/admin/Settings";
+// Lazy-loaded admin pages for better performance
+const AnalyticsHub = React.lazy(() => import("@/pages/admin/AnalyticsHub"));
+const UserManagementHub = React.lazy(() => import("@/pages/admin/UserManagementHub"));
+const OrderManagementHub = React.lazy(() => import("@/pages/admin/OrderManagementHub"));
+const ContentManagementHub = React.lazy(() => import("@/pages/admin/ContentManagementHub"));
+const CommunicationCenter = React.lazy(() => import("@/pages/admin/CommunicationCenter"));
+const SystemHub = React.lazy(() => import("@/pages/admin/SystemHub"));
+const AdminDashboard = React.lazy(() => import("@/pages/admin/Dashboard"));
+const TestingDashboard = React.lazy(() => import("@/pages/admin/TestingDashboard"));
+
+// Loading component for lazy-loaded routes
+const LazyLoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="text-center">
+      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+      <p className="text-gray-600 dark:text-gray-400 font-medium">Loading...</p>
+    </div>
+  </div>
+);
 
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
@@ -86,7 +85,7 @@ const hasValidGoogleClientId = () => {
     clientId !== "your-google-client-id" &&
     clientId !== "YOUR_NEW_GOOGLE_CLIENT_ID_HERE" &&
     clientId !==
-      "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com" &&
+    "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com" &&
     clientId.includes(".apps.googleusercontent.com")
   );
 };
@@ -222,14 +221,14 @@ const InnerRoutes: React.FC = () => {
           path="/"
           element={
             isAuthenticated &&
-            user &&
-            user.role.toLowerCase() !== "customer" ? (
+              user &&
+              user.role.toLowerCase() !== "customer" ? (
               <Navigate to={getDefaultRoute()} replace />
             ) : (
               <>
                 {isAuthenticated &&
-                user &&
-                user.role.toLowerCase() === "customer" ? (
+                  user &&
+                  user.role.toLowerCase() === "customer" ? (
                   <CustomerHomeNavbar />
                 ) : (
                   <Navbar />
@@ -536,7 +535,7 @@ const InnerRoutes: React.FC = () => {
           element={<PickupNavigationDemo />}
         />
 
-        {/* Admin Routes */}
+        {/* Clean Admin Routes - One per Hub */}
         <Route
           path="/admin"
           element={
@@ -550,37 +549,9 @@ const InnerRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminDashboard />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminManageUser />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/manage-user"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminManageUser />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/orders"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <OrderManagement />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <AdminDashboard />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
@@ -590,57 +561,45 @@ const InnerRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminAnalytics />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <AnalyticsHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/admin/settings"
+          path="/admin/users"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminSettings />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <UserManagementHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/admin/profile"
+          path="/admin/orders"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminProfile />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <OrderManagementHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/admin/reports"
+          path="/admin/contents"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminReports />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/food"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminFoodMenuManagement />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/food-menu-management"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminFoodMenuManagement />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <ContentManagementHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
@@ -650,157 +609,21 @@ const InnerRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminCommunication />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <CommunicationCenter />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/admin/communication"
+          path="/admin/settings"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminCommunication />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/feedback-management"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminFeedbackManagement />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/backend-integration"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminBackendIntegration />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/analytics-backend"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminBackendIntegration />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/advanced-analytics"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdvancedAnalytics />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/ai-analytics"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdvancedAnalytics />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/ai-reports"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AIReportsAutomation />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/delivery"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminDeliveryDashboard />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/referrals"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <ReferralManagement />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/offers"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <OfferManagement />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/payments"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <PaymentManagement />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/ai-insights"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AIInsights />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/reports-automation"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AIReportsAutomation />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/ml-integration"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <MachineLearningIntegration />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/machine-learning"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <MachineLearningIntegration />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <SystemHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }

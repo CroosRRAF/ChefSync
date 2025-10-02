@@ -27,7 +27,7 @@ interface QuickAction {
  * - Floating action button with pulsing animation
  * - Expandable chat interface
  * - Quick action shortcuts
- * - AI-powered insights and help
+ * - Business insights and help
  */
 export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
   className,
@@ -51,11 +51,11 @@ export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
   const quickActions: QuickAction[] = [
     {
       id: "insights",
-      label: "Get AI Insights",
+      label: "Get Insights",
       icon: Sparkles,
-      description: "View AI-generated business insights",
+      description: "View business insights and analytics",
       onClick: () => {
-        addMessage("Show me the latest AI business insights", "user");
+        addMessage("Show me the latest business insights", "user");
         addMessage("📊 Here are your key insights:\n• Revenue up 12% this month\n• Peak order time: 7-9 PM\n• Top performing food: Chicken Biryani\n• 3 pending complaints need attention", "ai");
       },
     },
@@ -66,7 +66,7 @@ export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
       description: "Quick performance overview",
       onClick: () => {
         addMessage("Give me a performance summary", "user");
-        addMessage("🚀 Performance Summary:\n• Total Users: 108 (↑5%)\n• Orders Today: 23 (↑15%)\n• Revenue: $2,840 (↑8%)\n• Customer Satisfaction: 4.6/5", "ai");
+        addMessage("🚀 Performance Summary:\n• Total Users: 108 (↑5%)\n• Orders Today: 23 (↑15%)\n• Revenue: LKR 2,840 (↑8%)\n• Customer Satisfaction: 4.6/5", "ai");
       },
     },
     {

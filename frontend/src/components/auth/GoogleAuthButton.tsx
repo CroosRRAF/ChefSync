@@ -100,10 +100,16 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
 
   const handleGoogleError = () => {
     console.error("Google OAuth failed");
+    
+    // Check if it's an origin error
+    const isOriginError = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
     toast({
       variant: "destructive",
       title: "Google authentication failed",
-      description: "Please try again or use email/password",
+      description: isOriginError 
+        ? "OAuth origin not configured. Please add http://localhost:8081 to Google Console authorized origins."
+        : "Please try again or use email/password",
     });
   };
 

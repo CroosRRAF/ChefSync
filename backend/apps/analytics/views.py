@@ -284,7 +284,7 @@ def order_analytics(request):
         
         # Daily breakdown
         daily_stats = orders.extra(
-            select={'day': 'date(created_at)'}
+            select={'day': 'DATE(created_at)'}  # MySQL DATE function
         ).values('day').annotate(
             count=Count('id'),
             revenue=Sum('total_amount')

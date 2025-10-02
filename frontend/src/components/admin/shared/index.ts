@@ -60,6 +60,8 @@ export { default as PieChart } from "./charts/PieChart";
 // Table Components
 export { default as DataTable } from "./tables/DataTable";
 export type { BulkAction, Column } from "./tables/DataTable";
+export { default as VirtualizedTable } from "./VirtualizedTable";
+export type { VirtualizedTableColumn } from "./VirtualizedTable";
 
 // Form Components
 export { default as DynamicForm } from "./forms/DynamicForm";

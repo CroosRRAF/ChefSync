@@ -1559,6 +1559,148 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=["get"])
+    def orders_distribution(self, request):
+        """Get orders distribution data for pie chart"""
+        try:
+            days = int(request.query_params.get("days", 7))
+            
+            # Get orders from the last N days
+            from apps.orders.models import Order
+            
+            end_date = timezone.now()
+            start_date = end_date - timedelta(days=days)
+            
+            if days == 7:
+                # Weekly distribution by day of week
+                orders_by_day = (
+                    Order.objects.filter(created_at__range=[start_date, end_date])
+                    .extra({"day": "DAYOFWEEK(created_at) - 1"})  # MySQL DAYOFWEEK returns 1-7, we want 0-6
+                    .values("day")
+                    .annotate(count=Count("id"))
+                    .order_by("day")
+                )
+                
+                day_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+                labels = []
+                data = []
+                
+                for item in orders_by_day:
+                    day_index = int(item["day"])
+                    labels.append(day_names[day_index])
+                    data.append(item["count"])
+                    
+            else:
+                # Monthly distribution by date
+                orders_by_date = (
+                    Order.objects.filter(created_at__range=[start_date, end_date])
+                    .extra({"date": "DATE(created_at)"})  # MySQL DATE function
+                    .values("date")
+                    .annotate(count=Count("id"))
+                    .order_by("date")
+                )
+                
+                labels = []
+                data = []
+                
+                for item in orders_by_date:
+                    labels.append(item["date"].strftime("%m/%d"))
+                    data.append(item["count"])
+            
+            return Response({
+                "data": {
+                    "labels": labels,
+                    "datasets": [{
+                        "label": "Orders",
+                        "data": data,
+                    }]
+                }
+            })
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to get orders distribution: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    def new_users(self, request):
+        """Get new users data for area chart"""
+        try:
+            days = int(request.query_params.get("days", 30))
+            
+            end_date = timezone.now()
+            start_date = end_date - timedelta(days=days)
+            
+            # Get new users by date
+            new_users_by_date = (
+                User.objects.filter(date_joined__range=[start_date, end_date])
+                .extra({"date": "DATE(date_joined)"})  # MySQL DATE function
+                .values("date")
+                .annotate(count=Count("user_id"))
+                .order_by("date")
+            )
+            
+            labels = []
+            data = []
+            
+            for item in new_users_by_date:
+                labels.append(item["date"].strftime("%m/%d"))
+                data.append(item["count"])
+            
+            return Response({
+                "data": {
+                    "labels": labels,
+                    "datasets": [{
+                        "label": "New Users",
+                        "data": data,
+                    }]
+                }
+            })
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to get new users data: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    def recent_deliveries(self, request):
+        """Get recent deliveries data"""
+        try:
+            limit = int(request.query_params.get("limit", 5))
+            
+            # Try to get delivery data from orders
+            from apps.orders.models import Order
+            
+            recent_orders = (
+                Order.objects.filter(status__in=["delivered", "out_for_delivery", "in_transit"])
+                .select_related("customer", "delivery_partner")
+                .order_by("-created_at")[:limit]
+            )
+            
+            deliveries = []
+            for order in recent_orders:
+                deliveries.append({
+                    "id": order.id,
+                    "order_id": order.id,
+                    "delivery_agent": order.delivery_partner.get_full_name() if order.delivery_partner else "Unassigned",
+                    "customer_name": order.customer.get_full_name() if order.customer else "Unknown",
+                    "delivery_address": getattr(order, "delivery_address", "Address not available"),
+                    "status": order.status,
+                    "estimated_time": (order.created_at + timedelta(hours=1)).isoformat(),
+                    "actual_time": order.updated_at.isoformat() if order.status == "delivered" else None,
+                    "tracking_code": f"TRK{str(order.id).zfill(6)}",
+                })
+            
+            return Response(deliveries)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to get recent deliveries: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
 
 class AdminUserManagementViewSet(viewsets.ViewSet):
     """Complete user management for admins"""

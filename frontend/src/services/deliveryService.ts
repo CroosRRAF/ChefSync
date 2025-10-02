@@ -202,15 +202,7 @@ export const reportDeliveryIssue = async (
     };
   } catch (error) {
     console.error("Failed to report issue:", error);
-    // Fallback to mock data on error
-    return {
-      id: `issue_${Date.now()}`,
-      orderId,
-      type: issueType,
-      description,
-      timestamp: new Date().toISOString(),
-      status: "reported",
-    };
+    throw error;
   }
 };
 
@@ -233,12 +225,7 @@ export const updateDeliveryLocation = async (
     return res.data;
   } catch (error) {
     console.error("Failed to update location:", error);
-    // Fallback to mock response on error
-    return {
-      success: true,
-      location: { latitude, longitude, address },
-      timestamp: new Date().toISOString(),
-    };
+    throw error;
   }
 };
 
@@ -306,98 +293,41 @@ export const getChatMessages = async (
 export const submitDeliveryLog = async (
   log: Omit<DeliveryLog, "id">
 ): Promise<DeliveryLog> => {
-  // TODO: Backend endpoint for delivery logs not yet implemented
-  console.warn("Submit delivery log endpoint not yet implemented in backend");
-
-  // For now, return a mock response
-  const mockLog: DeliveryLog = {
-    id: `log_${Date.now()}`,
-    ...log,
-  };
-
-  return mockLog;
-
-  // TODO: Uncomment when backend endpoint is ready:
-  // const res = await apiClient.post('/delivery/logs/', log);
-  // return res.data;
+  const res = await apiClient.post('/delivery/logs/', log);
+  return res.data;
 };
 
 export const getDeliveryLogs = async (dateRange?: {
   start: string;
   end: string;
 }): Promise<DeliveryLog[]> => {
-  // TODO: Backend endpoint for delivery logs not yet implemented
-  // For now, return empty array to prevent errors
-  console.warn("Delivery logs endpoint not yet implemented in backend");
-  return [];
-
-  // Uncomment below when backend endpoint is ready:
-  // const params = dateRange ? `?start=${dateRange.start}&end=${dateRange.end}` : '';
-  // const res = await apiClient.get(`/orders/order-history/${params}`);
-  // return res.data.results || res.data;
+  const params = dateRange ? `?start=${dateRange.start}&end=${dateRange.end}` : '';
+  const res = await apiClient.get(`/delivery/logs/${params}`);
+  return res.data.results || res.data;
 };
 
 // 🗺️ Route optimization
 export const optimizeDeliveryRoute = async (orderIds: number[]) => {
-  // TODO: Backend endpoint for route optimization not yet implemented
-  console.warn("Route optimization endpoint not yet implemented in backend");
-
-  // For now, return a mock response
-  return {
-    optimizedOrder: [],
-    totalDistance: 0,
-    estimatedTime: 0,
-    savings: { distance: 0, time: 0 },
-  };
-
-  // TODO: Uncomment when backend endpoint is ready:
-  // const res = await apiClient.post('/delivery/route/optimize/', { order_ids: orderIds });
-  // return res.data;
+  const res = await apiClient.post('/delivery/route/optimize/', { order_ids: orderIds });
+  return res.data;
 };
 
 export const getRouteDirections = async (orderId: number) => {
-  // TODO: Backend endpoint for route directions not yet implemented
-  console.warn("Route directions endpoint not yet implemented in backend");
-
-  // For now, return a mock response
-  return {
-    route: [],
-    distance: 0,
-    duration: 0,
-  };
-
-  // TODO: Uncomment when backend endpoint is ready:
-  // const res = await apiClient.get(`/delivery/route/${orderId}/directions/`);
-  // return res.data;
+  const res = await apiClient.get(`/delivery/route/${orderId}/directions/`);
+  return res.data;
 };
 
 // 🔔 Notifications
 export const getDeliveryNotifications = async (): Promise<
   DeliveryNotification[]
 > => {
-  // TODO: Backend endpoint for notifications not yet implemented
-  console.warn("Notifications endpoint not yet implemented in backend");
-
-  // For now, return empty array to prevent errors
-  return [];
-
-  // TODO: Uncomment when backend endpoint is ready:
-  // const res = await apiClient.get('/delivery/notifications/');
-  // return res.data.results || res.data;
+  const res = await apiClient.get('/delivery/notifications/');
+  return res.data.results || res.data;
 };
 
 export const markNotificationAsRead = async (notificationId: string) => {
-  // TODO: Backend endpoint for notifications not yet implemented
-  console.warn(
-    "Mark notification as read endpoint not yet implemented in backend"
-  );
-
-  // For now, return a mock response
-  return { success: true };
-
-  // TODO: Uncomment when backend endpoint is ready:
-  // const res = await apiClient.patch(`/delivery/notifications/${notificationId}/`, { read: true });
-  // return res.data;
+  const res = await apiClient.patch(`/delivery/notifications/${notificationId}/`, { read: true });
+  return res.data;
 };
 
 // 📞 Emergency and support
@@ -406,25 +336,14 @@ export const requestEmergencyHelp = async (
   type: "vehicle_breakdown" | "safety_concern" | "customer_issue" | "other",
   description: string
 ) => {
-  // TODO: Backend endpoint for emergency help not yet implemented
-  console.warn("Emergency help endpoint not yet implemented in backend");
-
-  // For now, return a mock response
-  return {
-    success: true,
-    emergencyId: `emergency_${Date.now()}`,
-    message: "Emergency request logged. Help is on the way.",
-  };
-
-  // TODO: Uncomment when backend endpoint is ready:
-  // const res = await apiClient.post('/delivery/emergency/', {
-  //   orderId,
-  //   type,
-  //   description,
-  //   timestamp: new Date().toISOString(),
-  //   location: await getCurrentLocation()
-  // });
-  // return res.data;
+  const res = await apiClient.post('/delivery/emergency/', {
+    orderId,
+    type,
+    description,
+    timestamp: new Date().toISOString(),
+    // Optionally include current location via getCurrentLocation()
+  });
+  return res.data;
 };
 
 // 🎯 Enhanced location and tracking services
@@ -433,20 +352,11 @@ export const startDeliveryTracking = async (
   startLocation: { lat: number; lng: number }
 ) => {
   try {
-    // TODO: Uncomment when backend endpoint is ready
-    // const res = await apiClient.post(`/delivery/tracking/${orderId}/start/`, {
-    //   start_location: startLocation,
-    //   timestamp: new Date().toISOString()
-    // });
-    // return res.data;
-
-    console.warn("Delivery tracking endpoint not yet implemented in backend");
-    return {
-      success: true,
-      trackingId: `tracking_${orderId}_${Date.now()}`,
-      startTime: new Date().toISOString(),
-      startLocation,
-    };
+    const res = await apiClient.post(`/delivery/tracking/${orderId}/start/`, {
+      start_location: startLocation,
+      timestamp: new Date().toISOString()
+    });
+    return res.data;
   } catch (error) {
     console.error("Failed to start delivery tracking:", error);
     throw error;
@@ -463,22 +373,11 @@ export const updateDeliveryProgress = async (
   }
 ) => {
   try {
-    // TODO: Uncomment when backend endpoint is ready
-    // const res = await apiClient.post(`/delivery/tracking/${orderId}/update/`, {
-    //   ...progress,
-    //   timestamp: new Date().toISOString()
-    // });
-    // return res.data;
-
-    console.warn(
-      "Delivery progress update endpoint not yet implemented in backend"
-    );
-    return {
-      success: true,
-      orderId,
+    const res = await apiClient.post(`/delivery/tracking/${orderId}/update/`, {
       ...progress,
-      timestamp: new Date().toISOString(),
-    };
+      timestamp: new Date().toISOString()
+    });
+    return res.data;
   } catch (error) {
     console.error("Failed to update delivery progress:", error);
     throw error;
@@ -519,22 +418,10 @@ export const calculateOptimalRoute = async (
 ) => {
   try {
     // TODO: Integrate with Google Maps Directions API or backend route optimization
-    console.warn("Route calculation using mock data");
-
-    return {
-      optimizedRoute: destinations.map((dest, index) => ({
-        ...dest,
-        order: index + 1,
-        estimatedDuration: Math.random() * 30 + 10, // 10-40 minutes
-        distance: Math.random() * 5 + 1, // 1-6 km
-      })),
-      totalDistance: destinations.length * 3.5,
-      totalDuration: destinations.length * 20,
-      savings: {
-        distanceSaved: destinations.length * 0.8,
-        timeSaved: destinations.length * 5,
-      },
-    };
+    const response = await apiClient.post('/delivery/optimize-route', {
+      destinations
+    });
+    return response.data;
   } catch (error) {
     console.error("Failed to calculate optimal route:", error);
     throw error;

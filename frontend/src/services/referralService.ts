@@ -110,16 +110,7 @@ class ReferralService {
       return response.data;
     } catch (error) {
       console.error("Error fetching referral stats:", error);
-      // Return mock data as fallback
-      return {
-        total_tokens: 0,
-        active_tokens: 0,
-        total_referrals: 0,
-        successful_referrals: 0,
-        pending_referrals: 0,
-        conversion_rate: 0,
-        top_referrers: [],
-      };
+      throw error;
     }
   }
 

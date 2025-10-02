@@ -399,6 +399,13 @@ class AdminService {
         total_foods: Number(d.total_foods) || 0,
         active_foods: Number(d.active_foods) || 0,
         pending_food_approvals: Number(d.pending_food_approvals) || 0,
+        foods_growth: Number(d.foods_growth) || 0,
+
+        total_delivery_agents: Number(d.total_delivery_agents) || 0,
+        active_delivery_agents: Number(d.active_delivery_agents) || 0,
+        delivery_growth: Number(d.delivery_growth) || 0,
+
+        chefs_growth: Number(d.chefs_growth) || Number(d.chef_growth) || 0,
 
         system_health_score: Number(d.system_health_score) || 0,
         active_sessions: Number(d.active_sessions) || 0,
@@ -999,81 +1006,42 @@ class AdminService {
   // Get orders distribution data (7-day pie chart)
   async getOrdersDistribution(days: number = 7) {
     try {
+      // Try the new endpoint first
       const response = await apiClient.get(
-        `/admin-management/analytics/orders-distribution/?days=${days}`
+        `/admin-management/dashboard/orders_distribution/?days=${days}`
       );
       return response.data;
     } catch (error) {
       console.error("Error fetching orders distribution:", error);
-      // Return mock data for development
-      const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      return {
-        data: {
-          labels: dayNames.slice(0, days),
-          datasets: [
-            {
-              label: "Orders",
-              data: Array.from({ length: days }, () => Math.floor(Math.random() * 50) + 10),
-            },
-          ],
-        },
-      };
+      throw error;
     }
   }
 
   // Get new users data (30-day area chart)
   async getNewUsersData(days: number = 30) {
     try {
+      // Try the new endpoint first
       const response = await apiClient.get(
-        `/admin-management/analytics/new-users/?days=${days}`
+        `/admin-management/dashboard/new_users/?days=${days}`
       );
       return response.data;
     } catch (error) {
       console.error("Error fetching new users data:", error);
-      // Return mock data for development
-      return {
-        data: {
-          labels: Array.from({ length: days }, (_, i) => 
-            new Date(Date.now() - (days - 1 - i) * 24 * 60 * 60 * 1000).toLocaleDateString()
-          ),
-          datasets: [
-            {
-              label: "New Users",
-              data: Array.from({ length: days }, () => Math.floor(Math.random() * 15) + 2),
-            },
-          ],
-        },
-      };
+      throw error;
     }
   }
 
   // Get recent deliveries
   async getRecentDeliveries(limit: number = 5) {
     try {
+      // Try the new endpoint first
       const response = await apiClient.get(
-        `/admin-management/deliveries/recent/?limit=${limit}`
+        `/admin-management/dashboard/recent_deliveries/?limit=${limit}`
       );
       return response.data;
     } catch (error) {
       console.error("Error fetching recent deliveries:", error);
-      // Return mock data for development
-      return Array.from({ length: limit }, (_, i) => ({
-        id: i + 1,
-        order_id: 1000 + i,
-        delivery_agent: ['John Smith', 'Sarah Johnson', 'Mike Wilson', 'Lisa Brown', 'Tom Davis'][i] || 'Agent ' + (i + 1),
-        customer_name: ['Alice Cooper', 'Bob Johnson', 'Carol White', 'David Lee', 'Emma Wilson'][i] || 'Customer ' + (i + 1),
-        delivery_address: [
-          '123 Main St, Downtown',
-          '456 Oak Ave, Midtown',
-          '789 Pine Rd, Uptown',
-          '321 Elm St, Westside',
-          '654 Maple Dr, Eastside'
-        ][i] || `Address ${i + 1}`,
-        status: ['in_transit', 'assigned', 'delivered', 'picked_up', 'assigned'][i] || 'assigned',
-        estimated_time: new Date(Date.now() + (i + 1) * 30 * 60 * 1000).toISOString(),
-        actual_time: i < 2 ? new Date(Date.now() - (i + 1) * 15 * 60 * 1000).toISOString() : null,
-        tracking_code: `TRK${String(i + 1).padStart(6, '0')}`,
-      }));
+      throw error;
     }
   }
 }

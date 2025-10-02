@@ -335,15 +335,7 @@ class PaymentService {
       return response.data;
     } catch (error: any) {
       console.error("Error fetching payment stats:", error);
-      // Return mock data if endpoint doesn't exist yet
-      return {
-        total_transactions: 0,
-        total_revenue: "0.00",
-        total_refunds: "0.00",
-        pending_refunds: 0,
-        success_rate: 0,
-        average_transaction_value: "0.00",
-      };
+      throw error;
     }
   }
 

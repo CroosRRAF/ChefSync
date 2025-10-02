@@ -40,6 +40,12 @@ import {
   X,
   Bot,
   Sparkles,
+  ShoppingCart,
+  Truck,
+  Gift,
+  CreditCard,
+  Brain,
+  UserPlus,
 } from "lucide-react";
 import React, { memo, useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -71,7 +77,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Navigation items for the new admin structure
+  // Navigation items organized in logical order: Dashboard → Analytics → Users → Orders → Contents → Communications → Settings
   const navItems: NavItem[] = [
     {
       label: "Dashboard",
@@ -80,55 +86,43 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
       description: "Overview, KPIs, and insights",
     },
     {
-      label: "Analytics",
+      label: "Analytics Hub",
       href: "/admin/analytics",
       icon: BarChart3,
-      description: "Business analytics and reports",
-    },
-    {
-      label: "Feedback Management",
-      href: "/admin/feedback-management",
-      icon: MessageSquare,
-      description: "Handle complaints and suggestions",
-      badge: 5, // Pending feedback items
-    },
-    {
-      label: "Communication",
-      href: "/admin/communication",
-      icon: MessageSquare,
-      description: "Notifications and messaging",
-      badge: 3, // Unread notifications
-    },
-    {
-      label: "Food & Menu",
-      href: "/admin/food-menu-management",
-      icon: Utensils,
-      description: "Manage food items and menus",
+      description: "Business analytics, reports, and insights",
     },
     {
       label: "User Management",
-      href: "/admin/manage-user",
+      href: "/admin/users",
       icon: Users,
-      description: "Manage users and permissions",
+      description: "Manage users, permissions, and profiles",
       badge: 2, // Pending approvals
     },
     {
-      label: "Reports",
-      href: "/admin/reports",
-      icon: FileText,
-      description: "Generate and export reports",
+      label: "Order Management",
+      href: "/admin/orders",
+      icon: ShoppingCart,
+      description: "Orders, delivery tracking, and payments",
+      badge: 8, // Active orders
     },
     {
-      label: "Settings",
+      label: "Content Management",
+      href: "/admin/contents",
+      icon: Utensils,
+      description: "Food menus, offers, and referrals",
+    },
+    {
+      label: "Communications",
+      href: "/admin/communications",
+      icon: MessageSquare,
+      description: "Messages, feedback, and notifications",
+      badge: 5, // Pending feedback items
+    },
+    {
+      label: "System Settings",
       href: "/admin/settings",
       icon: Settings,
-      description: "System configuration",
-    },
-    {
-      label: "Profile",
-      href: "/admin/profile",
-      icon: User,
-      description: "Admin profile settings",
+      description: "Settings, reports, and configuration",
     },
   ];
 
@@ -222,7 +216,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
                 <div className="flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-blue-500" />
                   <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                    AI Admin
+                    Admin Panel
                   </span>
                 </div>
               </div>
@@ -474,7 +468,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
                     </div>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate("/admin/profile")}>
+                  <DropdownMenuItem onClick={() => navigate("/admin/users")}>
                     <User className="mr-2 h-4 w-4" />
                     Profile
                   </DropdownMenuItem>
