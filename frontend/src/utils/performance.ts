@@ -1,288 +1,284 @@
+import { useCallback, useMemo, useRef, useEffect } from 'react';
+
 /**
- * Performance Monitoring & Optimization Utilities
- *
- * Provides performance monitoring, memoization helpers,
- * and optimization utilities for React components.
+ * Debounce hook for performance optimization
  */
-
-// Performance metrics collection
-export interface PerformanceMetrics {
-  loadTime: number;
-  renderTime: number;
-  componentCount: number;
-  memoryUsage?: number;
-  timestamp: number;
-}
-
-// Performance observer for monitoring page load
-export class PerformanceMonitor {
-  private static instance: PerformanceMonitor;
-  private metrics: PerformanceMetrics[] = [];
-  private observers: PerformanceObserver[] = [];
-
-  static getInstance(): PerformanceMonitor {
-    if (!PerformanceMonitor.instance) {
-      PerformanceMonitor.instance = new PerformanceMonitor();
+export function useDebounce<T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number
+): T {
+  const timeoutRef = useRef<NodeJS.Timeout>();
+  
+  return useCallback((...args: Parameters<T>) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
-    return PerformanceMonitor.instance;
-  }
-
-  constructor() {
-    this.initializeObservers();
-  }
-
-  private initializeObservers() {
-    if (typeof window === "undefined" || !window.PerformanceObserver) {
-      return;
-    }
-
-    // Observe navigation timing
-    try {
-      const navigationObserver = new PerformanceObserver((list) => {
-        const entries = list.getEntries();
-        entries.forEach((entry) => {
-          if (entry.entryType === "navigation") {
-            this.recordMetric({
-              loadTime: entry.loadEventEnd - entry.loadEventStart,
-              renderTime:
-                entry.domContentLoadedEventEnd -
-                entry.domContentLoadedEventStart,
-              componentCount:
-                document.querySelectorAll("[data-component]").length,
-              timestamp: Date.now(),
-            });
-          }
-        });
-      });
-
-      navigationObserver.observe({ entryTypes: ["navigation"] });
-      this.observers.push(navigationObserver);
-    } catch (error) {
-      console.warn("Navigation observer not supported:", error);
-    }
-
-    // Observe largest contentful paint
-    try {
-      const lcpObserver = new PerformanceObserver((list) => {
-        const entries = list.getEntries();
-        const lastEntry = entries[entries.length - 1];
-        console.log("LCP:", lastEntry.startTime);
-      });
-
-      lcpObserver.observe({ entryTypes: ["largest-contentful-paint"] });
-      this.observers.push(lcpObserver);
-    } catch (error) {
-      console.warn("LCP observer not supported:", error);
-    }
-  }
-
-  recordMetric(metric: PerformanceMetrics) {
-    this.metrics.push(metric);
-
-    // Keep only last 50 metrics
-    if (this.metrics.length > 50) {
-      this.metrics = this.metrics.slice(-50);
-    }
-  }
-
-  getMetrics(): PerformanceMetrics[] {
-    return [...this.metrics];
-  }
-
-  getAverageLoadTime(): number {
-    if (this.metrics.length === 0) return 0;
-    const total = this.metrics.reduce(
-      (sum, metric) => sum + metric.loadTime,
-      0
-    );
-    return total / this.metrics.length;
-  }
-
-  getMemoryUsage(): number | null {
-    if ("memory" in performance) {
-      const memory = (performance as any).memory;
-      return {
-        used: memory.usedJSHeapSize,
-        total: memory.totalJSHeapSize,
-        limit: memory.jsHeapSizeLimit,
-      };
-    }
-    return null;
-  }
-
-  disconnect() {
-    this.observers.forEach((observer) => observer.disconnect());
-    this.observers = [];
-  }
+    
+    timeoutRef.current = setTimeout(() => {
+      callback(...args);
+    }, delay);
+  }, [callback, delay]) as T;
 }
 
-// Debounce utility for performance optimization
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number,
-  immediate?: boolean
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null;
-
-  return function executedFunction(...args: Parameters<T>) {
-    const later = () => {
-      timeout = null;
-      if (!immediate) func(...args);
-    };
-
-    const callNow = immediate && !timeout;
-
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-
-    if (callNow) func(...args);
-  };
-}
-
-// Throttle utility for performance optimization
-export function throttle<T extends (...args: any[]) => any>(
-  func: T,
-  limit: number
-): (...args: Parameters<T>) => void {
-  let inThrottle: boolean;
-
-  return function executedFunction(...args: Parameters<T>) {
-    if (!inThrottle) {
-      func(...args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  };
-}
-
-// Virtual scrolling helper for large lists
-export interface VirtualScrollOptions {
-  itemHeight: number;
-  containerHeight: number;
-  overscan?: number;
-}
-
-export function calculateVirtualScrollItems(
-  scrollTop: number,
-  totalItems: number,
-  options: VirtualScrollOptions
-) {
-  const { itemHeight, containerHeight, overscan = 5 } = options;
-
-  const startIndex = Math.floor(scrollTop / itemHeight);
-  const endIndex = Math.min(
-    startIndex + Math.ceil(containerHeight / itemHeight),
-    totalItems - 1
-  );
-
-  const visibleStartIndex = Math.max(0, startIndex - overscan);
-  const visibleEndIndex = Math.min(totalItems - 1, endIndex + overscan);
-
-  return {
-    startIndex: visibleStartIndex,
-    endIndex: visibleEndIndex,
-    offsetY: visibleStartIndex * itemHeight,
-  };
-}
-
-// Intersection Observer hook utility
-export interface UseIntersectionObserverOptions {
-  threshold?: number | number[];
-  root?: Element | null;
-  rootMargin?: string;
-}
-
-export function createIntersectionObserver(
-  callback: IntersectionObserverCallback,
-  options: UseIntersectionObserverOptions = {}
-): IntersectionObserver | null {
-  if (typeof window === "undefined" || !window.IntersectionObserver) {
-    return null;
-  }
-
-  return new IntersectionObserver(callback, {
-    threshold: 0.1,
-    rootMargin: "0px",
-    ...options,
-  });
-}
-
-// Image lazy loading utility
-export function lazyLoadImage(
-  img: HTMLImageElement,
-  src: string,
-  placeholder?: string
-) {
-  const observer = createIntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        const image = entry.target as HTMLImageElement;
-        image.src = src;
-        image.onload = () => {
-          image.classList.add("loaded");
-        };
-        observer?.unobserve(image);
+/**
+ * Throttle hook for performance optimization
+ */
+export function useThrottle<T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number
+): T {
+  const lastCallRef = useRef<number>(0);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+  
+  return useCallback((...args: Parameters<T>) => {
+    const now = Date.now();
+    const timeSinceLastCall = now - lastCallRef.current;
+    
+    if (timeSinceLastCall >= delay) {
+      lastCallRef.current = now;
+      callback(...args);
+    } else {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
-    });
-  });
-
-  if (observer) {
-    if (placeholder) {
-      img.src = placeholder;
+      
+      timeoutRef.current = setTimeout(() => {
+        lastCallRef.current = Date.now();
+        callback(...args);
+      }, delay - timeSinceLastCall);
     }
-    img.classList.add("lazy-loading");
-    observer.observe(img);
-  } else {
-    // Fallback for browsers without intersection observer
-    img.src = src;
-  }
+  }, [callback, delay]) as T;
 }
 
-// Bundle analyzer helper
+/**
+ * Memoized computation hook with dependency tracking
+ */
+export function useMemoizedComputation<T>(
+  computation: () => T,
+  deps: React.DependencyList,
+  options: {
+    maxAge?: number; // Cache expiry in milliseconds
+    debug?: boolean;
+  } = {}
+): T {
+  const { maxAge = 5 * 60 * 1000, debug = false } = options; // Default 5 minutes
+  const cacheRef = useRef<{
+    value: T;
+    timestamp: number;
+    deps: React.DependencyList;
+  }>();
+
+  return useMemo(() => {
+    const now = Date.now();
+    
+    // Check if we have a cached value
+    if (cacheRef.current) {
+      const { value, timestamp, deps: cachedDeps } = cacheRef.current;
+      
+      // Check if dependencies haven't changed and cache hasn't expired
+      const depsUnchanged = deps.length === cachedDeps.length && 
+        deps.every((dep, index) => dep === cachedDeps[index]);
+      const cacheValid = (now - timestamp) < maxAge;
+      
+      if (depsUnchanged && cacheValid) {
+        if (debug) {
+          console.log('🚀 Using cached computation result');
+        }
+        return value;
+      }
+    }
+    
+    // Compute new value
+    if (debug) {
+      console.log('🔄 Computing new result');
+    }
+    const newValue = computation();
+    
+    // Cache the result
+    cacheRef.current = {
+      value: newValue,
+      timestamp: now,
+      deps: [...deps],
+    };
+    
+    return newValue;
+  }, deps);
+}
+
+/**
+ * Virtual scrolling hook for large lists
+ */
+export function useVirtualScrolling<T>(
+  items: T[],
+  itemHeight: number,
+  containerHeight: number,
+  overscan: number = 5
+) {
+  const [scrollTop, setScrollTop] = useState(0);
+  
+  const visibleRange = useMemo(() => {
+    const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
+    const endIndex = Math.min(
+      items.length - 1,
+      Math.ceil((scrollTop + containerHeight) / itemHeight) + overscan
+    );
+    
+    return { startIndex, endIndex };
+  }, [scrollTop, itemHeight, containerHeight, items.length, overscan]);
+  
+  const visibleItems = useMemo(() => {
+    return items.slice(visibleRange.startIndex, visibleRange.endIndex + 1);
+  }, [items, visibleRange]);
+  
+  const totalHeight = items.length * itemHeight;
+  const offsetY = visibleRange.startIndex * itemHeight;
+  
+  return {
+    visibleItems,
+    totalHeight,
+    offsetY,
+    setScrollTop,
+    visibleRange,
+  };
+}
+
+/**
+ * Intersection Observer hook for lazy loading
+ */
+export function useIntersectionObserver(
+  options: IntersectionObserverInit = {}
+) {
+  const [isIntersecting, setIsIntersecting] = useState(false);
+  const [hasIntersected, setHasIntersected] = useState(false);
+  const targetRef = useRef<HTMLElement>(null);
+  
+  useEffect(() => {
+    const element = targetRef.current;
+    if (!element) return;
+    
+    const observer = new IntersectionObserver(([entry]) => {
+      setIsIntersecting(entry.isIntersecting);
+      if (entry.isIntersecting && !hasIntersected) {
+        setHasIntersected(true);
+      }
+    }, options);
+    
+    observer.observe(element);
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, [options, hasIntersected]);
+  
+  return {
+    targetRef,
+    isIntersecting,
+    hasIntersected,
+  };
+}
+
+/**
+ * Performance monitoring hook
+ */
+export function usePerformanceMonitor(name: string) {
+  const startTimeRef = useRef<number>();
+  
+  const start = useCallback(() => {
+    startTimeRef.current = performance.now();
+  }, []);
+  
+  const end = useCallback(() => {
+    if (startTimeRef.current) {
+      const duration = performance.now() - startTimeRef.current;
+      console.log(`⏱️ ${name}: ${duration.toFixed(2)}ms`);
+      
+      // Report to performance monitoring service
+      if (typeof window !== 'undefined' && 'performance' in window) {
+        performance.mark(`${name}-end`);
+        performance.measure(name, `${name}-start`, `${name}-end`);
+      }
+      
+      return duration;
+    }
+    return 0;
+  }, [name]);
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'performance' in window) {
+      performance.mark(`${name}-start`);
+    }
+  }, [name]);
+  
+  return { start, end };
+}
+
+/**
+ * Lazy component loader utility
+ * Note: This returns a lazy component factory, JSX implementation should be in .tsx files
+ */
+export function createLazyComponent<T extends React.ComponentType<any>>(
+  importFn: () => Promise<{ default: T }>
+) {
+  return React.lazy(importFn);
+}
+
+/**
+ * Memory usage monitoring
+ */
+export function useMemoryMonitor() {
+  const [memoryInfo, setMemoryInfo] = useState<{
+    usedJSHeapSize: number;
+    totalJSHeapSize: number;
+    jsHeapSizeLimit: number;
+  } | null>(null);
+  
+  useEffect(() => {
+    const updateMemoryInfo = () => {
+      if ('memory' in performance) {
+        const memory = (performance as any).memory;
+        setMemoryInfo({
+          usedJSHeapSize: memory.usedJSHeapSize,
+          totalJSHeapSize: memory.totalJSHeapSize,
+          jsHeapSizeLimit: memory.jsHeapSizeLimit,
+        });
+      }
+    };
+    
+    updateMemoryInfo();
+    const interval = setInterval(updateMemoryInfo, 5000); // Update every 5 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  return memoryInfo;
+}
+
+/**
+ * Bundle size analyzer (development only)
+ */
 export function analyzeBundleSize() {
-  if (typeof window === "undefined") return;
-
-  const scripts = Array.from(document.querySelectorAll("script[src]"));
-  const styles = Array.from(
-    document.querySelectorAll('link[rel="stylesheet"]')
-  );
-
-  console.group("Bundle Analysis");
-
-  scripts.forEach((script: any) => {
-    console.log("Script:", script.src, "Size: Unknown (external)");
-  });
-
-  styles.forEach((style: any) => {
-    console.log("Stylesheet:", style.href, "Size: Unknown (external)");
-  });
-
-  const memoryInfo = (performance as any).memory;
-  if (memoryInfo) {
-    console.log("Memory Usage:", {
-      used: `${(memoryInfo.usedJSHeapSize / 1048576).toFixed(2)} MB`,
-      total: `${(memoryInfo.totalJSHeapSize / 1048576).toFixed(2)} MB`,
-      limit: `${(memoryInfo.jsHeapSizeLimit / 1048576).toFixed(2)} MB`,
-    });
-  }
-
-  console.groupEnd();
-}
-
-// Component render tracking
-export function trackComponentRender(componentName: string) {
-  if (process.env.NODE_ENV === "development") {
-    console.log(`🔄 ${componentName} rendered at`, new Date().toISOString());
+  if (process.env.NODE_ENV === 'development') {
+    const scripts = Array.from(document.querySelectorAll('script[src]'));
+    const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"]'));
+    
+    console.group('📦 Bundle Analysis');
+    console.log('Scripts:', scripts.map(s => (s as HTMLScriptElement).src));
+    console.log('Styles:', styles.map(s => (s as HTMLLinkElement).href));
+    console.groupEnd();
   }
 }
+
+// Import React for lazy component creation
+import React, { useState } from 'react';
 
 export default {
-  PerformanceMonitor,
-  debounce,
-  throttle,
-  calculateVirtualScrollItems,
-  createIntersectionObserver,
-  lazyLoadImage,
+  useDebounce,
+  useThrottle,
+  useMemoizedComputation,
+  useVirtualScrolling,
+  useIntersectionObserver,
+  usePerformanceMonitor,
+  createLazyComponent,
+  useMemoryMonitor,
   analyzeBundleSize,
-  trackComponentRender,
 };

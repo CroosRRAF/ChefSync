@@ -112,7 +112,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Database configuration - MySQL is now the default
+# Database configuration - MySQL (reverted)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",

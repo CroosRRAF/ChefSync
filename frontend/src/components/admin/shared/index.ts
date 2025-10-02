@@ -10,6 +10,47 @@ export type { GradientButtonProps } from "./GradientButton";
 
 export { default as CommandPalette } from "./CommandPalette";
 
+export { default as AIAssistantButton } from "./AIAssistantButton";
+export type { AIAssistantButtonProps } from "./AIAssistantButton";
+
+// Optimistic UI Components
+export { default as OptimisticButton } from "./OptimisticButton";
+export type { OptimisticButtonProps } from "./OptimisticButton";
+
+// Toast Notifications
+export { default as ToastProvider, useToast } from "./Toast";
+export type { Toast } from "./Toast";
+
+// Error Boundaries
+export { default as ErrorBoundary, withErrorBoundary } from "./ErrorBoundary";
+
+// Performance Components
+export { default as LazyPageWrapper, withLazyLoading } from "./LazyPageWrapper";
+export { default as MemoizedDataTable, HighlyOptimizedDataTable } from "./MemoizedDataTable";
+
+// Accessibility Components
+export { default as AccessibleButton } from "./AccessibleButton";
+export type { AccessibleButtonProps } from "./AccessibleButton";
+export { default as SkipLinks, useSkipLinkTarget, withSkipLinkTarget } from "./SkipLinks";
+
+// Skeleton Loading Components
+export { 
+  default as Skeleton,
+  SkeletonCard,
+  SkeletonTable,
+  SkeletonStats,
+  SkeletonChart,
+  SkeletonList
+} from "./SkeletonLoader";
+export type { 
+  SkeletonProps,
+  SkeletonCardProps,
+  SkeletonTableProps,
+  SkeletonStatsProps,
+  SkeletonChartProps,
+  SkeletonListProps
+} from "./SkeletonLoader";
+
 // Chart Components
 export { default as BarChart } from "./charts/BarChart";
 export { default as LineChart } from "./charts/LineChart";

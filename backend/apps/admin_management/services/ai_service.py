@@ -41,7 +41,7 @@ class AdminAIService:
 
         try:
             genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            self.model = genai.GenerativeModel('gemini-2.0-flash')
             logger.info("AI service initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize AI service: {e}")
@@ -191,7 +191,7 @@ Report generation is ready for Phase 10 implementation.
             orders = Order.objects.filter(
                 created_at__gte=start_date,
                 created_at__lte=end_date,
-                status='completed'
+                status='delivered'  # Use 'delivered' instead of 'completed'
             ).values('created_at', 'total_amount')
             
             if not orders:
@@ -599,3 +599,117 @@ Report generation is ready for Phase 10 implementation.
                 'insights': ['Customer insights generation failed'],
                 'error': str(e)
             }
+
+    def is_available(self) -> bool:
+        """Check if AI service is available and properly configured"""
+        return self.model is not None and PANDAS_AVAILABLE
+
+    def get_service_status(self) -> Dict[str, Any]:
+        """Get detailed status of AI service components"""
+        return {
+            'ai_model_available': self.model is not None,
+            'pandas_available': PANDAS_AVAILABLE,
+            'google_ai_configured': hasattr(settings, 'GOOGLE_AI_API_KEY') and settings.GOOGLE_AI_API_KEY,
+            'service_ready': self.is_available(),
+            'features': {
+                'sales_forecasting': PANDAS_AVAILABLE,
+                'anomaly_detection': PANDAS_AVAILABLE,
+                'product_recommendations': PANDAS_AVAILABLE,
+                'customer_insights': PANDAS_AVAILABLE,
+                'sentiment_analysis': self.model is not None
+            }
+        }
+
+    def generate_business_insights(self) -> Dict[str, Any]:
+        """Generate comprehensive business insights using all AI features"""
+        if not self.is_available():
+            return {
+                'error': 'AI service not available',
+                'message': 'Please ensure all dependencies are installed and API keys are configured'
+            }
+        
+        try:
+            # Get all AI insights
+            sales_forecast = self.get_sales_forecast(30)
+            anomalies = self.detect_anomalies(30)
+            product_recs = self.get_product_recommendations(5)
+            customer_insights = self.get_customer_insights()
+            
+            # Generate AI-powered summary
+            summary = self._generate_ai_summary({
+                'sales_forecast': sales_forecast,
+                'anomalies': anomalies,
+                'product_recommendations': product_recs,
+                'customer_insights': customer_insights
+            })
+            
+            return {
+                'success': True,
+                'insights': {
+                    'sales_forecast': sales_forecast,
+                    'anomalies': anomalies,
+                    'product_recommendations': product_recs,
+                    'customer_insights': customer_insights,
+                    'ai_summary': summary
+                },
+                'generated_at': datetime.now().isoformat(),
+                'confidence_score': self._calculate_overall_confidence(sales_forecast, anomalies)
+            }
+            
+        except Exception as e:
+            logger.error(f"Business insights generation failed: {e}")
+            return {
+                'error': str(e),
+                'message': 'Failed to generate business insights'
+            }
+
+    def _generate_ai_summary(self, data: Dict[str, Any]) -> str:
+        """Generate AI-powered summary of business insights"""
+        if not self.model:
+            return "AI summary not available - model not configured"
+        
+        try:
+            # Prepare data for AI analysis
+            summary_data = {
+                'sales_trend': data['sales_forecast'].get('insights', []),
+                'anomalies_detected': len(data['anomalies'].get('anomalies', [])),
+                'top_products': [p.get('name', 'Unknown') for p in data['product_recommendations'].get('recommendations', [])[:3]],
+                'customer_segments': len(data['customer_insights'].get('segments', []))
+            }
+            
+            prompt = f"""
+            Based on the following business data, provide a concise executive summary with key insights and recommendations:
+            
+            Sales Insights: {summary_data['sales_trend']}
+            Anomalies Detected: {summary_data['anomalies_detected']}
+            Top Products: {summary_data['top_products']}
+            Customer Segments: {summary_data['customer_segments']}
+            
+            Please provide:
+            1. Key business performance highlights
+            2. Areas requiring attention
+            3. Strategic recommendations
+            4. Growth opportunities
+            
+            Keep the summary professional and actionable.
+            """
+            
+            response = self.model.generate_content(prompt)
+            return response.text
+            
+        except Exception as e:
+            logger.error(f"AI summary generation failed: {e}")
+            return "AI summary generation failed - please check logs"
+
+    def _calculate_overall_confidence(self, sales_forecast: Dict, anomalies: Dict) -> float:
+        """Calculate overall confidence score for AI insights"""
+        try:
+            sales_confidence = sales_forecast.get('confidence', 0.0)
+            anomaly_confidence = 0.8 if anomalies.get('anomalies') else 0.9  # Higher confidence if no anomalies
+            
+            # Weighted average
+            overall_confidence = (sales_confidence * 0.6) + (anomaly_confidence * 0.4)
+            return round(overall_confidence, 2)
+            
+        except Exception:
+            return 0.5  # Default confidence

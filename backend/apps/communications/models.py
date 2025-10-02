@@ -136,6 +136,49 @@ class Communication(models.Model):
         self.resolution_notes = resolution_notes
         self.resolved_at = timezone.now()
         self.save()
+    
+    def update_status(self, new_status, admin_user, notes=None):
+        """Update communication status and send notifications"""
+        from django.utils import timezone
+        
+        old_status = self.status
+        self.status = new_status
+        
+        # Update timestamps and assignments based on status
+        if new_status == 'in_progress' and old_status == 'pending':
+            self.assigned_to = admin_user
+        elif new_status == 'resolved':
+            self.resolved_at = timezone.now()
+            if notes:
+                self.resolution_notes = notes
+        elif new_status == 'closed':
+            if not self.resolved_at:
+                self.resolved_at = timezone.now()
+        
+        self.save()
+        
+        # Send notification to user
+        self._send_status_change_notification(old_status, new_status, admin_user, notes)
+        
+        return True
+    
+    def _send_status_change_notification(self, old_status, new_status, admin_user, notes=None):
+        """Send notification to user about status change"""
+        try:
+            from .services.communication_notification_service import CommunicationNotificationService
+            
+            notification_service = CommunicationNotificationService()
+            notification_service.send_status_change_notification(
+                communication=self,
+                old_status=old_status,
+                new_status=new_status,
+                admin_user=admin_user,
+                notes=notes
+            )
+        except Exception as e:
+            # Log error but don't fail the status update
+            print(f"Failed to send status change notification: {e}")
+            pass
 
 
 class CommunicationResponse(models.Model):

@@ -551,20 +551,13 @@ class CommunicationService {
     }
   }
 
-  // Feedback-specific methods
-  async updateFeedbackStatus(
-    feedbackId: number,
-    status: string
-  ): Promise<Communication> {
-    return this.updateStatus(feedbackId, status);
-  }
-
-  async updateFeedbackPriority(
-    feedbackId: number,
+  // Priority update method
+  async updatePriority(
+    communicationId: number,
     priority: string
   ): Promise<Communication> {
     try {
-      const response = await apiClient.patch(`/communications/${feedbackId}/`, {
+      const response = await apiClient.patch(`/communications/${communicationId}/`, {
         priority,
       });
       toast({
@@ -573,31 +566,19 @@ class CommunicationService {
       });
       return response.data;
     } catch (error) {
-      return this.handleError(error, "updateFeedbackPriority");
+      return this.handleError(error, "updatePriority");
     }
   }
 
-  async deleteFeedback(feedbackId: number): Promise<void> {
-    try {
-      await apiClient.delete(`/communications/${feedbackId}/`);
-      toast({
-        title: "Success",
-        description: "Feedback deleted successfully",
-      });
-    } catch (error) {
-      return this.handleError(error, "deleteFeedback");
-    }
-  }
-
-  async bulkUpdateStatus(feedbackIds: number[], status: string): Promise<void> {
+  async bulkUpdateStatus(communicationIds: number[], status: string): Promise<void> {
     try {
       await apiClient.patch("/communications/bulk-update/", {
-        ids: feedbackIds,
+        ids: communicationIds,
         status,
       });
       toast({
         title: "Success",
-        description: `${feedbackIds.length} items updated successfully`,
+        description: `${communicationIds.length} items updated successfully`,
       });
     } catch (error) {
       return this.handleError(error, "bulkUpdateStatus");

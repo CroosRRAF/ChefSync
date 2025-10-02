@@ -342,8 +342,9 @@ class CommunicationViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def sentiment_analysis(self, request):
-        """Get sentiment analysis of communications"""
+        """Get AI-powered sentiment analysis of communications"""
         from datetime import timedelta
+        from .services.ai_sentiment_service import AISentimentService
 
         period = request.GET.get("period", "30d")
         days = int(period.replace("d", ""))
@@ -351,43 +352,35 @@ class CommunicationViewSet(viewsets.ModelViewSet):
         start_date = timezone.now() - timedelta(days=days)
         queryset = self.get_queryset().filter(created_at__gte=start_date)
 
-        # Basic sentiment based on ratings and keywords
-        positive_count = (
-            queryset.filter(
-                Q(rating__gte=4)
-                | Q(message__icontains="thank")
-                | Q(message__icontains="great")
-            )
-            .distinct()
-            .count()
-        )
+        # Get AI-powered sentiment analysis
+        ai_service = AISentimentService()
+        sentiment_data = ai_service.analyze_communications_sentiment(queryset)
 
-        negative_count = (
-            queryset.filter(Q(rating__lte=2) | Q(communication_type="complaint"))
-            .distinct()
-            .count()
-        )
-
-        total = queryset.count()
-        neutral_count = max(0, total - positive_count - negative_count)
-
-        # Extract trending topics from subjects
-        trending_topics = list(
-            queryset.exclude(subject__isnull=True)
-            .exclude(subject="")
-            .values_list("subject", flat=True)[:10]
-        )
-
-        return Response(
-            {
-                "positive": positive_count,
-                "negative": negative_count,
-                "neutral": neutral_count,
-                "total": total,
-                "period_days": days,
-                "trending_topics": trending_topics,
+        # Get communication type breakdown
+        type_breakdown = {}
+        for comm_type, _ in Communication.COMMUNICATION_TYPE:
+            type_queryset = queryset.filter(communication_type=comm_type)
+            type_sentiment = ai_service.analyze_communications_sentiment(type_queryset)
+            type_breakdown[comm_type] = {
+                'count': type_queryset.count(),
+                'sentiment': type_sentiment
             }
-        )
+
+        # Get trending topics with AI analysis
+        trending_topics = ai_service.extract_trending_topics(queryset)
+
+        # Get sentiment trends over time
+        sentiment_trends = ai_service.get_sentiment_trends(queryset, days)
+
+        return Response({
+            "overall_sentiment": sentiment_data,
+            "type_breakdown": type_breakdown,
+            "trending_topics": trending_topics,
+            "sentiment_trends": sentiment_trends,
+            "period_days": days,
+            "ai_analysis": True,
+            "last_updated": timezone.now().isoformat()
+        })
 
     @action(detail=False, methods=["get"])
     def campaign_stats(self, request):
@@ -754,6 +747,250 @@ class CommunicationViewSet(viewsets.ModelViewSet):
 
         serializer = CommunicationResponseSerializer(responses, many=True)
         return Response({"results": serializer.data, "count": responses.count()})
+
+    @action(detail=True, methods=['patch'])
+    def update_status(self, request, pk=None):
+        """Update communication status with automatic notifications"""
+        communication = self.get_object()
+        
+        new_status = request.data.get('status')
+        notes = request.data.get('notes', '')
+        
+        if not new_status:
+            return Response(
+                {'error': 'Status is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if new_status not in [choice[0] for choice in Communication.STATUS_CHOICES]:
+            return Response(
+                {'error': 'Invalid status'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        old_status = communication.status
+        
+        # Update status with notification
+        communication.update_status(
+            new_status=new_status,
+            admin_user=request.user,
+            notes=notes
+        )
+        
+        # Log activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action="update_status",
+            resource_type="communication",
+            resource_id=communication.id,
+            description=f"Updated status from {old_status} to {new_status}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+        )
+        
+        return Response({
+            'message': f'Status updated to {new_status}',
+            'old_status': old_status,
+            'new_status': new_status,
+            'notification_sent': True
+        })
+
+    @action(detail=False, methods=['patch'])
+    def bulk_update_status(self, request):
+        """Bulk update communication statuses with notifications"""
+        communication_ids = request.data.get('communication_ids', [])
+        new_status = request.data.get('status')
+        notes = request.data.get('notes', '')
+        
+        if not communication_ids:
+            return Response(
+                {'error': 'communication_ids list is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not new_status:
+            return Response(
+                {'error': 'Status is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if new_status not in [choice[0] for choice in Communication.STATUS_CHOICES]:
+            return Response(
+                {'error': 'Invalid status'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        updated_count = 0
+        failed_count = 0
+        
+        for comm_id in communication_ids:
+            try:
+                comm = Communication.objects.get(id=comm_id)
+                old_status = comm.status
+                
+                # Update status with notification
+                comm.update_status(
+                    new_status=new_status,
+                    admin_user=request.user,
+                    notes=notes
+                )
+                
+                updated_count += 1
+                
+            except Communication.DoesNotExist:
+                failed_count += 1
+                continue
+        
+        # Log activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action="bulk_update_status",
+            resource_type="communication",
+            resource_id="bulk",
+            description=f"Bulk updated {updated_count} communications to {new_status}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+        )
+        
+        return Response({
+            'message': f'Successfully updated {updated_count} communications',
+            'updated_count': updated_count,
+            'failed_count': failed_count,
+            'notifications_sent': updated_count
+        })
+
+    @action(detail=False, methods=['get'])
+    def filter_by_type(self, request):
+        """Get communications filtered by type with enhanced analytics"""
+        communication_type = request.GET.get('type')
+        period = request.GET.get('period', '30d')
+        
+        if not communication_type:
+            return Response(
+                {'error': 'Type parameter is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate communication type
+        valid_types = [choice[0] for choice in Communication.COMMUNICATION_TYPE]
+        if communication_type not in valid_types:
+            return Response(
+                {'error': f'Invalid type. Valid types: {valid_types}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get filtered queryset
+        queryset = self.get_queryset().filter(communication_type=communication_type)
+        
+        # Apply period filter
+        if period != 'all':
+            days = int(period.replace('d', ''))
+            start_date = timezone.now() - timedelta(days=days)
+            queryset = queryset.filter(created_at__gte=start_date)
+        
+        # Get analytics for this type
+        analytics = self._get_type_analytics(queryset, communication_type)
+        
+        # Get paginated results
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response({
+                'results': serializer.data,
+                'analytics': analytics,
+                'type': communication_type,
+                'period': period
+            })
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            'results': serializer.data,
+            'analytics': analytics,
+            'type': communication_type,
+            'period': period
+        })
+
+    @action(detail=False, methods=['get'])
+    def type_analytics(self, request):
+        """Get analytics breakdown by communication type"""
+        period = request.GET.get('period', '30d')
+        days = int(period.replace('d', '')) if period != 'all' else None
+        
+        queryset = self.get_queryset()
+        if days:
+            start_date = timezone.now() - timedelta(days=days)
+            queryset = queryset.filter(created_at__gte=start_date)
+        
+        analytics = {}
+        
+        for comm_type, type_label in Communication.COMMUNICATION_TYPE:
+            type_queryset = queryset.filter(communication_type=comm_type)
+            
+            # Get basic stats
+            total = type_queryset.count()
+            status_breakdown = type_queryset.values('status').annotate(count=Count('id'))
+            priority_breakdown = type_queryset.values('priority').annotate(count=Count('id'))
+            
+            # Get sentiment analysis for this type
+            from .services.ai_sentiment_service import AISentimentService
+            ai_service = AISentimentService()
+            sentiment_data = ai_service.analyze_communications_sentiment(type_queryset)
+            
+            # Get trending topics for this type
+            trending_topics = ai_service.extract_trending_topics(type_queryset)
+            
+            analytics[comm_type] = {
+                'label': type_label,
+                'total': total,
+                'status_breakdown': {item['status']: item['count'] for item in status_breakdown},
+                'priority_breakdown': {item['priority']: item['count'] for item in priority_breakdown},
+                'sentiment': sentiment_data,
+                'trending_topics': trending_topics,
+                'percentage': round((total / queryset.count()) * 100, 1) if queryset.count() > 0 else 0
+            }
+        
+        return Response({
+            'type_analytics': analytics,
+            'period': period,
+            'total_communications': queryset.count(),
+            'last_updated': timezone.now().isoformat()
+        })
+
+    def _get_type_analytics(self, queryset, communication_type):
+        """Get analytics for a specific communication type"""
+        from .services.ai_sentiment_service import AISentimentService
+        
+        ai_service = AISentimentService()
+        
+        # Basic metrics
+        total = queryset.count()
+        status_breakdown = queryset.values('status').annotate(count=Count('id'))
+        priority_breakdown = queryset.values('priority').annotate(count=Count('id'))
+        
+        # Sentiment analysis
+        sentiment_data = ai_service.analyze_communications_sentiment(queryset)
+        
+        # Trending topics
+        trending_topics = ai_service.extract_trending_topics(queryset)
+        
+        # Response time analysis
+        response_times = []
+        for comm in queryset.filter(resolved_at__isnull=False):
+            if comm.assigned_at:
+                response_time = (comm.resolved_at - comm.assigned_at).total_seconds() / 3600  # hours
+                response_times.append(response_time)
+        
+        avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+        
+        return {
+            'total': total,
+            'status_breakdown': {item['status']: item['count'] for item in status_breakdown},
+            'priority_breakdown': {item['priority']: item['count'] for item in priority_breakdown},
+            'sentiment': sentiment_data,
+            'trending_topics': trending_topics,
+            'avg_response_time_hours': round(avg_response_time, 1),
+            'response_time_count': len(response_times)
+        }
 
 
 class CommunicationResponseViewSet(viewsets.ModelViewSet):

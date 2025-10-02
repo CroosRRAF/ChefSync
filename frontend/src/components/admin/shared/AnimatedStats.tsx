@@ -102,11 +102,11 @@ export const AnimatedStats: React.FC<AnimatedStatsProps> = ({
       <GlassCard gradient={gradient} hover={false} animate={false}>
         <div className="animate-pulse">
           <div className="flex items-center justify-between mb-4">
-            <div className="h-10 w-10 bg-gray-300 dark:bg-gray-700 rounded-xl" />
-            <div className="h-4 w-16 bg-gray-300 dark:bg-gray-700 rounded" />
+            <div className="h-10 w-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded-xl animate-pulse" />
+            <div className="h-4 w-16 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded animate-pulse" />
           </div>
-          <div className="h-8 w-24 bg-gray-300 dark:bg-gray-700 rounded mb-2" />
-          <div className="h-4 w-full bg-gray-300 dark:bg-gray-700 rounded" />
+          <div className="h-8 w-24 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded mb-2 animate-pulse" />
+          <div className="h-4 w-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded animate-pulse" />
         </div>
       </GlassCard>
     );

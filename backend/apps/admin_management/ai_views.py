@@ -235,3 +235,353 @@ def ai_dashboard_summary(request):
             'error': 'Failed to generate AI dashboard summary',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def communication_ai_insights(request):
+    """
+    Get AI-powered insights for communication management
+    
+    Query Parameters:
+        period (str): Time period for analysis (default: '30d')
+        type (str): Communication type filter (optional)
+    """
+    try:
+        from apps.communications.services.ai_sentiment_service import AISentimentService
+        from apps.communications.models import Communication
+        from datetime import timedelta
+        from django.utils import timezone
+        
+        # Get parameters
+        period = request.GET.get('period', '30d')
+        comm_type = request.GET.get('type')
+        
+        # Calculate date range
+        days = int(period.replace('d', '')) if period != 'all' else None
+        if days:
+            start_date = timezone.now() - timedelta(days=days)
+            queryset = Communication.objects.filter(created_at__gte=start_date)
+        else:
+            queryset = Communication.objects.all()
+        
+        # Filter by type if specified
+        if comm_type:
+            queryset = queryset.filter(communication_type=comm_type)
+        
+        # Initialize AI service
+        ai_service = AISentimentService()
+        
+        # Get comprehensive AI insights
+        insights = {
+            'overview': {
+                'total_communications': queryset.count(),
+                'period': period,
+                'type_filter': comm_type,
+                'analysis_timestamp': timezone.now().isoformat()
+            },
+            'sentiment_analysis': ai_service.analyze_communications_sentiment(queryset),
+            'trending_topics': ai_service.extract_trending_topics(queryset),
+            'sentiment_trends': ai_service.get_sentiment_trends(queryset, days or 30),
+            'type_breakdown': {},
+            'recommendations': []
+        }
+        
+        # Get type-specific insights
+        for comm_type_choice, type_label in Communication.COMMUNICATION_TYPE:
+            type_queryset = queryset.filter(communication_type=comm_type_choice)
+            if type_queryset.exists():
+                type_sentiment = ai_service.analyze_communications_sentiment(type_queryset)
+                type_topics = ai_service.extract_trending_topics(type_queryset)
+                
+                insights['type_breakdown'][comm_type_choice] = {
+                    'label': type_label,
+                    'count': type_queryset.count(),
+                    'sentiment': type_sentiment,
+                    'trending_topics': type_topics
+                }
+        
+        # Generate AI recommendations
+        insights['recommendations'] = _generate_communication_recommendations(insights)
+        
+        return Response({
+            'success': True,
+            'data': insights,
+            'message': 'Communication AI insights generated successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Communication AI insights error: {e}")
+        return Response({
+            'success': False,
+            'error': str(e),
+            'message': 'Failed to generate communication AI insights'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _generate_communication_recommendations(insights):
+    """Generate AI-powered recommendations based on communication insights"""
+    recommendations = []
+    
+    try:
+        # Analyze sentiment patterns
+        sentiment_data = insights.get('sentiment_analysis', {})
+        negative_percentage = sentiment_data.get('negative_percentage', 0)
+        positive_percentage = sentiment_data.get('positive_percentage', 0)
+        
+        # Generate recommendations based on sentiment
+        if negative_percentage > 30:
+            recommendations.append({
+                'type': 'urgent',
+                'title': 'High Negative Sentiment Detected',
+                'description': f'{negative_percentage}% of communications show negative sentiment',
+                'action': 'Review recent complaints and implement immediate response strategy',
+                'priority': 'high'
+            })
+        
+        if positive_percentage > 70:
+            recommendations.append({
+                'type': 'positive',
+                'title': 'Excellent Customer Satisfaction',
+                'description': f'{positive_percentage}% of communications show positive sentiment',
+                'action': 'Consider sharing positive feedback with team and customers',
+                'priority': 'medium'
+            })
+        
+        # Analyze trending topics
+        trending_topics = insights.get('trending_topics', [])
+        for topic in trending_topics[:3]:  # Top 3 topics
+            if topic.get('sentiment') == 'negative':
+                recommendations.append({
+                    'type': 'topic_focus',
+                    'title': f'Focus on {topic.get("topic", "Unknown")}',
+                    'description': f'High frequency of negative feedback about {topic.get("topic")}',
+                    'action': f'Investigate and improve {topic.get("topic")} processes',
+                    'priority': 'high'
+                })
+        
+        # Analyze response times
+        type_breakdown = insights.get('type_breakdown', {})
+        for comm_type, data in type_breakdown.items():
+            if data.get('count', 0) > 10:  # Only for types with significant volume
+                recommendations.append({
+                    'type': 'process_improvement',
+                    'title': f'Optimize {data.get("label")} Process',
+                    'description': f'{data.get("count")} {data.get("label").lower()} received',
+                    'action': f'Review and streamline {data.get("label").lower()} handling process',
+                    'priority': 'medium'
+                })
+        
+        # Add general recommendations
+        recommendations.append({
+            'type': 'general',
+            'title': 'Regular Communication Review',
+            'description': 'Schedule weekly reviews of communication trends',
+            'action': 'Set up automated reports for communication analytics',
+            'priority': 'low'
+        })
+        
+    except Exception as e:
+        logger.error(f"Recommendation generation failed: {e}")
+        recommendations.append({
+            'type': 'error',
+            'title': 'Analysis Error',
+            'description': 'Unable to generate recommendations',
+            'action': 'Check system logs and try again',
+            'priority': 'low'
+        })
+    
+    return recommendations
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def ai_service_status(request):
+    """
+    Get detailed status of AI service components
+    """
+    try:
+        status_data = ai_service.get_service_status()
+        
+        return Response({
+            'success': True,
+            'data': status_data,
+            'message': 'AI service status retrieved successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"AI service status error: {e}")
+        return Response({
+            'success': False,
+            'error': str(e),
+            'message': 'Failed to get AI service status'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def business_insights(request):
+    """
+    Get comprehensive business insights using all AI features
+    
+    Query Parameters:
+        include_forecast (bool): Include sales forecasting (default: true)
+        include_anomalies (bool): Include anomaly detection (default: true)
+        include_products (bool): Include product recommendations (default: true)
+        include_customers (bool): Include customer insights (default: true)
+    """
+    try:
+        # Get parameters
+        include_forecast = request.GET.get('include_forecast', 'true').lower() == 'true'
+        include_anomalies = request.GET.get('include_anomalies', 'true').lower() == 'true'
+        include_products = request.GET.get('include_products', 'true').lower() == 'true'
+        include_customers = request.GET.get('include_customers', 'true').lower() == 'true'
+        
+        # Generate comprehensive insights
+        insights_data = ai_service.generate_business_insights()
+        
+        if 'error' in insights_data:
+            return Response({
+                'success': False,
+                'error': insights_data['error'],
+                'message': insights_data.get('message', 'Failed to generate business insights')
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Filter insights based on parameters
+        filtered_insights = {}
+        if include_forecast:
+            filtered_insights['sales_forecast'] = insights_data['insights']['sales_forecast']
+        if include_anomalies:
+            filtered_insights['anomalies'] = insights_data['insights']['anomalies']
+        if include_products:
+            filtered_insights['product_recommendations'] = insights_data['insights']['product_recommendations']
+        if include_customers:
+            filtered_insights['customer_insights'] = insights_data['insights']['customer_insights']
+        
+        # Always include AI summary
+        filtered_insights['ai_summary'] = insights_data['insights']['ai_summary']
+        
+        return Response({
+            'success': True,
+            'data': {
+                'insights': filtered_insights,
+                'generated_at': insights_data['generated_at'],
+                'confidence_score': insights_data['confidence_score'],
+                'included_features': {
+                    'sales_forecast': include_forecast,
+                    'anomaly_detection': include_anomalies,
+                    'product_recommendations': include_products,
+                    'customer_insights': include_customers
+                }
+            },
+            'message': 'Business insights generated successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Business insights error: {e}")
+        return Response({
+            'success': False,
+            'error': str(e),
+            'message': 'Failed to generate business insights'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def ai_recommendations(request):
+    """
+    Get AI-powered recommendations for business improvement
+    
+    Query Parameters:
+        category (str): Category of recommendations (all, sales, operations, customer)
+        priority (str): Priority level (all, high, medium, low)
+    """
+    try:
+        category = request.GET.get('category', 'all')
+        priority = request.GET.get('priority', 'all')
+        
+        # Get all AI insights
+        sales_forecast = ai_service.get_sales_forecast(30)
+        anomalies = ai_service.detect_anomalies(30)
+        product_recs = ai_service.get_product_recommendations(10)
+        customer_insights = ai_service.get_customer_insights()
+        
+        # Generate recommendations
+        recommendations = []
+        
+        # Sales recommendations
+        if category in ['all', 'sales']:
+            if sales_forecast.get('confidence', 0) > 0.7:
+                recommendations.append({
+                    'category': 'sales',
+                    'priority': 'high',
+                    'title': 'Optimize Sales Strategy',
+                    'description': f"High confidence forecast available ({sales_forecast.get('confidence', 0):.1%})",
+                    'action': 'Use sales forecast to plan inventory and marketing campaigns',
+                    'impact': 'high'
+                })
+        
+        # Anomaly recommendations
+        if category in ['all', 'operations']:
+            anomalies_detected = len(anomalies.get('anomalies', []))
+            if anomalies_detected > 0:
+                recommendations.append({
+                    'category': 'operations',
+                    'priority': 'high' if anomalies_detected > 3 else 'medium',
+                    'title': 'Address Detected Anomalies',
+                    'description': f"{anomalies_detected} anomalies detected in recent data",
+                    'action': 'Review anomaly details and investigate root causes',
+                    'impact': 'high'
+                })
+        
+        # Product recommendations
+        if category in ['all', 'sales']:
+            top_products = product_recs.get('recommendations', [])[:3]
+            if top_products:
+                recommendations.append({
+                    'category': 'sales',
+                    'priority': 'medium',
+                    'title': 'Promote Top Performing Products',
+                    'description': f"AI identified {len(top_products)} high-potential products",
+                    'action': 'Increase marketing focus on top-performing products',
+                    'impact': 'medium'
+                })
+        
+        # Customer recommendations
+        if category in ['all', 'customer']:
+            segments = customer_insights.get('segments', [])
+            if len(segments) > 2:
+                recommendations.append({
+                    'category': 'customer',
+                    'priority': 'medium',
+                    'title': 'Implement Customer Segmentation',
+                    'description': f"AI identified {len(segments)} distinct customer segments",
+                    'action': 'Develop targeted marketing strategies for each segment',
+                    'impact': 'medium'
+                })
+        
+        # Filter by priority
+        if priority != 'all':
+            recommendations = [r for r in recommendations if r['priority'] == priority]
+        
+        return Response({
+            'success': True,
+            'data': {
+                'recommendations': recommendations,
+                'total_count': len(recommendations),
+                'filters': {
+                    'category': category,
+                    'priority': priority
+                },
+                'generated_at': timezone.now().isoformat()
+            },
+            'message': 'AI recommendations generated successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"AI recommendations error: {e}")
+        return Response({
+            'success': False,
+            'error': str(e),
+            'message': 'Failed to generate AI recommendations'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -142,3 +142,58 @@ class CommunicationEmailService:
         except Exception as e:
             print(f"Failed to send new communication email: {e}")
             return False
+
+    @staticmethod
+    def send_status_change_email(communication, old_status, new_status, admin_user, notes=None):
+        """Send email when communication status changes"""
+        from django.utils import timezone
+        
+        try:
+            logo_base64 = CommunicationEmailService.get_logo_base64()
+            
+            # Get status-specific content
+            from .communication_notification_service import CommunicationNotificationService
+            notification_service = CommunicationNotificationService()
+            status_info = notification_service.get_status_info(new_status, communication.communication_type)
+            
+            context = {
+                "user_name": communication.user.name,
+                "communication_type": communication.communication_type.title(),
+                "reference_number": communication.reference_number,
+                "subject": communication.subject,
+                "old_status": old_status.title(),
+                "new_status": new_status.title(),
+                "status_title": status_info['title'],
+                "status_message": status_info['message'],
+                "status_icon": status_info['icon'],
+                "status_color": status_info['color'],
+                "admin_name": admin_user.name,
+                "admin_role": admin_user.role.title(),
+                "notes": notes,
+                "update_date": timezone.now().strftime("%B %d, %Y at %I:%M %p"),
+                "logo_base64": logo_base64,
+                "site_name": "ChefSync Kitchen",
+                "communication_url": f"{settings.FRONTEND_URL}/communications/{communication.id}",
+            }
+            
+            # Render HTML and text versions
+            html_content = render_to_string("emails/communication_status_update.html", context)
+            text_content = strip_tags(html_content)
+            
+            # Create email
+            subject = f"Update on your {communication.communication_type.title()}: {communication.reference_number}"
+            from_email = settings.DEFAULT_FROM_EMAIL
+            to_email = communication.user.email
+            
+            email = EmailMultiAlternatives(
+                subject=subject, body=text_content, from_email=from_email, to=[to_email]
+            )
+            email.attach_alternative(html_content, "text/html")
+            
+            # Send email
+            email.send()
+            return True
+            
+        except Exception as e:
+            print(f"Failed to send status change email: {e}")
+            return False

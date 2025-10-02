@@ -38,10 +38,13 @@ import {
   Users,
   Utensils,
   X,
+  Bot,
+  Sparkles,
 } from "lucide-react";
 import React, { memo, useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AdminBreadcrumb from "./AdminBreadcrumb";
+import { CommandPalette, AIAssistantButton, GlassCard } from "../shared";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -184,7 +187,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
   }, [location.pathname]);
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-blue-900">
       {/* Sidebar */}
       <motion.aside
         initial={false}
@@ -193,25 +196,36 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
         }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className={cn(
-          "hidden md:flex flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm",
+          "hidden md:flex flex-col",
+          "backdrop-blur-xl bg-white/80 dark:bg-gray-900/80",
+          "border-r border-white/20 dark:border-gray-700/50",
+          "shadow-xl shadow-blue-500/10",
           "relative z-30"
         )}
       >
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-white/10 dark:border-gray-700/50">
           {!sidebarCollapsed && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.1 }}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-3"
             >
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">A</span>
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Bot className="text-white w-5 h-5" />
               </div>
-              <span className="font-semibold text-gray-900 dark:text-white">
-                Admin Panel
-              </span>
+              <div>
+                <span className="font-bold text-gray-900 dark:text-white text-lg">
+                  ChefSync
+                </span>
+                <div className="flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-blue-500" />
+                  <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                    AI Admin
+                  </span>
+                </div>
+              </div>
             </motion.div>
           )}
           <Button
@@ -295,13 +309,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
               <Avatar className="w-8 h-8">
                 <AvatarImage src={user?.avatar} />
                 <AvatarFallback>
-                  {user?.firstName?.[0]}
-                  {user?.lastName?.[0]}
+                  {user?.name?.[0] || user?.email?.[0] || "A"}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {user?.firstName} {user?.lastName}
+                  {user?.name || user?.email}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                   {user?.email}
@@ -388,10 +401,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center justify-between px-4 py-3">
+        <header className="backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border-b border-white/20 dark:border-gray-700/50 shadow-lg shadow-blue-500/5">
+          <div className="flex items-center justify-between px-6 py-4">
             {/* Left Section */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-6">
               {/* Mobile Menu Button */}
               <Button
                 variant="ghost"
@@ -402,32 +415,24 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
                 <Menu size={20} />
               </Button>
 
+              {/* Breadcrumb */}
+              <AdminBreadcrumb />
+
               {/* Page Info */}
               <div>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-blue-600 dark:from-white dark:to-blue-400 bg-clip-text text-transparent">
                   {pageInfo.title}
                 </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                   {pageInfo.description}
                 </p>
               </div>
             </div>
 
             {/* Right Section */}
-            <div className="flex items-center space-x-2">
-              {/* Search */}
-              <div className="relative hidden sm:block">
-                <Search
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                  size={16}
-                />
-                <Input
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
+            <div className="flex items-center space-x-3">
+              {/* Command Palette */}
+              <CommandPalette />
 
               {/* Theme Toggle */}
               <Button variant="ghost" size="sm" onClick={toggleTheme}>
@@ -450,10 +455,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
                     className="relative h-9 w-9 rounded-full"
                   >
                     <Avatar className="h-9 w-9">
-                      <AvatarImage src={user?.avatar} alt={user?.firstName} />
+                      <AvatarImage src={user?.avatar} alt={user?.name} />
                       <AvatarFallback>
-                        {user?.firstName?.[0]}
-                        {user?.lastName?.[0]}
+                        {user?.name?.[0] || user?.email?.[0] || "A"}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -462,7 +466,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
                   <div className="flex items-center justify-start gap-2 p-2">
                     <div className="flex flex-col space-y-1 leading-none">
                       <p className="font-medium">
-                        {user?.firstName} {user?.lastName}
+                        {user?.name || user?.email}
                       </p>
                       <p className="w-[200px] truncate text-sm text-muted-foreground">
                         {user?.email}
@@ -494,13 +498,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
-          <div className="p-6">
-            <AdminBreadcrumb />
+        <main className="flex-1 overflow-y-auto bg-transparent">
+          <div className="p-6 min-h-full">
             {children}
           </div>
         </main>
       </div>
+
+      {/* AI Assistant Button */}
+      <AIAssistantButton />
     </div>
   );
 });

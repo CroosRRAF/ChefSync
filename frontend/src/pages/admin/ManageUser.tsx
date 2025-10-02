@@ -43,6 +43,7 @@ import {
   Download,
   Edit,
   Eye,
+  Loader2,
   MoreHorizontal,
   RefreshCw,
   Shield,
@@ -51,14 +52,27 @@ import {
   UserPlus,
   Users,
   UserX,
+  Search,
+  Filter,
+  Calendar,
+  Mail,
+  Phone,
+  MapPin,
+  Activity,
 } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 
 // Import shared components
+import { 
+  AnimatedStats,
+  GlassCard,
+  GradientButton,
+  OptimisticButton,
+  DataTable 
+} from "@/components/admin/shared";
+import { useOptimisticUpdates } from "@/hooks";
 import DynamicForm from "@/components/admin/shared/forms/DynamicForm";
 import { BaseModal } from "@/components/admin/shared/modals";
-import DataTable from "@/components/admin/shared/tables/DataTable";
-import { StatsWidget as StatsCard } from "@/components/admin/shared/widgets/index";
 import { adminService, type UserListResponse } from "@/services/adminService";
 
 /**
@@ -106,6 +120,26 @@ const ManageUser: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Optimistic updates
+  const {
+    data: optimisticUsers,
+    optimisticUpdate,
+    optimisticDelete,
+    updateData,
+    isPending,
+  } = useOptimisticUpdates<User>(users, {
+    onSuccess: (action) => {
+      console.log(`✅ ${action.type} operation completed successfully`);
+    },
+    onError: (action, error) => {
+      console.error(`❌ ${action.type} operation failed:`, error);
+      setError(`Failed to ${action.type} user: ${error.message}`);
+    },
+    onRevert: (action) => {
+      console.log(`🔄 Reverted ${action.type} operation`);
+    },
+  });
   // Selection is handled inside DataTable; we'll receive selected rows in bulk actions
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -197,6 +231,7 @@ const ManageUser: React.FC = () => {
         }));
 
         setUsers(transformedUsers);
+        updateData(transformedUsers); // Update optimistic data
         setPagination(response.pagination);
         setUserStats(calculateStats(transformedUsers));
       } catch (err) {
@@ -275,9 +310,19 @@ const ManageUser: React.FC = () => {
       title: "Status",
       render: (_: any, user: User) => (
         <div className="flex items-center space-x-2">
-          <Badge variant={user.is_active ? "default" : "secondary"}>
-            {user.is_active ? "Active" : "Inactive"}
-          </Badge>
+          <div className="relative">
+            <Badge 
+              variant={user.is_active ? "default" : "secondary"}
+              className={isPending(user.id.toString()) ? "opacity-50" : ""}
+            >
+              {user.is_active ? "Active" : "Inactive"}
+            </Badge>
+            {isPending(user.id.toString()) && (
+              <div className="absolute -top-1 -right-1">
+                <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+              </div>
+            )}
+          </div>
           {user.verification_status === "pending" && (
             <Badge variant="outline" className="text-yellow-600">
               <Clock className="h-3 w-3 mr-1" />
@@ -418,16 +463,17 @@ const ManageUser: React.FC = () => {
   };
 
   const handleToggleStatus = async (user: User) => {
+    const updatedUser = { ...user, is_active: !user.is_active };
+    const action = user.is_active ? "deactivate" : "activate";
+    
     try {
-      const action = user.is_active ? "deactivate" : "activate";
-      await adminService.updateUserStatus(user.id, action);
-
-      // Refresh users list
-      await fetchUsers(currentPage, searchTerm, roleFilter, statusFilter);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update user status"
+      await optimisticUpdate(
+        updatedUser,
+        user,
+        () => adminService.updateUserStatus(user.id, action)
       );
+    } catch (err) {
+      // Error handling is done in the optimistic updates hook
     }
   };
 
@@ -534,16 +580,16 @@ const ManageUser: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-8">
       {/* Error Display */}
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <AlertTriangle className="h-5 w-5" />
+        <GlassCard gradient="orange" className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-red-500/20">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
             </div>
-            <div className="ml-3">
-              <p className="text-sm">{error}</p>
+            <div className="flex-1">
+              <p className="text-sm text-gray-900 dark:text-white font-medium">{error}</p>
               <button
                 onClick={() => setError(null)}
                 className="text-red-600 hover:text-red-800 text-sm underline mt-1"
@@ -552,142 +598,232 @@ const ManageUser: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </GlassCard>
       )}
 
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            User Management
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Manage users, roles, and permissions across your platform
-          </p>
-        </div>
-        <Button
-          onClick={handleCreateUser}
-          className="flex items-center space-x-2"
-        >
-          <UserPlus className="h-4 w-4" />
-          <span>Add User</span>
-        </Button>
+      {/* Modern Header */}
+      <div className="mb-8">
+        <GlassCard gradient="blue" className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-600 shadow-lg">
+                <Users className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-blue-600 dark:from-white dark:to-blue-400 bg-clip-text text-transparent">
+                  User Management
+                </h1>
+                <p className="text-gray-600 dark:text-gray-300 mt-1">
+                  Manage users, roles, and permissions across your platform
+                </p>
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Activity className="h-4 w-4" />
+                    {userStats.total} total users
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-xs text-green-600 font-medium">Live data</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <GradientButton
+                gradient="green"
+                icon={UserPlus}
+                onClick={handleCreateUser}
+              >
+                Add User
+              </GradientButton>
+              <GradientButton
+                gradient="blue"
+                variant="outline"
+                icon={RefreshCw}
+                onClick={() => window.location.reload()}
+              >
+                Refresh
+              </GradientButton>
+            </div>
+          </div>
+        </GlassCard>
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatsCard
-          title="Total Users"
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <AnimatedStats
           value={userStats.total}
-          icon={<Users className="h-5 w-5" />}
-          change={{ value: 12, type: "increase", period: "last week" }}
+          label="Total Users"
+          icon={Users}
+          gradient="blue"
+          loading={loading}
+          subtitle="All registered users"
         />
-        <StatsCard
-          title="New Today"
+        <AnimatedStats
           value={userStats.newToday}
-          icon={<UserPlus className="h-5 w-5" />}
-          change={{ value: 8, type: "increase", period: "24h" }}
+          label="New Today"
+          icon={UserPlus}
+          gradient="green"
+          loading={loading}
+          subtitle="Joined in last 24h"
         />
-        <StatsCard
-          title="Pending Verification"
+        <AnimatedStats
           value={userStats.pendingVerification}
-          icon={<Clock className="h-5 w-5" />}
-          change={{ value: 2, type: "decrease", period: "24h" }}
+          label="Pending Verification"
+          icon={Clock}
+          gradient="orange"
+          loading={loading}
+          subtitle="Awaiting approval"
         />
-        <StatsCard
-          title="Admins"
+        <AnimatedStats
           value={userStats.adminCount}
-          icon={<Shield className="h-5 w-5" />}
+          label="Admins"
+          icon={Shield}
+          gradient="purple"
+          loading={loading}
+          subtitle="System administrators"
         />
       </div>
 
       {/* Quick Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Quick Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={roleFilter === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setRoleFilter("all")}
-            >
-              All Users ({userStats.total})
-            </Button>
-            <Button
-              variant={roleFilter === "customer" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setRoleFilter("customer")}
-            >
-              Customers ({userStats.customerCount})
-            </Button>
-            <Button
-              variant={roleFilter === "cook" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setRoleFilter("cook")}
-            >
-              Cooks ({userStats.cookCount})
-            </Button>
-            <Button
-              variant={roleFilter === "delivery_agent" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setRoleFilter("delivery_agent")}
-            >
-              Delivery ({userStats.deliveryCount})
-            </Button>
-            <Button
-              variant={roleFilter === "admin" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setRoleFilter("admin")}
-            >
-              Admins ({userStats.adminCount})
-            </Button>
+      <GlassCard gradient="cyan" className="p-6 mb-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600">
+            <Filter className="h-5 w-5 text-white" />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              Quick Filters
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Filter users by role and status
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant={roleFilter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setRoleFilter("all")}
+            className="backdrop-blur-sm bg-white/20 border-white/30 hover:bg-white/30"
+          >
+            All Users ({userStats.total})
+          </Button>
+          <Button
+            variant={roleFilter === "customer" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setRoleFilter("customer")}
+            className="backdrop-blur-sm bg-white/20 border-white/30 hover:bg-white/30"
+          >
+            Customers ({userStats.customerCount})
+          </Button>
+          <Button
+            variant={roleFilter === "cook" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setRoleFilter("cook")}
+            className="backdrop-blur-sm bg-white/20 border-white/30 hover:bg-white/30"
+          >
+            Cooks ({userStats.cookCount})
+          </Button>
+          <Button
+            variant={roleFilter === "delivery_agent" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setRoleFilter("delivery_agent")}
+            className="backdrop-blur-sm bg-white/20 border-white/30 hover:bg-white/30"
+          >
+            Delivery ({userStats.deliveryCount})
+          </Button>
+          <Button
+            variant={roleFilter === "admin" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setRoleFilter("admin")}
+            className="backdrop-blur-sm bg-white/20 border-white/30 hover:bg-white/30"
+          >
+            Admins ({userStats.adminCount})
+          </Button>
+        </div>
+      </GlassCard>
 
-      {/* Main User Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center space-x-2">
-              <Users className="h-5 w-5" />
-              <span>All Users</span>
-            </CardTitle>
-            <div className="flex items-center space-x-2">
+      {/* Search and Filters */}
+      <GlassCard gradient="purple" className="p-6 mb-8">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-600">
+              <Search className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                Search & Filter Users
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Find and manage users efficiently
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Search users..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-64"
+                className="pl-10 w-64 backdrop-blur-sm bg-white/20 border-white/30 focus:border-purple-400"
               />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="verified">Verified</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
             </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40 backdrop-blur-sm bg-white/20 border-white/30">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="verified">Verified</SelectItem>
+              </SelectContent>
+            </Select>
+            <GradientButton
+              gradient="purple"
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
+              onClick={() => window.location.reload()}
+            >
+              Refresh
+            </GradientButton>
+            <GradientButton
+              gradient="blue"
+              variant="outline"
+              size="sm"
+              icon={Download}
+              onClick={() => console.log("Exporting users...")}
+            >
+              Export
+            </GradientButton>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+      </GlassCard>
+
+      {/* Main User Table */}
+      <GlassCard gradient="none" className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-gradient-to-r from-gray-500 to-gray-600">
+            <Users className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              All Users
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Manage user accounts and permissions
+            </p>
+          </div>
+        </div>
           <DataTable
-            data={users}
+            data={optimisticUsers}
             columns={columns}
             loading={loading}
             selectable
@@ -719,8 +855,7 @@ const ManageUser: React.FC = () => {
               },
             ]}
           />
-        </CardContent>
-      </Card>
+      </GlassCard>
 
       {/* Create User Modal */}
       <BaseModal
