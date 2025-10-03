@@ -206,20 +206,46 @@ const OrderManagementHub: React.FC = () => {
   // Load order statistics
   const loadOrderStats = useCallback(async () => {
     try {
-      // Mock stats - replace with actual API call
-      const stats: OrderStats = {
-        total: 2547,
-        pending: 23,
-        preparing: 15,
-        outForDelivery: 8,
-        delivered: 2480,
-        cancelled: 21,
-        totalRevenue: 1250000,
-        averageOrderValue: 4500,
-      };
-      setOrderStats(stats);
+      // Fetch real order stats from API
+      const response = await fetch('/api/admin-management/orders/stats/', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const statsData = await response.json();
+        setOrderStats(statsData);
+      } else {
+        // Fallback stats if API fails
+        const fallbackStats: OrderStats = {
+          total: 0,
+          pending: 0,
+          preparing: 0,
+          outForDelivery: 0,
+          delivered: 0,
+          cancelled: 0,
+          totalRevenue: 0,
+          averageOrderValue: 0,
+        };
+        setOrderStats(fallbackStats);
+      }
     } catch (error) {
       console.error("Error loading order stats:", error);
+      
+      // Set fallback data on error
+      const fallbackStats: OrderStats = {
+        total: 0,
+        pending: 0,
+        preparing: 0,
+        outForDelivery: 0,
+        delivered: 0,
+        cancelled: 0,
+        totalRevenue: 0,
+        averageOrderValue: 0,
+      };
+      setOrderStats(fallbackStats);
     }
   }, []);
 
@@ -270,9 +296,24 @@ const OrderManagementHub: React.FC = () => {
     try {
       setPaymentLoading(true);
       
-      // Mock data for now since paymentService methods need to be implemented
-      const transactionsData = { transactions: [] };
-      const refundsData = { refunds: [] };
+      // Fetch real payment data from API
+      const [transactionsResponse, refundsResponse] = await Promise.all([
+        fetch('/api/payments/transactions/', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch('/api/payments/refunds/', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          },
+        })
+      ]);
+
+      const transactionsData = transactionsResponse.ok ? await transactionsResponse.json() : { transactions: [] };
+      const refundsData = refundsResponse.ok ? await refundsResponse.json() : { refunds: [] };
       const stats = await paymentService.getPaymentStats();
       
       setTransactions(transactionsData.transactions);
@@ -288,13 +329,25 @@ const OrderManagementHub: React.FC = () => {
   // Update order status
   const updateOrderStatus = async (orderId: number, newStatus: string) => {
     try {
-      // Mock update for now since adminService.updateOrderStatus needs to be implemented
-      console.log(`Updating order ${orderId} to status ${newStatus}`);
-      await loadOrders(); // Refresh orders
-      toast({
-        title: "Success",
-        description: "Order status updated successfully",
+      // Update order status via API
+      const response = await fetch(`/api/admin-management/orders/${orderId}/status/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
       });
+
+      if (response.ok) {
+        await loadOrders(); // Refresh orders
+        toast({
+          title: "Success",
+          description: "Order status updated successfully",
+        });
+      } else {
+        throw new Error('Failed to update order status');
+      }
     } catch (error) {
       console.error("Error updating order status:", error);
       toast({

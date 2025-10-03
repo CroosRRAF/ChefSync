@@ -14,4 +14,5 @@ urlpatterns = [
     # Additional endpoints for frontend compatibility
     path('orders', views.order_analytics, name='order-analytics'),
     path('customers', views.customer_analytics, name='customer-analytics'),
+    path('performance', views.performance_analytics, name='performance-analytics'),
 ]

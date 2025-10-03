@@ -96,6 +96,7 @@ import {
 
 // Import services
 import { adminService, type UserListResponse, type AdminUser } from "@/services/adminService";
+import { useToast } from "@/hooks/use-toast";
 
 /**
  * Unified User Management Hub - Consolidates 2 user-related pages
@@ -173,6 +174,7 @@ interface Session {
 
 const UserManagementHub: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   
   // Active tab state
   const [activeTab, setActiveTab] = useState<
@@ -206,25 +208,62 @@ const UserManagementHub: React.FC = () => {
     optimisticUpdate,
     optimisticDelete,
     isPending,
-  } = useOptimisticUpdates<User>(users);
+  } = useOptimisticUpdates<User>([]);
 
   // Load user statistics
   const loadUserStats = useCallback(async () => {
     try {
-      // Mock stats - replace with actual API call when available
-      const stats: UserStats = {
-        totalUsers: 1250,
-        activeUsers: 1180,
-        pendingApprovals: 15,
-        newThisMonth: 87,
-        customerCount: 980,
-        cookCount: 45,
-        deliveryAgentCount: 32,
-        adminCount: 5,
-      };
-      setUserStats(stats);
+      console.log("Loading user stats...");
+      const token = localStorage.getItem('access_token');
+      console.log("Auth token:", token ? "Present" : "Missing");
+      
+      // Fetch real user stats from API
+      const response = await fetch('/api/admin-management/users/stats/', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log("User stats response status:", response.status);
+      
+      if (response.ok) {
+        const statsData = await response.json();
+        console.log("User stats data:", statsData);
+        setUserStats(statsData);
+      } else {
+        console.error("User stats API failed:", response.status, response.statusText);
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        
+        // Fallback stats if API fails
+        const fallbackStats: UserStats = {
+          totalUsers: 0,
+          activeUsers: 0,
+          pendingApprovals: 0,
+          newThisMonth: 0,
+          customerCount: 0,
+          cookCount: 0,
+          deliveryAgentCount: 0,
+          adminCount: 0,
+        };
+        setUserStats(fallbackStats);
+      }
     } catch (error) {
       console.error("Error loading user stats:", error);
+      
+      // Set fallback data on error
+      const fallbackStats: UserStats = {
+        totalUsers: 0,
+        activeUsers: 0,
+        pendingApprovals: 0,
+        newThisMonth: 0,
+        customerCount: 0,
+        cookCount: 0,
+        deliveryAgentCount: 0,
+        adminCount: 0,
+      };
+      setUserStats(fallbackStats);
     }
   }, []);
 
@@ -234,6 +273,12 @@ const UserManagementHub: React.FC = () => {
       setLoading(true);
       setError(null);
       
+      console.log("Loading users with filters:", {
+        search: searchQuery,
+        role: roleFilter === "all" ? undefined : roleFilter,
+        status: statusFilter === "all" ? undefined : statusFilter,
+      });
+      
       const response: UserListResponse = await adminService.getUsers({
         search: searchQuery,
         role: roleFilter === "all" ? undefined : roleFilter,
@@ -242,8 +287,14 @@ const UserManagementHub: React.FC = () => {
         limit: 50,
       });
       
+      console.log("Users API response:", response);
+      
       const usersData = response.users || [];
+      console.log("Processed users data:", usersData);
+      
+      console.log("Setting users state:", usersData.length);
       setUsers(usersData);
+      console.log("Calling updateData with:", usersData.length);
       updateData(usersData);
     } catch (error) {
       console.error("Error loading users:", error);
@@ -260,30 +311,42 @@ const UserManagementHub: React.FC = () => {
     try {
       setProfileLoading(true);
       
-      // Mock profile data - replace with actual API call
-      const profileData: AdminProfile = {
-        id: user.id?.toString() || "1",
-        firstName: user.name?.split(' ')[0] || "Admin",
-        lastName: user.name?.split(' ')[1] || "User",
-        email: user.email || "",
-        phone: user.phone || "",
-        role: user.role || "admin",
-        avatar: "",
-        bio: "System Administrator",
-        location: "Sri Lanka",
-        timezone: "Asia/Colombo",
-        language: "en",
-        theme: "system",
-        emailNotifications: true,
-        pushNotifications: true,
-        smsNotifications: false,
-        twoFactorEnabled: false,
-        createdAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString(),
-        loginCount: 0,
-      };
-      
-      setAdminProfile(profileData);
+      // Fetch real profile data from API
+      const response = await fetch(`/api/admin-management/profile/${user.id}/`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const profileData = await response.json();
+        setAdminProfile(profileData);
+      } else {
+        // Fallback profile data if API fails
+        const fallbackProfile: AdminProfile = {
+          id: user.id?.toString() || "1",
+          firstName: user.name?.split(' ')[0] || "Admin",
+          lastName: user.name?.split(' ')[1] || "User",
+          email: user.email || "",
+          phone: user.phone || "",
+          role: user.role || "admin",
+          avatar: "",
+          bio: "System Administrator",
+          location: "Sri Lanka",
+          timezone: "Asia/Colombo",
+          language: "en",
+          theme: "system",
+          emailNotifications: true,
+          pushNotifications: true,
+          smsNotifications: false,
+          twoFactorEnabled: false,
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+          loginCount: 0,
+        };
+        setAdminProfile(fallbackProfile);
+      }
     } catch (error) {
       console.error("Error loading admin profile:", error);
     } finally {
@@ -294,31 +357,21 @@ const UserManagementHub: React.FC = () => {
   // Load activity logs
   const loadActivityLogs = useCallback(async () => {
     try {
-      // Mock activity logs - replace with actual API call
-      const logs: ActivityLog[] = [
-        {
-          id: "1",
-          action: "Login",
-          description: "Successful admin login",
-          timestamp: new Date().toISOString(),
-          ipAddress: "192.168.1.1",
-          device: "Chrome on Windows",
-          location: "Colombo, Sri Lanka",
-          status: "success",
+      // Fetch real activity logs from API
+      const response = await fetch('/api/admin-management/activity-logs/', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
         },
-        {
-          id: "2",
-          action: "User Update",
-          description: "Updated user permissions",
-          timestamp: new Date(Date.now() - 3600000).toISOString(),
-          ipAddress: "192.168.1.1",
-          device: "Chrome on Windows",
-          location: "Colombo, Sri Lanka",
-          status: "success",
-        },
-      ];
-      
-      setActivityLogs(logs);
+      });
+
+      if (response.ok) {
+        const logsData = await response.json();
+        setActivityLogs(logsData.results || logsData);
+      } else {
+        // Fallback empty logs if API fails
+        setActivityLogs([]);
+      }
     } catch (error) {
       console.error("Error loading activity logs:", error);
     }
@@ -327,22 +380,24 @@ const UserManagementHub: React.FC = () => {
   // Load active sessions
   const loadSessions = useCallback(async () => {
     try {
-      // Mock sessions - replace with actual API call
-      const sessionsData: Session[] = [
-        {
-          id: "1",
-          device: "Windows PC",
-          browser: "Chrome 118",
-          location: "Colombo, Sri Lanka",
-          ipAddress: "192.168.1.1",
-          lastActive: new Date().toISOString(),
-          current: true,
+      // Fetch real sessions from API
+      const response = await fetch('/api/admin-management/sessions/', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
         },
-      ];
-      
-      setSessions(sessionsData);
+      });
+
+      if (response.ok) {
+        const sessionsData = await response.json();
+        setSessions(sessionsData.results || sessionsData);
+      } else {
+        // Fallback empty sessions if API fails
+        setSessions([]);
+      }
     } catch (error) {
       console.error("Error loading sessions:", error);
+      setSessions([]);
     }
   }, []);
 
@@ -400,12 +455,33 @@ const UserManagementHub: React.FC = () => {
     try {
       setSaving(true);
       
-      // Mock save - replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setAdminProfile({ ...adminProfile, ...updatedProfile });
+      // Save profile via API
+      const response = await fetch(`/api/admin-management/profile/${adminProfile.id}/`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedProfile),
+      });
+
+      if (response.ok) {
+        const savedProfile = await response.json();
+        setAdminProfile(savedProfile);
+        toast({
+          title: "Success",
+          description: "Profile updated successfully",
+        });
+      } else {
+        throw new Error('Failed to save profile');
+      }
     } catch (error) {
       console.error("Error saving profile:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save profile",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -424,22 +500,31 @@ const UserManagementHub: React.FC = () => {
     }
   }, [activeTab, loadUsers, loadUserStats, loadAdminProfile, loadActivityLogs, loadSessions]);
 
+  // Sync optimistic users with users state
+  useEffect(() => {
+    console.log("Users state changed:", users.length, "Optimistic users:", optimisticUsers.length);
+    if (users.length > 0) {
+      console.log("Syncing users to optimistic users:", users.length);
+      updateData(users);
+    }
+  }, [users, updateData]);
+
   // User table columns
-  const userColumns: Column<User>[] = [
+  const userColumns: Column<AdminUser>[] = [
     {
-      key: "user",
+      key: "name", // Changed from "user" to "name" to match the data structure
       title: "User",
-      render: (user: User) => (
+      render: (user: AdminUser) => (
         <div className="flex items-center space-x-3">
           <Avatar className="h-8 w-8">
             <AvatarImage src="" />
             <AvatarFallback>
-              {user.name.split(" ").map(n => n[0]).join("").toUpperCase()}
+              {user?.name ? user.name.split(" ").map(n => n[0]).join("").toUpperCase() : "U"}
             </AvatarFallback>
           </Avatar>
           <div>
-            <div className="font-medium">{user.name}</div>
-            <div className="text-sm text-gray-500">{user.email}</div>
+            <div className="font-medium">{user?.name || "Unknown User"}</div>
+            <div className="text-sm text-gray-500">{user?.email || "No email"}</div>
           </div>
         </div>
       ),
@@ -447,21 +532,21 @@ const UserManagementHub: React.FC = () => {
     {
       key: "role",
       title: "Role",
-      render: (user: User) => (
-        <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-          {user.role.replace("_", " ")}
+      render: (user: AdminUser) => (
+        <Badge variant={user?.role === "admin" ? "default" : "secondary"}>
+          {user?.role?.replace("_", " ") || "Unknown"}
         </Badge>
       ),
     },
     {
       key: "status",
       title: "Status",
-      render: (user: User) => (
+      render: (user: AdminUser) => (
         <div className="flex items-center space-x-2">
-          <Badge variant={user.is_active ? "default" : "secondary"}>
-            {user.is_active ? "Active" : "Inactive"}
+          <Badge variant={user?.is_active ? "default" : "secondary"}>
+            {user?.is_active ? "Active" : "Inactive"}
           </Badge>
-          {user.approval_status === 'pending' && (
+          {user?.approval_status === 'pending' && (
             <Badge variant="outline">Pending Approval</Badge>
           )}
         </div>
@@ -470,26 +555,26 @@ const UserManagementHub: React.FC = () => {
     {
       key: "stats",
       title: "Stats",
-      render: (user: User) => (
+      render: (user: AdminUser) => (
         <div className="text-sm">
-          <div>{user.total_orders} orders</div>
-          <div className="text-gray-500">LKR {user.total_spent?.toLocaleString()}</div>
+          <div>{user?.total_orders || 0} orders</div>
+          <div className="text-gray-500">LKR {user?.total_spent?.toLocaleString() || "0"}</div>
         </div>
       ),
     },
     {
       key: "joined",
       title: "Joined",
-      render: (user: User) => (
+      render: (user: AdminUser) => (
         <div className="text-sm">
-          {new Date(user.date_joined).toLocaleDateString()}
+          {user?.date_joined ? new Date(user.date_joined).toLocaleDateString() : "Unknown"}
         </div>
       ),
     },
     {
       key: "actions",
       title: "Actions",
-      render: (user: User) => (
+      render: (user: AdminUser) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -501,8 +586,8 @@ const UserManagementHub: React.FC = () => {
               <Eye className="h-4 w-4 mr-2" />
               View Details
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleToggleStatus(user.id, user.is_active)}>
-              {user.is_active ? (
+            <DropdownMenuItem onClick={() => handleToggleStatus(user?.id, user?.is_active)}>
+              {user?.is_active ? (
                 <>
                   <UserX className="h-4 w-4 mr-2" />
                   Deactivate
@@ -635,6 +720,26 @@ const UserManagementHub: React.FC = () => {
           columns={userColumns}
           loading={loading}
         />
+        
+        {/* Debug info - remove this after fixing */}
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+          <div className="font-semibold text-blue-800 mb-2">🔍 Debug Info:</div>
+          <div className="space-y-1 text-blue-700">
+            <div>Users state length: <span className="font-mono bg-blue-100 px-1 rounded">{users.length}</span></div>
+            <div>Optimistic users length: <span className="font-mono bg-blue-100 px-1 rounded">{optimisticUsers.length}</span></div>
+            <div>Loading: <span className="font-mono bg-blue-100 px-1 rounded">{loading.toString()}</span></div>
+            <div>Error: <span className="font-mono bg-blue-100 px-1 rounded">{error || 'None'}</span></div>
+            {optimisticUsers.length > 0 && (
+              <div className="mt-2">
+                <div className="font-semibold">First user data:</div>
+                <pre className="bg-blue-100 p-2 rounded text-xs overflow-auto max-h-32">
+                  {JSON.stringify(optimisticUsers[0], null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+        
       </GlassCard>
     </div>
   );

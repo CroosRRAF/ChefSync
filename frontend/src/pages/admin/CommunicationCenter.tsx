@@ -231,23 +231,36 @@ const CommunicationCenter: React.FC = () => {
   // Load communication statistics
   const loadCommunicationStats = useCallback(async () => {
     try {
-      // Mock stats for now - replace with actual API when available
-      const stats: CommunicationStats = {
-        total: 245,
-        pending: 38,
-        in_progress: 25,
-        resolved: 189,
-        closed: 12,
-        average_rating: 4.2,
-        by_type: {
-          feedback: 120,
-          complaint: 45,
-          suggestion: 35,
-          inquiry: 30,
-          other: 15
-        }
-      };
-      setCommunicationStats(stats);
+      // Fetch real communication stats from API
+      const response = await fetch('/api/communications/stats/', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const statsData = await response.json();
+        setCommunicationStats(statsData);
+      } else {
+        // Fallback stats if API fails
+        const fallbackStats: CommunicationStats = {
+          total: 0,
+          pending: 0,
+          in_progress: 0,
+          resolved: 0,
+          closed: 0,
+          average_rating: 0,
+          by_type: {
+            feedback: 0,
+            complaint: 0,
+            suggestion: 0,
+            inquiry: 0,
+            other: 0
+          }
+        };
+        setCommunicationStats(fallbackStats);
+      }
       
       // Load sentiment data
       try {
@@ -258,34 +271,48 @@ const CommunicationCenter: React.FC = () => {
           negative: sentiment.negative || 0,
           neutral: sentiment.neutral || 0,
           total: (sentiment.positive || 0) + (sentiment.negative || 0) + (sentiment.neutral || 0),
-          confidence: 85, // Mock confidence since it's not in the API response
+          confidence: sentiment.confidence || 0,
           trending_topics: (sentiment.trending_topics || []).map((t: any) => ({
             topic: typeof t === 'string' ? t : (t?.topic || 'Unknown'),
             frequency: typeof t === 'object' ? (t?.frequency || 1) : 1,
             sentiment: typeof t === 'object' ? (t?.sentiment || 'neutral') : 'neutral'
           })),
-          sentiment_trends: [] // Mock trends since it's not in the API response
+          sentiment_trends: sentiment.sentiment_trends || []
         };
         setSentimentData(transformedSentiment);
       } catch (sentimentError) {
         console.error("Error loading sentiment data:", sentimentError);
-        // Set mock sentiment data on error
+        // Set fallback sentiment data on error
         setSentimentData({
-          positive: 65,
-          negative: 15,
-          neutral: 20,
-          total: 100,
-          confidence: 85,
-          trending_topics: [
-            { topic: "Food Quality", frequency: 25, sentiment: "positive" },
-            { topic: "Delivery Speed", frequency: 18, sentiment: "neutral" },
-            { topic: "Customer Service", frequency: 15, sentiment: "positive" }
-          ],
+          positive: 0,
+          negative: 0,
+          neutral: 0,
+          total: 0,
+          confidence: 0,
+          trending_topics: [],
           sentiment_trends: []
         });
       }
     } catch (error) {
       console.error("Error loading communication stats:", error);
+      
+      // Set fallback data on error
+      const fallbackStats: CommunicationStats = {
+        total: 0,
+        pending: 0,
+        in_progress: 0,
+        resolved: 0,
+        closed: 0,
+        average_rating: 0,
+        by_type: {
+          feedback: 0,
+          complaint: 0,
+          suggestion: 0,
+          inquiry: 0,
+          other: 0
+        }
+      };
+      setCommunicationStats(fallbackStats);
     }
   }, []);
 
@@ -298,12 +325,38 @@ const CommunicationCenter: React.FC = () => {
       const templatesResponse = await communicationService.getEmailTemplates();
       setTemplates(templatesResponse.results || []);
       
-      // Mock data for alerts, notifications, categories, and tags
-      // These will be replaced with actual API calls when available
-      setAlerts([]);
-      setNotifications([]);
-      setCategories([]);
-      setTags([]);
+      // Load additional data from API
+      const [alertsResponse, notificationsResponse, categoriesResponse, tagsResponse] = await Promise.all([
+        fetch('/api/communications/alerts/', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch('/api/communications/notifications/', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch('/api/communications/categories/', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch('/api/communications/tags/', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          },
+        })
+      ]);
+
+      setAlerts(alertsResponse.ok ? (await alertsResponse.json()).results || [] : []);
+      setNotifications(notificationsResponse.ok ? (await notificationsResponse.json()).results || [] : []);
+      setCategories(categoriesResponse.ok ? (await categoriesResponse.json()).results || [] : []);
+      setTags(tagsResponse.ok ? (await tagsResponse.json()).results || [] : []);
     } catch (error) {
       console.error("Error loading communications:", error);
       toast({

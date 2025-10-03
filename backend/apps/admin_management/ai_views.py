@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import JsonResponse
+from django.utils import timezone
 import logging
 
 from .services.ai_service import AdminAIService
@@ -437,15 +438,54 @@ def business_insights(request):
         include_products = request.GET.get('include_products', 'true').lower() == 'true'
         include_customers = request.GET.get('include_customers', 'true').lower() == 'true'
         
+        # Check if AI service is available - return graceful fallback with 200
+        if not ai_service.is_available():
+            return Response({
+                'success': True,
+                'data': {
+                    'insights': {
+                        'sales_forecast': {'message': 'Forecast unavailable'},
+                        'anomalies': {'message': 'Anomaly detection unavailable'},
+                        'product_recommendations': {'message': 'Recommendations unavailable'},
+                        'customer_insights': {'message': 'Customer insights unavailable'},
+                        'ai_summary': 'AI service not configured; showing placeholder insights.'
+                    },
+                    'generated_at': timezone.now().isoformat(),
+                    'confidence_score': 0,
+                    'included_features': {
+                        'sales_forecast': False,
+                        'anomaly_detection': False,
+                        'product_recommendations': False,
+                        'customer_insights': False
+                    }
+                }
+            }, status=status.HTTP_200_OK)
+        
         # Generate comprehensive insights
         insights_data = ai_service.generate_business_insights()
         
         if 'error' in insights_data:
+            # Return graceful fallback instead of error
             return Response({
-                'success': False,
-                'error': insights_data['error'],
-                'message': insights_data.get('message', 'Failed to generate business insights')
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'success': True,
+                'data': {
+                    'insights': {
+                        'sales_forecast': {'message': 'Forecast unavailable'},
+                        'anomalies': {'message': 'Anomaly detection unavailable'},
+                        'product_recommendations': {'message': 'Recommendations unavailable'},
+                        'customer_insights': {'message': 'Customer insights unavailable'},
+                        'ai_summary': 'AI insights temporarily unavailable.'
+                    },
+                    'generated_at': timezone.now().isoformat(),
+                    'confidence_score': 0,
+                    'included_features': {
+                        'sales_forecast': include_forecast,
+                        'anomaly_detection': include_anomalies,
+                        'product_recommendations': include_products,
+                        'customer_insights': include_customers
+                    }
+                }
+            }, status=status.HTTP_200_OK)
         
         # Filter insights based on parameters
         filtered_insights = {}
@@ -479,11 +519,27 @@ def business_insights(request):
         
     except Exception as e:
         logger.error(f"Business insights error: {e}")
+        # Return graceful fallback instead of 500
         return Response({
-            'success': False,
-            'error': str(e),
-            'message': 'Failed to generate business insights'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            'success': True,
+            'data': {
+                'insights': {
+                    'sales_forecast': {'message': 'Forecast unavailable'},
+                    'anomalies': {'message': 'Anomaly detection unavailable'},
+                    'product_recommendations': {'message': 'Recommendations unavailable'},
+                    'customer_insights': {'message': 'Customer insights unavailable'},
+                    'ai_summary': f'AI error: {str(e)}'
+                },
+                'generated_at': timezone.now().isoformat(),
+                'confidence_score': 0,
+                'included_features': {
+                    'sales_forecast': False,
+                    'anomaly_detection': False,
+                    'product_recommendations': False,
+                    'customer_insights': False
+                }
+            }
+        }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

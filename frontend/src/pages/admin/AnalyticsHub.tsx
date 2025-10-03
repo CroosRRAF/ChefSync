@@ -173,16 +173,16 @@ const AnalyticsHub: React.FC = () => {
         analyticsService.getCustomerAnalytics(timeRange),
       ]);
 
-      // Transform API data
+      // Transform API data to match backend response shape
       const transformedData: AnalyticsData = {
-        revenue: orderData.total || 0,
-        orders: orderData.completed || 0,
-        users: customerData.total || 0,
-        avgOrderValue: orderData.avgOrderValue || 0,
+        revenue: orderData.total_revenue || 0,
+        orders: orderData.total_orders || 0,
+        users: customerData.total_customers || 0,
+        avgOrderValue: orderData.total_revenue / Math.max(orderData.total_orders || 1, 1),
         growth: {
-          revenue: orderData.trend || 0,
-          orders: orderData.trend || 0,
-          users: customerData.retention || 0,
+          revenue: 0, // TODO: compute from daily_breakdown
+          orders: 0,  // TODO: compute from daily_breakdown
+          users: customerData.growth_rate || 0,
         },
       };
 

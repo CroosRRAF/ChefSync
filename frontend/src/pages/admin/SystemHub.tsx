@@ -282,34 +282,71 @@ const SystemHub: React.FC = () => {
     try {
       setLoading(true);
       
-      // Mock system stats - replace with actual API calls
-      const mockStats: RealtimeStats = {
-        connections: 1247,
-        activeUsers: 89,
-        messagesSent: 15643,
-        deliveryRate: 98.5,
-        avgResponseTime: 245,
-        systemLoad: 45.2,
-        errorRate: 0.8,
-        lastUpdated: new Date().toISOString(),
-      };
-      
-      setRealtimeStats(mockStats);
-      
-      // Mock performance metrics
-      const mockMetrics: PerformanceMetrics = {
-        apiResponseTime: [120, 135, 142, 128, 156, 134, 145],
-        databaseQueries: [450, 520, 480, 510, 495, 530, 475],
-        memoryUsage: [65, 68, 72, 69, 71, 74, 67],
-        cpuUsage: [35, 42, 38, 45, 41, 39, 44],
-        networkLatency: [25, 28, 32, 27, 30, 26, 31],
-        timestamps: ['12:00', '12:05', '12:10', '12:15', '12:20', '12:25', '12:30'],
-      };
-      
-      setPerformanceMetrics(mockMetrics);
+      // Fetch real system stats from API
+      const [statsResponse, performanceResponse] = await Promise.all([
+        fetch('/api/admin-management/system/realtime-stats/', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch('/api/analytics/performance?range=7d', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          },
+        })
+      ]);
+
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        setRealtimeStats(statsData);
+      } else {
+        // Fallback data if API fails
+        const fallbackStats: RealtimeStats = {
+          connections: 0,
+          activeUsers: 0,
+          messagesSent: 0,
+          deliveryRate: 0,
+          avgResponseTime: 0,
+          systemLoad: 0,
+          errorRate: 0,
+          lastUpdated: new Date().toISOString(),
+        };
+        setRealtimeStats(fallbackStats);
+      }
+
+      if (performanceResponse.ok) {
+        const performanceData = await performanceResponse.json();
+        setPerformanceMetrics(performanceData);
+      } else {
+        // Fallback performance metrics
+        const fallbackMetrics: PerformanceMetrics = {
+          apiResponseTime: [0, 0, 0, 0, 0, 0, 0],
+          databaseQueries: [0, 0, 0, 0, 0, 0, 0],
+          memoryUsage: [0, 0, 0, 0, 0, 0, 0],
+          cpuUsage: [0, 0, 0, 0, 0, 0, 0],
+          networkLatency: [0, 0, 0, 0, 0, 0, 0],
+          timestamps: ['12:00', '12:05', '12:10', '12:15', '12:20', '12:25', '12:30'],
+        };
+        setPerformanceMetrics(fallbackMetrics);
+      }
     } catch (error) {
       console.error("Error loading system overview:", error);
       setError("Failed to load system data");
+      
+      // Set fallback data on error
+      const fallbackStats: RealtimeStats = {
+        connections: 0,
+        activeUsers: 0,
+        messagesSent: 0,
+        deliveryRate: 0,
+        avgResponseTime: 0,
+        systemLoad: 0,
+        errorRate: 0,
+        lastUpdated: new Date().toISOString(),
+      };
+      setRealtimeStats(fallbackStats);
     } finally {
       setLoading(false);
     }
@@ -324,27 +361,36 @@ const SystemHub: React.FC = () => {
     setConnectionStatus("connecting");
     
     try {
-      // Mock WebSocket connection
-      setTimeout(() => {
+      // Real WebSocket connection to backend
+      const wsUrl = `ws://localhost:8000/ws/admin/system/`;
+      wsRef.current = new WebSocket(wsUrl);
+      
+      wsRef.current.onopen = () => {
         setIsConnected(true);
         setConnectionStatus("connected");
-        
-        // Simulate live updates
-        const mockUpdate: LiveDeliveryUpdate = {
-          id: Date.now().toString(),
-          type: "email",
-          status: "delivered",
-          recipient: "user@example.com",
-          timestamp: new Date().toISOString(),
-          campaignId: "camp_123",
-          campaignTitle: "Weekly Newsletter",
-        };
-        
-        setLiveUpdates(prev => [mockUpdate, ...prev.slice(0, 9)]);
-      }, 2000);
-    } catch (error) {
-      console.error("WebSocket connection failed:", error);
-      setConnectionStatus("error");
+        console.log("WebSocket connected to admin system");
+      };
+      
+      wsRef.current.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'live_update') {
+            setLiveUpdates(prev => [data.update, ...prev.slice(0, 9)]);
+          }
+        } catch (error) {
+          console.error("Error parsing WebSocket message:", error);
+        }
+      };
+      
+      wsRef.current.onclose = () => {
+        setIsConnected(false);
+        setConnectionStatus("disconnected");
+        console.log("WebSocket disconnected");
+      };
+      
+      wsRef.current.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        setConnectionStatus("error");
       setIsConnected(false);
     }
   }, []);
@@ -364,14 +410,25 @@ const SystemHub: React.FC = () => {
     try {
       setLoading(true);
       
-      // Mock API call to save settings
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setSettingsChanged(false);
-      toast({
-        title: "Success",
-        description: "Settings saved successfully",
+      // Save settings via API
+      const response = await fetch('/api/admin-management/settings/', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
       });
+
+      if (response.ok) {
+        setSettingsChanged(false);
+        toast({
+          title: "Success",
+          description: "Settings saved successfully",
+        });
+      } else {
+        throw new Error('Failed to save settings');
+      }
     } catch (error) {
       console.error("Error saving settings:", error);
       toast({
@@ -389,22 +446,39 @@ const SystemHub: React.FC = () => {
     try {
       setLoading(true);
       
-      // Mock report generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Update report template
-      setReportTemplates(prev => 
-        prev.map(report => 
-          report.id === reportId 
-            ? { ...report, lastRun: new Date().toISOString(), status: "active" }
-            : report
-        )
-      );
-      
-      toast({
-        title: "Success",
-        description: "Report generated successfully",
+      // Generate report via API
+      const response = await fetch('/api/admin-management/reports/generate/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ report_id: reportId }),
       });
+
+      if (response.ok) {
+        const reportData = await response.json();
+        // Handle report download or display
+        if (reportData.download_url) {
+          window.open(reportData.download_url, '_blank');
+        }
+        
+        // Update report template
+        setReportTemplates(prev => 
+          prev.map(report => 
+            report.id === reportId 
+              ? { ...report, lastRun: new Date().toISOString(), status: "active" }
+              : report
+          )
+        );
+        
+        toast({
+          title: "Success",
+          description: "Report generated successfully",
+        });
+      } else {
+        throw new Error('Failed to generate report');
+      }
     } catch (error) {
       console.error("Error generating report:", error);
       toast({

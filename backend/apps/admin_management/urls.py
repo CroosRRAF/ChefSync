@@ -16,6 +16,10 @@ router.register(r'documents', views.AdminDocumentManagementViewSet, basename='ad
 urlpatterns = [
     path('', include(router.urls)),
     
+    # Reports endpoints
+    path('reports/templates/', views.get_report_templates, name='report-templates'),
+    path('reports/generate/', views.generate_report, name='generate-report'),
+    
     # AI/ML Endpoints (Phase 3)
     path('ai/sales-forecast/', ai_views.sales_forecast, name='ai-sales-forecast'),
     path('ai/anomaly-detection/', ai_views.anomaly_detection, name='ai-anomaly-detection'),

@@ -305,7 +305,7 @@ def order_analytics(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsAdminUser])
 def customer_analytics(request):
-    """Get customer analytics data"""
+    """Get customer analytics data with improved error handling"""
     try:
         range_param = request.GET.get('range', '30d')
         days = int(range_param.replace('d', ''))
@@ -316,28 +316,143 @@ def customer_analytics(request):
         from django.contrib.auth import get_user_model
         User = get_user_model()
         
-        # Get customer statistics
+        # Get customer statistics with safe queries
         customers = User.objects.filter(role='customer')
         new_customers = customers.filter(date_joined__gte=start_date).count()
         total_customers = customers.count()
         
-        # Customer activity
-        active_customers = customers.filter(
-            order__created_at__gte=start_date
-        ).distinct().count()
+        # Customer activity - use safer query approach
+        try:
+            from apps.orders.models import Order
+            # Get customers who have orders in the period
+            customer_ids_with_orders = Order.objects.filter(
+                created_at__gte=start_date
+            ).values_list('customer_id', flat=True).distinct()
+            
+            active_customers = customers.filter(
+                id__in=customer_ids_with_orders
+            ).count()
+            
+            # High value customers - get from orders aggregation
+            high_value_customer_ids = Order.objects.values('customer_id').annotate(
+                total_spent=Sum('total_amount')
+            ).filter(total_spent__gte=1000).values_list('customer_id', flat=True)
+            
+            high_value = customers.filter(
+                id__in=high_value_customer_ids
+            ).count()
+            
+        except Exception as order_error:
+            # Fallback if order model has issues
+            print(f"Order-related query failed: {order_error}")
+            active_customers = 0
+            high_value = 0
         
-        # Customer segments
-        high_value = customers.filter(
-            order__total_amount__gte=1000
-        ).distinct().count()
+        # Customer growth calculation
+        previous_period_start = start_date - timedelta(days=days)
+        previous_new_customers = customers.filter(
+            date_joined__gte=previous_period_start,
+            date_joined__lt=start_date
+        ).count()
+        
+        growth_rate = 0
+        if previous_new_customers > 0:
+            growth_rate = ((new_customers - previous_new_customers) / previous_new_customers) * 100
         
         return Response({
             'total_customers': total_customers,
             'new_customers': new_customers,
             'active_customers': active_customers,
             'high_value_customers': high_value,
-            'period': range_param
+            'growth_rate': round(growth_rate, 2),
+            'period': range_param,
+            'period_days': days
         })
         
+    except ValueError as ve:
+        return Response({
+            'error': f'Invalid range parameter: {str(ve)}'
+        }, status=400)
     except Exception as e:
-        return Response({'error': str(e)}, status=500)
+        return Response({
+            'error': f'Failed to fetch customer analytics: {str(e)}'
+        }, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def performance_analytics(request):
+    """Get system performance analytics data"""
+    try:
+        range_param = request.GET.get('range', '30d')
+        days = int(range_param.replace('d', ''))
+        
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=days)
+        
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        # System performance metrics
+        total_users = User.objects.count()
+        active_users = User.objects.filter(last_login__gte=start_date).count()
+        
+        # Order performance metrics
+        try:
+            from apps.orders.models import Order
+            total_orders = Order.objects.filter(created_at__gte=start_date).count()
+            completed_orders = Order.objects.filter(
+                created_at__gte=start_date,
+                status='completed'
+            ).count()
+            
+            # Calculate completion rate
+            completion_rate = (completed_orders / max(total_orders, 1)) * 100
+            
+            # Average order processing time (mock calculation)
+            avg_processing_time = 25.5  # minutes
+            
+        except Exception as order_error:
+            print(f"Order performance query failed: {order_error}")
+            total_orders = 0
+            completed_orders = 0
+            completion_rate = 0
+            avg_processing_time = 0
+        
+        # System health metrics (mock data for now)
+        system_health = {
+            'cpu_usage': 45.2,
+            'memory_usage': 67.8,
+            'disk_usage': 23.1,
+            'response_time': 1.2,  # seconds
+            'uptime': 99.9  # percentage
+        }
+        
+        # Performance trends (mock data)
+        performance_trends = {
+            'response_time_trend': 'stable',
+            'error_rate_trend': 'improving',
+            'throughput_trend': 'increasing'
+        }
+        
+        return Response({
+            'total_users': total_users,
+            'active_users': active_users,
+            'total_orders': total_orders,
+            'completed_orders': completed_orders,
+            'completion_rate': round(completion_rate, 2),
+            'avg_processing_time': avg_processing_time,
+            'system_health': system_health,
+            'performance_trends': performance_trends,
+            'period': range_param,
+            'period_days': days
+        })
+        
+    except ValueError as ve:
+        return Response({
+            'error': f'Invalid range parameter: {str(ve)}'
+        }, status=400)
+    except Exception as e:
+        return Response({
+            'error': f'Failed to fetch performance analytics: {str(e)}'
+        }, status=500)

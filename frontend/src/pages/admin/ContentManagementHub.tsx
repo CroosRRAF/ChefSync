@@ -200,20 +200,46 @@ const ContentManagementHub: React.FC = () => {
   // Load food statistics
   const loadFoodStats = useCallback(async () => {
     try {
-      // Mock stats - replace with actual API call
-      const stats: FoodStats = {
-        totalFoods: 245,
-        availableFoods: 198,
-        featuredFoods: 32,
-        totalCategories: 12,
-        totalCuisines: 8,
-        averageRating: 4.3,
-        totalOrders: 1547,
-        averagePrice: 2500,
-      };
-      setFoodStats(stats);
+      // Fetch real food stats from API
+      const response = await fetch('/api/food/stats/', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const statsData = await response.json();
+        setFoodStats(statsData);
+      } else {
+        // Fallback stats if API fails
+        const fallbackStats: FoodStats = {
+          totalFoods: 0,
+          availableFoods: 0,
+          featuredFoods: 0,
+          totalCategories: 0,
+          totalCuisines: 0,
+          averageRating: 0,
+          totalOrders: 0,
+          averagePrice: 0,
+        };
+        setFoodStats(fallbackStats);
+      }
     } catch (error) {
       console.error("Error loading food stats:", error);
+      
+      // Set fallback data on error
+      const fallbackStats: FoodStats = {
+        totalFoods: 0,
+        availableFoods: 0,
+        featuredFoods: 0,
+        totalCategories: 0,
+        totalCuisines: 0,
+        averageRating: 0,
+        totalOrders: 0,
+        averagePrice: 0,
+      };
+      setFoodStats(fallbackStats);
     }
   }, []);
 

@@ -214,7 +214,7 @@ export interface CustomerSegmentation {
 }
 
 class AnalyticsService {
-  private baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  private baseUrl = "/api"; // Use proxy configuration
 
   async getDashboardStats(): Promise<DashboardStats> {
     try {
@@ -265,7 +265,18 @@ class AnalyticsService {
       return await response.json();
     } catch (error) {
       console.error("Error fetching revenue analytics:", error);
-      throw error;
+      // Return fallback data instead of throwing
+      return {
+        current: 0,
+        previous: 0,
+        trend: "stable" as const,
+        forecast: [],
+        breakdown: {
+          daily: [],
+          weekly: [],
+          monthly: []
+        }
+      };
     }
   }
 
@@ -321,7 +332,19 @@ class AnalyticsService {
       return await response.json();
     } catch (error) {
       console.error("Error fetching customer analytics:", error);
-      throw error;
+      // Return fallback data instead of throwing
+      return {
+        total: 0,
+        active: 0,
+        new: 0,
+        retention: 0,
+        segments: [],
+        behavior: {
+          avgOrderFrequency: 0,
+          avgSessionDuration: 0,
+          conversionRate: 0
+        }
+      };
     }
   }
 
@@ -350,7 +373,16 @@ class AnalyticsService {
       return await response.json();
     } catch (error) {
       console.error("Error fetching performance metrics:", error);
-      throw error;
+      // Return fallback data instead of throwing
+      return {
+        avgDeliveryTime: 0,
+        customerSatisfaction: 0,
+        orderAccuracy: 0,
+        systemUptime: 0,
+        errorRate: 0,
+        responseTime: 0,
+        throughput: 0
+      };
     }
   }
 
@@ -446,7 +478,7 @@ class AnalyticsService {
    */
   async getReportTemplates(): Promise<ReportTemplate[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/reports/templates`, {
+      const response = await fetch(`${this.baseUrl}/admin-management/reports/templates/`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -461,7 +493,22 @@ class AnalyticsService {
       return await response.json();
     } catch (error) {
       console.error("Error fetching report templates:", error);
-      throw error;
+      // Return fallback data instead of throwing
+      return [
+        {
+          id: "sales_summary",
+          name: "Sales Summary Report",
+          description: "Comprehensive sales analytics and trends",
+          type: "financial" as const,
+          frequency: "monthly" as const,
+          format: "pdf" as const,
+          sections: [],
+          aiInsights: false,
+          automatedDelivery: false,
+          recipients: [],
+          status: "active" as const
+        }
+      ];
     }
   }
 
