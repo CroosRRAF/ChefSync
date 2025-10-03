@@ -307,6 +307,7 @@ const SimpleRegisterForm: React.FC = () => {
         // Store tokens in localStorage with correct keys for AuthContext
         if (result.tokens) {
           localStorage.setItem('access_token', result.tokens.access);
+          localStorage.setItem('refresh_token', result.tokens.refresh);
           localStorage.setItem('chefsync_refresh_token', result.tokens.refresh);
         }
         
@@ -325,8 +326,9 @@ const SimpleRegisterForm: React.FC = () => {
       } else {
         // For cooks and delivery agents, don't store tokens and show pending approval message
         // Clear any existing tokens to ensure they can't access the system
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('chefsync_refresh_token');
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('chefsync_refresh_token');
         
         toast({
           title: "Registration Complete!",

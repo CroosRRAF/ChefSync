@@ -537,12 +537,28 @@ def google_oauth_login(request):
             defaults={
                 'name': name,
                 'email_verified': True,
-                'role': forced_role  # Only allow customer role for Google OAuth users
+                'role': forced_role,  # Only allow customer role for Google OAuth users
+                'username': email,  # Ensure username uniqueness aligns with email for social logins
             }
         )
         
         print(f'User {"created" if created else "found"}: {user.email}')
         
+        # Ensure legacy users created without username/email_verified fields are updated
+        user_updates = []
+        if not user.username:
+            user.username = email
+            user_updates.append('username')
+        if user.role not in ['customer', 'Customer']:
+            user.role = forced_role
+            user_updates.append('role')
+        if not user.email_verified:
+            user.email_verified = True
+            user_updates.append('email_verified')
+
+        if user_updates:
+            user.save(update_fields=user_updates)
+
         if created:
             user.set_unusable_password()
             user.save()

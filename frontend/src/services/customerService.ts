@@ -78,13 +78,13 @@ export interface CustomerStats {
 export const customerService = {
   // Get customer profile
   getProfile: async (): Promise<CustomerProfile> => {
-    const response = await apiClient.get('/authentication/profile/');
+  const response = await apiClient.get('/auth/profile/');
     return response.data;
   },
 
   // Update customer profile
   updateProfile: async (data: Partial<CustomerProfile>): Promise<CustomerProfile> => {
-    const response = await apiClient.patch('/authentication/profile/update/', data);
+  const response = await apiClient.patch('/auth/profile/update/', data);
     return response.data;
   },
 

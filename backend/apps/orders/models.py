@@ -5,8 +5,9 @@ import uuid
 import math
 
 
+# Keep UserAddress for backward compatibility but mark as deprecated
 class UserAddress(models.Model):
-    """User saved addresses for delivery"""
+    """User saved addresses for delivery - DEPRECATED: Use apps.users.address_models.Address instead"""
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='addresses')
     label = models.CharField(max_length=100, help_text='Address label (e.g., Home, Work)')
@@ -85,13 +86,34 @@ class Order(models.Model):
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, validators=[MinValueValidator(0)])
     
     # Delivery Information
-    delivery_address = models.TextField(default='No address provided')
-    delivery_address_ref = models.ForeignKey(UserAddress, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
+    delivery_address = models.TextField(default='No address provided')  # Keep for backward compatibility
+    delivery_address_ref = models.ForeignKey(UserAddress, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')  # Deprecated
+    
+    # New address system - reference to apps.users.address_models.Address
+    delivery_address_new = models.ForeignKey(
+        'users.Address', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='delivery_orders',
+        help_text='New address system reference'
+    )
+    
     delivery_instructions = models.TextField(blank=True)
     delivery_latitude = models.DecimalField(max_digits=10, decimal_places=8, null=True, blank=True)
     delivery_longitude = models.DecimalField(max_digits=11, decimal_places=8, null=True, blank=True)
     distance_km = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text='Distance from kitchen to delivery address in km')
     promo_code = models.CharField(max_length=50, null=True, blank=True)
+    
+    # Kitchen location reference
+    kitchen_location = models.ForeignKey(
+        'users.Address',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='kitchen_orders',
+        help_text='Kitchen location for this order'
+    )
     
     # Timing
     estimated_delivery_time = models.DateTimeField(null=True, blank=True)
@@ -141,6 +163,70 @@ class Order(models.Model):
     def calculate_tax(self, subtotal):
         """Calculate 10% tax on subtotal"""
         return round(subtotal * 0.10, 2)
+    
+    # New address system helper methods
+    def get_delivery_address(self):
+        """Get delivery address - prioritize new address system"""
+        if self.delivery_address_new:
+            return self.delivery_address_new
+        elif self.delivery_address_ref:
+            return self.delivery_address_ref
+        return None
+    
+    def get_delivery_coordinates(self):
+        """Get delivery coordinates from address"""
+        address = self.get_delivery_address()
+        if address and hasattr(address, 'latitude') and hasattr(address, 'longitude'):
+            return address.latitude, address.longitude
+        return self.delivery_latitude, self.delivery_longitude
+    
+    def get_kitchen_coordinates(self):
+        """Get kitchen coordinates"""
+        if self.kitchen_location:
+            return self.kitchen_location.latitude, self.kitchen_location.longitude
+        # Fallback to chef's default kitchen
+        if hasattr(self.chef, 'chef_profile'):
+            kitchen = self.chef.chef_profile.get_kitchen_location()
+            if kitchen and kitchen.address:
+                return kitchen.address.latitude, kitchen.address.longitude
+        return None, None
+    
+    def calculate_distance(self):
+        """Calculate distance between kitchen and delivery location"""
+        kitchen_lat, kitchen_lng = self.get_kitchen_coordinates()
+        delivery_lat, delivery_lng = self.get_delivery_coordinates()
+        
+        if all([kitchen_lat, kitchen_lng, delivery_lat, delivery_lng]):
+            # Simple haversine formula for distance calculation
+            from math import radians, cos, sin, asin, sqrt
+            
+            # Convert to radians
+            lat1, lng1, lat2, lng2 = map(radians, [float(kitchen_lat), float(kitchen_lng), 
+                                                   float(delivery_lat), float(delivery_lng)])
+            
+            # Haversine formula
+            dlat = lat2 - lat1
+            dlng = lng2 - lng1
+            a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlng/2)**2
+            distance_km = 2 * asin(sqrt(a)) * 6371  # Earth radius in km
+            
+            return round(distance_km, 2)
+        return None
+    
+    def set_delivery_address(self, address):
+        """Set delivery address using new address system"""
+        if hasattr(address, 'address_type'):  # New Address model
+            self.delivery_address_new = address
+            if address.latitude and address.longitude:
+                self.delivery_latitude = address.latitude
+                self.delivery_longitude = address.longitude
+            # Update text address for backward compatibility
+            self.delivery_address = address.full_address
+        else:  # Old UserAddress model
+            self.delivery_address_ref = address
+            if address.latitude and address.longitude:
+                self.delivery_latitude = address.latitude
+                self.delivery_longitude = address.longitude
     
     def __str__(self):
         return f"Order {self.order_number} - {self.customer.username}"

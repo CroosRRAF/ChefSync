@@ -55,6 +55,7 @@ const removeSecureToken = (): void => {
   try {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('chefsync_refresh_token');
   } catch (error) {
     console.error('Error removing tokens from localStorage:', error);
   }
@@ -249,7 +250,10 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
     // Persist tokens
     localStorage.setItem('access_token', data.access);
-    if (data.refresh) localStorage.setItem('chefsync_refresh_token', data.refresh);
+    if (data.refresh) {
+      localStorage.setItem('refresh_token', data.refresh);
+      localStorage.setItem('chefsync_refresh_token', data.refresh); // Legacy key for compatibility
+    }
 
     const frontendUser: User = {
       id: data.user.user_id,
