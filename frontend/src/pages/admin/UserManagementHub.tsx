@@ -1,31 +1,25 @@
-import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import React, { useCallback, useEffect, useState } from "react";
 
 // Import shared components
-import { 
-  AnimatedStats,
-  GlassCard,
-  GradientButton,
-  OptimisticButton,
-  DataTable 
-} from "@/components/admin/shared";
+import { AnimatedStats, DataTable, GlassCard } from "@/components/admin/shared";
 import type { Column } from "@/components/admin/shared/tables/DataTable";
 import { useOptimisticUpdates } from "@/hooks";
-import DynamicForm from "@/components/admin/shared/forms/DynamicForm";
-import { BaseModal } from "@/components/admin/shared/modals";
 
 // Import UI components
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,47 +39,21 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 // Import icons
 import {
-  Activity,
-  AlertCircle,
   AlertTriangle,
   Camera,
-  CheckCircle,
   Clock,
   Download,
-  Edit,
   Eye,
-  EyeOff,
-  Filter,
-  Globe,
   Loader2,
   Lock,
-  Mail,
-  MapPin,
   Monitor,
-  Moon,
   MoreHorizontal,
-  Phone,
   RefreshCw,
   Save,
   Search,
-  Settings,
-  Shield,
-  Smartphone,
-  Sun,
   Trash2,
   User,
   UserCheck,
@@ -95,16 +63,20 @@ import {
 } from "lucide-react";
 
 // Import services
-import { adminService, type UserListResponse, type AdminUser } from "@/services/adminService";
 import { useToast } from "@/hooks/use-toast";
+import {
+  adminService,
+  type AdminUser,
+  type UserListResponse,
+} from "@/services/adminService";
 
 /**
  * Unified User Management Hub - Consolidates 2 user-related pages
- * 
+ *
  * Merged from:
  * - ManageUser.tsx (user management, CRUD operations, role management)
  * - Profile.tsx (admin profile management, settings, security)
- * 
+ *
  * Features:
  * - Tabbed interface for organized access
  * - User management with advanced filtering and search
@@ -175,12 +147,12 @@ interface Session {
 const UserManagementHub: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   // Active tab state
   const [activeTab, setActiveTab] = useState<
     "users" | "profile" | "security" | "activity"
   >("users");
-  
+
   // User Management States
   const [users, setUsers] = useState<User[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -193,14 +165,14 @@ const UserManagementHub: React.FC = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
-  
+
   // Profile Management States
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSaving, setSaving] = useState(false);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
-  
+
   // Optimistic updates hook
   const {
     data: optimisticUsers,
@@ -214,28 +186,32 @@ const UserManagementHub: React.FC = () => {
   const loadUserStats = useCallback(async () => {
     try {
       console.log("Loading user stats...");
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem("access_token");
       console.log("Auth token:", token ? "Present" : "Missing");
-      
+
       // Fetch real user stats from API
-      const response = await fetch('/api/admin-management/users/stats/', {
+      const response = await fetch("/api/admin-management/users/stats/", {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
       console.log("User stats response status:", response.status);
-      
+
       if (response.ok) {
         const statsData = await response.json();
         console.log("User stats data:", statsData);
         setUserStats(statsData);
       } else {
-        console.error("User stats API failed:", response.status, response.statusText);
+        console.error(
+          "User stats API failed:",
+          response.status,
+          response.statusText
+        );
         const errorText = await response.text();
         console.error("Error response:", errorText);
-        
+
         // Fallback stats if API fails
         const fallbackStats: UserStats = {
           totalUsers: 0,
@@ -251,7 +227,7 @@ const UserManagementHub: React.FC = () => {
       }
     } catch (error) {
       console.error("Error loading user stats:", error);
-      
+
       // Set fallback data on error
       const fallbackStats: UserStats = {
         totalUsers: 0,
@@ -272,13 +248,13 @@ const UserManagementHub: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       console.log("Loading users with filters:", {
         search: searchQuery,
         role: roleFilter === "all" ? undefined : roleFilter,
         status: statusFilter === "all" ? undefined : statusFilter,
       });
-      
+
       const response: UserListResponse = await adminService.getUsers({
         search: searchQuery,
         role: roleFilter === "all" ? undefined : roleFilter,
@@ -286,12 +262,12 @@ const UserManagementHub: React.FC = () => {
         page: 1,
         limit: 50,
       });
-      
+
       console.log("Users API response:", response);
-      
+
       const usersData = response.users || [];
       console.log("Processed users data:", usersData);
-      
+
       console.log("Setting users state:", usersData.length);
       setUsers(usersData);
       console.log("Calling updateData with:", usersData.length);
@@ -307,17 +283,20 @@ const UserManagementHub: React.FC = () => {
   // Load admin profile
   const loadAdminProfile = useCallback(async () => {
     if (!user) return;
-    
+
     try {
       setProfileLoading(true);
-      
+
       // Fetch real profile data from API
-      const response = await fetch(`/api/admin-management/profile/${user.id}/`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `/api/admin-management/profile/${user.id}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (response.ok) {
         const profileData = await response.json();
@@ -326,8 +305,8 @@ const UserManagementHub: React.FC = () => {
         // Fallback profile data if API fails
         const fallbackProfile: AdminProfile = {
           id: user.id?.toString() || "1",
-          firstName: user.name?.split(' ')[0] || "Admin",
-          lastName: user.name?.split(' ')[1] || "User",
+          firstName: user.name?.split(" ")[0] || "Admin",
+          lastName: user.name?.split(" ")[1] || "User",
           email: user.email || "",
           phone: user.phone || "",
           role: user.role || "admin",
@@ -358,10 +337,10 @@ const UserManagementHub: React.FC = () => {
   const loadActivityLogs = useCallback(async () => {
     try {
       // Fetch real activity logs from API
-      const response = await fetch('/api/admin-management/activity-logs/', {
+      const response = await fetch("/api/admin-management/activity-logs/", {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          "Content-Type": "application/json",
         },
       });
 
@@ -381,10 +360,10 @@ const UserManagementHub: React.FC = () => {
   const loadSessions = useCallback(async () => {
     try {
       // Fetch real sessions from API
-      const response = await fetch('/api/admin-management/sessions/', {
+      const response = await fetch("/api/admin-management/sessions/", {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          "Content-Type": "application/json",
         },
       });
 
@@ -404,19 +383,15 @@ const UserManagementHub: React.FC = () => {
   // Toggle user status
   const handleToggleStatus = async (userId: number, currentStatus: boolean) => {
     try {
-      const userToUpdate = users.find(u => u.id === userId);
+      const userToUpdate = users.find((u) => u.id === userId);
       if (!userToUpdate) return;
-      
+
       const updatedUser = { ...userToUpdate, is_active: !currentStatus };
-      
-      await optimisticUpdate(
-        updatedUser,
-        userToUpdate,
-        async () => {
-          await adminService.updateUser(userId, { is_active: !currentStatus });
-          return updatedUser;
-        }
-      );
+
+      await optimisticUpdate(updatedUser, userToUpdate, async () => {
+        await adminService.updateUser(userId, { is_active: !currentStatus });
+        return updatedUser;
+      });
     } catch (error) {
       console.error("Error toggling user status:", error);
     }
@@ -430,17 +405,14 @@ const UserManagementHub: React.FC = () => {
 
   const confirmDeleteUser = async () => {
     if (!userToDelete) return;
-    
+
     try {
       // For delete operations, we can use the optimisticDelete method
-      await optimisticDelete(
-        userToDelete,
-        async () => {
-          await adminService.deleteUser(userToDelete.id);
-          return userToDelete;
-        }
-      );
-      
+      await optimisticDelete(userToDelete, async () => {
+        await adminService.deleteUser(userToDelete.id);
+        return userToDelete;
+      });
+
       setShowDeleteDialog(false);
       setUserToDelete(null);
     } catch (error) {
@@ -451,19 +423,22 @@ const UserManagementHub: React.FC = () => {
   // Save admin profile
   const handleSaveProfile = async (updatedProfile: Partial<AdminProfile>) => {
     if (!adminProfile) return;
-    
+
     try {
       setSaving(true);
-      
+
       // Save profile via API
-      const response = await fetch(`/api/admin-management/profile/${adminProfile.id}/`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedProfile),
-      });
+      const response = await fetch(
+        `/api/admin-management/profile/${adminProfile.id}/`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedProfile),
+        }
+      );
 
       if (response.ok) {
         const savedProfile = await response.json();
@@ -473,7 +448,7 @@ const UserManagementHub: React.FC = () => {
           description: "Profile updated successfully",
         });
       } else {
-        throw new Error('Failed to save profile');
+        throw new Error("Failed to save profile");
       }
     } catch (error) {
       console.error("Error saving profile:", error);
@@ -498,11 +473,23 @@ const UserManagementHub: React.FC = () => {
       loadActivityLogs();
       loadSessions();
     }
-  }, [activeTab, loadUsers, loadUserStats, loadAdminProfile, loadActivityLogs, loadSessions]);
+  }, [
+    activeTab,
+    loadUsers,
+    loadUserStats,
+    loadAdminProfile,
+    loadActivityLogs,
+    loadSessions,
+  ]);
 
   // Sync optimistic users with users state
   useEffect(() => {
-    console.log("Users state changed:", users.length, "Optimistic users:", optimisticUsers.length);
+    console.log(
+      "Users state changed:",
+      users.length,
+      "Optimistic users:",
+      optimisticUsers.length
+    );
     if (users.length > 0) {
       console.log("Syncing users to optimistic users:", users.length);
       updateData(users);
@@ -514,17 +501,25 @@ const UserManagementHub: React.FC = () => {
     {
       key: "name", // Changed from "user" to "name" to match the data structure
       title: "User",
-      render: (user: AdminUser) => (
+      render: (value: any, user: AdminUser) => (
         <div className="flex items-center space-x-3">
           <Avatar className="h-8 w-8">
             <AvatarImage src="" />
             <AvatarFallback>
-              {user?.name ? user.name.split(" ").map(n => n[0]).join("").toUpperCase() : "U"}
+              {user?.name
+                ? user.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()
+                : "U"}
             </AvatarFallback>
           </Avatar>
           <div>
             <div className="font-medium">{user?.name || "Unknown User"}</div>
-            <div className="text-sm text-gray-500">{user?.email || "No email"}</div>
+            <div className="text-sm text-gray-500">
+              {user?.email || "No email"}
+            </div>
           </div>
         </div>
       ),
@@ -532,7 +527,7 @@ const UserManagementHub: React.FC = () => {
     {
       key: "role",
       title: "Role",
-      render: (user: AdminUser) => (
+      render: (value: any, user: AdminUser) => (
         <Badge variant={user?.role === "admin" ? "default" : "secondary"}>
           {user?.role?.replace("_", " ") || "Unknown"}
         </Badge>
@@ -541,12 +536,12 @@ const UserManagementHub: React.FC = () => {
     {
       key: "status",
       title: "Status",
-      render: (user: AdminUser) => (
+      render: (value: any, user: AdminUser) => (
         <div className="flex items-center space-x-2">
           <Badge variant={user?.is_active ? "default" : "secondary"}>
             {user?.is_active ? "Active" : "Inactive"}
           </Badge>
-          {user?.approval_status === 'pending' && (
+          {user?.approval_status === "pending" && (
             <Badge variant="outline">Pending Approval</Badge>
           )}
         </div>
@@ -555,26 +550,30 @@ const UserManagementHub: React.FC = () => {
     {
       key: "stats",
       title: "Stats",
-      render: (user: AdminUser) => (
+      render: (value: any, user: AdminUser) => (
         <div className="text-sm">
           <div>{user?.total_orders || 0} orders</div>
-          <div className="text-gray-500">LKR {user?.total_spent?.toLocaleString() || "0"}</div>
+          <div className="text-gray-500">
+            LKR {user?.total_spent?.toLocaleString() || "0"}
+          </div>
         </div>
       ),
     },
     {
       key: "joined",
       title: "Joined",
-      render: (user: AdminUser) => (
+      render: (value: any, user: AdminUser) => (
         <div className="text-sm">
-          {user?.date_joined ? new Date(user.date_joined).toLocaleDateString() : "Unknown"}
+          {user?.date_joined
+            ? new Date(user.date_joined).toLocaleDateString()
+            : "Unknown"}
         </div>
       ),
     },
     {
       key: "actions",
       title: "Actions",
-      render: (user: AdminUser) => (
+      render: (value: any, user: AdminUser) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -586,7 +585,9 @@ const UserManagementHub: React.FC = () => {
               <Eye className="h-4 w-4 mr-2" />
               View Details
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleToggleStatus(user?.id, user?.is_active)}>
+            <DropdownMenuItem
+              onClick={() => handleToggleStatus(user?.id, user?.is_active)}
+            >
               {user?.is_active ? (
                 <>
                   <UserX className="h-4 w-4 mr-2" />
@@ -600,7 +601,7 @@ const UserManagementHub: React.FC = () => {
               )}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => handleDeleteUser(user)}
               className="text-red-600"
             >
@@ -702,7 +703,7 @@ const UserManagementHub: React.FC = () => {
             Add User
           </Button>
         </div>
-        
+
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
             <div className="flex">
@@ -720,15 +721,35 @@ const UserManagementHub: React.FC = () => {
           columns={userColumns}
           loading={loading}
         />
-        
+
         {/* Debug info - remove this after fixing */}
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
           <div className="font-semibold text-blue-800 mb-2">🔍 Debug Info:</div>
           <div className="space-y-1 text-blue-700">
-            <div>Users state length: <span className="font-mono bg-blue-100 px-1 rounded">{users.length}</span></div>
-            <div>Optimistic users length: <span className="font-mono bg-blue-100 px-1 rounded">{optimisticUsers.length}</span></div>
-            <div>Loading: <span className="font-mono bg-blue-100 px-1 rounded">{loading.toString()}</span></div>
-            <div>Error: <span className="font-mono bg-blue-100 px-1 rounded">{error || 'None'}</span></div>
+            <div>
+              Users state length:{" "}
+              <span className="font-mono bg-blue-100 px-1 rounded">
+                {users.length}
+              </span>
+            </div>
+            <div>
+              Optimistic users length:{" "}
+              <span className="font-mono bg-blue-100 px-1 rounded">
+                {optimisticUsers.length}
+              </span>
+            </div>
+            <div>
+              Loading:{" "}
+              <span className="font-mono bg-blue-100 px-1 rounded">
+                {loading.toString()}
+              </span>
+            </div>
+            <div>
+              Error:{" "}
+              <span className="font-mono bg-blue-100 px-1 rounded">
+                {error || "None"}
+              </span>
+            </div>
             {optimisticUsers.length > 0 && (
               <div className="mt-2">
                 <div className="font-semibold">First user data:</div>
@@ -739,7 +760,6 @@ const UserManagementHub: React.FC = () => {
             )}
           </div>
         </div>
-        
       </GlassCard>
     </div>
   );
@@ -756,7 +776,8 @@ const UserManagementHub: React.FC = () => {
                 <Avatar className="h-20 w-20">
                   <AvatarImage src={adminProfile.avatar} />
                   <AvatarFallback>
-                    {adminProfile.firstName[0]}{adminProfile.lastName[0]}
+                    {adminProfile.firstName[0]}
+                    {adminProfile.lastName[0]}
                   </AvatarFallback>
                 </Avatar>
                 <Button
@@ -786,7 +807,9 @@ const UserManagementHub: React.FC = () => {
           {/* Profile Settings */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <GlassCard className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Personal Information</h3>
+              <h3 className="text-lg font-semibold mb-4">
+                Personal Information
+              </h3>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -794,10 +817,12 @@ const UserManagementHub: React.FC = () => {
                     <Input
                       id="firstName"
                       value={adminProfile.firstName}
-                      onChange={(e) => setAdminProfile({
-                        ...adminProfile,
-                        firstName: e.target.value
-                      })}
+                      onChange={(e) =>
+                        setAdminProfile({
+                          ...adminProfile,
+                          firstName: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div>
@@ -805,10 +830,12 @@ const UserManagementHub: React.FC = () => {
                     <Input
                       id="lastName"
                       value={adminProfile.lastName}
-                      onChange={(e) => setAdminProfile({
-                        ...adminProfile,
-                        lastName: e.target.value
-                      })}
+                      onChange={(e) =>
+                        setAdminProfile({
+                          ...adminProfile,
+                          lastName: e.target.value,
+                        })
+                      }
                     />
                   </div>
                 </div>
@@ -818,10 +845,12 @@ const UserManagementHub: React.FC = () => {
                     id="email"
                     type="email"
                     value={adminProfile.email}
-                    onChange={(e) => setAdminProfile({
-                      ...adminProfile,
-                      email: e.target.value
-                    })}
+                    onChange={(e) =>
+                      setAdminProfile({
+                        ...adminProfile,
+                        email: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div>
@@ -829,10 +858,12 @@ const UserManagementHub: React.FC = () => {
                   <Input
                     id="phone"
                     value={adminProfile.phone}
-                    onChange={(e) => setAdminProfile({
-                      ...adminProfile,
-                      phone: e.target.value
-                    })}
+                    onChange={(e) =>
+                      setAdminProfile({
+                        ...adminProfile,
+                        phone: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div>
@@ -840,10 +871,12 @@ const UserManagementHub: React.FC = () => {
                   <Textarea
                     id="bio"
                     value={adminProfile.bio}
-                    onChange={(e) => setAdminProfile({
-                      ...adminProfile,
-                      bio: e.target.value
-                    })}
+                    onChange={(e) =>
+                      setAdminProfile({
+                        ...adminProfile,
+                        bio: e.target.value,
+                      })
+                    }
                     rows={3}
                   />
                 </div>
@@ -857,10 +890,12 @@ const UserManagementHub: React.FC = () => {
                   <Label htmlFor="timezone">Timezone</Label>
                   <Select
                     value={adminProfile.timezone}
-                    onValueChange={(value) => setAdminProfile({
-                      ...adminProfile,
-                      timezone: value
-                    })}
+                    onValueChange={(value) =>
+                      setAdminProfile({
+                        ...adminProfile,
+                        timezone: value,
+                      })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -868,7 +903,9 @@ const UserManagementHub: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="Asia/Colombo">Asia/Colombo</SelectItem>
                       <SelectItem value="UTC">UTC</SelectItem>
-                      <SelectItem value="America/New_York">America/New_York</SelectItem>
+                      <SelectItem value="America/New_York">
+                        America/New_York
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -876,10 +913,12 @@ const UserManagementHub: React.FC = () => {
                   <Label htmlFor="language">Language</Label>
                   <Select
                     value={adminProfile.language}
-                    onValueChange={(value) => setAdminProfile({
-                      ...adminProfile,
-                      language: value
-                    })}
+                    onValueChange={(value) =>
+                      setAdminProfile({
+                        ...adminProfile,
+                        language: value,
+                      })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -895,10 +934,12 @@ const UserManagementHub: React.FC = () => {
                   <Label htmlFor="theme">Theme</Label>
                   <Select
                     value={adminProfile.theme}
-                    onValueChange={(value: "light" | "dark" | "system") => setAdminProfile({
-                      ...adminProfile,
-                      theme: value
-                    })}
+                    onValueChange={(value: "light" | "dark" | "system") =>
+                      setAdminProfile({
+                        ...adminProfile,
+                        theme: value,
+                      })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -940,7 +981,9 @@ const UserManagementHub: React.FC = () => {
         <>
           {/* Notification Settings */}
           <GlassCard className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Notification Preferences</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Notification Preferences
+            </h3>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -951,10 +994,12 @@ const UserManagementHub: React.FC = () => {
                 </div>
                 <Switch
                   checked={adminProfile.emailNotifications}
-                  onCheckedChange={(checked) => setAdminProfile({
-                    ...adminProfile,
-                    emailNotifications: checked
-                  })}
+                  onCheckedChange={(checked) =>
+                    setAdminProfile({
+                      ...adminProfile,
+                      emailNotifications: checked,
+                    })
+                  }
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -966,10 +1011,12 @@ const UserManagementHub: React.FC = () => {
                 </div>
                 <Switch
                   checked={adminProfile.pushNotifications}
-                  onCheckedChange={(checked) => setAdminProfile({
-                    ...adminProfile,
-                    pushNotifications: checked
-                  })}
+                  onCheckedChange={(checked) =>
+                    setAdminProfile({
+                      ...adminProfile,
+                      pushNotifications: checked,
+                    })
+                  }
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -981,10 +1028,12 @@ const UserManagementHub: React.FC = () => {
                 </div>
                 <Switch
                   checked={adminProfile.smsNotifications}
-                  onCheckedChange={(checked) => setAdminProfile({
-                    ...adminProfile,
-                    smsNotifications: checked
-                  })}
+                  onCheckedChange={(checked) =>
+                    setAdminProfile({
+                      ...adminProfile,
+                      smsNotifications: checked,
+                    })
+                  }
                 />
               </div>
             </div>
@@ -1025,7 +1074,10 @@ const UserManagementHub: React.FC = () => {
             <h3 className="text-lg font-semibold mb-4">Active Sessions</h3>
             <div className="space-y-3">
               {sessions.map((session) => (
-                <div key={session.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div
+                  key={session.id}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
                   <div className="flex items-center space-x-3">
                     <Monitor className="h-5 w-5 text-gray-400" />
                     <div>
@@ -1036,13 +1088,16 @@ const UserManagementHub: React.FC = () => {
                         {session.location} • {session.ipAddress}
                       </div>
                       <div className="text-xs text-gray-400">
-                        Last active: {new Date(session.lastActive).toLocaleString()}
+                        Last active:{" "}
+                        {new Date(session.lastActive).toLocaleString()}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     {session.current && (
-                      <Badge variant="default" className="text-xs">Current</Badge>
+                      <Badge variant="default" className="text-xs">
+                        Current
+                      </Badge>
                     )}
                     {!session.current && (
                       <Button variant="outline" size="sm">
@@ -1066,17 +1121,25 @@ const UserManagementHub: React.FC = () => {
         <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
         <div className="space-y-3">
           {activityLogs.map((log) => (
-            <div key={log.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-              <div className={`h-3 w-3 rounded-full ${
-                log.status === "success" ? "bg-green-500" :
-                log.status === "warning" ? "bg-yellow-500" :
-                "bg-red-500"
-              }`} />
+            <div
+              key={log.id}
+              className="flex items-center space-x-3 p-3 border rounded-lg"
+            >
+              <div
+                className={`h-3 w-3 rounded-full ${
+                  log.status === "success"
+                    ? "bg-green-500"
+                    : log.status === "warning"
+                    ? "bg-yellow-500"
+                    : "bg-red-500"
+                }`}
+              />
               <div className="flex-1">
                 <div className="font-medium">{log.action}</div>
                 <div className="text-sm text-gray-600">{log.description}</div>
                 <div className="text-xs text-gray-400">
-                  {new Date(log.timestamp).toLocaleString()} • {log.device} • {log.location}
+                  {new Date(log.timestamp).toLocaleString()} • {log.device} •{" "}
+                  {log.location}
                 </div>
               </div>
             </div>
@@ -1098,7 +1161,7 @@ const UserManagementHub: React.FC = () => {
             Comprehensive user management and admin profile settings
           </p>
         </div>
-        
+
         <div className="flex items-center space-x-4">
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
@@ -1112,26 +1175,29 @@ const UserManagementHub: React.FC = () => {
       </div>
 
       {/* Tabbed Interface */}
-      <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value: any) => setActiveTab(value)}
+      >
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="users" className="mt-6">
           {renderUsersTab()}
         </TabsContent>
-        
+
         <TabsContent value="profile" className="mt-6">
           {renderProfileTab()}
         </TabsContent>
-        
+
         <TabsContent value="security" className="mt-6">
           {renderSecurityTab()}
         </TabsContent>
-        
+
         <TabsContent value="activity" className="mt-6">
           {renderActivityTab()}
         </TabsContent>
@@ -1143,7 +1209,8 @@ const UserManagementHub: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete User</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {userToDelete?.name}? This action cannot be undone.
+              Are you sure you want to delete {userToDelete?.name}? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

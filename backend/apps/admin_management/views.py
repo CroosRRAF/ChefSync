@@ -719,9 +719,15 @@ class AdminDashboardViewSet(viewsets.ViewSet):
     def revenue_analytics(self, request):
         """Get comprehensive revenue analytics with trends and forecasts"""
         try:
-            print(f"DEBUG: revenue_analytics called with params: {request.query_params}")
-            print(f"DEBUG: User: {request.user}, Is authenticated: {request.user.is_authenticated}")
-            print(f"DEBUG: User is staff: {request.user.is_staff if request.user.is_authenticated else 'N/A'}")
+            print(
+                f"DEBUG: revenue_analytics called with params: {request.query_params}"
+            )
+            print(
+                f"DEBUG: User: {request.user}, Is authenticated: {request.user.is_authenticated}"
+            )
+            print(
+                f"DEBUG: User is staff: {request.user.is_staff if request.user.is_authenticated else 'N/A'}"
+            )
             # Get time range parameter (default 30d)
             time_range = request.query_params.get("range", "30d")
             days = int(time_range.replace("d", ""))
@@ -777,7 +783,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 .annotate(amount=Sum("total_amount"))
                 .order_by("date")
             )
-            
+
             # Fallback if extra() fails
             try:
                 daily_data = [
@@ -790,10 +796,13 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 daily_data = []
                 for i in range(min(days, 30)):
                     date = start_date + timedelta(days=i)
-                    daily_data.append({
-                        "date": date.strftime("%Y-%m-%d"),
-                        "amount": float(current_revenue / max(days, 1)) * (0.8 + 0.4 * (i % 7) / 7)
-                    })
+                    daily_data.append(
+                        {
+                            "date": date.strftime("%Y-%m-%d"),
+                            "amount": float(current_revenue / max(days, 1))
+                            * (0.8 + 0.4 * (i % 7) / 7),
+                        }
+                    )
 
             # Weekly aggregation (for monthly+ views)
             weekly_data = []
@@ -876,6 +885,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             print(f"DEBUG: revenue_analytics error: {str(e)}")
             print(f"DEBUG: Error type: {type(e)}")
             import traceback
+
             print(f"DEBUG: Traceback: {traceback.format_exc()}")
             # Return graceful fallback instead of 500 to avoid breaking UI
             fallback_response = {
@@ -1093,6 +1103,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             from apps.food.models import Food
             from apps.orders.models import Order
             from django.contrib.auth import get_user_model
+
             User = get_user_model()
 
             insights = []
@@ -1594,32 +1605,42 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get orders distribution data for pie chart"""
         try:
             days = int(request.query_params.get("days", 7))
-            
+
             # Get orders from the last N days
             from apps.orders.models import Order
-            
+
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
-            
+
             if days == 7:
                 # Weekly distribution by day of week
                 orders_by_day = (
                     Order.objects.filter(created_at__range=[start_date, end_date])
-                    .extra({"day": "DAYOFWEEK(created_at) - 1"})  # MySQL DAYOFWEEK returns 1-7, we want 0-6
+                    .extra(
+                        {"day": "DAYOFWEEK(created_at) - 1"}
+                    )  # MySQL DAYOFWEEK returns 1-7, we want 0-6
                     .values("day")
                     .annotate(count=Count("id"))
                     .order_by("day")
                 )
-                
-                day_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
+                day_names = [
+                    "Sunday",
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                ]
                 labels = []
                 data = []
-                
+
                 for item in orders_by_day:
                     day_index = int(item["day"])
                     labels.append(day_names[day_index])
                     data.append(item["count"])
-                    
+
             else:
                 # Monthly distribution by date
                 orders_by_date = (
@@ -1629,24 +1650,28 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                     .annotate(count=Count("id"))
                     .order_by("date")
                 )
-                
+
                 labels = []
                 data = []
-                
+
                 for item in orders_by_date:
                     labels.append(item["date"].strftime("%m/%d"))
                     data.append(item["count"])
-            
-            return Response({
-                "data": {
-                    "labels": labels,
-                    "datasets": [{
-                        "label": "Orders",
-                        "data": data,
-                    }]
+
+            return Response(
+                {
+                    "data": {
+                        "labels": labels,
+                        "datasets": [
+                            {
+                                "label": "Orders",
+                                "data": data,
+                            }
+                        ],
+                    }
                 }
-            })
-            
+            )
+
         except Exception as e:
             return Response(
                 {"error": f"Failed to get orders distribution: {str(e)}"},
@@ -1658,10 +1683,10 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get new users data for area chart"""
         try:
             days = int(request.query_params.get("days", 30))
-            
+
             end_date = timezone.now()
             start_date = end_date - timedelta(days=days)
-            
+
             # Get new users by date
             new_users_by_date = (
                 User.objects.filter(date_joined__range=[start_date, end_date])
@@ -1670,24 +1695,28 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 .annotate(count=Count("user_id"))
                 .order_by("date")
             )
-            
+
             labels = []
             data = []
-            
+
             for item in new_users_by_date:
                 labels.append(item["date"].strftime("%m/%d"))
                 data.append(item["count"])
-            
-            return Response({
-                "data": {
-                    "labels": labels,
-                    "datasets": [{
-                        "label": "New Users",
-                        "data": data,
-                    }]
+
+            return Response(
+                {
+                    "data": {
+                        "labels": labels,
+                        "datasets": [
+                            {
+                                "label": "New Users",
+                                "data": data,
+                            }
+                        ],
+                    }
                 }
-            })
-            
+            )
+
         except Exception as e:
             return Response(
                 {"error": f"Failed to get new users data: {str(e)}"},
@@ -1699,32 +1728,52 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get recent deliveries data"""
         try:
             limit = int(request.query_params.get("limit", 5))
-            
+
             # Try to get delivery data from orders
             from apps.orders.models import Order
-            
+
             recent_orders = (
-                Order.objects.filter(status__in=["delivered", "out_for_delivery", "in_transit"])
+                Order.objects.filter(
+                    status__in=["delivered", "out_for_delivery", "in_transit"]
+                )
                 .select_related("customer", "delivery_partner")
                 .order_by("-created_at")[:limit]
             )
-            
+
             deliveries = []
             for order in recent_orders:
-                deliveries.append({
-                    "id": order.id,
-                    "order_id": order.id,
-                    "delivery_agent": order.delivery_partner.get_full_name() if order.delivery_partner else "Unassigned",
-                    "customer_name": order.customer.get_full_name() if order.customer else "Unknown",
-                    "delivery_address": getattr(order, "delivery_address", "Address not available"),
-                    "status": order.status,
-                    "estimated_time": (order.created_at + timedelta(hours=1)).isoformat(),
-                    "actual_time": order.updated_at.isoformat() if order.status == "delivered" else None,
-                    "tracking_code": f"TRK{str(order.id).zfill(6)}",
-                })
-            
+                deliveries.append(
+                    {
+                        "id": order.id,
+                        "order_id": order.id,
+                        "delivery_agent": (
+                            order.delivery_partner.get_full_name()
+                            if order.delivery_partner
+                            else "Unassigned"
+                        ),
+                        "customer_name": (
+                            order.customer.get_full_name()
+                            if order.customer
+                            else "Unknown"
+                        ),
+                        "delivery_address": getattr(
+                            order, "delivery_address", "Address not available"
+                        ),
+                        "status": order.status,
+                        "estimated_time": (
+                            order.created_at + timedelta(hours=1)
+                        ).isoformat(),
+                        "actual_time": (
+                            order.updated_at.isoformat()
+                            if order.status == "delivered"
+                            else None
+                        ),
+                        "tracking_code": f"TRK{str(order.id).zfill(6)}",
+                    }
+                )
+
             return Response(deliveries)
-            
+
         except Exception as e:
             return Response(
                 {"error": f"Failed to get recent deliveries: {str(e)}"},
@@ -1741,45 +1790,54 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
     def stats(self, request):
         """Get user statistics for admin dashboard"""
         try:
-            from django.utils import timezone
             from datetime import timedelta
-            
+
+            from django.utils import timezone
+
             # Get current date and calculate date ranges
             now = timezone.now()
-            this_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            
+            this_month_start = now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+
             # Count users by role and status
             total_users = User.objects.count()
             active_users = User.objects.filter(is_active=True).count()
-            
+
             # Count by role
-            customer_count = User.objects.filter(role__in=['customer', 'Customer']).count()
-            cook_count = User.objects.filter(role__in=['cook', 'Cook']).count()
-            delivery_agent_count = User.objects.filter(role__in=['delivery_agent', 'DeliveryAgent']).count()
-            admin_count = User.objects.filter(role__in=['admin', 'Admin']).count()
-            
+            customer_count = User.objects.filter(
+                role__in=["customer", "Customer"]
+            ).count()
+            cook_count = User.objects.filter(role__in=["cook", "Cook"]).count()
+            delivery_agent_count = User.objects.filter(
+                role__in=["delivery_agent", "DeliveryAgent"]
+            ).count()
+            admin_count = User.objects.filter(role__in=["admin", "Admin"]).count()
+
             # Count pending approvals (cooks and delivery agents)
             pending_approvals = User.objects.filter(
-                role__in=['cook', 'Cook', 'delivery_agent', 'DeliveryAgent'],
-                approval_status='pending'
+                role__in=["cook", "Cook", "delivery_agent", "DeliveryAgent"],
+                approval_status="pending",
             ).count()
-            
+
             # Count new users this month
             new_this_month = User.objects.filter(
                 date_joined__gte=this_month_start
             ).count()
-            
-            return Response({
-                'totalUsers': total_users,
-                'activeUsers': active_users,
-                'pendingApprovals': pending_approvals,
-                'newThisMonth': new_this_month,
-                'customerCount': customer_count,
-                'cookCount': cook_count,
-                'deliveryAgentCount': delivery_agent_count,
-                'adminCount': admin_count,
-            })
-            
+
+            return Response(
+                {
+                    "totalUsers": total_users,
+                    "activeUsers": active_users,
+                    "pendingApprovals": pending_approvals,
+                    "newThisMonth": new_this_month,
+                    "customerCount": customer_count,
+                    "cookCount": cook_count,
+                    "deliveryAgentCount": delivery_agent_count,
+                    "adminCount": admin_count,
+                }
+            )
+
         except Exception as e:
             print(f"Error in user stats: {str(e)}")
             return Response(
@@ -1792,57 +1850,67 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
         """Get or update admin profile"""
         try:
             user = User.objects.get(user_id=pk)
-            
+
             if request.method == "GET":
                 # Return admin profile data
                 profile_data = {
-                    'id': str(user.user_id),
-                    'firstName': user.name.split(' ')[0] if user.name else '',
-                    'lastName': ' '.join(user.name.split(' ')[1:]) if user.name and len(user.name.split(' ')) > 1 else '',
-                    'email': user.email,
-                    'phone': user.phone_no or '',
-                    'role': user.role,
-                    'avatar': '',
-                    'bio': '',
-                    'location': user.address or 'Sri Lanka',
-                    'timezone': 'Asia/Colombo',
-                    'language': 'en',
-                    'theme': 'system',
-                    'emailNotifications': True,
-                    'pushNotifications': True,
-                    'smsNotifications': False,
-                    'twoFactorEnabled': False,
-                    'createdAt': user.date_joined.isoformat() if user.date_joined else None,
-                    'lastLogin': user.last_login.isoformat() if user.last_login else None,
-                    'loginCount': 0,
+                    "id": str(user.user_id),
+                    "firstName": user.name.split(" ")[0] if user.name else "",
+                    "lastName": (
+                        " ".join(user.name.split(" ")[1:])
+                        if user.name and len(user.name.split(" ")) > 1
+                        else ""
+                    ),
+                    "email": user.email,
+                    "phone": user.phone_no or "",
+                    "role": user.role,
+                    "avatar": "",
+                    "bio": "",
+                    "location": user.address or "Sri Lanka",
+                    "timezone": "Asia/Colombo",
+                    "language": "en",
+                    "theme": "system",
+                    "emailNotifications": True,
+                    "pushNotifications": True,
+                    "smsNotifications": False,
+                    "twoFactorEnabled": False,
+                    "createdAt": (
+                        user.date_joined.isoformat() if user.date_joined else None
+                    ),
+                    "lastLogin": (
+                        user.last_login.isoformat() if user.last_login else None
+                    ),
+                    "loginCount": 0,
                 }
                 return Response(profile_data)
-            
+
             elif request.method == "PUT":
                 # Update admin profile
                 data = request.data
-                
+
                 # Update basic info
-                if 'firstName' in data and 'lastName' in data:
+                if "firstName" in data and "lastName" in data:
                     user.name = f"{data['firstName']} {data['lastName']}".strip()
-                if 'phone' in data:
-                    user.phone_no = data['phone']
-                if 'location' in data:
-                    user.address = data['location']
-                
+                if "phone" in data:
+                    user.phone_no = data["phone"]
+                if "location" in data:
+                    user.address = data["location"]
+
                 user.save()
-                
-                return Response({
-                    'success': True,
-                    'message': 'Profile updated successfully',
-                    'user': {
-                        'id': str(user.user_id),
-                        'name': user.name,
-                        'email': user.email,
-                        'phone': user.phone_no,
+
+                return Response(
+                    {
+                        "success": True,
+                        "message": "Profile updated successfully",
+                        "user": {
+                            "id": str(user.user_id),
+                            "name": user.name,
+                            "email": user.email,
+                            "phone": user.phone_no,
+                        },
                     }
-                })
-                
+                )
+
         except User.DoesNotExist:
             return Response(
                 {"error": "User not found"},
@@ -1862,13 +1930,13 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             # Return mock sessions for now (can be enhanced with real session tracking)
             sessions = [
                 {
-                    'id': '1',
-                    'device': 'Windows PC',
-                    'browser': 'Chrome',
-                    'location': 'Sri Lanka',
-                    'ipAddress': request.META.get('REMOTE_ADDR', 'Unknown'),
-                    'lastActive': timezone.now().isoformat(),
-                    'current': True,
+                    "id": "1",
+                    "device": "Windows PC",
+                    "browser": "Chrome",
+                    "location": "Sri Lanka",
+                    "ipAddress": request.META.get("REMOTE_ADDR", "Unknown"),
+                    "lastActive": timezone.now().isoformat(),
+                    "current": True,
                 }
             ]
             return Response(sessions)
@@ -1971,10 +2039,15 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     safe_name = (user.name or "").strip()  # type: ignore
                     if not safe_name:
                         # Fallback to email local-part if name missing
-                        safe_name = (user.email.split("@")[0] if user.email else "User")
+                        safe_name = user.email.split("@")[0] if user.email else "User"
 
                     normalized_role = (user.role or "").lower()  # type: ignore
-                    if normalized_role in ("admin", "customer", "cook", "delivery_agent"):
+                    if normalized_role in (
+                        "admin",
+                        "customer",
+                        "cook",
+                        "delivery_agent",
+                    ):
                         role_value = normalized_role
                     else:
                         # Map legacy role strings
@@ -2668,50 +2741,60 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
     def stats(self, request):
         """Get order statistics for admin dashboard"""
         try:
-            from django.utils import timezone
             from datetime import timedelta
-            
+
+            from apps.orders.models import Order
+            from django.utils import timezone
+
             # Get current date and calculate date ranges
             now = timezone.now()
             today = now.date()
             this_week = today - timedelta(days=7)
             this_month = today - timedelta(days=30)
-            
+
             # Count orders by status
             total_orders = Order.objects.count()
-            pending_orders = Order.objects.filter(status='pending').count()
-            preparing_orders = Order.objects.filter(status='preparing').count()
-            ready_orders = Order.objects.filter(status='ready').count()
-            delivered_orders = Order.objects.filter(status='delivered').count()
-            cancelled_orders = Order.objects.filter(status='cancelled').count()
-            
+            pending_orders = Order.objects.filter(status="pending").count()
+            preparing_orders = Order.objects.filter(status="preparing").count()
+            ready_orders = Order.objects.filter(status="ready").count()
+            delivered_orders = Order.objects.filter(status="delivered").count()
+            cancelled_orders = Order.objects.filter(status="cancelled").count()
+
             # Calculate revenue
-            total_revenue = Order.objects.aggregate(
-                total=Sum('total_amount')
-            )['total'] or 0
-            
+            total_revenue = (
+                Order.objects.aggregate(total=Sum("total_amount"))["total"] or 0
+            )
+
             # Recent activity
             orders_this_week = Order.objects.filter(created_at__gte=this_week).count()
             orders_this_month = Order.objects.filter(created_at__gte=this_month).count()
-            
+
             # Average order value
             avg_order_value = total_revenue / max(total_orders, 1)
-            
-            return Response({
-                'totalOrders': total_orders,
-                'pendingOrders': pending_orders,
-                'preparingOrders': preparing_orders,
-                'readyOrders': ready_orders,
-                'deliveredOrders': delivered_orders,
-                'cancelledOrders': cancelled_orders,
-                'totalRevenue': float(total_revenue),
-                'avgOrderValue': float(avg_order_value),
-                'ordersThisWeek': orders_this_week,
-                'ordersThisMonth': orders_this_month,
-            })
-            
+
+            return Response(
+                {
+                    "orders": [],  # Return empty orders array for stats endpoint
+                    "stats": {
+                        "total_orders": total_orders,
+                        "pending": pending_orders,
+                        "preparing": preparing_orders,
+                        "ready": ready_orders,
+                        "delivered": delivered_orders,
+                        "cancelled": cancelled_orders,
+                        "total_revenue": float(total_revenue),
+                        "average_order_value": float(avg_order_value),
+                        "orders_this_week": orders_this_week,
+                        "orders_this_month": orders_this_month,
+                    },
+                }
+            )
+
         except Exception as e:
+            import traceback
+
             print(f"Error in order stats: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
             return Response(
                 {"error": f"Failed to fetch order stats: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -3227,17 +3310,18 @@ class AdminSystemSettingsViewSet(viewsets.ModelViewSet):
     def realtime_stats(self, request):
         """Get real-time system statistics"""
         try:
-            from django.utils import timezone
             from datetime import timedelta
-            
+
+            from django.utils import timezone
+
             # Get current time and calculate recent activity
             now = timezone.now()
             last_hour = now - timedelta(hours=1)
-            
+
             # Count recent activity
             recent_connections = User.objects.filter(last_login__gte=last_hour).count()
             active_users = User.objects.filter(is_active=True).count()
-            
+
             # Mock some real-time metrics (can be enhanced with actual monitoring)
             stats = {
                 "connections": recent_connections,
@@ -3249,9 +3333,9 @@ class AdminSystemSettingsViewSet(viewsets.ModelViewSet):
                 "errorRate": 0.8,  # Mock error rate percentage
                 "lastUpdated": now.isoformat(),
             }
-            
+
             return Response(stats)
-            
+
         except Exception as e:
             print(f"Error in realtime_stats: {str(e)}")
             return Response(
@@ -3748,15 +3832,13 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
             # All required documents are approved - auto-approve user if pending
             if user.approval_status == "pending":
                 user.approval_status = "approved"
-                user.approved_by = (
-                    self.request.user if hasattr(self, "request") else None
-                )
+                user.approved_by = request.user if hasattr(request, "user") else None
                 user.approved_at = timezone.now()
                 user.save()
 
                 # Log activity
                 AdminActivityLog.objects.create(
-                    admin=self.request.user if hasattr(self, "request") else None,
+                    admin=request.user if hasattr(request, "user") else None,
                     action="approve",
                     resource_type="user",
                     resource_id=str(user.user_id),
@@ -3768,98 +3850,59 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
             print(f"Error checking user approval status: {e}")
 
 
-# Report Template Functions
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAdminUser])
 def get_report_templates(request):
     """Get available report templates"""
     try:
         templates = [
             {
-                "id": "sales_summary",
-                "name": "Sales Summary Report",
-                "description": "Comprehensive sales analytics and trends",
-                "category": "sales",
-                "parameters": ["date_range", "include_forecasts"],
-                "format": ["pdf", "excel", "csv"]
+                "id": "user_activity",
+                "name": "User Activity Report",
+                "description": "Report on user registrations and activity",
+                "parameters": ["date_range", "user_role"],
             },
             {
-                "id": "customer_analytics",
-                "name": "Customer Analytics Report",
-                "description": "Customer behavior and segmentation analysis",
-                "category": "customers",
-                "parameters": ["customer_segment", "date_range"],
-                "format": ["pdf", "excel"]
+                "id": "order_summary",
+                "name": "Order Summary Report",
+                "description": "Summary of orders by status and time period",
+                "parameters": ["date_range", "status"],
             },
             {
-                "id": "order_analysis",
-                "name": "Order Analysis Report",
-                "description": "Order patterns and fulfillment metrics",
-                "category": "orders",
-                "parameters": ["order_status", "date_range", "include_trends"],
-                "format": ["pdf", "excel", "csv"]
+                "id": "revenue_report",
+                "name": "Revenue Report",
+                "description": "Financial summary and revenue analysis",
+                "parameters": ["date_range", "payment_method"],
             },
-            {
-                "id": "financial_summary",
-                "name": "Financial Summary Report",
-                "description": "Revenue, costs, and profitability analysis",
-                "category": "financial",
-                "parameters": ["date_range", "include_projections"],
-                "format": ["pdf", "excel"]
-            },
-            {
-                "id": "operational_metrics",
-                "name": "Operational Metrics Report",
-                "description": "System performance and operational KPIs",
-                "category": "operations",
-                "parameters": ["metrics_type", "date_range"],
-                "format": ["pdf", "excel", "csv"]
-            }
         ]
-        
-        return Response({
-            "templates": templates,
-            "total": len(templates)
-        })
-        
+        return Response(templates)
     except Exception as e:
-        return Response({
-            "error": f"Failed to fetch report templates: {str(e)}"
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"error": f"Failed to get report templates: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAdminUser])
 def generate_report(request):
-    """Generate a report from template"""
+    """Generate a report based on template and parameters"""
     try:
-        template_id = request.data.get('template_id')
-        parameters = request.data.get('parameters', {})
-        format_type = request.data.get('format', 'pdf')
-        
-        if not template_id:
-            return Response({
-                "error": "Template ID is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Validate template exists
-        valid_templates = ["sales_summary", "customer_analytics", "order_analysis", "financial_summary", "operational_metrics"]
-        if template_id not in valid_templates:
-            return Response({
-                "error": f"Invalid template ID: {template_id}"
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # For now, return a mock response indicating report generation started
-        # In a real implementation, this would queue a background task
-        return Response({
-            "message": f"Report generation started for template: {template_id}",
-            "report_id": f"report_{template_id}_{int(timezone.now().timestamp())}",
-            "status": "processing",
-            "estimated_completion": "2-5 minutes",
-            "download_url": None  # Will be available when processing completes
-        })
-        
+        template_id = request.data.get("template_id")
+        parameters = request.data.get("parameters", {})
+
+        # Placeholder implementation
+        report_data = {
+            "template_id": template_id,
+            "parameters": parameters,
+            "generated_at": timezone.now().isoformat(),
+            "status": "completed",
+            "data": {"summary": "Report generated successfully", "total_records": 0},
+        }
+
+        return Response(report_data)
     except Exception as e:
-        return Response({
-            "error": f"Failed to generate report: {str(e)}"
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"error": f"Failed to generate report: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

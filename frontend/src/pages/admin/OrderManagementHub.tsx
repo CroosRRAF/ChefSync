@@ -1,19 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 
 // Import shared components
-import { 
-  AnimatedStats,
-  GlassCard,
-  GradientButton,
-  DataTable 
-} from "@/components/admin/shared";
+import { AnimatedStats, DataTable, GlassCard } from "@/components/admin/shared";
 import type { Column } from "@/components/admin/shared/tables/DataTable";
-import { StatsWidget } from "@/components/admin/shared/widgets/index";
 
 // Import UI components
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -44,50 +37,45 @@ import { useToast } from "@/hooks/use-toast";
 
 // Import icons
 import {
-  AlertCircle,
   AlertTriangle,
-  Calendar,
   CheckCircle,
   ChefHat,
   Clock,
-  CreditCard,
   DollarSign,
   Download,
   Eye,
-  Filter,
-  MapPin,
   MoreHorizontal,
-  Navigation,
   Package,
   RefreshCw,
   Search,
   ShoppingCart,
-  TrendingDown,
   TrendingUp,
   Truck,
-  User,
   XCircle,
 } from "lucide-react";
 
 // Import services
-import { adminService, type OrderListResponse, type AdminOrder } from "@/services/adminService";
+import {
+  adminService,
+  type AdminOrder,
+  type OrderListResponse,
+} from "@/services/adminService";
 import * as deliveryService from "@/services/deliveryService";
 import {
   paymentService,
-  type Payment,
+  type PaymentStats,
   type Refund,
   type Transaction,
-  type PaymentStats,
 } from "@/services/paymentService";
 
 /**
  * Unified Order Management Hub - Consolidates 3 order-related pages
- * 
+ *
  * Merged from:
  * - OrderManagement.tsx (order lifecycle, status management, assignment)
  * - DeliveryDashboard.tsx (delivery tracking, partner management, issues)
  * - PaymentManagement.tsx (transaction history, refunds, payment stats)
- * 
+ *
  * Features:
  * - Tabbed interface for organized access
  * - Complete order lifecycle management
@@ -154,12 +142,12 @@ interface DeliveryStats {
 
 const OrderManagementHub: React.FC = () => {
   const { toast } = useToast();
-  
+
   // Active tab state
   const [activeTab, setActiveTab] = useState<
     "orders" | "delivery" | "payments"
   >("orders");
-  
+
   // Orders Tab States
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [orderStats, setOrderStats] = useState<OrderStats | null>(null);
@@ -168,25 +156,31 @@ const OrderManagementHub: React.FC = () => {
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
-  
+
   // Delivery Tab States
-  const [activeDeliveries, setActiveDeliveries] = useState<ActiveDelivery[]>([]);
-  const [deliveryStats, setDeliveryStats] = useState<DeliveryStats | null>(null);
+  const [activeDeliveries, setActiveDeliveries] = useState<ActiveDelivery[]>(
+    []
+  );
+  const [deliveryStats, setDeliveryStats] = useState<DeliveryStats | null>(
+    null
+  );
   const [deliveryLoading, setDeliveryLoading] = useState(false);
-  const [selectedDelivery, setSelectedDelivery] = useState<ActiveDelivery | null>(null);
+  const [selectedDelivery, setSelectedDelivery] =
+    useState<ActiveDelivery | null>(null);
   const [showDeliveryDetails, setShowDeliveryDetails] = useState(false);
-  
+
   // Payments Tab States
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refunds, setRefunds] = useState<Refund[]>([]);
   const [paymentStats, setPaymentStats] = useState<PaymentStats | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<Transaction | null>(null);
   const [showTransactionDetails, setShowTransactionDetails] = useState(false);
   const [selectedRefund, setSelectedRefund] = useState<Refund | null>(null);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   const [refundNote, setRefundNote] = useState("");
-  
+
   // Filters
   const [orderFilters, setOrderFilters] = useState({
     status: "all",
@@ -195,7 +189,7 @@ const OrderManagementHub: React.FC = () => {
     page: 1,
     limit: 25,
   });
-  
+
   const [transactionFilters, setTransactionFilters] = useState({
     search: "",
     status: "all",
@@ -207,33 +201,37 @@ const OrderManagementHub: React.FC = () => {
   const loadOrderStats = useCallback(async () => {
     try {
       // Fetch real order stats from API
-      const response = await fetch('/api/admin-management/orders/stats/', {
+      const response = await fetch("/api/admin-management/orders/stats/", {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          "Content-Type": "application/json",
         },
       });
 
       if (response.ok) {
         const statsData = await response.json();
-        setOrderStats(statsData);
+        // Ensure we have a valid stats object
+        if (statsData && typeof statsData === "object") {
+          setOrderStats(statsData);
+        } else {
+          console.warn("Invalid stats data received:", statsData);
+          throw new Error("Invalid API response format");
+        }
       } else {
-        // Fallback stats if API fails
-        const fallbackStats: OrderStats = {
-          total: 0,
-          pending: 0,
-          preparing: 0,
-          outForDelivery: 0,
-          delivered: 0,
-          cancelled: 0,
-          totalRevenue: 0,
-          averageOrderValue: 0,
-        };
-        setOrderStats(fallbackStats);
+        console.error(
+          "Order stats API failed:",
+          response.status,
+          response.statusText
+        );
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        throw new Error(
+          `API returned ${response.status}: ${response.statusText}`
+        );
       }
     } catch (error) {
       console.error("Error loading order stats:", error);
-      
+
       // Set fallback data on error
       const fallbackStats: OrderStats = {
         total: 0,
@@ -254,19 +252,23 @@ const OrderManagementHub: React.FC = () => {
     try {
       setOrderLoading(true);
       setOrderError(null);
-      
+
       const response: OrderListResponse = await adminService.getOrders({
         search: orderFilters.search,
         status: orderFilters.status === "all" ? undefined : orderFilters.status,
         page: orderFilters.page,
         limit: orderFilters.limit,
       });
-      
-      const ordersData = response.orders || [];
+
+      // Safely handle the response and ensure we have an array
+      const ordersData = Array.isArray(response?.orders) ? response.orders : [];
+      console.log("Orders loaded:", ordersData.length, "orders");
       setOrders(ordersData);
     } catch (error) {
       console.error("Error loading orders:", error);
       setOrderError("Failed to load orders");
+      // Set empty array on error to prevent undefined access
+      setOrders([]);
     } finally {
       setOrderLoading(false);
     }
@@ -276,12 +278,12 @@ const OrderManagementHub: React.FC = () => {
   const loadDeliveryData = useCallback(async () => {
     try {
       setDeliveryLoading(true);
-      
+
       const [deliveries, stats] = await Promise.all([
         deliveryService.getActiveDeliveries(),
         deliveryService.getDeliveryStats(),
       ]);
-      
+
       setActiveDeliveries(deliveries);
       setDeliveryStats(stats);
     } catch (error) {
@@ -295,27 +297,31 @@ const OrderManagementHub: React.FC = () => {
   const loadPaymentData = useCallback(async () => {
     try {
       setPaymentLoading(true);
-      
+
       // Fetch real payment data from API
       const [transactionsResponse, refundsResponse] = await Promise.all([
-        fetch('/api/payments/transactions/', {
+        fetch("/api/payments/transactions/", {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
           },
         }),
-        fetch('/api/payments/refunds/', {
+        fetch("/api/payments/refunds/", {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
           },
-        })
+        }),
       ]);
 
-      const transactionsData = transactionsResponse.ok ? await transactionsResponse.json() : { transactions: [] };
-      const refundsData = refundsResponse.ok ? await refundsResponse.json() : { refunds: [] };
+      const transactionsData = transactionsResponse.ok
+        ? await transactionsResponse.json()
+        : { transactions: [] };
+      const refundsData = refundsResponse.ok
+        ? await refundsResponse.json()
+        : { refunds: [] };
       const stats = await paymentService.getPaymentStats();
-      
+
       setTransactions(transactionsData.transactions);
       setRefunds(refundsData.refunds);
       setPaymentStats(stats);
@@ -330,14 +336,17 @@ const OrderManagementHub: React.FC = () => {
   const updateOrderStatus = async (orderId: number, newStatus: string) => {
     try {
       // Update order status via API
-      const response = await fetch(`/api/admin-management/orders/${orderId}/status/`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      const response = await fetch(
+        `/api/admin-management/orders/${orderId}/status/`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
 
       if (response.ok) {
         await loadOrders(); // Refresh orders
@@ -346,7 +355,7 @@ const OrderManagementHub: React.FC = () => {
           description: "Order status updated successfully",
         });
       } else {
-        throw new Error('Failed to update order status');
+        throw new Error("Failed to update order status");
       }
     } catch (error) {
       console.error("Error updating order status:", error);
@@ -359,7 +368,11 @@ const OrderManagementHub: React.FC = () => {
   };
 
   // Process refund
-  const processRefund = async (transactionId: number, amount: number, reason: string) => {
+  const processRefund = async (
+    transactionId: number,
+    amount: number,
+    reason: string
+  ) => {
     try {
       await paymentService.processRefund(transactionId, "approve", reason);
       await loadPaymentData(); // Refresh payment data
@@ -389,29 +402,47 @@ const OrderManagementHub: React.FC = () => {
     } else if (activeTab === "payments") {
       loadPaymentData();
     }
-  }, [activeTab, loadOrders, loadOrderStats, loadDeliveryData, loadPaymentData]);
+  }, [
+    activeTab,
+    loadOrders,
+    loadOrderStats,
+    loadDeliveryData,
+    loadPaymentData,
+  ]);
 
   // Get status color
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case "pending": return "orange";
-      case "confirmed": return "blue";
-      case "preparing": return "purple";
-      case "out_for_delivery": return "cyan";
-      case "delivered": return "green";
-      case "cancelled": return "red";
-      default: return "gray";
+      case "pending":
+        return "orange";
+      case "confirmed":
+        return "blue";
+      case "preparing":
+        return "purple";
+      case "out_for_delivery":
+        return "cyan";
+      case "delivered":
+        return "green";
+      case "cancelled":
+        return "red";
+      default:
+        return "gray";
     }
   };
 
   // Get payment status color
   const getPaymentStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case "completed": return "green";
-      case "pending": return "orange";
-      case "failed": return "red";
-      case "refunded": return "purple";
-      default: return "gray";
+      case "completed":
+        return "green";
+      case "pending":
+        return "orange";
+      case "failed":
+        return "red";
+      case "refunded":
+        return "purple";
+      default:
+        return "gray";
     }
   };
 
@@ -420,60 +451,74 @@ const OrderManagementHub: React.FC = () => {
     {
       key: "order_number",
       title: "Order #",
-      render: (order: AdminOrder) => (
-        <div className="font-medium">#{order.order_number}</div>
+      render: (value: any, order: AdminOrder) => (
+        <div className="font-medium">#{order?.order_number || "N/A"}</div>
       ),
     },
     {
       key: "customer",
       title: "Customer",
-      render: (order: AdminOrder) => (
+      render: (value: any, order: AdminOrder) => (
         <div>
-          <div className="font-medium">{order.customer_name}</div>
-          <div className="text-sm text-gray-500">{order.customer_email}</div>
+          <div className="font-medium">
+            {order?.customer_name || "Unknown Customer"}
+          </div>
+          <div className="text-sm text-gray-500">
+            {order?.customer_email || "No email"}
+          </div>
         </div>
       ),
     },
     {
       key: "items",
       title: "Items",
-      render: (order: AdminOrder) => (
-        <div className="text-sm">
-          {order.items_count} items
-        </div>
+      render: (value: any, order: AdminOrder) => (
+        <div className="text-sm">{order?.items_count || 0} items</div>
       ),
     },
     {
       key: "total",
       title: "Total",
-      render: (order: AdminOrder) => (
+      render: (value: any, order: AdminOrder) => (
         <div className="font-medium">
-          LKR {typeof order.total_amount === 'string' ? parseFloat(order.total_amount).toFixed(2) : order.total_amount.toFixed(2)}
+          LKR{" "}
+          {order?.total_amount
+            ? typeof order.total_amount === "string"
+              ? parseFloat(order.total_amount).toFixed(2)
+              : order.total_amount.toFixed(2)
+            : "0.00"}
         </div>
       ),
     },
     {
       key: "status",
       title: "Status",
-      render: (order: AdminOrder) => (
-        <Badge variant="outline" className={`border-${getStatusColor(order.status)}-500 text-${getStatusColor(order.status)}-700`}>
-          {order.status.replace("_", " ")}
+      render: (value: any, order: AdminOrder) => (
+        <Badge
+          variant="outline"
+          className={`border-${getStatusColor(
+            order?.status || "unknown"
+          )}-500 text-${getStatusColor(order?.status || "unknown")}-700`}
+        >
+          {order?.status ? order.status.replace("_", " ") : "Unknown"}
         </Badge>
       ),
     },
     {
       key: "created_at",
       title: "Date",
-      render: (order: AdminOrder) => (
+      render: (value: any, order: AdminOrder) => (
         <div className="text-sm">
-          {new Date(order.created_at).toLocaleDateString()}
+          {order?.created_at
+            ? new Date(order.created_at).toLocaleDateString()
+            : "Unknown"}
         </div>
       ),
     },
     {
       key: "actions",
       title: "Actions",
-      render: (order: AdminOrder) => (
+      render: (value: any, order: AdminOrder) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -481,32 +526,42 @@ const OrderManagementHub: React.FC = () => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => {
-              setSelectedOrder(order);
-              setShowOrderDetails(true);
-            }}>
+            <DropdownMenuItem
+              onClick={() => {
+                setSelectedOrder(order);
+                setShowOrderDetails(true);
+              }}
+            >
               <Eye className="h-4 w-4 mr-2" />
               View Details
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => updateOrderStatus(order.id, "confirmed")}>
+            <DropdownMenuItem
+              onClick={() => updateOrderStatus(order.id, "confirmed")}
+            >
               <CheckCircle className="h-4 w-4 mr-2" />
               Confirm Order
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => updateOrderStatus(order.id, "preparing")}>
+            <DropdownMenuItem
+              onClick={() => updateOrderStatus(order.id, "preparing")}
+            >
               <ChefHat className="h-4 w-4 mr-2" />
               Start Preparing
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => updateOrderStatus(order.id, "out_for_delivery")}>
+            <DropdownMenuItem
+              onClick={() => updateOrderStatus(order.id, "out_for_delivery")}
+            >
               <Truck className="h-4 w-4 mr-2" />
               Out for Delivery
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => updateOrderStatus(order.id, "delivered")}>
+            <DropdownMenuItem
+              onClick={() => updateOrderStatus(order.id, "delivered")}
+            >
               <Package className="h-4 w-4 mr-2" />
               Mark Delivered
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => updateOrderStatus(order.id, "cancelled")}
               className="text-red-600"
             >
@@ -524,29 +579,37 @@ const OrderManagementHub: React.FC = () => {
     {
       key: "order_id",
       title: "Order ID",
-      render: (delivery: ActiveDelivery) => (
-        <div className="font-medium">#{delivery.order_id}</div>
+      render: (value: any, delivery: ActiveDelivery) => (
+        <div className="font-medium">#{delivery?.order_id || "N/A"}</div>
       ),
     },
     {
       key: "customer",
       title: "Customer",
-      render: (delivery: ActiveDelivery) => (
+      render: (value: any, delivery: ActiveDelivery) => (
         <div>
-          <div className="font-medium">{delivery.customer.name}</div>
-          <div className="text-sm text-gray-500">{delivery.customer.phone}</div>
+          <div className="font-medium">
+            {delivery?.customer?.name || "Unknown Customer"}
+          </div>
+          <div className="text-sm text-gray-500">
+            {delivery?.customer?.phone || "No phone"}
+          </div>
         </div>
       ),
     },
     {
       key: "delivery_partner",
       title: "Delivery Partner",
-      render: (delivery: ActiveDelivery) => (
+      render: (value: any, delivery: ActiveDelivery) => (
         <div>
-          {delivery.delivery_partner ? (
+          {delivery?.delivery_partner ? (
             <>
-              <div className="font-medium">{delivery.delivery_partner.name}</div>
-              <div className="text-sm text-gray-500">{delivery.delivery_partner.phone}</div>
+              <div className="font-medium">
+                {delivery.delivery_partner.name}
+              </div>
+              <div className="text-sm text-gray-500">
+                {delivery.delivery_partner.phone}
+              </div>
             </>
           ) : (
             <Badge variant="outline">Unassigned</Badge>
@@ -557,30 +620,38 @@ const OrderManagementHub: React.FC = () => {
     {
       key: "status",
       title: "Status",
-      render: (delivery: ActiveDelivery) => (
-        <Badge variant="outline" className={`border-${getStatusColor(delivery.status)}-500 text-${getStatusColor(delivery.status)}-700`}>
-          {delivery.status.replace("_", " ")}
+      render: (value: any, delivery: ActiveDelivery) => (
+        <Badge
+          variant="outline"
+          className={`border-${getStatusColor(
+            delivery?.status || "unknown"
+          )}-500 text-${getStatusColor(delivery?.status || "unknown")}-700`}
+        >
+          {delivery?.status ? delivery.status.replace("_", " ") : "Unknown"}
         </Badge>
       ),
     },
     {
       key: "time_elapsed",
       title: "Time Elapsed",
-      render: (delivery: ActiveDelivery) => (
-        <div className="text-sm">{delivery.time_elapsed}</div>
+      render: (value: any, delivery: ActiveDelivery) => (
+        <div className="text-sm">{delivery?.time_elapsed || "N/A"}</div>
       ),
     },
     {
       key: "total_amount",
       title: "Amount",
-      render: (delivery: ActiveDelivery) => (
-        <div className="font-medium">LKR {delivery.total_amount.toFixed(2)}</div>
+      render: (value: any, delivery: ActiveDelivery) => (
+        <div className="font-medium">
+          LKR{" "}
+          {delivery?.total_amount ? delivery.total_amount.toFixed(2) : "0.00"}
+        </div>
       ),
     },
     {
       key: "actions",
       title: "Actions",
-      render: (delivery: ActiveDelivery) => (
+      render: (value: any, delivery: ActiveDelivery) => (
         <Button
           variant="outline"
           size="sm"
@@ -601,60 +672,76 @@ const OrderManagementHub: React.FC = () => {
     {
       key: "transaction_id",
       title: "Transaction ID",
-      render: (transaction: Transaction) => (
+      render: (value: any, transaction: Transaction) => (
         <div className="font-medium font-mono text-sm">
-          {transaction.id}
+          {transaction?.id || "N/A"}
         </div>
       ),
     },
     {
       key: "customer",
       title: "Customer",
-      render: (transaction: Transaction) => (
+      render: (value: any, transaction: Transaction) => (
         <div>
-          <div className="font-medium">Customer #{transaction.order_id}</div>
-          <div className="text-sm text-gray-500">Payment #{transaction.payment_id}</div>
+          <div className="font-medium">
+            Customer #{transaction?.order_id || "N/A"}
+          </div>
+          <div className="text-sm text-gray-500">
+            Payment #{transaction?.payment_id || "N/A"}
+          </div>
         </div>
       ),
     },
     {
       key: "amount",
       title: "Amount",
-      render: (transaction: Transaction) => (
-        <div className="font-medium">LKR {parseFloat(transaction.amount).toFixed(2)}</div>
+      render: (value: any, transaction: Transaction) => (
+        <div className="font-medium">
+          LKR{" "}
+          {transaction?.amount
+            ? parseFloat(transaction.amount).toFixed(2)
+            : "0.00"}
+        </div>
       ),
     },
     {
       key: "payment_method",
       title: "Method",
-      render: (transaction: Transaction) => (
-        <Badge variant="outline">
-          {transaction.type}
-        </Badge>
+      render: (value: any, transaction: Transaction) => (
+        <Badge variant="outline">{transaction?.type || "Unknown"}</Badge>
       ),
     },
     {
       key: "status",
       title: "Status",
-      render: (transaction: Transaction) => (
-        <Badge variant="outline" className={`border-${getPaymentStatusColor(transaction.status)}-500 text-${getPaymentStatusColor(transaction.status)}-700`}>
-          {transaction.status}
+      render: (value: any, transaction: Transaction) => (
+        <Badge
+          variant="outline"
+          className={`border-${getPaymentStatusColor(
+            transaction?.status || "unknown"
+          )}-500 text-${getPaymentStatusColor(
+            transaction?.status || "unknown"
+          )}-700`}
+        >
+          {transaction?.status || "Unknown"}
         </Badge>
       ),
     },
     {
       key: "created_at",
       title: "Date",
-      render: (transaction: Transaction) => (
+      render: (value: any, transaction: Transaction) => (
         <div className="text-sm">
-          {new Date(transaction.transaction_date).toLocaleDateString()}
+          {transaction?.transaction_date
+            ? new Date(transaction.transaction_date).toLocaleDateString()
+            : "Unknown"}
         </div>
       ),
     },
     {
       key: "actions",
       title: "Actions",
-      render: (transaction: Transaction) => (
+      render: (value: any, transaction: Transaction) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -662,18 +749,22 @@ const OrderManagementHub: React.FC = () => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => {
-              setSelectedTransaction(transaction);
-              setShowTransactionDetails(true);
-            }}>
+            <DropdownMenuItem
+              onClick={() => {
+                setSelectedTransaction(transaction);
+                setShowTransactionDetails(true);
+              }}
+            >
               <Eye className="h-4 w-4 mr-2" />
               View Details
             </DropdownMenuItem>
-            {transaction.status === "completed" && (
-              <DropdownMenuItem onClick={() => {
-                setSelectedTransaction(transaction);
-                setShowRefundDialog(true);
-              }}>
+            {transaction?.status === "completed" && (
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedTransaction(transaction);
+                  setShowRefundDialog(true);
+                }}
+              >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Process Refund
               </DropdownMenuItem>
@@ -732,14 +823,21 @@ const OrderManagementHub: React.FC = () => {
               <Input
                 placeholder="Search orders by customer or order number..."
                 value={orderFilters.search}
-                onChange={(e) => setOrderFilters(prev => ({ ...prev, search: e.target.value }))}
+                onChange={(e) =>
+                  setOrderFilters((prev) => ({
+                    ...prev,
+                    search: e.target.value,
+                  }))
+                }
                 className="pl-10"
               />
             </div>
           </div>
-          <Select 
-            value={orderFilters.status} 
-            onValueChange={(value) => setOrderFilters(prev => ({ ...prev, status: value }))}
+          <Select
+            value={orderFilters.status}
+            onValueChange={(value) =>
+              setOrderFilters((prev) => ({ ...prev, status: value }))
+            }
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by status" />
@@ -770,7 +868,7 @@ const OrderManagementHub: React.FC = () => {
             Export
           </Button>
         </div>
-        
+
         {orderError && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
             <div className="flex">
@@ -856,21 +954,21 @@ const OrderManagementHub: React.FC = () => {
       {/* Payment Statistics */}
       {paymentStats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <AnimatedStats
-              value={parseFloat(paymentStats.total_revenue)}
-              label="Total Revenue"
-              icon={DollarSign}
-              trend={12.5}
-              gradient="green"
-              prefix="LKR "
-            />
-            <AnimatedStats
-              value={paymentStats.total_transactions}
-              label="Total Transactions"
-              icon={CheckCircle}
-              trend={8.3}
-              gradient="blue"
-            />
+          <AnimatedStats
+            value={parseFloat(paymentStats.total_revenue)}
+            label="Total Revenue"
+            icon={DollarSign}
+            trend={12.5}
+            gradient="green"
+            prefix="LKR "
+          />
+          <AnimatedStats
+            value={paymentStats.total_transactions}
+            label="Total Transactions"
+            icon={CheckCircle}
+            trend={8.3}
+            gradient="blue"
+          />
           <AnimatedStats
             value={paymentStats.pending_refunds}
             label="Pending Refunds"
@@ -898,14 +996,21 @@ const OrderManagementHub: React.FC = () => {
               <Input
                 placeholder="Search transactions..."
                 value={transactionFilters.search}
-                onChange={(e) => setTransactionFilters(prev => ({ ...prev, search: e.target.value }))}
+                onChange={(e) =>
+                  setTransactionFilters((prev) => ({
+                    ...prev,
+                    search: e.target.value,
+                  }))
+                }
                 className="pl-10"
               />
             </div>
           </div>
-          <Select 
-            value={transactionFilters.status} 
-            onValueChange={(value) => setTransactionFilters(prev => ({ ...prev, status: value }))}
+          <Select
+            value={transactionFilters.status}
+            onValueChange={(value) =>
+              setTransactionFilters((prev) => ({ ...prev, status: value }))
+            }
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by status" />
@@ -956,17 +1061,19 @@ const OrderManagementHub: React.FC = () => {
             Complete order lifecycle, delivery tracking, and payment management
           </p>
         </div>
-        
+
         <div className="flex items-center space-x-4">
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Export All
           </Button>
-          <Button onClick={() => {
-            if (activeTab === "orders") loadOrders();
-            else if (activeTab === "delivery") loadDeliveryData();
-            else if (activeTab === "payments") loadPaymentData();
-          }}>
+          <Button
+            onClick={() => {
+              if (activeTab === "orders") loadOrders();
+              else if (activeTab === "delivery") loadDeliveryData();
+              else if (activeTab === "payments") loadPaymentData();
+            }}
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -974,21 +1081,24 @@ const OrderManagementHub: React.FC = () => {
       </div>
 
       {/* Tabbed Interface */}
-      <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value: any) => setActiveTab(value)}
+      >
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="delivery">Delivery</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="orders" className="mt-6">
           {renderOrdersTab()}
         </TabsContent>
-        
+
         <TabsContent value="delivery" className="mt-6">
           {renderDeliveryTab()}
         </TabsContent>
-        
+
         <TabsContent value="payments" className="mt-6">
           {renderPaymentsTab()}
         </TabsContent>
@@ -1009,17 +1119,29 @@ const OrderManagementHub: React.FC = () => {
                 <div>
                   <Label>Customer</Label>
                   <p className="font-medium">{selectedOrder.customer_name}</p>
-                  <p className="text-sm text-gray-500">{selectedOrder.customer_email}</p>
+                  <p className="text-sm text-gray-500">
+                    {selectedOrder.customer_email}
+                  </p>
                 </div>
                 <div>
                   <Label>Status</Label>
-                  <Badge variant="outline" className={`border-${getStatusColor(selectedOrder.status)}-500 text-${getStatusColor(selectedOrder.status)}-700`}>
+                  <Badge
+                    variant="outline"
+                    className={`border-${getStatusColor(
+                      selectedOrder.status
+                    )}-500 text-${getStatusColor(selectedOrder.status)}-700`}
+                  >
                     {selectedOrder.status.replace("_", " ")}
                   </Badge>
                 </div>
                 <div>
                   <Label>Total Amount</Label>
-                  <p className="font-medium">LKR {typeof selectedOrder.total_amount === 'string' ? parseFloat(selectedOrder.total_amount).toFixed(2) : selectedOrder.total_amount.toFixed(2)}</p>
+                  <p className="font-medium">
+                    LKR{" "}
+                    {typeof selectedOrder.total_amount === "string"
+                      ? parseFloat(selectedOrder.total_amount).toFixed(2)
+                      : selectedOrder.total_amount.toFixed(2)}
+                  </p>
                 </div>
                 <div>
                   <Label>Order Date</Label>
@@ -1037,7 +1159,8 @@ const OrderManagementHub: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Process Refund</DialogTitle>
             <DialogDescription>
-              {selectedTransaction && `Transaction ID: ${selectedTransaction.id}`}
+              {selectedTransaction &&
+                `Transaction ID: ${selectedTransaction.id}`}
             </DialogDescription>
           </DialogHeader>
           {selectedTransaction && (
@@ -1062,14 +1185,23 @@ const OrderManagementHub: React.FC = () => {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRefundDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowRefundDialog(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={() => {
-              if (selectedTransaction) {
-                processRefund(selectedTransaction.id, parseFloat(selectedTransaction.amount), refundNote);
-              }
-            }}>
+            <Button
+              onClick={() => {
+                if (selectedTransaction) {
+                  processRefund(
+                    selectedTransaction.id,
+                    parseFloat(selectedTransaction.amount),
+                    refundNote
+                  );
+                }
+              }}
+            >
               Process Refund
             </Button>
           </DialogFooter>

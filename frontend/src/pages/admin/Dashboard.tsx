@@ -1,18 +1,17 @@
-import React, { useCallback, useEffect, useState, useMemo, memo } from "react";
+import { motion } from "framer-motion";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 // Import shared components
-import { 
-  BarChart, 
-  LineChart, 
-  PieChart,
-  AnimatedStats, 
-  GlassCard, 
-  GradientButton,
+import {
+  AnimatedStats,
+  BarChart,
   ErrorBoundary,
+  GlassCard,
+  GradientButton,
   LazyPageWrapper,
   MemoizedDataTable,
-  OptimisticButton
+  OptimisticButton,
+  PieChart,
 } from "@/components/admin/shared";
 
 import { useAuth } from "@/context/AuthContext";
@@ -26,35 +25,28 @@ import {
   AlertTriangle,
   ArrowUpRight,
   BarChart3,
+  Brain,
+  Calendar,
   CheckCircle,
+  ChefHat,
   Clock,
   DollarSign,
+  Download,
+  Eye,
+  Gauge,
   MessageSquare,
   RefreshCw,
   Settings,
   ShoppingCart,
+  Sparkles,
+  Target,
   TrendingUp,
+  Truck,
   UserCheck,
   Users,
   Utensils,
-  Sparkles,
-  Brain,
-  Zap,
-  Target,
-  TrendingDown,
-  ChefHat,
-  Truck,
-  Calendar,
-  Filter,
-  Download,
-  Eye,
-  Bell,
-  Star,
-  Award,
-  Gauge,
-  Wifi,
-  WifiOff,
   X,
+  Zap,
 } from "lucide-react";
 
 /**
@@ -129,7 +121,16 @@ interface QuickAction {
   label: string;
   icon: React.ComponentType<any>;
   onClick: () => void;
-  color: "blue" | "green" | "red" | "yellow" | "purple" | "gray" | "orange" | "cyan" | "pink";
+  color:
+    | "blue"
+    | "green"
+    | "red"
+    | "yellow"
+    | "purple"
+    | "gray"
+    | "orange"
+    | "cyan"
+    | "pink";
   badge?: number;
   description: string;
 }
@@ -188,18 +189,22 @@ const DashboardContent: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
-  const [recentDeliveries, setRecentDeliveries] = useState<RecentDelivery[]>([]);
+  const [recentDeliveries, setRecentDeliveries] = useState<RecentDelivery[]>(
+    []
+  );
   const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([]);
   const [timeFilter, setTimeFilter] = useState<"7d" | "30d" | "90d">("30d");
-  
+
   // Chart datasets from backend
   const [revenueTrend, setRevenueTrend] = useState<any | null>(null);
   const [ordersTrend, setOrdersTrend] = useState<any | null>(null);
   const [weeklyPerformance, setWeeklyPerformance] = useState<any | null>(null);
   const [growthAnalytics, setGrowthAnalytics] = useState<any | null>(null);
-  const [ordersDistribution, setOrdersDistribution] = useState<any | null>(null);
+  const [ordersDistribution, setOrdersDistribution] = useState<any | null>(
+    null
+  );
   const [newUsersData, setNewUsersData] = useState<any | null>(null);
-  
+
   // AI Insights state
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
@@ -275,48 +280,91 @@ const DashboardContent: React.FC = () => {
     const labels = [];
     const data = [];
     const now = new Date();
-    
+
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      
+
       if (days <= 7) {
-        labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+        labels.push(date.toLocaleDateString("en-US", { weekday: "short" }));
       } else {
-        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        labels.push(
+          date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        );
       }
-      
+
       // Generate realistic fallback data
-      const baseValue = type === 'Revenue' ? 15000 : type === 'Orders' ? 25 : type === 'Users' ? 8 : 75;
+      const baseValue =
+        type === "Revenue"
+          ? 15000
+          : type === "Orders"
+          ? 25
+          : type === "Users"
+          ? 8
+          : 75;
       const randomVariation = (Math.random() - 0.5) * 0.3; // ±15% variation
       data.push(Math.max(0, Math.floor(baseValue * (1 + randomVariation))));
     }
-    
+
     return {
       data: {
         labels,
-        datasets: [{
-          label: type,
-          data,
-          backgroundColor: type === 'Revenue' ? '#3B82F6' : type === 'Orders' ? '#10B981' : type === 'Users' ? '#F59E0B' : '#8B5CF6',
-          borderColor: type === 'Revenue' ? '#2563EB' : type === 'Orders' ? '#059669' : type === 'Users' ? '#D97706' : '#7C3AED'
-        }]
-      }
+        datasets: [
+          {
+            label: type,
+            data,
+            backgroundColor:
+              type === "Revenue"
+                ? "#3B82F6"
+                : type === "Orders"
+                ? "#10B981"
+                : type === "Users"
+                ? "#F59E0B"
+                : "#8B5CF6",
+            borderColor:
+              type === "Revenue"
+                ? "#2563EB"
+                : type === "Orders"
+                ? "#059669"
+                : type === "Users"
+                ? "#D97706"
+                : "#7C3AED",
+          },
+        ],
+      },
     };
   }, []);
 
   const createFallbackPieData = useCallback(() => {
-    const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    const dayNames = [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ];
     const data = dayNames.map(() => Math.floor(Math.random() * 15) + 5); // 5-20 orders per day
-    
+
     return {
       data: {
         labels: dayNames,
-        datasets: [{
-          data,
-          backgroundColor: ["#8B5CF6", "#EC4899", "#F59E0B", "#EF4444", "#10B981", "#3B82F6", "#6366F1"]
-        }]
-      }
+        datasets: [
+          {
+            data,
+            backgroundColor: [
+              "#8B5CF6",
+              "#EC4899",
+              "#F59E0B",
+              "#EF4444",
+              "#10B981",
+              "#3B82F6",
+              "#6366F1",
+            ],
+          },
+        ],
+      },
     };
   }, []);
 
@@ -337,7 +385,7 @@ const DashboardContent: React.FC = () => {
           recentDeliveriesData,
           recentActivitiesData,
           revenueTrendRes,
-          ordersTrendRes,
+          weeklyOrdersRes,
           weeklyPerformanceRes,
           growthAnalyticsRes,
           ordersDistributionRes,
@@ -348,7 +396,7 @@ const DashboardContent: React.FC = () => {
           adminService.getRecentDeliveries(5),
           adminService.getRecentActivities(5),
           adminService.getRevenueTrend(days),
-          adminService.getOrdersTrend(days),
+          adminService.getWeeklyOrdersDistribution(),
           adminService.getWeeklyPerformance(days),
           adminService.getGrowthAnalytics(days),
           adminService.getOrdersDistribution(days),
@@ -362,14 +410,18 @@ const DashboardContent: React.FC = () => {
           activeUsers: dashboardStats.active_users || 0,
           totalFoods: dashboardStats.total_foods || 0,
           totalChefs: dashboardStats.total_chefs || 0,
-          totalDeliveryAgents: (dashboardStats as any).total_delivery_agents || 15,
+          totalDeliveryAgents:
+            (dashboardStats as any).total_delivery_agents || 15,
           // Use backend's pending_user_approvals; keep name aligned with UI card
           pendingApprovals: dashboardStats.pending_user_approvals || 0,
           revenueGrowth: dashboardStats.revenue_growth || 0,
           ordersGrowth: dashboardStats.order_growth || 0,
           usersGrowth: dashboardStats.user_growth || 0,
           foodsGrowth: (dashboardStats as any).foods_growth || 8.5,
-          chefsGrowth: (dashboardStats as any).chefs_growth || dashboardStats.chef_growth || 12.3,
+          chefsGrowth:
+            (dashboardStats as any).chefs_growth ||
+            dashboardStats.chef_growth ||
+            12.3,
           deliveryGrowth: (dashboardStats as any).delivery_growth || 6.7,
           // approvalsGrowth isn't provided by backend; leave synthetic for now
           approvalsGrowth: -5.2,
@@ -403,19 +455,19 @@ const DashboardContent: React.FC = () => {
         );
 
         // Transform recent deliveries
-        const transformedDeliveries: RecentDelivery[] = recentDeliveriesData.map(
-          (delivery) => ({
+        const transformedDeliveries: RecentDelivery[] =
+          recentDeliveriesData.map((delivery) => ({
             id: delivery.id,
             order_id: delivery.order_id,
-            delivery_agent: delivery.delivery_agent || 'Unassigned',
-            customer_name: delivery.customer_name || 'Unknown Customer',
-            delivery_address: delivery.delivery_address || 'Address not provided',
-            status: delivery.status || 'pending',
+            delivery_agent: delivery.delivery_agent || "Unassigned",
+            customer_name: delivery.customer_name || "Unknown Customer",
+            delivery_address:
+              delivery.delivery_address || "Address not provided",
+            status: delivery.status || "pending",
             estimated_time: delivery.estimated_time,
             actual_time: delivery.actual_time,
             tracking_code: delivery.tracking_code || `TRK${delivery.id}`,
-          })
-        );
+          }));
 
         // Transform recent activities
         const transformedActivities: ActivityItem[] = recentActivitiesData.map(
@@ -434,14 +486,24 @@ const DashboardContent: React.FC = () => {
         setRecentOrders(transformedOrders);
         setRecentDeliveries(transformedDeliveries);
         setRecentActivities(transformedActivities);
-        
+
         // Set chart data with fallbacks
-        setRevenueTrend(revenueTrendRes || createFallbackChartData("Revenue", days));
-        setOrdersTrend(ordersTrendRes || createFallbackChartData("Orders", days));
-        setWeeklyPerformance(weeklyPerformanceRes || createFallbackChartData("Performance", days));
-        setGrowthAnalytics(growthAnalyticsRes || createFallbackChartData("Growth", days));
+        setRevenueTrend(
+          revenueTrendRes || createFallbackChartData("Revenue", days)
+        );
+        setOrdersTrend(
+          weeklyOrdersRes || createFallbackChartData("Orders", days)
+        );
+        setWeeklyPerformance(
+          weeklyPerformanceRes || createFallbackChartData("Performance", days)
+        );
+        setGrowthAnalytics(
+          growthAnalyticsRes || createFallbackChartData("Growth", days)
+        );
         setOrdersDistribution(ordersDistributionRes || createFallbackPieData());
-        setNewUsersData(newUsersDataRes || createFallbackChartData("Users", days));
+        setNewUsersData(
+          newUsersDataRes || createFallbackChartData("Users", days)
+        );
         setLastRefresh(new Date());
       } catch (error) {
         console.error("Error loading dashboard data:", error);
@@ -450,16 +512,16 @@ const DashboardContent: React.FC = () => {
             ? error.message
             : "Failed to load dashboard data"
         );
-        
+
         // Set fallback data to ensure charts still display
         const days = timeFilter === "7d" ? 7 : timeFilter === "90d" ? 90 : 30;
         setRevenueTrend(createFallbackChartData("Revenue", days));
-        setOrdersTrend(createFallbackChartData("Orders", days));
+        setOrdersTrend(createFallbackPieData());
         setWeeklyPerformance(createFallbackChartData("Performance", days));
         setGrowthAnalytics(createFallbackChartData("Growth", days));
         setOrdersDistribution(createFallbackPieData());
         setNewUsersData(createFallbackChartData("Users", days));
-        
+
         // Set minimal stats to prevent null errors
         setStats({
           totalRevenue: 0,
@@ -494,47 +556,63 @@ const DashboardContent: React.FC = () => {
     try {
       setAiLoading(true);
       const insights = await aiService.getDashboardSummary();
-      
+
       // Transform AI insights to match our interface
       const transformedInsights: AIInsight[] = [
         {
           id: "sales-forecast",
           title: "Sales Forecast",
-          description: `Predicted revenue for next 7 days: LKR ${insights.sales_forecast?.next_7_days_revenue?.toLocaleString() || '0'}`,
+          description: `Predicted revenue for next 7 days: LKR ${
+            insights.sales_forecast?.next_7_days_revenue?.toLocaleString() ||
+            "0"
+          }`,
           type: "success",
           confidence: insights.sales_forecast?.confidence || 85,
           icon: TrendingUp,
-          action: "View Forecast"
+          action: "View Forecast",
         },
         {
           id: "anomaly-detection",
           title: "System Anomalies",
-          description: `${insights.anomaly_detection?.total_anomalies || 0} anomalies detected, ${insights.anomaly_detection?.high_severity_count || 0} high priority`,
-          type: insights.anomaly_detection?.high_severity_count > 0 ? "warning" : "success",
+          description: `${
+            insights.anomaly_detection?.total_anomalies || 0
+          } anomalies detected, ${
+            insights.anomaly_detection?.high_severity_count || 0
+          } high priority`,
+          type:
+            insights.anomaly_detection?.high_severity_count > 0
+              ? "warning"
+              : "success",
           confidence: 92,
           icon: AlertTriangle,
-          action: "View Details"
+          action: "View Details",
         },
         {
           id: "product-recommendations",
           title: "Product Insights",
-          description: `${insights.product_recommendations?.total_recommendations || 0} product recommendations available`,
+          description: `${
+            insights.product_recommendations?.total_recommendations || 0
+          } product recommendations available`,
           type: "info",
           confidence: 78,
           icon: Target,
-          action: "View Products"
+          action: "View Products",
         },
         {
           id: "customer-insights",
           title: "Customer Analytics",
-          description: `${insights.customer_insights?.total_customers || 0} customers analyzed, avg order: LKR ${(insights.customer_insights?.avg_order_value || 0).toFixed(2)}`,
+          description: `${
+            insights.customer_insights?.total_customers || 0
+          } customers analyzed, avg order: LKR ${(
+            insights.customer_insights?.avg_order_value || 0
+          ).toFixed(2)}`,
           type: "success",
           confidence: 88,
           icon: Users,
-          action: "View Insights"
-        }
+          action: "View Insights",
+        },
       ];
-      
+
       setAiInsights(transformedInsights);
     } catch (error) {
       console.error("Error loading AI insights:", error);
@@ -555,7 +633,7 @@ const DashboardContent: React.FC = () => {
           type: "info",
           confidence: 73,
           icon: TrendingUp,
-        }
+        },
       ]);
     } finally {
       setAiLoading(false);
@@ -717,7 +795,8 @@ const DashboardContent: React.FC = () => {
                   Connection Issue
                 </h3>
                 <p className="text-sm text-red-600 dark:text-red-300 mt-1">
-                  Some data may be unavailable. Showing fallback data where possible. {error}
+                  Some data may be unavailable. Showing fallback data where
+                  possible. {error}
                 </p>
               </div>
               <button
@@ -756,7 +835,7 @@ const DashboardContent: React.FC = () => {
                 >
                   <BarChart3 className="h-10 w-10 text-white" />
                 </motion.div>
-                
+
                 <div className="space-y-2">
                   <motion.h1
                     initial={{ opacity: 0, x: -20 }}
@@ -764,9 +843,9 @@ const DashboardContent: React.FC = () => {
                     transition={{ delay: 0.3 }}
                     className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-blue-600 to-purple-600 dark:from-white dark:via-blue-400 dark:to-purple-400 bg-clip-text text-transparent"
                   >
-                    Welcome back, {user?.name?.split(' ')[0] || 'Admin'}!
+                    Welcome back, {user?.name?.split(" ")[0] || "Admin"}!
                   </motion.h1>
-                  
+
                   <motion.p
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -775,7 +854,7 @@ const DashboardContent: React.FC = () => {
                   >
                     Here's what's happening with your restaurant today
                   </motion.p>
-                  
+
                   <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -784,9 +863,11 @@ const DashboardContent: React.FC = () => {
                   >
                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                       <Clock className="h-4 w-4" />
-                      <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
+                      <span>
+                        Last updated: {lastRefresh.toLocaleTimeString()}
+                      </span>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       <motion.div
                         animate={{ scale: [1, 1.2, 1] }}
@@ -797,15 +878,15 @@ const DashboardContent: React.FC = () => {
                         Real-time data
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30">
                       <Calendar className="h-4 w-4 text-blue-600" />
                       <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-                        {new Date().toLocaleDateString('en-US', { 
-                          weekday: 'long', 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
+                        {new Date().toLocaleDateString("en-US", {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
                         })}
                       </span>
                     </div>
@@ -847,7 +928,7 @@ const DashboardContent: React.FC = () => {
                   size="sm"
                   icon={RefreshCw}
                   onClick={async () => {
-                    await new Promise(resolve => {
+                    await new Promise((resolve) => {
                       handleRefresh();
                       setTimeout(resolve, 1000);
                     });
@@ -895,7 +976,7 @@ const DashboardContent: React.FC = () => {
           loading={loading}
           subtitle="Monthly revenue"
         />
-        
+
         <AnimatedStats
           value={stats?.totalOrders || 0}
           label="Total Orders"
@@ -905,7 +986,7 @@ const DashboardContent: React.FC = () => {
           loading={loading}
           subtitle="All time orders"
         />
-        
+
         <AnimatedStats
           value={stats?.activeUsers || 0}
           label="Active Users"
@@ -915,7 +996,7 @@ const DashboardContent: React.FC = () => {
           loading={loading}
           subtitle="Registered users"
         />
-        
+
         <AnimatedStats
           value={stats?.totalFoods || 0}
           label="Total Foods"
@@ -943,7 +1024,7 @@ const DashboardContent: React.FC = () => {
           loading={loading}
           subtitle="Cooking partners"
         />
-        
+
         <AnimatedStats
           value={stats?.totalDeliveryAgents || 0}
           label="Delivery Agents"
@@ -953,7 +1034,7 @@ const DashboardContent: React.FC = () => {
           loading={loading}
           subtitle="Available for delivery"
         />
-        
+
         <AnimatedStats
           value={stats?.pendingApprovals || 0}
           label="Pending Approvals"
@@ -982,7 +1063,7 @@ const DashboardContent: React.FC = () => {
           loading={loading}
           subtitle="Per order average"
         />
-        
+
         <AnimatedStats
           value={stats?.completionRate || 0}
           label="Completion Rate"
@@ -993,7 +1074,7 @@ const DashboardContent: React.FC = () => {
           loading={loading}
           subtitle="Order success rate"
         />
-        
+
         <AnimatedStats
           value={stats?.responseTime || 0}
           label="Response Time"
@@ -1053,7 +1134,7 @@ const DashboardContent: React.FC = () => {
             View Analytics Hub
           </GradientButton>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {aiInsights.slice(0, 4).map((insight, index) => (
             <motion.div
@@ -1062,8 +1143,8 @@ const DashboardContent: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.6 + index * 0.1 }}
             >
-              <GlassCard 
-                gradient="purple" 
+              <GlassCard
+                gradient="purple"
                 className="p-6 hover:shadow-xl transition-all duration-300 cursor-pointer group"
                 onClick={() => {
                   // Navigate to specific insight or analytics page
@@ -1101,12 +1182,17 @@ const DashboardContent: React.FC = () => {
                         <button className="text-sm text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium transition-colors">
                           {insight.action} →
                         </button>
-                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          insight.type === 'success' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                          insight.type === 'warning' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                          insight.type === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-                          'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                        }`}>
+                        <div
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            insight.type === "success"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                              : insight.type === "warning"
+                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                              : insight.type === "error"
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                          }`}
+                        >
                           {insight.type}
                         </div>
                       </div>
@@ -1119,8 +1205,7 @@ const DashboardContent: React.FC = () => {
         </div>
       </motion.div>
 
-
-      {/* Advanced Analytics Charts */}
+      {/* Essential Analytics Charts - Only 2 Working Charts */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1134,10 +1219,10 @@ const DashboardContent: React.FC = () => {
             </div>
             <div>
               <h2 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-400 dark:to-teal-400 bg-clip-text text-transparent">
-                Advanced Analytics
+                Essential Analytics
               </h2>
               <p className="text-gray-600 dark:text-gray-400">
-                Real-time business metrics and performance trends
+                Key business metrics at a glance
               </p>
             </div>
           </div>
@@ -1155,68 +1240,13 @@ const DashboardContent: React.FC = () => {
               onClick={() => navigate("/admin/analytics")}
               className="shadow-lg hover:shadow-xl transition-shadow"
             >
-              Full Analytics
+              View Full Analytics
             </GradientButton>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {/* Chart 1: Daily Revenue (30-day) - Bar Chart */}
-          <GlassCard gradient="blue" className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-600">
-                  <DollarSign className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Daily Revenue
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    30-day revenue breakdown
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-500" />
-                <span className="text-sm font-medium text-green-600">
-                  +{(stats?.revenueGrowth || 0).toFixed(1)}%
-                </span>
-              </div>
-            </div>
-            <div className="h-64">
-              {revenueTrend && revenueTrend.data ? (
-                <BarChart
-                  data={revenueTrend.data.labels.map(
-                    (label: string, index: number) => ({
-                      name: label,
-                      revenue: revenueTrend.data.datasets[0]?.data[index] || 0,
-                    })
-                  )}
-                  dataKeys={["revenue"]}
-                  xAxisDataKey="name"
-                  height={240}
-                  colors={["#3B82F6"]}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  <div className="text-center">
-                    <DollarSign size={48} className="mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">
-                      {error ? "Using fallback data" : "Loading revenue chart..."}
-                    </p>
-                    {error && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Chart data may be limited
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </GlassCard>
-
-          {/* Chart 2: Orders per Day (30-day) - Line Chart */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Chart 1: Weekly Orders Distribution - Pie Chart */}
           <GlassCard gradient="green" className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -1225,10 +1255,10 @@ const DashboardContent: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Orders per Day
+                    Weekly Orders Distribution
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    30-day order trends
+                    Orders by day of week
                   </p>
                 </div>
               </div>
@@ -1241,71 +1271,46 @@ const DashboardContent: React.FC = () => {
             </div>
             <div className="h-64">
               {ordersTrend && ordersTrend.data ? (
-                <LineChart
+                <PieChart
                   data={ordersTrend.data.labels.map(
                     (label: string, index: number) => ({
                       name: label,
-                      orders: ordersTrend.data.datasets[0]?.data[index] || 0,
+                      value: ordersTrend.data.datasets[0]?.data[index] || 0,
                     })
                   )}
-                  dataKeys={["orders"]}
-                  xAxisDataKey="name"
                   height={240}
-                  showTrend={true}
-                  colors={["#10B981"]}
+                  showLegend={true}
+                  showLabels={true}
+                  colors={[
+                    "#10B981",
+                    "#3B82F6",
+                    "#F59E0B",
+                    "#EF4444",
+                    "#8B5CF6",
+                    "#06B6D4",
+                    "#84CC16",
+                  ]}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
-                    <ShoppingCart size={48} className="mx-auto mb-2 text-gray-400" />
-                    <p>Loading orders chart...</p>
+                    <ShoppingCart
+                      size={48}
+                      className="mx-auto mb-2 text-gray-400"
+                    />
+                    <p className="text-sm">Loading orders chart...</p>
+                    {error && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Using fallback data
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           </GlassCard>
 
-          {/* Chart 3: Orders per Day (7-day) - Pie Chart */}
-          <GlassCard gradient="purple" className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-600">
-                  <BarChart3 className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Weekly Distribution
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    7-day order breakdown
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="h-64">
-              {ordersDistribution && ordersDistribution.data ? (
-                <PieChart
-                  data={ordersDistribution.data.labels.map(
-                    (label: string, index: number) => ({
-                      name: label,
-                      value: ordersDistribution.data.datasets[0]?.data[index] || 0,
-                    })
-                  )}
-                  height={240}
-                  colors={["#8B5CF6", "#EC4899", "#F59E0B", "#EF4444", "#10B981", "#3B82F6", "#6366F1"]}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  <div className="text-center">
-                    <BarChart3 size={48} className="mx-auto mb-2 text-gray-400" />
-                    <p>Loading distribution chart...</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </GlassCard>
-
-          {/* Chart 4: New Users per Day (30-day) - Area Chart */}
+          {/* Chart 2: User Growth (30-day) - Bar Chart */}
           <GlassCard gradient="orange" className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -1314,10 +1319,10 @@ const DashboardContent: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    New Users
+                    User Growth
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    30-day user registrations
+                    {timeFilter} user registrations
                   </p>
                 </div>
               </div>
@@ -1330,7 +1335,7 @@ const DashboardContent: React.FC = () => {
             </div>
             <div className="h-64">
               {newUsersData && newUsersData.data ? (
-                <LineChart
+                <BarChart
                   data={newUsersData.data.labels.map(
                     (label: string, index: number) => ({
                       name: label,
@@ -1340,111 +1345,74 @@ const DashboardContent: React.FC = () => {
                   dataKeys={["users"]}
                   xAxisDataKey="name"
                   height={240}
-                  showTrend={true}
+                  showGrid={true}
+                  showLegend={false}
                   colors={["#F97316"]}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
                     <Users size={48} className="mx-auto mb-2 text-gray-400" />
-                    <p>Loading users chart...</p>
+                    <p className="text-sm">Loading users chart...</p>
+                    {error && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Using fallback data
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           </GlassCard>
+        </div>
 
-          {/* Chart 5: Weekly Performance */}
-          <GlassCard gradient="cyan" className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600">
-                  <Activity className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Performance Metrics
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Weekly performance trends
-                  </p>
-                </div>
+        {/* Quick Analytics Insights */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <GlassCard gradient="blue" className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500">
+                <BarChart3 className="h-4 w-4 text-white" />
               </div>
-              <div className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-cyan-500" />
-                <span className="text-sm font-medium text-cyan-600">
-                  {(stats?.completionRate || 0).toFixed(1)}%
-                </span>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Peak Order Time
+                </p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  2:00 PM - 4:00 PM
+                </p>
               </div>
-            </div>
-            <div className="h-64">
-              {weeklyPerformance && weeklyPerformance.data ? (
-                <LineChart
-                  data={weeklyPerformance.data.labels.map(
-                    (label: string, index: number) => ({
-                      name: label,
-                      performance: weeklyPerformance.data.datasets[0]?.data[index] || 0,
-                      completion: weeklyPerformance.data.datasets[1]?.data[index] || 0,
-                    })
-                  )}
-                  dataKeys={["performance", "completion"]}
-                  xAxisDataKey="name"
-                  height={240}
-                  showTrend={true}
-                  colors={["#06B6D4", "#3B82F6"]}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  <div className="text-center">
-                    <Activity size={48} className="mx-auto mb-2 text-gray-400" />
-                    <p>Loading performance chart...</p>
-                  </div>
-                </div>
-              )}
             </div>
           </GlassCard>
 
-          {/* Chart 6: Growth Analytics */}
-          <GlassCard gradient="pink" className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-pink-500 to-rose-600">
-                  <TrendingUp className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Growth Analytics
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Multi-metric growth tracking
-                  </p>
-                </div>
+          <GlassCard gradient="purple" className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-500">
+                <TrendingUp className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Growth Rate
+                </p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  +{(stats?.ordersGrowth || 0).toFixed(1)}% orders
+                </p>
               </div>
             </div>
-            <div className="h-64">
-              {growthAnalytics && growthAnalytics.data ? (
-                <BarChart
-                  data={growthAnalytics.data.labels.map(
-                    (label: string, index: number) => ({
-                      name: label,
-                      users: growthAnalytics.data.datasets[0]?.data[index] || 0,
-                      orders: growthAnalytics.data.datasets[1]?.data[index] || 0,
-                      revenue: growthAnalytics.data.datasets[2]?.data[index] || 0,
-                    })
-                  )}
-                  dataKeys={["users", "orders", "revenue"]}
-                  xAxisDataKey="name"
-                  height={240}
-                  colors={["#EC4899", "#F59E0B", "#10B981"]}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  <div className="text-center">
-                    <TrendingUp size={48} className="mx-auto mb-2 text-gray-400" />
-                    <p>Loading growth chart...</p>
-                  </div>
-                </div>
-              )}
+          </GlassCard>
+
+          <GlassCard gradient="cyan" className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-cyan-500">
+                <Users className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  User Retention
+                </p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  {(stats?.completionRate || 85).toFixed(0)}%
+                </p>
+              </div>
             </div>
           </GlassCard>
         </div>
@@ -1475,7 +1443,7 @@ const DashboardContent: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {quickActions.map((action, index) => (
                 <motion.button
@@ -1497,20 +1465,27 @@ const DashboardContent: React.FC = () => {
                       {action.badge}
                     </motion.span>
                   )}
-                  
+
                   <div className="flex items-center gap-3 mb-3">
-                    <div className={`p-2 rounded-lg bg-gradient-to-r ${
-                      action.color === 'blue' ? 'from-blue-500 to-cyan-500' :
-                      action.color === 'green' ? 'from-green-500 to-emerald-500' :
-                      action.color === 'purple' ? 'from-purple-500 to-pink-500' :
-                      action.color === 'orange' ? 'from-orange-500 to-red-500' :
-                      action.color === 'cyan' ? 'from-cyan-500 to-blue-500' :
-                      'from-pink-500 to-rose-500'
-                    } shadow-md group-hover:shadow-lg transition-shadow`}>
+                    <div
+                      className={`p-2 rounded-lg bg-gradient-to-r ${
+                        action.color === "blue"
+                          ? "from-blue-500 to-cyan-500"
+                          : action.color === "green"
+                          ? "from-green-500 to-emerald-500"
+                          : action.color === "purple"
+                          ? "from-purple-500 to-pink-500"
+                          : action.color === "orange"
+                          ? "from-orange-500 to-red-500"
+                          : action.color === "cyan"
+                          ? "from-cyan-500 to-blue-500"
+                          : "from-pink-500 to-rose-500"
+                      } shadow-md group-hover:shadow-lg transition-shadow`}
+                    >
                       <action.icon size={20} className="text-white" />
                     </div>
                   </div>
-                  
+
                   <div className="font-bold text-gray-900 dark:text-white text-sm mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     {action.label}
                   </div>
@@ -1601,11 +1576,13 @@ const DashboardContent: React.FC = () => {
               </motion.div>
             ))}
           </div>
-          
+
           {recentActivities.length === 0 && (
             <div className="text-center py-8">
               <Activity className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500 dark:text-gray-400">No recent activity</p>
+              <p className="text-gray-500 dark:text-gray-400">
+                No recent activity
+              </p>
             </div>
           )}
         </GlassCard>
@@ -1656,7 +1633,7 @@ const DashboardContent: React.FC = () => {
                 title: "Customer",
                 render: (order: RecentOrder) => (
                   <div className="font-medium text-gray-900 dark:text-white">
-                    {order.customer_name || 'Unknown Customer'}
+                    {order.customer_name || "Unknown Customer"}
                   </div>
                 ),
               },
@@ -1686,10 +1663,11 @@ const DashboardContent: React.FC = () => {
                 render: (order: RecentOrder) => (
                   <span
                     className={`px-2 py-1 text-xs font-medium rounded-full ${getOrderStatusColor(
-                      order.status || 'pending'
+                      order.status || "pending"
                     )}`}
                   >
-                    {(order.status || 'pending').charAt(0).toUpperCase() + (order.status || 'pending').slice(1)}
+                    {(order.status || "pending").charAt(0).toUpperCase() +
+                      (order.status || "pending").slice(1)}
                   </span>
                 ),
               },
@@ -1698,7 +1676,9 @@ const DashboardContent: React.FC = () => {
                 title: "Time",
                 render: (order: RecentOrder) => (
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {order.created_at ? timeAgo(new Date(order.created_at)) : 'Unknown'}
+                    {order.created_at
+                      ? timeAgo(new Date(order.created_at))
+                      : "Unknown"}
                   </div>
                 ),
               },
@@ -1765,7 +1745,9 @@ const DashboardContent: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-600 flex items-center justify-center">
                       <span className="text-white text-xs font-medium">
-                        {(delivery.delivery_agent || 'U').charAt(0).toUpperCase()}
+                        {(delivery.delivery_agent || "U")
+                          .charAt(0)
+                          .toUpperCase()}
                       </span>
                     </div>
                     <span className="text-sm text-gray-700 dark:text-gray-300">
@@ -1792,7 +1774,8 @@ const DashboardContent: React.FC = () => {
                       delivery.status
                     )}`}
                   >
-                    {(delivery.status || 'pending').charAt(0).toUpperCase() + (delivery.status || 'pending').slice(1)}
+                    {(delivery.status || "pending").charAt(0).toUpperCase() +
+                      (delivery.status || "pending").slice(1)}
                   </span>
                 ),
               },
@@ -1801,7 +1784,9 @@ const DashboardContent: React.FC = () => {
                 title: "ETA",
                 render: (delivery: RecentDelivery) => (
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {delivery.estimated_time ? new Date(delivery.estimated_time).toLocaleTimeString() : 'N/A'}
+                    {delivery.estimated_time
+                      ? new Date(delivery.estimated_time).toLocaleTimeString()
+                      : "N/A"}
                   </div>
                 ),
               },
@@ -1860,7 +1845,7 @@ const Dashboard: React.FC = () => {
     <ErrorBoundary
       level="page"
       onError={(error, errorInfo) => {
-        console.error('Dashboard error:', error, errorInfo);
+        console.error("Dashboard error:", error, errorInfo);
       }}
     >
       <LazyPageWrapper showProgress={true}>

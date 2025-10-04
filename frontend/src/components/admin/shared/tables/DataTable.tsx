@@ -182,10 +182,24 @@ const DataTable = <T extends Record<string, any>>({
 
   // Render cell content
   const renderCell = (column: Column<T>, row: T, rowIndex: number) => {
+    // Safety check: ensure row exists
+    if (!row) {
+      return <span className="text-gray-400">N/A</span>;
+    }
+
     const value = row[column.key as keyof T];
 
     if (column.render) {
-      return column.render(value, row, rowIndex);
+      try {
+        return column.render(value, row, rowIndex);
+      } catch (error) {
+        console.error("Error rendering cell:", error, {
+          column: column.key,
+          row,
+          rowIndex,
+        });
+        return <span className="text-red-400">Error</span>;
+      }
     }
 
     // Default rendering based on value type

@@ -1003,6 +1003,34 @@ class AdminService {
     }
   }
 
+  // Get weekly orders distribution for pie chart (shows orders by day of week)
+  async getWeeklyOrdersDistribution(): Promise<{
+    data: {
+      labels: string[];
+      datasets: Array<{ label: string; data: number[] }>;
+    };
+    total_orders: number;
+    period: string;
+  }> {
+    try {
+      const response = await apiClient.get(
+        `/admin-management/dashboard/orders_distribution/?days=7`
+      );
+      return {
+        data: response.data.data,
+        total_orders:
+          response.data.data.datasets[0]?.data.reduce(
+            (sum: number, val: number) => sum + val,
+            0
+          ) || 0,
+        period: "Last 7 days",
+      };
+    } catch (error) {
+      console.error("Error fetching weekly orders distribution:", error);
+      throw new Error("Failed to fetch weekly orders distribution");
+    }
+  }
+
   // Get orders distribution data (7-day pie chart)
   async getOrdersDistribution(days: number = 7) {
     try {
