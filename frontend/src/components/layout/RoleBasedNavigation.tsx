@@ -1,24 +1,21 @@
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useUserStore } from "@/store/userStore";
+import {
+  BarChart3,
+  Bell,
+  Calendar,
+  ChefHat,
+  FileText,
+  Home,
+  MapPin,
+  Package,
+  Settings,
+  ShoppingCart,
+  User,
+} from "lucide-react";
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useUserStore } from "@/store/userStore";
-import { Button } from "@/components/ui/button";
-import {
-  Home,
-  Menu,
-  User,
-  ShoppingCart,
-  ChefHat,
-  Truck,
-  Shield,
-  Settings,
-  BarChart3,
-  FileText,
-  Bell,
-  MapPin,
-  Calendar,
-  Package,
-} from "lucide-react";
-import { cn } from "@/libs/utils";
 
 const RoleBasedNavigation: React.FC = () => {
   const { user } = useUserStore();

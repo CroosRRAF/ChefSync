@@ -482,6 +482,54 @@ class AdminFoodApprovalViewSet(viewsets.ReadOnlyModelViewSet):
             'message': f'Food "{food.name}" has been rejected',
             'reason': rejection_reason
         }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get food statistics for admin dashboard"""
+        try:
+            from django.db.models import Avg, Count, Min, Max
+            
+            # Food statistics
+            total_foods = Food.objects.count()
+            approved_foods = Food.objects.filter(status='Approved').count()
+            pending_foods = Food.objects.filter(status='Pending').count()
+            rejected_foods = Food.objects.filter(status='Rejected').count()
+            
+            # Category and cuisine counts
+            total_categories = FoodCategory.objects.count()
+            total_cuisines = Cuisine.objects.count()
+            
+            # Rating statistics
+            avg_rating = FoodReview.objects.aggregate(
+                avg_rating=Avg('rating')
+            )['avg_rating'] or 0
+            
+            # Price statistics
+            price_stats = FoodPrice.objects.aggregate(
+                avg_price=Avg('price'),
+                min_price=Min('price'),
+                max_price=Max('price')
+            )
+            
+            return Response({
+                'totalFoods': total_foods,
+                'approvedFoods': approved_foods,
+                'pendingFoods': pending_foods,
+                'rejectedFoods': rejected_foods,
+                'totalCategories': total_categories,
+                'totalCuisines': total_cuisines,
+                'averageRating': round(float(avg_rating), 2),
+                'averagePrice': round(float(price_stats['avg_price'] or 0), 2),
+                'minPrice': round(float(price_stats['min_price'] or 0), 2),
+                'maxPrice': round(float(price_stats['max_price'] or 0), 2),
+            })
+            
+        except Exception as e:
+            print(f"Error in food stats: {str(e)}")
+            return Response(
+                {"error": f"Failed to fetch food stats: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
     
     def _notify_chef(self, food, action, comments):
         """Send notification to chef about approval decision"""

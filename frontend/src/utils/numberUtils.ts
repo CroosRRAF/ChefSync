@@ -6,14 +6,14 @@
  * Safely formats a number as currency with fallback for invalid values
  * @param value - The value to format (can be number, string, null, undefined)
  * @param decimals - Number of decimal places (default: 2)
- * @param currency - Currency symbol (default: '$')
+ * @param currency - Currency symbol (default: 'LKR ')
  * @param fallback - Fallback text for invalid values (default: 'N/A')
  * @returns Formatted currency string or fallback
  */
 export function formatCurrency(
   value: any,
   decimals: number = 2,
-  currency: string = '$',
+  currency: string = 'LKR ',
   fallback: string = 'N/A'
 ): string {
   // Convert to number safely
