@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 
 // Import shared components
-import { AnimatedStats, DataTable, GlassCard } from "@/components/admin/shared";
+import { AnimatedStats, DataTable, GlassCard, ErrorBoundary, useDebouncedSearch, usePerformanceMonitor } from "@/components/admin/shared";
 import type { Column } from "@/components/admin/shared/tables/DataTable";
 
 // Import UI components
@@ -142,6 +142,7 @@ interface DeliveryStats {
 
 const OrderManagementHub: React.FC = () => {
   const { toast } = useToast();
+  const { measureApiCall } = usePerformanceMonitor();
 
   // Active tab state
   const [activeTab, setActiveTab] = useState<
@@ -190,6 +191,9 @@ const OrderManagementHub: React.FC = () => {
     limit: 25,
   });
 
+  // Debounced search for better performance
+  const debouncedSearch = useDebouncedSearch(orderFilters.search, 300);
+
   const [transactionFilters, setTransactionFilters] = useState({
     search: "",
     status: "all",
@@ -200,19 +204,33 @@ const OrderManagementHub: React.FC = () => {
   // Load order statistics
   const loadOrderStats = useCallback(async () => {
     try {
-      // Fetch real order stats from API
-      const response = await fetch("/api/admin-management/orders/stats/", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          "Content-Type": "application/json",
-        },
-      });
+      // Fetch real order stats from API with performance monitoring
+      const response = await measureApiCall(
+        () => fetch("/api/admin-management/orders/stats/", {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
+          },
+        }),
+        "order-stats"
+      );
 
       if (response.ok) {
         const statsData = await response.json();
         // Ensure we have a valid stats object
-        if (statsData && typeof statsData === "object") {
-          setOrderStats(statsData);
+        if (statsData && statsData.stats && typeof statsData.stats === "object") {
+          // Map API response fields to frontend interface
+          const mappedStats: OrderStats = {
+            total: statsData.stats.total_orders || 0,
+            pending: statsData.stats.pending || 0,
+            preparing: statsData.stats.preparing || 0,
+            outForDelivery: statsData.stats.ready || 0, // API uses 'ready' for out for delivery
+            delivered: statsData.stats.delivered || 0,
+            cancelled: statsData.stats.cancelled || 0,
+            totalRevenue: statsData.stats.total_revenue || 0,
+            averageOrderValue: statsData.stats.average_order_value || 0,
+          };
+          setOrderStats(mappedStats);
         } else {
           console.warn("Invalid stats data received:", statsData);
           throw new Error("Invalid API response format");
@@ -253,12 +271,15 @@ const OrderManagementHub: React.FC = () => {
       setOrderLoading(true);
       setOrderError(null);
 
-      const response: OrderListResponse = await adminService.getOrders({
-        search: orderFilters.search,
-        status: orderFilters.status === "all" ? undefined : orderFilters.status,
-        page: orderFilters.page,
-        limit: orderFilters.limit,
-      });
+      const response: OrderListResponse = await measureApiCall(
+        () => adminService.getOrders({
+          search: debouncedSearch,
+          status: orderFilters.status === "all" ? undefined : orderFilters.status,
+          page: orderFilters.page,
+          limit: orderFilters.limit,
+        }),
+        "orders-list"
+      );
 
       // Safely handle the response and ensure we have an array
       const ordersData = Array.isArray(response?.orders) ? response.orders : [];
@@ -272,7 +293,7 @@ const OrderManagementHub: React.FC = () => {
     } finally {
       setOrderLoading(false);
     }
-  }, [orderFilters]);
+  }, [orderFilters, debouncedSearch, measureApiCall]);
 
   // Load delivery data
   const loadDeliveryData = useCallback(async () => {
@@ -280,8 +301,8 @@ const OrderManagementHub: React.FC = () => {
       setDeliveryLoading(true);
 
       const [deliveries, stats] = await Promise.all([
-        deliveryService.getActiveDeliveries(),
-        deliveryService.getDeliveryStats(),
+        measureApiCall(() => deliveryService.getActiveDeliveries(), "active-deliveries"),
+        measureApiCall(() => deliveryService.getDeliveryStats(), "delivery-stats"),
       ]);
 
       setActiveDeliveries(deliveries);
@@ -291,7 +312,7 @@ const OrderManagementHub: React.FC = () => {
     } finally {
       setDeliveryLoading(false);
     }
-  }, []);
+  }, [measureApiCall]);
 
   // Load payment data
   const loadPaymentData = useCallback(async () => {
@@ -881,11 +902,13 @@ const OrderManagementHub: React.FC = () => {
           </div>
         )}
 
-        <DataTable
-          data={orders}
-          columns={orderColumns}
-          loading={orderLoading}
-        />
+        <ErrorBoundary>
+          <DataTable
+            data={orders}
+            columns={orderColumns}
+            loading={orderLoading}
+          />
+        </ErrorBoundary>
       </GlassCard>
     </div>
   );
@@ -939,11 +962,13 @@ const OrderManagementHub: React.FC = () => {
           </Button>
         </div>
 
-        <DataTable
-          data={activeDeliveries}
-          columns={deliveryColumns}
-          loading={deliveryLoading}
-        />
+        <ErrorBoundary>
+          <DataTable
+            data={activeDeliveries}
+            columns={deliveryColumns}
+            loading={deliveryLoading}
+          />
+        </ErrorBoundary>
       </GlassCard>
     </div>
   );
@@ -1040,11 +1065,13 @@ const OrderManagementHub: React.FC = () => {
           </Button>
         </div>
 
-        <DataTable
-          data={transactions}
-          columns={transactionColumns}
-          loading={paymentLoading}
-        />
+        <ErrorBoundary>
+          <DataTable
+            data={transactions}
+            columns={transactionColumns}
+            loading={paymentLoading}
+          />
+        </ErrorBoundary>
       </GlassCard>
     </div>
   );

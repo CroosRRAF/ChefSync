@@ -24,6 +24,7 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
   FileText,
   HelpCircle,
   LayoutDashboard,
@@ -43,7 +44,6 @@ import {
   ShoppingCart,
   Truck,
   Gift,
-  CreditCard,
   Brain,
   UserPlus,
 } from "lucide-react";
@@ -117,6 +117,13 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
       icon: MessageSquare,
       description: "Messages, feedback, and notifications",
       badge: 5, // Pending feedback items
+    },
+    {
+      label: "Payment Management",
+      href: "/admin/payment-management",
+      icon: CreditCard,
+      description: "Manage payments and transactions",
+      badge: 1, // Pending refunds
     },
     {
       label: "System Settings",

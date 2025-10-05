@@ -1418,23 +1418,32 @@ const DashboardContent: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Quick Actions & Activity Hub */}
+      {/* Quick Actions & Activity Hub - Equal Space Layout */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.7 }}
-        className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-8"
       >
-        {/* Modern Quick Actions */}
-        <div className="lg:col-span-2">
-          <GlassCard gradient="cyan" className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 shadow-lg">
-                  <Zap className="h-5 w-5 text-white" />
-                </div>
+        {/* Enhanced Quick Actions */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.8 }}
+        >
+          <GlassCard gradient="cyan" className="p-8 h-full">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.9, type: "spring", stiffness: 200 }}
+                  className="p-3 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 shadow-xl"
+                >
+                  <Zap className="h-6 w-6 text-white" />
+                </motion.div>
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                     Quick Actions
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -1442,33 +1451,46 @@ const DashboardContent: React.FC = () => {
                   </p>
                 </div>
               </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.0 }}
+                className="flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-100 dark:bg-cyan-900/30"
+              >
+                <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+                <span className="text-xs font-medium text-cyan-600 dark:text-cyan-400">
+                  {quickActions.length} actions
+                </span>
+              </motion.div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {quickActions.map((action, index) => (
                 <motion.button
                   key={action.id}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.3, delay: 0.8 + index * 0.1 }}
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.4, delay: 1.1 + index * 0.1 }}
+                  whileHover={{ scale: 1.03, y: -3 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={action.onClick}
-                  className="relative p-4 text-left bg-white/50 dark:bg-gray-800/50 rounded-xl hover:bg-white/70 dark:hover:bg-gray-700/70 transition-all duration-200 border border-white/20 dark:border-gray-700/50 shadow-lg hover:shadow-xl group"
+                  className="relative p-6 text-left bg-white/60 dark:bg-gray-800/60 rounded-2xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-300 border border-white/30 dark:border-gray-700/50 shadow-lg hover:shadow-2xl group backdrop-blur-sm"
                 >
                   {action.badge > 0 && (
                     <motion.span
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg"
+                      transition={{ delay: 1.2 + index * 0.1 }}
+                      className="absolute -top-3 -right-3 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-7 w-7 flex items-center justify-center font-bold shadow-lg border-2 border-white dark:border-gray-800"
                     >
                       {action.badge}
                     </motion.span>
                   )}
 
-                  <div className="flex items-center gap-3 mb-3">
-                    <div
-                      className={`p-2 rounded-lg bg-gradient-to-r ${
+                  <div className="flex items-center gap-4 mb-4">
+                    <motion.div
+                      whileHover={{ rotate: 5 }}
+                      className={`p-3 rounded-xl bg-gradient-to-r ${
                         action.color === "blue"
                           ? "from-blue-500 to-cyan-500"
                           : action.color === "green"
@@ -1480,112 +1502,172 @@ const DashboardContent: React.FC = () => {
                           : action.color === "cyan"
                           ? "from-cyan-500 to-blue-500"
                           : "from-pink-500 to-rose-500"
-                      } shadow-md group-hover:shadow-lg transition-shadow`}
+                      } shadow-lg group-hover:shadow-xl transition-all duration-300`}
                     >
-                      <action.icon size={20} className="text-white" />
-                    </div>
+                      <action.icon size={24} className="text-white" />
+                    </motion.div>
                   </div>
 
-                  <div className="font-bold text-gray-900 dark:text-white text-sm mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    {action.label}
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-gray-900 dark:text-white text-base group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
+                      {action.label}
+                    </h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                      {action.description}
+                    </p>
                   </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                    {action.description}
-                  </div>
+
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 1.3 + index * 0.1 }}
+                    className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  >
+                    <ArrowUpRight className="h-4 w-4 text-cyan-500" />
+                  </motion.div>
                 </motion.button>
               ))}
             </div>
           </GlassCard>
-        </div>
+        </motion.div>
 
-        {/* Enhanced Recent Activity */}
-        <GlassCard gradient="orange" className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 shadow-lg">
-                <Activity className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Live Activity
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Recent system events
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => navigate("/admin/analytics")}
-              className="text-sm text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 font-medium transition-colors"
-            >
-              View All →
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {recentActivities.slice(0, 5).map((activity, index) => (
-              <motion.div
-                key={activity.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: 0.9 + index * 0.1 }}
-                className="flex items-start gap-3 p-3 rounded-lg bg-white/30 dark:bg-gray-800/30 hover:bg-white/50 dark:hover:bg-gray-700/50 transition-colors"
-              >
+        {/* Enhanced Live Activity */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.8 }}
+        >
+          <GlassCard gradient="orange" className="p-8 h-full">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  transition={{ delay: 1 + index * 0.1 }}
-                  className={`p-2 rounded-full flex-shrink-0 ${
-                    activity.type === "success"
-                      ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                      : activity.type === "warning"
-                      ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
-                      : activity.type === "error"
-                      ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-                      : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                  }`}
+                  transition={{ delay: 0.9, type: "spring", stiffness: 200 }}
+                  className="p-3 rounded-2xl bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 shadow-xl"
                 >
-                  {activity.type === "success" ? (
-                    <CheckCircle size={14} />
-                  ) : activity.type === "warning" ? (
-                    <AlertTriangle size={14} />
-                  ) : activity.type === "error" ? (
-                    <AlertTriangle size={14} />
-                  ) : (
-                    <Activity size={14} />
-                  )}
+                  <Activity className="h-6 w-6 text-white" />
                 </motion.div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                    {activity.title}
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    Live Activity
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Real-time system events
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                    {activity.description}
-                  </p>
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-xs text-gray-500 dark:text-gray-500">
-                      {timeAgo(activity.timestamp)}
+                </div>
+              </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.0 }}
+                className="flex items-center gap-2"
+              >
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="w-3 h-3 rounded-full bg-green-400"
+                />
+                <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                  Live
+                </span>
+                <button
+                  onClick={() => navigate("/admin/analytics")}
+                  className="text-sm text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 font-medium transition-colors ml-2"
+                >
+                  View All →
+                </button>
+              </motion.div>
+            </div>
+
+            <div className="space-y-4 max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
+              {recentActivities.slice(0, 6).map((activity, index) => (
+                <motion.div
+                  key={activity.id}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4, delay: 1.1 + index * 0.1 }}
+                  className="flex items-start gap-4 p-4 rounded-xl bg-white/40 dark:bg-gray-800/40 hover:bg-white/60 dark:hover:bg-gray-700/60 transition-all duration-300 border border-white/20 dark:border-gray-700/30 group"
+                >
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 1.2 + index * 0.1 }}
+                    className={`p-2.5 rounded-full flex-shrink-0 ${
+                      activity.type === "success"
+                        ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                        : activity.type === "warning"
+                        ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
+                        : activity.type === "error"
+                        ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                        : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                    } group-hover:scale-110 transition-transform duration-200`}
+                  >
+                    {activity.type === "success" ? (
+                      <CheckCircle size={16} />
+                    ) : activity.type === "warning" ? (
+                      <AlertTriangle size={16} />
+                    ) : activity.type === "error" ? (
+                      <AlertTriangle size={16} />
+                    ) : (
+                      <Activity size={16} />
+                    )}
+                  </motion.div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
+                        {activity.title}
+                      </h4>
+                      <span className="text-xs text-gray-500 dark:text-gray-500 flex-shrink-0 ml-2">
+                        {timeAgo(activity.timestamp)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed mb-3 line-clamp-2">
+                      {activity.description}
                     </p>
                     {activity.user && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-                        {activity.user}
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium">
+                          {activity.user}
+                        </span>
+                        <div
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            activity.type === "success"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                              : activity.type === "warning"
+                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                              : activity.type === "error"
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                          }`}
+                        >
+                          {activity.type}
+                        </div>
+                      </div>
                     )}
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {recentActivities.length === 0 && (
-            <div className="text-center py-8">
-              <Activity className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500 dark:text-gray-400">
-                No recent activity
-              </p>
+                </motion.div>
+              ))}
             </div>
-          )}
-        </GlassCard>
+
+            {recentActivities.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.0 }}
+                className="text-center py-12"
+              >
+                <Activity className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400 text-lg">
+                  No recent activity
+                </p>
+                <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
+                  System events will appear here
+                </p>
+              </motion.div>
+            )}
+          </GlassCard>
+        </motion.div>
       </motion.div>
 
       {/* Recent Orders Table */}

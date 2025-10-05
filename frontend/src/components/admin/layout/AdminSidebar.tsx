@@ -14,10 +14,11 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
-  Feedback,
+  CreditCard,
   FileText,
   LayoutDashboard,
   MessageSquare,
+  MessageCircle,
   Settings,
   User,
   Users,
@@ -62,7 +63,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = memo(
       {
         label: "Feedback Management",
         href: "/admin/feedback-management",
-        icon: Feedback,
+        icon: MessageCircle,
         description: "Handle complaints and suggestions",
         badge: 5, // Pending feedback items
       },
@@ -87,6 +88,13 @@ const AdminSidebar: React.FC<AdminSidebarProps> = memo(
         badge: 2, // Pending approvals
       },
       {
+        label: "Payment Management",
+        href: "/admin/payment-management",
+        icon: CreditCard,
+        description: "Manage payments and transactions",
+        badge: 1, // Pending refunds
+      },
+      {
         label: "Reports",
         href: "/admin/reports",
         icon: FileText,
@@ -105,6 +113,9 @@ const AdminSidebar: React.FC<AdminSidebarProps> = memo(
         description: "Admin profile settings",
       },
     ];
+
+    // Debug: Log navigation items
+    console.log("AdminSidebar navItems:", navItems);
 
     // Check if route is active
     const isActiveRoute = (href: string) => {
@@ -220,13 +231,12 @@ const AdminSidebar: React.FC<AdminSidebarProps> = memo(
               <Avatar className="w-8 h-8">
                 <AvatarImage src={user?.avatar} />
                 <AvatarFallback>
-                  {user?.firstName?.[0]}
-                  {user?.lastName?.[0]}
+                  {user?.name?.[0] || user?.email?.[0] || "A"}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {user?.firstName} {user?.lastName}
+                  {user?.name || user?.email}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                   {user?.email}

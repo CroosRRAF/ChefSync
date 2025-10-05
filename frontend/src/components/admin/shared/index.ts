@@ -27,6 +27,16 @@ export { default as ErrorBoundary, withErrorBoundary } from "./ErrorBoundary";
 // Performance Components
 export { default as LazyPageWrapper, withLazyLoading } from "./LazyPageWrapper";
 export { default as MemoizedDataTable, HighlyOptimizedDataTable } from "./MemoizedDataTable";
+export { 
+  default as PerformanceOptimizer,
+  MemoizedDataTable as OptimizedDataTable,
+  usePerformanceMonitor,
+  useDebouncedSearch,
+  useVirtualScrolling,
+  withCodeSplitting,
+  useMemoizedSelector,
+  useBatchedUpdates
+} from "./PerformanceOptimizer";
 
 // Accessibility Components
 export { default as AccessibleButton } from "./AccessibleButton";

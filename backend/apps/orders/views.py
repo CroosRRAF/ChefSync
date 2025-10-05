@@ -205,7 +205,7 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
         if obj.customer:
             return (
                 obj.customer.name
-                or f"{obj.customer.first_name} {obj.customer.last_name}".strip()
+                or obj.customer.name
                 or obj.customer.username
             )
         return "Unknown Customer"
@@ -214,7 +214,7 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
         if obj.chef:
             return (
                 obj.chef.name
-                or f"{obj.chef.first_name} {obj.chef.last_name}".strip()
+                or obj.chef.name
                 or obj.chef.username
             )
         return "Unknown Chef"
@@ -265,7 +265,7 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
                     "size": order_item.price.size if order_item.price else "Medium",
                     "cook_name": (
                         order_item.price.cook.name
-                        or f"{order_item.price.cook.first_name} {order_item.price.cook.last_name}".strip()
+                        or order_item.price.cook.name
                         or order_item.price.cook.username
                         if order_item.price
                         else "Unknown Cook"
@@ -855,7 +855,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         chef_info = {
             "id": chef.id,
             "name": chef.name
-            or f"{chef.first_name} {chef.last_name}".strip()
+            or chef.name
             or chef.username,
             "phone": getattr(chef, "phone_no", None),
             "email": chef.email,
@@ -1253,7 +1253,7 @@ def chef_recent_activity(request):
         chef_info = {
             "id": chef.id,
             "name": chef.name
-            or f"{chef.first_name} {chef.last_name}".strip()
+            or chef.name
             or chef.username,
             "phone": chef.phone_no,
             "email": chef.email,
@@ -1473,12 +1473,12 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                         "customer": {
                             "id": order.customer.id if order.customer else None,
                             "name": (
-                                f"{order.customer.first_name} {order.customer.last_name}".strip()
+                                order.customer.name
                                 if order.customer
                                 else "Unknown"
                             ),
                             "phone": (
-                                getattr(order.customer, "phone", None)
+                                getattr(order.customer, "phone_no", None)
                                 if order.customer
                                 else None
                             ),
@@ -1491,12 +1491,12 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                                     else None
                                 ),
                                 "name": (
-                                    f"{order.delivery_partner.first_name} {order.delivery_partner.last_name}".strip()
+                                    order.delivery_partner.name
                                     if order.delivery_partner
                                     else "Unassigned"
                                 ),
                                 "phone": (
-                                    getattr(order.delivery_partner, "phone", None)
+                                    getattr(order.delivery_partner, "phone_no", None)
                                     if order.delivery_partner
                                     else None
                                 ),
@@ -1705,12 +1705,12 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                     "delivery_partner": (
                         {
                             "name": (
-                                f"{order.delivery_partner.first_name} {order.delivery_partner.last_name}".strip()
+                                order.delivery_partner.name
                                 if order.delivery_partner
                                 else "Not assigned"
                             ),
                             "phone": (
-                                getattr(order.delivery_partner, "phone", None)
+                                getattr(order.delivery_partner, "phone_no", None)
                                 if order.delivery_partner
                                 else None
                             ),
@@ -1845,8 +1845,7 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                 )
                 .values(
                     "delivery_partner__id",
-                    "delivery_partner__first_name",
-                    "delivery_partner__last_name",
+                    "delivery_partner__name",
                 )
                 .annotate(delivery_count=Count("id"), total_earned=Sum("delivery_fee"))
                 .order_by("-delivery_count")[:5]
@@ -1869,7 +1868,7 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                     "top_delivery_partners": [
                         {
                             "id": partner["delivery_partner__id"],
-                            "name": f"{partner['delivery_partner__first_name']} {partner['delivery_partner__last_name']}".strip(),
+                            "name": partner["delivery_partner__name"] or "Unknown",
                             "deliveries": partner["delivery_count"],
                             "total_earned": (
                                 float(partner["total_earned"])
@@ -2008,7 +2007,7 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                                 "message_id": str(msg.message_id),
                                 "sender": {
                                     "id": msg.sender.id,
-                                    "name": f"{msg.sender.first_name} {msg.sender.last_name}".strip()
+                                    "name": msg.sender.name
                                     or msg.sender.username,
                                 },
                                 "message": msg.message,

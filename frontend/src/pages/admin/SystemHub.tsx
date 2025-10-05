@@ -284,7 +284,7 @@ const SystemHub: React.FC = () => {
       
       // Fetch real system stats from API
       const [statsResponse, performanceResponse] = await Promise.all([
-        fetch('/api/admin-management/system/realtime-stats/', {
+        fetch('/api/admin-management/settings/realtime_stats/', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
             'Content-Type': 'application/json',
@@ -391,6 +391,11 @@ const SystemHub: React.FC = () => {
       wsRef.current.onerror = (error) => {
         console.error("WebSocket error:", error);
         setConnectionStatus("error");
+        setIsConnected(false);
+      };
+    } catch (error) {
+      console.error("Failed to create WebSocket connection:", error);
+      setConnectionStatus("error");
       setIsConnected(false);
     }
   }, []);
@@ -975,30 +980,38 @@ const SystemHub: React.FC = () => {
         <StatsCard
           title="API Endpoints"
           value="47"
-          change="+3"
-          trend="up"
-          icon={<Server className="h-4 w-4" />}
+          subtitle="Active endpoints"
+          trend={{ value: 3, isPositive: true }}
+          icon="bx bx-server"
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-100"
         />
         <StatsCard
           title="Database Queries"
           value="1,247"
-          change="+12%"
-          trend="up"
-          icon={<Database className="h-4 w-4" />}
+          subtitle="Queries per minute"
+          trend={{ value: 12, isPositive: true }}
+          icon="bx bx-data"
+          iconColor="text-green-600"
+          iconBgColor="bg-green-100"
         />
         <StatsCard
           title="Cache Hit Rate"
           value="94.2%"
-          change="+2.1%"
-          trend="up"
-          icon={<Zap className="h-4 w-4" />}
+          subtitle="Cache efficiency"
+          trend={{ value: 2.1, isPositive: true }}
+          icon="bx bx-zap"
+          iconColor="text-yellow-600"
+          iconBgColor="bg-yellow-100"
         />
         <StatsCard
           title="Error Rate"
           value="0.8%"
-          change="-0.3%"
-          trend="down"
-          icon={<AlertTriangle className="h-4 w-4" />}
+          subtitle="System errors"
+          trend={{ value: 0.3, isPositive: false }}
+          icon="bx bx-error"
+          iconColor="text-red-600"
+          iconBgColor="bg-red-100"
         />
       </div>
 
@@ -1050,7 +1063,7 @@ const SystemHub: React.FC = () => {
   const renderMonitoringTab = () => (
     <div className="space-y-6">
       {/* Performance Charts */}
-      {performanceMetrics && (
+      {performanceMetrics && performanceMetrics.apiResponseTime && performanceMetrics.timestamps && performanceMetrics.cpuUsage && performanceMetrics.memoryUsage && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <GlassCard className="p-6">
             <h3 className="text-lg font-semibold mb-4">API Response Time</h3>

@@ -15,4 +15,13 @@ urlpatterns = [
     path('orders', views.order_analytics, name='order-analytics'),
     path('customers', views.customer_analytics, name='customer-analytics'),
     path('performance', views.performance_analytics, name='performance-analytics'),
+    
+    # Export and Report Scheduling endpoints
+    path('export/', views.export_data, name='export-data'),
+    path('reports/schedule/', views.schedule_report, name='schedule-report'),
+    path('reports/scheduled/', views.get_scheduled_reports, name='scheduled-reports'),
+    
+    # Admin-specific analytics endpoints for frontend compatibility
+    path('admin/analytics/dashboard/advanced_analytics/', views.DashboardViewSet.as_view({'get': 'advanced_analytics'}), name='admin-advanced-analytics'),
+    path('admin/analytics/reports/scheduled/', views.get_scheduled_reports, name='admin-scheduled-reports'),
 ]

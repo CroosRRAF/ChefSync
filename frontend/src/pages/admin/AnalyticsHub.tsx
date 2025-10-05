@@ -22,7 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Import services
-import { analyticsService } from "@/services/analyticsService";
+import { analyticsService, AdvancedAnalyticsData } from "@/services/analyticsService";
 
 // Import icons
 import {
@@ -141,6 +141,8 @@ const AnalyticsHub: React.FC = () => {
     useState<BusinessMetrics | null>(null);
   const [businessInsights, setBusinessInsights] =
     useState<BusinessInsights | null>(null);
+  const [advancedAnalytics, setAdvancedAnalytics] =
+    useState<AdvancedAnalyticsData | null>(null);
   const [reportTemplates, setReportTemplates] = useState<ReportTemplate[]>([]);
 
   // UI states
@@ -149,6 +151,12 @@ const AnalyticsHub: React.FC = () => {
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d">("30d");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
+  const [selectedReportType, setSelectedReportType] = useState<string>("");
+  const [customReportFilters, setCustomReportFilters] = useState<any>({});
+  const [scheduledReports, setScheduledReports] = useState<any[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRealTimeActive, setIsRealTimeActive] = useState(false);
 
   // Load analytics data
   const loadAnalyticsData = useCallback(async () => {
@@ -163,19 +171,19 @@ const AnalyticsHub: React.FC = () => {
 
       // Transform API data to match backend response shape
       const transformedData: AnalyticsData = {
-        revenue: orderData.total_revenue || 0,
-        orders: orderData.total_orders || 0,
-        users: customerData.total_customers || 0,
-        avgOrderValue:
-          orderData.total_revenue / Math.max(orderData.total_orders || 1, 1),
+        revenue: orderData.total || 0,
+        orders: orderData.total || 0,
+        users: customerData.total || 0,
+        avgOrderValue: orderData.avgOrderValue || 0,
         growth: {
-          revenue: 0, // TODO: compute from daily_breakdown
-          orders: 0, // TODO: compute from daily_breakdown
-          users: customerData.growth_rate || 0,
+          revenue: orderData.trend || 0,
+          orders: orderData.trend || 0,
+          users: customerData.retention || 0,
         },
       };
 
       setAnalyticsData(transformedData);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error("Error loading analytics:", error);
       setError("Failed to load analytics data");
@@ -243,6 +251,17 @@ const AnalyticsHub: React.FC = () => {
     }
   }, []);
 
+  // Load advanced analytics data
+  const loadAdvancedAnalytics = useCallback(async () => {
+    try {
+      const data = await analyticsService.getAdvancedAnalytics(timeRange);
+      setAdvancedAnalytics(data);
+    } catch (error) {
+      console.error("Error loading advanced analytics:", error);
+      // Keep null state on error - component will handle gracefully
+    }
+  }, [timeRange]);
+
   // Load report templates
   const loadReportTemplates = useCallback(async () => {
     try {
@@ -269,17 +288,79 @@ const AnalyticsHub: React.FC = () => {
     }
   };
 
+  // Export data functionality
+  const handleExport = async (type: "csv" | "pdf" | "excel", reportType?: string) => {
+    setExportingData(true);
+    try {
+      const response = await analyticsService.exportData(type, {
+        reportType: reportType || selectedReportType,
+        timeRange,
+        filters: customReportFilters
+      });
+      
+      // Handle file download
+      if (response instanceof Response) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `admin-report-${Date.now()}.${type}`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        // Handle mock data
+        const mockResponse = response as { data: string; status: number; statusText: string };
+        const blob = new Blob([mockResponse.data]);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `admin-report-${Date.now()}.${type}`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error("Export failed:", error);
+    } finally {
+      setExportingData(false);
+    }
+  };
+
+  // Schedule report
+  const scheduleReport = async (templateId: string, schedule: any) => {
+    try {
+      await analyticsService.scheduleReport(templateId, schedule);
+      // Refresh scheduled reports
+      await loadScheduledReports();
+    } catch (error) {
+      console.error("Error scheduling report:", error);
+    }
+  };
+
+  // Load scheduled reports
+  const loadScheduledReports = async () => {
+    try {
+      const reports = await analyticsService.getScheduledReports();
+      setScheduledReports(reports);
+    } catch (error) {
+      console.error("Error loading scheduled reports:", error);
+    }
+  };
+
   // Load all data
   useEffect(() => {
     loadAnalyticsData();
     loadBusinessMetrics();
     loadBusinessInsights();
+    loadAdvancedAnalytics();
     loadReportTemplates();
+    loadScheduledReports();
   }, [
     loadAnalyticsData,
     loadBusinessMetrics,
     loadBusinessInsights,
+    loadAdvancedAnalytics,
     loadReportTemplates,
+    loadScheduledReports,
   ]);
 
   // Auto-refresh functionality
@@ -289,6 +370,7 @@ const AnalyticsHub: React.FC = () => {
         loadAnalyticsData();
         loadBusinessMetrics();
         loadBusinessInsights();
+        loadAdvancedAnalytics();
       }, 30000); // Refresh every 30 seconds
 
       return () => clearInterval(interval);
@@ -298,6 +380,23 @@ const AnalyticsHub: React.FC = () => {
     loadAnalyticsData,
     loadBusinessMetrics,
     loadBusinessInsights,
+    loadAdvancedAnalytics,
+  ]);
+
+  // Real-time updates (faster polling)
+  useEffect(() => {
+    if (isRealTimeActive) {
+      const interval = setInterval(() => {
+        // Only update advanced analytics for real-time to avoid overloading
+        loadAdvancedAnalytics();
+        setLastUpdated(new Date());
+      }, 10000); // Update every 10 seconds for real-time
+
+      return () => clearInterval(interval);
+    }
+  }, [
+    isRealTimeActive,
+    loadAdvancedAnalytics,
   ]);
 
   // Render Overview Tab
@@ -765,6 +864,151 @@ const AnalyticsHub: React.FC = () => {
               </div>
             </div>
           </GlassCard>
+
+          {/* Advanced Analytics Section */}
+          {advancedAnalytics && (
+            <>
+              {/* Trend Analysis */}
+              <GlassCard className="p-6">
+                <h3 className="text-lg font-semibold mb-4">
+                  Trend Analysis ({advancedAnalytics.period})
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {advancedAnalytics.trends.summary.revenue_growth_rate >= 0 ? '+' : ''}
+                      {advancedAnalytics.trends.summary.revenue_growth_rate.toFixed(1)}%
+                    </div>
+                    <p className="text-sm text-gray-600">Revenue Growth Rate</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      LKR {advancedAnalytics.trends.summary.avg_daily_revenue.toLocaleString()}
+                    </div>
+                    <p className="text-sm text-gray-600">Avg Daily Revenue</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {advancedAnalytics.trends.summary.avg_daily_orders.toFixed(1)}
+                    </div>
+                    <p className="text-sm text-gray-600">Avg Daily Orders</p>
+                  </div>
+                </div>
+
+                {/* Revenue Trend Chart */}
+                <div className="mt-6">
+                  <h4 className="font-medium mb-3">Revenue Trends</h4>
+                  <LineChart
+                    data={advancedAnalytics.trends.revenue_trends.map(item => ({
+                      name: item.day_name,
+                      value: item.revenue
+                    }))}
+                    dataKeys={['value']}
+                    xAxisDataKey="name"
+                    height={200}
+                    colors={['#3B82F6']}
+                  />
+                </div>
+              </GlassCard>
+
+              {/* Predictive Analytics */}
+              <GlassCard className="p-6">
+                <h3 className="text-lg font-semibold mb-4">
+                  Predictive Analytics
+                </h3>
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Model Accuracy</span>
+                    <Badge variant="outline">
+                      {advancedAnalytics.predictive.model_type} - {(advancedAnalytics.predictive.accuracy_score * 100).toFixed(0)}%
+                    </Badge>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full"
+                      style={{ width: `${advancedAnalytics.predictive.accuracy_score * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-medium mb-3">Next 7 Days Forecast</h4>
+                    <div className="space-y-2">
+                      {advancedAnalytics.predictive.predictions.slice(0, 3).map((pred, index) => (
+                        <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <span className="text-sm">{pred.date.split('-')[2]}/{pred.date.split('-')[1]}</span>
+                          <div className="text-right">
+                            <div className="text-sm font-medium">LKR {pred.predicted_revenue.toLocaleString()}</div>
+                            <div className="text-xs text-gray-600">{pred.predicted_orders} orders</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-3">Prediction Confidence</h4>
+                    <div className="space-y-2">
+                      {advancedAnalytics.predictive.predictions.slice(0, 3).map((pred, index) => (
+                        <div key={index} className="flex justify-between items-center">
+                          <span className="text-sm">Day {index + 1}</span>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-16 bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-green-600 h-2 rounded-full"
+                                style={{ width: `${pred.confidence * 100}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-xs text-gray-600">{(pred.confidence * 100).toFixed(0)}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </GlassCard>
+
+              {/* Customer Segmentation */}
+              <GlassCard className="p-6">
+                <h3 className="text-lg font-semibold mb-4">
+                  Customer Segmentation
+                </h3>
+                <p className="text-sm text-gray-600 mb-6">
+                  Total customers analyzed: {advancedAnalytics.segmentation.total_customers_analyzed}
+                </p>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {Object.entries(advancedAnalytics.segmentation.segments).map(([segment, data]) => (
+                    <div key={segment} className="text-center p-4 bg-gray-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600 mb-1">
+                        {data.customers}
+                      </div>
+                      <div className="text-sm font-medium capitalize mb-1">{segment}</div>
+                      <div className="text-xs text-gray-600">
+                        Avg: LKR {data.avg_order_value}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Total: LKR {data.total_spent.toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6">
+                  <h4 className="font-medium mb-3">Segmentation Criteria</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(advancedAnalytics.segmentation.segmentation_criteria).map(([segment, criteria]) => (
+                      <div key={segment} className="p-3 bg-blue-50 rounded-lg">
+                        <div className="font-medium capitalize text-blue-800">{segment}</div>
+                        <div className="text-sm text-blue-600">{criteria}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </GlassCard>
+            </>
+          )}
         </>
       )}
     </div>
@@ -807,6 +1051,15 @@ const AnalyticsHub: React.FC = () => {
               <Activity className="h-4 w-4 mr-2" />
               Operations Report
             </Button>
+            <Button
+              className="w-full justify-start"
+              variant="outline"
+              onClick={() => generateReport("financial")}
+              disabled={generatingReport}
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              Financial Report
+            </Button>
           </div>
         </GlassCard>
 
@@ -825,13 +1078,23 @@ const AnalyticsHub: React.FC = () => {
                       {template.description}
                     </p>
                   </div>
-                  <Badge
-                    variant={
-                      template.status === "active" ? "default" : "secondary"
-                    }
-                  >
-                    {template.status}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Badge
+                      variant={
+                        template.status === "active" ? "default" : "secondary"
+                      }
+                    >
+                      {template.status}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => generateReport(template.id)}
+                      disabled={generatingReport}
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               ))
             ) : (
@@ -850,31 +1113,135 @@ const AnalyticsHub: React.FC = () => {
           <Button
             variant="outline"
             className="flex flex-col items-center p-4 h-auto"
+            onClick={() => handleExport("pdf")}
+            disabled={exportingData}
           >
             <Download className="h-6 w-6 mb-2" />
-            <span>PDF Report</span>
+            <span>{exportingData ? "Exporting..." : "PDF Report"}</span>
           </Button>
           <Button
             variant="outline"
             className="flex flex-col items-center p-4 h-auto"
+            onClick={() => handleExport("excel")}
+            disabled={exportingData}
           >
             <FileText className="h-6 w-6 mb-2" />
-            <span>Excel Export</span>
+            <span>{exportingData ? "Exporting..." : "Excel Export"}</span>
           </Button>
           <Button
             variant="outline"
             className="flex flex-col items-center p-4 h-auto"
+            onClick={() => handleExport("csv")}
+            disabled={exportingData}
           >
             <BarChart3 className="h-6 w-6 mb-2" />
-            <span>Charts Only</span>
+            <span>{exportingData ? "Exporting..." : "CSV Data"}</span>
           </Button>
           <Button
             variant="outline"
             className="flex flex-col items-center p-4 h-auto"
+            onClick={() => scheduleReport("comprehensive", { frequency: "weekly" })}
+            disabled={exportingData}
           >
             <Calendar className="h-6 w-6 mb-2" />
             <span>Schedule Report</span>
           </Button>
+        </div>
+      </GlassCard>
+
+      {/* Custom Report Builder */}
+      <GlassCard className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Custom Report Builder</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="report-type">Report Type</Label>
+              <Select value={selectedReportType} onValueChange={setSelectedReportType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select report type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="comprehensive">Comprehensive Report</SelectItem>
+                  <SelectItem value="sales">Sales Analysis</SelectItem>
+                  <SelectItem value="customers">Customer Insights</SelectItem>
+                  <SelectItem value="operations">Operations Report</SelectItem>
+                  <SelectItem value="financial">Financial Summary</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="time-range">Time Range</Label>
+              <Select value={timeRange} onValueChange={(value: "7d" | "30d" | "90d") => setTimeRange(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7d">Last 7 days</SelectItem>
+                  <SelectItem value="30d">Last 30 days</SelectItem>
+                  <SelectItem value="90d">Last 90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch id="include-charts" />
+              <Label htmlFor="include-charts">Include Charts</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch id="include-details" />
+              <Label htmlFor="include-details">Include Detailed Data</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch id="include-recommendations" />
+              <Label htmlFor="include-recommendations">Include Recommendations</Label>
+            </div>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => handleExport("pdf", selectedReportType)}
+            disabled={!selectedReportType || exportingData}
+          >
+            Generate Custom Report
+          </Button>
+        </div>
+      </GlassCard>
+
+      {/* Scheduled Reports */}
+      <GlassCard className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Scheduled Reports</h3>
+        <div className="space-y-3">
+          {scheduledReports.length > 0 ? (
+            scheduledReports.map((report) => (
+              <div
+                key={report.id}
+                className="flex items-center justify-between p-3 border rounded-lg"
+              >
+                <div>
+                  <h4 className="font-medium">{report.name}</h4>
+                  <p className="text-sm text-gray-600">
+                    {report.frequency} • Next: {report.nextRun}
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={report.status === "active" ? "default" : "secondary"}>
+                    {report.status}
+                  </Badge>
+                  <Button size="sm" variant="ghost">
+                    <Clock className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8">
+              <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-600">No scheduled reports</p>
+              <p className="text-sm text-gray-500">Create your first scheduled report above</p>
+            </div>
+          )}
         </div>
       </GlassCard>
     </div>
@@ -891,6 +1258,24 @@ const AnalyticsHub: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-300 mt-1">
             Comprehensive business analytics and insights
           </p>
+          {lastUpdated && (
+            <div className="flex items-center space-x-2 mt-2">
+              <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              <span className="text-sm text-gray-500">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </span>
+              {autoRefresh && (
+                <Badge variant="outline" className="text-xs">
+                  Auto-refresh ON
+                </Badge>
+              )}
+              {isRealTimeActive && (
+                <Badge variant="default" className="text-xs bg-green-500">
+                  Real-time Active
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center space-x-4">
@@ -900,6 +1285,14 @@ const AnalyticsHub: React.FC = () => {
               id="auto-refresh"
               checked={autoRefresh}
               onCheckedChange={setAutoRefresh}
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="real-time">Real-time</Label>
+            <Switch
+              id="real-time"
+              checked={isRealTimeActive}
+              onCheckedChange={setIsRealTimeActive}
             />
           </div>
 
@@ -923,6 +1316,7 @@ const AnalyticsHub: React.FC = () => {
               loadAnalyticsData();
               loadBusinessMetrics();
               loadBusinessInsights();
+              loadAdvancedAnalytics();
             }}
             disabled={loading}
           >

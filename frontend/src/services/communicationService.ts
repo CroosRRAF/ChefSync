@@ -117,12 +117,13 @@ export interface EmailTemplate {
   id: number;
   name: string;
   subject: string;
-  body: string;
-  type: "welcome" | "order" | "alert" | "feedback" | "promotional";
-  variables: string[];
+  content: string;
+  template_type: "feedback" | "complaint" | "inquiry" | "general" | "resolution" | "acknowledgment";
+  variables: any;
+  is_active: boolean;
+  created_by: number;
   created_at: string;
   updated_at: string;
-  last_used_at?: string;
 }
 
 export interface SystemAlert {
@@ -401,7 +402,7 @@ class CommunicationService {
       }
 
       const response = await apiClient.post(
-        "/communications/send-email/",
+        "/communications/communications/send-email/",
         formData,
         {
           headers: {
@@ -432,7 +433,7 @@ class CommunicationService {
     } = {}
   ): Promise<PaginatedResponse<SystemAlert>> {
     try {
-      const response = await apiClient.get("/communications/", {
+      const response = await apiClient.get("/communications/communications/", {
         params: { ...params, type: "system_alert" },
       });
       return response.data;
@@ -445,7 +446,7 @@ class CommunicationService {
     data: Omit<SystemAlert, "id" | "created_at" | "updated_at">
   ): Promise<SystemAlert> {
     try {
-      const response = await apiClient.post("/communications/", data);
+      const response = await apiClient.post("/communications/communications/", data);
       toast({
         title: "Success",
         description: "System alert created successfully",
@@ -461,7 +462,7 @@ class CommunicationService {
     data: Partial<SystemAlert>
   ): Promise<SystemAlert> {
     try {
-      const response = await apiClient.patch(`/communications/${id}/`, data);
+      const response = await apiClient.patch(`/communications/communications/${id}/`, data);
       toast({
         title: "Success",
         description: "System alert updated successfully",
@@ -474,7 +475,7 @@ class CommunicationService {
 
   async deleteSystemAlert(id: number): Promise<void> {
     try {
-      await apiClient.delete(`/communications/${id}/`);
+      await apiClient.delete(`/communications/communications/${id}/`);
       toast({
         title: "Success",
         description: "System alert deleted successfully",
@@ -486,7 +487,7 @@ class CommunicationService {
 
   async sendSystemAlert(id: number): Promise<SystemAlert> {
     try {
-      const response = await apiClient.post(`/communications/${id}/send/`);
+      const response = await apiClient.post(`/communications/communications/${id}/send/`);
       toast({
         title: "Success",
         description: "System alert sent successfully",
@@ -557,7 +558,7 @@ class CommunicationService {
     priority: string
   ): Promise<Communication> {
     try {
-      const response = await apiClient.patch(`/communications/${communicationId}/`, {
+      const response = await apiClient.patch(`/communications/communications/${communicationId}/`, {
         priority,
       });
       toast({
@@ -572,7 +573,7 @@ class CommunicationService {
 
   async bulkUpdateStatus(communicationIds: number[], status: string): Promise<void> {
     try {
-      await apiClient.patch("/communications/bulk-update/", {
+      await apiClient.patch("/communications/communications/bulk-update/", {
         ids: communicationIds,
         status,
       });

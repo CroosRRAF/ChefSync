@@ -59,7 +59,9 @@ export const AnimatedStats: React.FC<AnimatedStatsProps> = ({
 
   useEffect(() => {
     if (!loading) {
-      motionValue.set(value);
+      // Ensure value is a valid number before setting motion value
+      const safeValue = isNaN(value) || value === null || value === undefined ? 0 : value;
+      motionValue.set(safeValue);
     }
   }, [value, loading, motionValue]);
 
@@ -72,6 +74,11 @@ export const AnimatedStats: React.FC<AnimatedStatsProps> = ({
   }, [springValue]);
 
   const formatValue = (val: number) => {
+    // Handle NaN, undefined, or null values
+    if (isNaN(val) || val === null || val === undefined) {
+      return "0";
+    }
+    
     if (val >= 1000000) {
       return `${(val / 1000000).toFixed(1)}M`;
     }

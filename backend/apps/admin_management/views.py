@@ -923,7 +923,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 )
                 .values("user")
                 .annotate(
-                    order_count=Count("order_id"),
+                    order_count=Count("id"),
                     total_spent=Sum("total_amount"),
                     avg_order_value=Avg("total_amount"),
                     last_order=models.Max("created_at"),
@@ -1029,7 +1029,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 Order.objects.filter(payment_status="paid", created_at__gte=start_date)
                 .extra(select={"hour": "EXTRACT(hour FROM created_at)"})
                 .values("hour")
-                .annotate(count=Count("order_id"))
+                .annotate(count=Count("id"))
                 .order_by("hour")
             )
 
@@ -1113,7 +1113,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 Order.objects.filter(created_at__gte=start_date)
                 .extra(select={"hour": "EXTRACT(hour FROM created_at)"})
                 .values("hour")
-                .annotate(count=Count("order_id"))
+                .annotate(count=Count("id"))
                 .order_by("-count")
             )
 
@@ -1282,7 +1282,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 Order.objects.filter(created_at__gte=start_date)
                 .extra(select={"date": "DATE(created_at)"})
                 .values("date")
-                .annotate(count=Count("order_id"), revenue=Sum("total_amount"))
+                .annotate(count=Count("id"), revenue=Sum("total_amount"))
                 .order_by("date")
             )
 
@@ -1319,7 +1319,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 .values("price__food__name", "price__food_id")
                 .annotate(
                     total_quantity=Sum("quantity"),
-                    order_count=Count("order_id", distinct=True),
+                    order_count=Count("id", distinct=True),
                 )
                 .order_by("-total_quantity")[:5]
             )
@@ -1345,7 +1345,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 Order.objects.filter(payment_status="paid", created_at__gte=start_date)
                 .values("user")
                 .annotate(
-                    order_count=Count("order_id"),
+                    order_count=Count("id"),
                     total_spent=Sum("total_amount"),
                     avg_order=Avg("total_amount"),
                 )

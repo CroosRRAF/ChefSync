@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useEffect, useState } from 'react';
 
 /**
  * Debounce hook for performance optimization
@@ -268,8 +268,7 @@ export function analyzeBundleSize() {
   }
 }
 
-// Import React for lazy component creation
-import React, { useState } from 'react';
+// React is already imported at the top
 
 export default {
   useDebounce,

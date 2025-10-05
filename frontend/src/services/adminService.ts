@@ -614,7 +614,7 @@ class AdminService {
   }
 
   // Approval Management
-  async getPendingApprovals(role: "cook" | "delivery_agent"): Promise<{
+  async getPendingApprovals(role?: "cook" | "delivery_agent"): Promise<{
     users: Array<{
       id: number;
       name: string;
@@ -636,9 +636,9 @@ class AdminService {
   }> {
     try {
       const response = await apiClient.get(
-        `${this.baseUrl}/users/pending_approvals/`,
+        `/auth/admin/pending-approvals/`,
         {
-          params: { role },
+          params: role ? { role } : {},
         }
       );
       return response.data;
@@ -664,7 +664,7 @@ class AdminService {
   }> {
     try {
       const response = await apiClient.post(
-        `${this.baseUrl}/users/${userId}/approve_user/`,
+        `/auth/admin/user/${userId}/approve/`,
         {
           action,
           notes,

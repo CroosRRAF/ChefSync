@@ -85,9 +85,12 @@ const DataTable = <T extends Record<string, any>>({
 
   // Filter data based on search query
   const filteredData = useMemo(() => {
-    if (!searchQuery.trim()) return data;
+    // Ensure data is always an array
+    const safeData = Array.isArray(data) ? data : [];
+    
+    if (!searchQuery.trim()) return safeData;
 
-    return data.filter((row) =>
+    return safeData.filter((row) =>
       Object.values(row).some((value) =>
         String(value).toLowerCase().includes(searchQuery.toLowerCase())
       )
@@ -211,8 +214,8 @@ const DataTable = <T extends Record<string, any>>({
       );
     }
 
-    if (value instanceof Date) {
-      return value.toLocaleDateString();
+    if (value && typeof value === 'object' && (value as any) instanceof Date) {
+      return (value as Date).toLocaleDateString();
     }
 
     return String(value || "");
@@ -369,7 +372,7 @@ const DataTable = <T extends Record<string, any>>({
                       <Checkbox
                         checked={selectedRows.has(index)}
                         onCheckedChange={(checked) =>
-                          handleRowSelect(index, checked)
+                          handleRowSelect(index, Boolean(checked))
                         }
                         onClick={(e) => e.stopPropagation()}
                       />

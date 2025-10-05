@@ -150,7 +150,7 @@ const UserManagementHub: React.FC = () => {
 
   // Active tab state
   const [activeTab, setActiveTab] = useState<
-    "users" | "profile" | "security" | "activity"
+    "users" | "pending" | "profile" | "security" | "activity"
   >("users");
 
   // User Management States
@@ -165,6 +165,13 @@ const UserManagementHub: React.FC = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
+  const [userToApprove, setUserToApprove] = useState<User | null>(null);
+  const [approvalNotes, setApprovalNotes] = useState("");
+  const [showUserDetails, setShowUserDetails] = useState(false);
+  const [selectedUserDetails, setSelectedUserDetails] = useState<any>(null);
+  const [loadingUserDetails, setLoadingUserDetails] = useState(false);
 
   // Profile Management States
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
@@ -403,6 +410,89 @@ const UserManagementHub: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
+  // Handle user approval with notes
+  const handleApprove = (user: User) => {
+    setUserToApprove(user);
+    setApprovalAction("approve");
+    setApprovalNotes("");
+    setShowApprovalDialog(true);
+  };
+
+  // Handle user rejection with notes
+  const handleReject = (user: User) => {
+    setUserToApprove(user);
+    setApprovalAction("reject");
+    setApprovalNotes("");
+    setShowApprovalDialog(true);
+  };
+
+  // Confirm approval/rejection with notes
+  const confirmApprovalAction = async () => {
+    if (!userToApprove || !approvalAction) return;
+
+    try {
+      await adminService.approveUser(userToApprove.id, approvalAction, approvalNotes);
+      toast({
+        title: "Success",
+        description: `User ${approvalAction}d successfully`,
+      });
+      loadUsers(); // Refresh the list
+      setShowApprovalDialog(false);
+      setUserToApprove(null);
+      setApprovalAction(null);
+      setApprovalNotes("");
+    } catch (error) {
+      console.error(`Error ${approvalAction}ing user:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to ${approvalAction} user`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Load user details for view details
+  const loadUserDetails = async (userId: number) => {
+    try {
+      setLoadingUserDetails(true);
+      
+      // First, try to get user details from admin management (works for all user types)
+      try {
+        const userDetails = await adminService.getUserDetails(userId);
+        setSelectedUserDetails(userDetails);
+        setShowUserDetails(true);
+        return;
+      } catch (adminError) {
+        console.log("Admin service failed, trying auth endpoint:", adminError);
+      }
+
+      // If admin service fails, try the auth endpoint (only works for cook/delivery_agent)
+      const response = await fetch(`/api/auth/admin/user/${userId}/`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const userDetails = await response.json();
+        setSelectedUserDetails(userDetails);
+        setShowUserDetails(true);
+      } else {
+        throw new Error("Failed to fetch user details from both endpoints");
+      }
+    } catch (error) {
+      console.error("Error loading user details:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load user details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingUserDetails(false);
+    }
+  };
+
   const confirmDeleteUser = async () => {
     if (!userToDelete) return;
 
@@ -465,7 +555,7 @@ const UserManagementHub: React.FC = () => {
   // Load data on mount and tab changes
   useEffect(() => {
     loadUserStats();
-    if (activeTab === "users") {
+    if (activeTab === "users" || activeTab === "pending") {
       loadUsers();
     } else if (activeTab === "profile") {
       loadAdminProfile();
@@ -581,7 +671,7 @@ const UserManagementHub: React.FC = () => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setSelectedUser(user)}>
+            <DropdownMenuItem onClick={() => loadUserDetails(user.id)}>
               <Eye className="h-4 w-4 mr-2" />
               View Details
             </DropdownMenuItem>
@@ -600,6 +690,19 @@ const UserManagementHub: React.FC = () => {
                 </>
               )}
             </DropdownMenuItem>
+            {user?.approval_status === "pending" && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleApprove(user)}>
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Approve User
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleReject(user)}>
+                  <UserX className="h-4 w-4 mr-2" />
+                  Reject User
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => handleDeleteUser(user)}
@@ -763,6 +866,104 @@ const UserManagementHub: React.FC = () => {
       </GlassCard>
     </div>
   );
+
+  // Render Pending Approvals Tab
+  const renderPendingApprovalsTab = () => {
+    const pendingUsers = users.filter(user => user.approval_status === "pending");
+    
+    return (
+      <div className="space-y-6">
+        {/* Pending Approvals Header */}
+        <GlassCard className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Pending User Approvals</h3>
+              <p className="text-gray-600 dark:text-gray-300">
+                Review and approve cook and delivery agent applications
+              </p>
+            </div>
+            <Badge variant="outline" className="text-orange-600 border-orange-200">
+              {pendingUsers.length} Pending
+            </Badge>
+          </div>
+        </GlassCard>
+
+        {/* Pending Users List */}
+        {pendingUsers.length > 0 ? (
+          <div className="space-y-4">
+            {pendingUsers.map((user) => (
+              <GlassCard key={user.id} className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src="" />
+                      <AvatarFallback>
+                        {user?.name
+                          ? user.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()
+                          : "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="font-medium">{user?.name || "Unknown User"}</div>
+                      <div className="text-sm text-gray-500">{user?.email || "No email"}</div>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <Badge variant="secondary">{user?.role?.replace("_", " ") || "Unknown"}</Badge>
+                        <Badge variant="outline" className="text-orange-600 border-orange-200">
+                          Pending Approval
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      onClick={() => handleApprove(user)}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <UserCheck className="h-4 w-4 mr-2" />
+                      Approve
+                    </Button>
+                    <Button
+                      onClick={() => handleReject(user)}
+                      size="sm"
+                      variant="destructive"
+                    >
+                      <UserX className="h-4 w-4 mr-2" />
+                      Reject
+                    </Button>
+                    <Button
+                      onClick={() => loadUserDetails(user.id)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Details
+                    </Button>
+                  </div>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
+        ) : (
+          <GlassCard className="p-6">
+            <div className="text-center py-8">
+              <UserCheck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                No Pending Approvals
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400">
+                All user applications have been reviewed and processed.
+              </p>
+            </div>
+          </GlassCard>
+        )}
+      </div>
+    );
+  };
 
   // Render Profile Tab
   const renderProfileTab = () => (
@@ -1179,8 +1380,11 @@ const UserManagementHub: React.FC = () => {
         value={activeTab}
         onValueChange={(value: any) => setActiveTab(value)}
       >
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="pending">
+            Pending Approvals {userStats?.pendingApprovals ? `(${userStats.pendingApprovals})` : ''}
+          </TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
@@ -1188,6 +1392,10 @@ const UserManagementHub: React.FC = () => {
 
         <TabsContent value="users" className="mt-6">
           {renderUsersTab()}
+        </TabsContent>
+
+        <TabsContent value="pending" className="mt-6">
+          {renderPendingApprovalsTab()}
         </TabsContent>
 
         <TabsContent value="profile" className="mt-6">
@@ -1221,6 +1429,261 @@ const UserManagementHub: React.FC = () => {
             >
               Delete
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Approval Dialog */}
+      <AlertDialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {approvalAction === "approve" ? "Approve User" : "Reject User"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {approvalAction === "approve" 
+                ? `Are you sure you want to approve ${userToApprove?.name}? This will activate their account and send them a notification email.`
+                : `Are you sure you want to reject ${userToApprove?.name}? This will prevent them from using the platform and send them a notification email.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="approval-notes">
+                {approvalAction === "approve" ? "Approval Notes (Optional)" : "Rejection Reason (Required)"}
+              </Label>
+              <Textarea
+                id="approval-notes"
+                placeholder={
+                  approvalAction === "approve" 
+                    ? "Add any notes about the approval..."
+                    : "Please provide a reason for rejection..."
+                }
+                value={approvalNotes}
+                onChange={(e) => setApprovalNotes(e.target.value)}
+                rows={3}
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmApprovalAction}
+              className={
+                approvalAction === "approve" 
+                  ? "bg-green-600 hover:bg-green-700" 
+                  : "bg-red-600 hover:bg-red-700"
+              }
+              disabled={approvalAction === "reject" && !approvalNotes.trim()}
+            >
+              {approvalAction === "approve" ? "Approve" : "Reject"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* User Details Modal */}
+      <AlertDialog open={showUserDetails} onOpenChange={setShowUserDetails}>
+        <AlertDialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>User Details</AlertDialogTitle>
+            <AlertDialogDescription>
+              Complete information about {selectedUserDetails?.name}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {loadingUserDetails ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">Loading user details...</span>
+            </div>
+          ) : selectedUserDetails ? (
+            <div className="space-y-6">
+              {/* User Basic Info */}
+              <GlassCard className="p-4">
+                <h3 className="text-lg font-semibold mb-3">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Name</Label>
+                    <p className="text-sm">{selectedUserDetails.name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Email</Label>
+                    <p className="text-sm">{selectedUserDetails.email}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Role</Label>
+                    <Badge variant="secondary">{selectedUserDetails.role}</Badge>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Status</Label>
+                    <Badge variant={
+                      selectedUserDetails.approval_status === "approved" || selectedUserDetails.is_active 
+                        ? "default" : "outline"
+                    }>
+                      {selectedUserDetails.approval_status_display || 
+                       (selectedUserDetails.is_active ? "Active" : "Inactive")}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Phone</Label>
+                    <p className="text-sm">{selectedUserDetails.phone_no || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Created</Label>
+                    <p className="text-sm">{new Date(selectedUserDetails.date_joined || selectedUserDetails.created_at).toLocaleDateString()}</p>
+                  </div>
+                  {selectedUserDetails.approved_at && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Approved</Label>
+                      <p className="text-sm">{new Date(selectedUserDetails.approved_at).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                  {selectedUserDetails.last_login && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Last Login</Label>
+                      <p className="text-sm">{new Date(selectedUserDetails.last_login).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                </div>
+                {selectedUserDetails.address && (
+                  <div className="mt-4">
+                    <Label className="text-sm font-medium text-gray-500">Address</Label>
+                    <p className="text-sm">{selectedUserDetails.address}</p>
+                  </div>
+                )}
+                {selectedUserDetails.approval_notes && (
+                  <div className="mt-4">
+                    <Label className="text-sm font-medium text-gray-500">Approval Notes</Label>
+                    <p className="text-sm bg-gray-50 p-2 rounded">{selectedUserDetails.approval_notes}</p>
+                  </div>
+                )}
+              </GlassCard>
+
+              {/* User Statistics (if available) */}
+              {selectedUserDetails.statistics && (
+                <GlassCard className="p-4">
+                  <h3 className="text-lg font-semibold mb-3">User Statistics</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Total Orders</Label>
+                      <p className="text-sm font-medium">{selectedUserDetails.statistics.total_orders || 0}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Total Spent</Label>
+                      <p className="text-sm font-medium">LKR {selectedUserDetails.statistics.total_spent?.toLocaleString() || "0"}</p>
+                    </div>
+                  </div>
+                </GlassCard>
+              )}
+
+              {/* Recent Orders (if available) */}
+              {selectedUserDetails.recent_orders && selectedUserDetails.recent_orders.length > 0 && (
+                <GlassCard className="p-4">
+                  <h3 className="text-lg font-semibold mb-3">Recent Orders</h3>
+                  <div className="space-y-2">
+                    {selectedUserDetails.recent_orders.map((order: any) => (
+                      <div key={order.id} className="flex items-center justify-between p-2 border rounded">
+                        <div>
+                          <p className="font-medium">#{order.order_number}</p>
+                          <p className="text-sm text-gray-500">{new Date(order.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">LKR {order.total_amount?.toLocaleString()}</p>
+                          <Badge variant="outline">{order.status}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </GlassCard>
+              )}
+
+              {/* Documents Section */}
+              {selectedUserDetails.documents && selectedUserDetails.documents.length > 0 && (
+                <GlassCard className="p-4">
+                  <h3 className="text-lg font-semibold mb-3">Submitted Documents</h3>
+                  <div className="space-y-3">
+                    {selectedUserDetails.documents.map((doc: any) => (
+                      <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <Download className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{doc.file_name}</p>
+                            <p className="text-sm text-gray-500">{doc.document_type}</p>
+                            <p className="text-xs text-gray-400">
+                              Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(doc.file_url, '_blank')}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = doc.file_url;
+                              link.download = doc.file_name;
+                              link.click();
+                            }}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </GlassCard>
+              )}
+
+              {/* Approval Actions */}
+              {selectedUserDetails.approval_status === "pending" && (
+                <GlassCard className="p-4">
+                  <h3 className="text-lg font-semibold mb-3">Approval Actions</h3>
+                  <div className="flex space-x-3">
+                    <Button
+                      onClick={() => {
+                        setShowUserDetails(false);
+                        const userId = selectedUserDetails.user_id || selectedUserDetails.id;
+                        handleApprove({ id: userId, name: selectedUserDetails.name } as User);
+                      }}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <UserCheck className="h-4 w-4 mr-2" />
+                      Approve User
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowUserDetails(false);
+                        const userId = selectedUserDetails.user_id || selectedUserDetails.id;
+                        handleReject({ id: userId, name: selectedUserDetails.name } as User);
+                      }}
+                      variant="destructive"
+                    >
+                      <UserX className="h-4 w-4 mr-2" />
+                      Reject User
+                    </Button>
+                  </div>
+                </GlassCard>
+              )}
+            </div>
+          ) : null}
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel>Close</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

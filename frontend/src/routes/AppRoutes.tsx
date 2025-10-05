@@ -62,6 +62,7 @@ const UserManagementHub = React.lazy(() => import("@/pages/admin/UserManagementH
 const OrderManagementHub = React.lazy(() => import("@/pages/admin/OrderManagementHub"));
 const ContentManagementHub = React.lazy(() => import("@/pages/admin/ContentManagementHub"));
 const CommunicationCenter = React.lazy(() => import("@/pages/admin/CommunicationCenter"));
+const PaymentManagementHub = React.lazy(() => import("@/pages/admin/PaymentManagementHub"));
 const SystemHub = React.lazy(() => import("@/pages/admin/SystemHub"));
 const AdminDashboard = React.lazy(() => import("@/pages/admin/Dashboard"));
 const TestingDashboard = React.lazy(() => import("@/pages/admin/TestingDashboard"));
@@ -581,6 +582,18 @@ const InnerRoutes: React.FC = () => {
           }
         />
         <Route
+          path="/admin/manage-user"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <UserManagementHub />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/orders"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
@@ -611,6 +624,78 @@ const InnerRoutes: React.FC = () => {
               <AdminLayout>
                 <Suspense fallback={<LazyLoadingFallback />}>
                   <CommunicationCenter />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/communication"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <CommunicationCenter />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/feedback-management"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <CommunicationCenter />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/food-menu-management"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <ContentManagementHub />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/payment-management"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <PaymentManagementHub />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <AnalyticsHub />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/profile"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <UserManagementHub />
                 </Suspense>
               </AdminLayout>
             </ProtectedRoute>

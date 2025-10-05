@@ -85,7 +85,6 @@ export const LazyPageWrapper: React.FC<LazyPageWrapperProps> = ({
 }) => {
   return (
     <ErrorBoundary
-      level="page"
       fallback={errorFallback}
       onError={(error, errorInfo) => {
         console.error('Lazy page error:', error, errorInfo);
@@ -112,7 +111,7 @@ export const LazyPageWrapper: React.FC<LazyPageWrapperProps> = ({
 };
 
 // Higher-order component for lazy loading pages
-export function withLazyLoading<P extends object>(
+export function withLazyLoading<P extends Record<string, any>>(
   Component: React.ComponentType<P>,
   options: {
     fallback?: React.ReactNode;
@@ -122,7 +121,7 @@ export function withLazyLoading<P extends object>(
 ) {
   const LazyComponent = React.forwardRef<any, P>((props, ref) => (
     <LazyPageWrapper {...options}>
-      <Component {...props} ref={ref} />
+      <Component {...(props as P)} ref={ref} />
     </LazyPageWrapper>
   ));
 
