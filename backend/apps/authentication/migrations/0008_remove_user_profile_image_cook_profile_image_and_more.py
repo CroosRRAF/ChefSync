@@ -6,27 +6,33 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('authentication', '0007_merge_20250924_1249'),
+        ("authentication", "0001_initial"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='user',
-            name='profile_image',
+            model_name="user",
+            name="profile_image",
         ),
         migrations.AddField(
-            model_name='cook',
-            name='profile_image',
-            field=models.BinaryField(blank=True, help_text='Cook profile image', null=True),
+            model_name="cook",
+            name="profile_image",
+            field=models.BinaryField(
+                blank=True, help_text="Cook profile image", null=True
+            ),
         ),
         migrations.AddField(
-            model_name='customer',
-            name='profile_image',
-            field=models.BinaryField(blank=True, help_text='Customer profile image', null=True),
+            model_name="customer",
+            name="profile_image",
+            field=models.BinaryField(
+                blank=True, help_text="Customer profile image", null=True
+            ),
         ),
         migrations.AddField(
-            model_name='deliveryagent',
-            name='profile_image',
-            field=models.BinaryField(blank=True, help_text='Delivery agent profile image', null=True),
+            model_name="deliveryagent",
+            name="profile_image",
+            field=models.BinaryField(
+                blank=True, help_text="Delivery agent profile image", null=True
+            ),
         ),
     ]

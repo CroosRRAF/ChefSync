@@ -118,8 +118,25 @@ class Order(models.Model):
     )
 
     # Delivery Information
-    delivery_address = models.TextField(default='No address provided')
-    delivery_address_ref = models.ForeignKey(UserAddress, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
+    delivery_address = models.TextField(default="No address provided")  # Keep for backward compatibility
+    delivery_address_ref = models.ForeignKey(
+        UserAddress,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
+    )  # Deprecated
+
+    # New address system - reference to apps.users.address_models.Address
+    delivery_address_new = models.ForeignKey(
+        'users.Address',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='delivery_orders',
+        help_text='New address system reference'
+    )
+
     delivery_instructions = models.TextField(blank=True)
     delivery_latitude = models.DecimalField(
         max_digits=10, decimal_places=8, null=True, blank=True
@@ -135,6 +152,17 @@ class Order(models.Model):
         help_text="Distance from kitchen to delivery address in km",
     )
     promo_code = models.CharField(max_length=50, null=True, blank=True)
+
+
+    # Kitchen location reference
+    kitchen_location = models.ForeignKey(
+        'users.Address',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='kitchen_orders',
+        help_text='Kitchen location for this order'
+    )
 
     # Timing
     estimated_delivery_time = models.DateTimeField(null=True, blank=True)

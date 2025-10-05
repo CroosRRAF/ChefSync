@@ -1,33 +1,45 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { pdfConverter, type PDFConversionResult } from '@/utils/pdfConverter';
+import {
+  Upload,
+  FileText,
+  Image,
+  File,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  Download,
+  Eye,
+  ArrowRight
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface DocumentType {
   id: number;
   name: string;
   description: string;
   is_required: boolean;
-  allowed_file_types: string | string[];
+  allowed_file_types: string | string[]; // Can be either string (comma-separated) or array
   max_file_size_mb: number;
-  max_pages?: number;
-  is_single_page_only?: boolean;
 }
 
 interface UploadedFile {
   id: string;
   file: File;
   documentType: DocumentType;
-  status: 'uploading' | 'success' | 'error' | 'pending' | 'converting';
+  status: 'uploading' | 'success' | 'error' | 'pending';
   progress: number;
   error?: string;
   preview?: string;
   documentId?: number;
   isPdfConverted?: boolean;
-  convertedImages?: File[];
-  originalPdfFile?: File;
+  convertedImages?: any[];
 }
 
 interface DocumentUploadProps {
@@ -36,58 +48,69 @@ interface DocumentUploadProps {
   onBack: () => void;
 }
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ 
-  role, 
-  onDocumentsComplete, 
-  onBack 
+const DocumentUpload: React.FC<DocumentUploadProps> = ({
+  role,
+  onDocumentsComplete,
+  onBack
 }) => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [selectedDocumentType, setSelectedDocumentType] = useState<DocumentType | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isConverting, setIsConverting] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [uploadedDocumentTypes, setUploadedDocumentTypes] = useState<Set<number>>(new Set());
+  const { toast } = useToast();
+
   const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
   const [isLoadingTypes, setIsLoadingTypes] = useState(true);
 
   // Fetch document types from API
   useEffect(() => {
+    console.log('DocumentUpload component mounted with role:', role);
     const fetchDocumentTypes = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-        const response = await fetch(`${apiUrl}/api/auth/documents/types/?role=${role}`);
+        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+        const response = await fetch(`${apiUrl}/auth/documents/types/?role=${role}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch document types: ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        const normaliseList = (items: DocumentType[]): DocumentType[] =>
-          items.map((item) => ({
-            ...item,
-            allowed_file_types: Array.isArray(item.allowed_file_types)
-              ? item.allowed_file_types.join(',')
-              : item.allowed_file_types || '',
-          }));
-
-        if (Array.isArray(data)) {
-          setDocumentTypes(normaliseList(data));
-        } else if (data.document_types && Array.isArray(data.document_types)) {
-          setDocumentTypes(normaliseList(data.document_types));
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Fetched document types:', data);
+          setDocumentTypes(data);
         } else {
-          setDocumentTypes([]);
+          console.error('Failed to fetch document types:', response.status, response.statusText);
+          toast({
+            title: "Error",
+            description: "Failed to load document types. Please try again.",
+            variant: "destructive",
+          });
         }
-
       } catch (error) {
         console.error('Error fetching document types:', error);
-        alert('Failed to load document types. Please refresh the page and try again.');
-        setDocumentTypes([]);
+        toast({
+          title: "Error",
+          description: "Failed to load document types. Please try again.",
+          variant: "destructive",
+        });
       } finally {
         setIsLoadingTypes(false);
       }
     };
 
     fetchDocumentTypes();
-  }, [role]);
+  }, [role, toast]);
+
+  const getFileIcon = (fileType: string, isPdfConverted?: boolean) => {
+    if (fileType.startsWith('image/') || isPdfConverted) {
+      return <Image className="w-5 h-5" />;
+    } else if (fileType === 'application/pdf') {
+      return <FileText className="w-5 h-5" />;
+    }
+    return <File className="w-5 h-5" />;
+  };
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -97,244 +120,308 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getFileExtension = (fileName: string): string => {
-    return fileName.toLowerCase().split('.').pop() || '';
+  // Helper function to normalize allowed_file_types to array
+  const getAllowedFileTypes = (documentType: DocumentType): string[] => {
+    if (Array.isArray(documentType.allowed_file_types)) {
+      return documentType.allowed_file_types;
+    } else if (typeof documentType.allowed_file_types === 'string') {
+      return documentType.allowed_file_types.split(',').map(type => type.trim());
+    }
+    return [];
   };
 
   const validateFile = (file: File, documentType: DocumentType): string | null => {
+    // Check if file is empty
     if (!file || file.size === 0) {
       return "File cannot be empty";
     }
 
+    // Check file name
     if (!file.name || file.name.trim().length === 0) {
       return "File name cannot be empty";
     }
 
-    const extension = getFileExtension(file.name);
-    if (!extension) {
+    // Check file extension
+    const fileParts = file.name.split('.');
+    if (fileParts.length < 2) {
       return "File must have a valid extension";
     }
 
+    // Check file size
     const maxSizeBytes = documentType.max_file_size_mb * 1024 * 1024;
     if (file.size > maxSizeBytes) {
       const fileSizeMB = Math.round((file.size / (1024 * 1024)) * 100) / 100;
-      return `File size (${fileSizeMB}MB) exceeds maximum allowed size (${documentType.max_file_size_mb}MB)`;
+      return `File size (${fileSizeMB}MB) exceeds maximum allowed size (${documentType.max_file_size_mb}MB). Please choose a smaller file.`;
     }
 
-    const rawTypes = typeof documentType.allowed_file_types === 'string'
-      ? documentType.allowed_file_types
-      : (documentType.allowed_file_types || []).join(',');
+    // Check file type
+    const fileExtension = fileParts[fileParts.length - 1].toLowerCase();
+    const allowedTypes = getAllowedFileTypes(documentType).map(type => type.toLowerCase());
+    if (!allowedTypes.includes(fileExtension)) {
+      const allowedTypesDisplay = allowedTypes.map(t => `.${t}`).join(', ');
+      return `File type '.${fileExtension}' is not allowed. Please upload a file with one of these formats: ${allowedTypesDisplay}`;
+    }
 
-    const allowedTypes = rawTypes
-      .split(',')
-      .map(t => t.trim().toLowerCase())
-      .filter(Boolean);
-    if (!allowedTypes.includes(extension)) {
-      return `File type '.${extension.toUpperCase()}' is not allowed. Allowed: ${allowedTypes.map(t => `.${t.toUpperCase()}`).join(', ')}`;
+    // Basic PDF validation (header check will be done in async validation)
+    if (fileExtension === 'pdf') {
+      // Additional size check for PDFs
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit for PDFs
+        return "PDF file is too large. Maximum size allowed is 10MB.";
+      }
     }
 
     return null;
   };
 
-  const handleFileSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || !selectedDocumentType) return;
+  const validatePDFFile = async (file: File): Promise<string | null> => {
+    try {
+      // First check PDF header
+      const headerCheck = await new Promise<string | null>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          const uint8Array = new Uint8Array(arrayBuffer);
 
-    const newFiles: UploadedFile[] = [];
-    
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const id = Math.random().toString(36).substr(2, 9);
-      const error = validateFile(file, selectedDocumentType);
-      
-      // Check if it's a PDF file
-      const isPdf = file.name.toLowerCase().endsWith('.pdf');
-      
-      const uploadedFile: UploadedFile = {
-        id,
-        file,
-        documentType: selectedDocumentType,
-        status: error ? 'error' : 'pending',
-        progress: 0,
-        error,
-        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
-        isPdfConverted: false,
-        originalPdfFile: isPdf ? file : undefined
-      };
+          // Check PDF header (%PDF)
+          const header = String.fromCharCode(uint8Array[0], uint8Array[1], uint8Array[2], uint8Array[3]);
+          if (header !== '%PDF') {
+            resolve("Invalid PDF file. Please ensure the file is a valid PDF document.");
+            return;
+          }
+          resolve(null);
+        };
+        reader.onerror = () => {
+          resolve("Error reading PDF file. Please try again.");
+        };
+        reader.readAsArrayBuffer(file.slice(0, 1024)); // Read first 1KB to check header
+      });
 
-      newFiles.push(uploadedFile);
-    }
-
-    setUploadedFiles(prev => [...prev, ...newFiles]);
-
-    // Process files (convert PDFs and upload)
-    for (const uploadedFile of newFiles) {
-      if (uploadedFile.status === 'pending') {
-        await processFile(uploadedFile);
+      if (headerCheck) {
+        return headerCheck;
       }
-    }
 
-    // Reset input
-    event.target.value = '';
+      // Now check page count using pdf-lib
+      try {
+        const { PDFDocument } = await import('pdf-lib');
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        const pageCount = pdfDoc.getPageCount();
+
+        if (pageCount > 3) {
+          return `PDF has ${pageCount} pages. Maximum allowed is 3 pages. Please use a PDF with fewer pages.`;
+        }
+
+        if (pageCount === 0) {
+          return "PDF appears to be empty or corrupted. Please check your file.";
+        }
+
+        return null; // PDF is valid
+      } catch (pdfError) {
+        console.error('PDF parsing error:', pdfError);
+        // If pdf-lib fails, we'll let the backend handle the validation
+        // This provides a fallback for edge cases
+        console.log('Falling back to backend validation for PDF page count');
+        return null;
+      }
+    } catch (error) {
+      console.error('PDF validation error:', error);
+      return "Error validating PDF file. Please try again.";
+    }
   };
 
-  const processFile = async (uploadedFile: UploadedFile) => {
-    const isPdf = uploadedFile.file.name.toLowerCase().endsWith('.pdf');
-    
-    if (isPdf) {
-      // Convert PDF to images first
-      await convertPdfToImages(uploadedFile);
-    } else {
-      // Upload image file directly
-      uploadFile(uploadedFile);
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (!selectedDocumentType) {
+      toast({
+        title: "Select Document Type",
+        description: "Please select a document type before uploading files.",
+        variant: "destructive",
+      });
+      return;
     }
-  };
 
-  const convertPdfToImages = async (uploadedFile: UploadedFile) => {
-    setIsConverting(true);
-    
-    // Update status to converting
-    setUploadedFiles(prev => prev.map(file => 
-      file.id === uploadedFile.id 
-        ? { ...file, status: 'converting' as const }
-        : file
-    ));
+    setIsValidating(true);
+    const newFiles: UploadedFile[] = [];
 
     try {
-      // Convert PDF to images
-      const conversionResult = await pdfConverter.convertPDFToImages(uploadedFile.file);
-      
-      if (!conversionResult.success) {
-        throw new Error(conversionResult.message);
+      // Validate files (including async PDF validation)
+      for (const file of acceptedFiles) {
+        const id = Math.random().toString(36).substr(2, 9);
+        let error: string | null = null;
+
+        // Basic validation
+        error = validateFile(file, selectedDocumentType);
+
+      // If it's a PDF and basic validation passed, do async PDF validation
+      if (!error && file.name.toLowerCase().endsWith('.pdf')) {
+        try {
+          error = await validatePDFFile(file);
+        } catch (validationError) {
+          console.error('PDF validation failed:', validationError);
+          // If client-side validation fails, let the backend handle it
+          error = null;
+        }
       }
 
-      if (!conversionResult.images || conversionResult.images.length === 0) {
-        throw new Error('No images generated from PDF');
+        newFiles.push({
+          id,
+          file,
+          documentType: selectedDocumentType,
+          status: error ? 'error' : 'pending',
+          progress: 0,
+          error,
+          preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
+        });
       }
 
-      // Create File objects from converted images
-      const imageFiles = pdfConverter.createImageFiles(conversionResult.images, uploadedFile.file.name);
-      
-      // Update the uploaded file with converted images
-      const updatedFile: UploadedFile = {
-        ...uploadedFile,
-        status: 'pending' as const,
-        isPdfConverted: true,
-        convertedImages: imageFiles,
-        preview: conversionResult.images[0].dataUrl // Use first image as preview
-      };
+      setUploadedFiles(prev => [...prev, ...newFiles]);
 
-      setUploadedFiles(prev => prev.map(file => 
-        file.id === uploadedFile.id ? updatedFile : file
-      ));
-
-      // Upload each converted image
-      for (let i = 0; i < imageFiles.length; i++) {
-        const imageFile = imageFiles[i];
-        const imageUploadFile: UploadedFile = {
-          ...updatedFile,
-          id: `${uploadedFile.id}_img_${i}`,
-          file: imageFile,
-          status: 'pending' as const,
-          progress: 0
-        };
-
-        await uploadFile(imageUploadFile);
-      }
-
-      alert(`PDF successfully converted to ${imageFiles.length} image(s) and uploaded!`);
-
-    } catch (error: any) {
-      console.error('PDF conversion error:', error);
-      
-      setUploadedFiles(prev => prev.map(file => 
-        file.id === uploadedFile.id 
-          ? { ...file, status: 'error' as const, error: error.message || 'PDF conversion failed' }
-          : file
-      ));
-
-      alert(`Failed to convert PDF: ${error.message || 'Unknown error'}`);
+      // Auto-upload valid files
+      newFiles.forEach(uploadedFile => {
+        if (uploadedFile.status === 'pending') {
+          uploadFile(uploadedFile);
+        }
+      });
+    } catch (error) {
+      console.error('Error during file validation:', error);
+      toast({
+        title: "Validation Error",
+        description: "An error occurred while validating files. Please try again.",
+        variant: "destructive",
+      });
     } finally {
-      setIsConverting(false);
+      setIsValidating(false);
     }
-  };
+  }, [selectedDocumentType, toast]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: selectedDocumentType ? (() => {
+      const allowedTypes = getAllowedFileTypes(selectedDocumentType);
+      const acceptObject: Record<string, string[]> = {};
+
+      allowedTypes.forEach(type => {
+        if (type === 'pdf') {
+          acceptObject['application/pdf'] = ['.pdf'];
+        } else if (['jpg', 'jpeg', 'png'].includes(type)) {
+          const mimeType = `image/${type === 'jpg' ? 'jpeg' : type}`;
+          if (!acceptObject[mimeType]) {
+            acceptObject[mimeType] = [];
+          }
+          acceptObject[mimeType].push(`.${type}`);
+        }
+      });
+
+      return acceptObject;
+    })() : undefined,
+    multiple: true,
+    disabled: !selectedDocumentType
+  });
 
   const uploadFile = async (uploadedFile: UploadedFile) => {
     setIsUploading(true);
-    
-    // Update status to uploading
-    setUploadedFiles(prev => prev.map(file => 
-      file.id === uploadedFile.id 
-        ? { ...file, status: 'uploading' as const }
-        : file
-    ));
 
     // Simulate upload progress
     const progressInterval = setInterval(() => {
-      setUploadedFiles(prev => prev.map(file => 
-        file.id === uploadedFile.id 
+      setUploadedFiles(prev => prev.map(file =>
+        file.id === uploadedFile.id
           ? { ...file, progress: Math.min(file.progress + 10, 90) }
           : file
       ));
     }, 200);
 
     try {
+      // Get user email from localStorage or props
       const userEmail = localStorage.getItem('registration_email') || '';
-      
+
+      console.log('User email found in localStorage:', userEmail);
+
       if (!userEmail) {
+        console.error('No registration email found in localStorage');
+        console.log('Available localStorage keys:', Object.keys(localStorage));
         throw new Error('User email not found. Please restart the registration process.');
       }
 
+      // Create FormData for file upload
       const formData = new FormData();
       formData.append('file_upload', uploadedFile.file);
       formData.append('document_type_id', uploadedFile.documentType.id.toString());
       formData.append('user_email', userEmail);
-      
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      
-      const response = await fetch(`${apiUrl}/api/auth/documents/upload-registration/`, {
+
+      // Upload to backend
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
+      // Debug logging
+      console.log('Uploading file:', {
+        fileName: uploadedFile.file.name,
+        fileSize: uploadedFile.file.size,
+        fileType: uploadedFile.file.type,
+        documentTypeId: uploadedFile.documentType.id,
+        userEmail: userEmail,
+        apiUrl: `${apiUrl}/auth/documents/upload-registration/`
+      });
+      const response = await fetch(`${apiUrl}/auth/documents/upload-registration/`, {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
-        let errorMessage = `Upload failed with status ${response.status}`;
+        let errorData;
         try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch (e) {
-          // Use default error message
+          errorData = await response.json();
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+          throw new Error(`Upload failed with status ${response.status}: ${response.statusText}`);
         }
+
+        // Use the detailed error message from backend if available
+        const errorMessage = errorData.message || errorData.error || `Upload failed with status ${response.status}`;
+        console.error('Upload error details:', errorData);
         throw new Error(errorMessage);
       }
 
       const result = await response.json();
-      
+
       clearInterval(progressInterval);
-      
-      setUploadedFiles(prev => prev.map(file => 
-        file.id === uploadedFile.id 
-          ? { 
-              ...file, 
-              status: 'success' as const, 
-              progress: 100, 
-              documentId: result.document.id
+
+      setUploadedFiles(prev => prev.map(file =>
+        file.id === uploadedFile.id
+          ? {
+              ...file,
+              status: 'success',
+              progress: 100,
+              documentId: result.document.id,
+              isPdfConverted: result.document.is_pdf_converted || false,
+              convertedImages: result.document.converted_images || []
             }
           : file
       ));
 
-      alert(`${uploadedFile.file.name} uploaded successfully!`);
+      // Add document type to uploaded set
+      setUploadedDocumentTypes(prev => new Set([...prev, uploadedFile.documentType.id]));
 
+      const isPdfConverted = result.document.is_pdf_converted || false;
+      const convertedImagesCount = result.document.converted_images?.length || 0;
+
+      toast({
+        title: "File Uploaded",
+        description: isPdfConverted
+          ? `${uploadedFile.file.name} has been converted to ${convertedImagesCount} image(s) and uploaded successfully.`
+          : `${uploadedFile.file.name} has been uploaded successfully.`,
+      });
     } catch (error: any) {
       clearInterval(progressInterval);
-      
-      setUploadedFiles(prev => prev.map(file => 
-        file.id === uploadedFile.id 
-          ? { ...file, status: 'error' as const, error: error.message || 'Upload failed' }
+
+      setUploadedFiles(prev => prev.map(file =>
+        file.id === uploadedFile.id
+          ? { ...file, status: 'error', error: error.message || 'Upload failed' }
           : file
       ));
 
-      alert(`Failed to upload ${uploadedFile.file.name}: ${error.message}`);
+      toast({
+        title: "Upload Failed",
+        description: `Failed to upload ${uploadedFile.file.name}: ${error.message || 'Please try again.'}`,
+        variant: "destructive",
+      });
     } finally {
       setIsUploading(false);
     }
@@ -346,143 +433,173 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       if (file?.preview) {
         URL.revokeObjectURL(file.preview);
       }
-      return prev.filter(f => f.id !== fileId);
+
+      // Remove document type from uploaded set if no more files of this type
+      const remainingFiles = prev.filter(f => f.id !== fileId);
+      const documentTypeIds = new Set(remainingFiles.map(f => f.documentType.id));
+      setUploadedDocumentTypes(documentTypeIds);
+
+      return remainingFiles;
     });
   };
 
   const retryUpload = (fileId: string) => {
     const file = uploadedFiles.find(f => f.id === fileId);
     if (file) {
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === fileId 
-          ? { ...f, status: 'pending' as const, progress: 0, error: undefined }
+      setUploadedFiles(prev => prev.map(f =>
+        f.id === fileId
+          ? { ...f, status: 'pending', progress: 0, error: undefined }
           : f
       ));
-      uploadFile(file);
+      uploadFile({ ...file, status: 'pending', progress: 0 });
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'success':
-        return '✅';
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
       case 'error':
-        return '❌';
-      case 'converting':
-        return '🔄';
+        return <AlertCircle className="w-5 h-5 text-red-500" />;
       case 'uploading':
-        return '⏳';
+        return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
+      case 'pending':
+        return <Loader2 className="w-5 h-5 text-yellow-500 animate-spin" />;
       default:
-        return '⏳';
+        return <File className="w-5 h-5 text-gray-500" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'success':
-        return 'border-green-200 bg-green-50';
+        return 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800';
       case 'error':
-        return 'border-red-200 bg-red-50';
-      case 'converting':
-        return 'border-purple-200 bg-purple-50';
+        return 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800';
       case 'uploading':
-        return 'border-blue-200 bg-blue-50';
+        return 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800';
+      case 'pending':
+        return 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-800';
       default:
-        return 'border-yellow-200 bg-yellow-50';
+        return 'bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-800';
     }
   };
 
   const requiredDocuments = documentTypes.filter(doc => doc.is_required);
-  const allRequiredUploaded = requiredDocuments.every(doc => 
+  const optionalDocuments = documentTypes.filter(doc => !doc.is_required);
+  const uploadedRequiredDocs = uploadedFiles.filter(file =>
+    file.documentType.is_required && file.status === 'success'
+  );
+  const allRequiredUploaded = requiredDocuments.every(doc =>
     uploadedFiles.some(file => file.documentType.id === doc.id && file.status === 'success')
   );
 
   const handleContinue = () => {
     if (!allRequiredUploaded) {
-      alert('Please upload all required documents before continuing.');
+      toast({
+        title: "Missing Required Documents",
+        description: "Please upload all required documents before continuing.",
+        variant: "destructive",
+      });
       return;
     }
     onDocumentsComplete(uploadedFiles);
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto p-4">
+    <div className="space-y-6">
       <div className="text-center space-y-4">
-        <h2 className="text-2xl font-bold mb-2">
+        <h2 className="text-2xl font-bold text-foreground mb-2">
           Upload Required Documents
         </h2>
-        <p className="text-gray-600 text-lg mb-3">
-          {role === 'cook' 
-            ? 'Please upload your cooking credentials and certifications'
-            : 'Please upload your delivery-related documents and licenses'
-          }
-        </p>
-        
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-900 mb-2">
-            📋 Document Requirements
-          </h3>
-          <ul className="text-sm text-blue-800 space-y-1 text-left">
-            <li>• Upload clear, high-quality images or PDF files</li>
-            <li>• Maximum file size: 15MB per document</li>
-            <li>• Supported formats: PDF, JPG, PNG, JPEG</li>
-            <li>• PDF files will be converted to images (max 3 pages)</li>
-            <li>• All documents are securely stored</li>
-          </ul>
+        <div className="max-w-2xl mx-auto">
+          <p className="text-muted-foreground text-lg mb-3">
+            {role === 'cook'
+              ? 'Please upload your cooking credentials and certifications to verify your culinary expertise'
+              : 'Please upload your delivery-related documents and licenses to verify your delivery capabilities'
+            }
+          </p>
+          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+              📋 Document Requirements
+            </h3>
+            <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 text-left">
+              <li>• Upload clear, high-quality images or PDF files</li>
+              <li>• Maximum file size: 15MB per document</li>
+              <li>• Supported formats: PDF, JPG, PNG, JPEG</li>
+              <li>• PDF files will be automatically converted to images</li>
+              <li>• All documents are securely stored and encrypted</li>
+              <li>• Your documents will be reviewed by our admin team</li>
+            </ul>
+          </div>
         </div>
       </div>
 
       {/* Document Type Selection */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Select Document Type</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Select Document Type
+          </CardTitle>
           <CardDescription>
-            Choose the type of document you want to upload, then select your files.
+            Choose the type of document you want to upload. Click on a document type to select it, then upload your files below.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoadingTypes ? (
             <div className="flex items-center justify-center py-8">
-              <span className="text-gray-500">Loading document types...</span>
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Loading document types...</span>
             </div>
           ) : documentTypes.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">No document types found for your role.</p>
+              <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No document types found for your role.</p>
+              <p className="text-sm text-muted-foreground mt-2">Please contact support if you believe this is an error.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {documentTypes.map((docType) => {
-                const isUploaded = uploadedFiles.some(f => f.documentType.id === docType.id && f.status === 'success');
-                
-                return (
-                  <Button
-                    key={docType.id}
-                    variant={selectedDocumentType?.id === docType.id ? "default" : "outline"}
-                    className={`h-auto p-4 justify-start text-left ${
-                      isUploaded ? 'border-green-500 bg-green-50' : ''
-                    }`}
-                    onClick={() => setSelectedDocumentType(docType)}
-                  >
-                    <div className="w-full">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">{docType.name}</div>
-                        {isUploaded && <span>✅</span>}
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1">
-                        {docType.description}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant={docType.is_required ? "destructive" : "secondary"}>
-                          {docType.is_required ? "Required" : "Optional"}
-                        </Badge>
-                        <span className="text-xs text-gray-500">
-                          Max {docType.max_file_size_mb}MB
-                        </span>
-                      </div>
+              const isUploaded = uploadedDocumentTypes.has(docType.id);
+              const uploadedFilesForType = uploadedFiles.filter(f => f.documentType.id === docType.id && f.status === 'success');
+
+              return (
+                <Button
+                  key={docType.id}
+                  variant={selectedDocumentType?.id === docType.id ? "default" : "outline"}
+                  className={`h-auto p-4 justify-start relative ${
+                    isUploaded ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : ''
+                  }`}
+                  onClick={() => setSelectedDocumentType(docType)}
+                >
+                  <div className="text-left w-full">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{docType.name}</div>
+                      {isUploaded && (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      )}
                     </div>
-                  </Button>
-                );
-              })}
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {docType.description}
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant={docType.is_required ? "destructive" : "secondary"}>
+                        {docType.is_required ? "Required" : "Optional"}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        Max {docType.max_file_size_mb}MB
+                      </span>
+                      {uploadedFilesForType.length > 0 && (
+                        <Badge variant="outline" className="text-green-600 border-green-600">
+                          {uploadedFilesForType.length} file{uploadedFilesForType.length > 1 ? 's' : ''}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </Button>
+              );
+            })}
             </div>
           )}
         </CardContent>
@@ -492,56 +609,58 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       {selectedDocumentType && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Upload {selectedDocumentType.name}</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Upload className="w-5 h-5" />
+              Upload {selectedDocumentType.name}
+            </CardTitle>
             <CardDescription>
               {selectedDocumentType.description}
+              <br />
+              <span className="text-sm text-muted-foreground mt-1 block">
+                Drag and drop your files here or click to browse. You can upload multiple files of the same type.
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <div className="text-4xl mb-4">📁</div>
-                <p className="text-lg font-medium mb-2">Select Files to Upload</p>
-                <p className="text-sm text-gray-500 mb-4">
-                  Allowed: {(
-                    typeof selectedDocumentType.allowed_file_types === 'string'
-                      ? selectedDocumentType.allowed_file_types
-                      : selectedDocumentType.allowed_file_types.join(',')
-                  )
-                    .split(',')
-                    .map(t => `.${t.trim()}`)
-                    .filter(Boolean)
-                    .join(', ')} • 
-                  Max size: {selectedDocumentType.max_file_size_mb}MB
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  accept={(
-                    typeof selectedDocumentType.allowed_file_types === 'string'
-                      ? selectedDocumentType.allowed_file_types
-                      : selectedDocumentType.allowed_file_types.join(',')
-                  )
-                    .split(',')
-                    .map(t => `.${t.trim()}`)
-                    .filter(Boolean)
-                    .join(',')}
-                  onChange={handleFileSelection}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                />
-              </div>
-              
-              {/* Mobile Camera Button */}
-              <div className="md:hidden">
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleFileSelection}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-                />
-                <p className="text-xs text-gray-500 mt-1 text-center">📱 Take Photo</p>
-              </div>
+            <div
+              {...getRootProps()}
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                isDragActive
+                  ? 'border-primary bg-primary/5'
+                  : isValidating
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                    : 'border-muted-foreground/25 hover:border-primary/50'
+              }`}
+            >
+              <input {...getInputProps()} disabled={isValidating} />
+              {isValidating ? (
+                <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-500 animate-spin" />
+              ) : (
+                <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              )}
+              <p className="text-lg font-medium mb-2">
+                {isValidating
+                  ? 'Validating files...'
+                  : isDragActive
+                    ? 'Drop files here'
+                    : 'Drag & drop files here'
+                }
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {isValidating ? 'Please wait while we validate your files' : 'or click to select files'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Allowed: {getAllowedFileTypes(selectedDocumentType).map(t => `.${t}`).join(', ')} •
+                Max size: {selectedDocumentType.max_file_size_mb}MB
+              </p>
+              {getAllowedFileTypes(selectedDocumentType).includes('pdf') && (
+                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    📄 PDF files will be automatically converted to images for better viewing and storage.
+                    Maximum 3 pages allowed. We'll validate your PDF before upload.
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -551,9 +670,12 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       {uploadedFiles.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Uploaded Documents</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CheckCircle className="w-5 h-5" />
+              Uploaded Documents
+            </CardTitle>
             <CardDescription>
-              Review your uploaded documents.
+              Review your uploaded documents. You can remove files or retry failed uploads.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -572,24 +694,40 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                           className="w-10 h-10 object-cover rounded"
                         />
                       ) : (
-                        <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">
-                          📄
+                        <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
+                          {getFileIcon(uploadedFile.file.type, uploadedFile.isPdfConverted)}
                         </div>
                       )}
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{uploadedFile.file.name}</p>
-                          <span className="text-lg">{getStatusIcon(uploadedFile.status)}</span>
+                          {uploadedFile.isPdfConverted && (
+                            <Badge variant="secondary" className="text-xs">
+                              PDF → Image
+                            </Badge>
+                          )}
                         </div>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                           {uploadedFile.documentType.name} • {formatFileSize(uploadedFile.file.size)}
+                          {uploadedFile.isPdfConverted && uploadedFile.convertedImages && (
+                            <span className="ml-2 text-blue-600">
+                              ({uploadedFile.convertedImages.length} page{uploadedFile.convertedImages.length > 1 ? 's' : ''})
+                            </span>
+                          )}
                         </p>
                         {uploadedFile.error && (
                           <p className="text-sm text-red-600">{uploadedFile.error}</p>
                         )}
+                        {uploadedFile.status === 'pending' && !uploadedFile.error && (
+                          <p className="text-sm text-yellow-600">Validating file...</p>
+                        )}
+                        {uploadedFile.status === 'uploading' && (
+                          <p className="text-sm text-blue-600">Uploading...</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
+                      {getStatusIcon(uploadedFile.status)}
                       {uploadedFile.status === 'error' && (
                         <Button
                           size="sm"
@@ -601,22 +739,16 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                       )}
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => removeFile(uploadedFile.id)}
                       >
-                        ✕
+                        <X className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
                   {uploadedFile.status === 'uploading' && (
                     <div className="mt-3">
                       <Progress value={uploadedFile.progress} className="h-2" />
-                    </div>
-                  )}
-                  {uploadedFile.status === 'converting' && (
-                    <div className="mt-3">
-                      <div className="text-sm text-purple-600 mb-1">Converting PDF to images...</div>
-                      <Progress value={uploadedFile.progress || 0} className="h-2" />
                     </div>
                   )}
                 </div>
@@ -626,50 +758,98 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         </Card>
       )}
 
-      {/* Document Status */}
+      {/* Progress Summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Document Status</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Document Status
+          </CardTitle>
           <CardDescription>
-            Track your document upload progress.
+            Track your document upload progress. All required documents must be uploaded before you can continue.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            {requiredDocuments.map((doc) => {
-              const uploaded = uploadedFiles.some(file => 
-                file.documentType.id === doc.id && file.status === 'success'
-              );
-              return (
-                <div key={doc.id} className="flex items-center space-x-2">
-                  <span className="text-lg">{uploaded ? '✅' : '⏳'}</span>
-                  <span className={uploaded ? 'text-green-700' : 'text-amber-700'}>
-                    {doc.name}
-                  </span>
+          <div className="space-y-4">
+            <div>
+              <h4 className="font-medium mb-2">Required Documents</h4>
+              <div className="space-y-2">
+                {requiredDocuments.map((doc) => {
+                  const uploaded = uploadedFiles.some(file =>
+                    file.documentType.id === doc.id && file.status === 'success'
+                  );
+                  return (
+                    <div key={doc.id} className="flex items-center space-x-2">
+                      {uploaded ? (
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-amber-500" />
+                      )}
+                      <span className={uploaded ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'}>
+                        {doc.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {optionalDocuments.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-2">Optional Documents</h4>
+                <div className="space-y-2">
+                  {optionalDocuments.map((doc) => {
+                    const uploaded = uploadedFiles.some(file =>
+                      file.documentType.id === doc.id && file.status === 'success'
+                    );
+                    return (
+                      <div key={doc.id} className="flex items-center space-x-2">
+                        {uploaded ? (
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <div className="w-4 h-4 border border-muted-foreground rounded" />
+                        )}
+                        <span className={uploaded ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground'}>
+                          {doc.name}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
       {/* Action Buttons */}
       <div className="flex justify-between items-center pt-4 border-t">
-        <Button variant="outline" onClick={onBack}>
-          ← Back to Role Selection
+        <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
+          <ArrowRight className="w-4 h-4 rotate-180" />
+          Back to Role Selection
         </Button>
         <div className="text-right">
           {!allRequiredUploaded && (
-            <p className="text-sm text-gray-500 mb-2">
-              {requiredDocuments.length - uploadedFiles.filter(f => f.status === 'success' && f.documentType.is_required).length} required document(s) remaining
+            <p className="text-sm text-muted-foreground mb-2">
+              {requiredDocuments.length - uploadedRequiredDocs.length} required document(s) remaining
             </p>
           )}
-          <Button 
+          <Button
             onClick={handleContinue}
             disabled={!allRequiredUploaded || isUploading}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
+            className="flex items-center gap-2"
           >
-            {isUploading ? 'Uploading...' : 'Continue to Account Setup →'}
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                Continue to Account Setup
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </Button>
         </div>
       </div>

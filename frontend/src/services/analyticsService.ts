@@ -135,8 +135,16 @@ export interface AdvancedAnalyticsData {
   segmentation: {
     segments: {
       vip: { customers: number; total_spent: number; avg_order_value: number };
-      regular: { customers: number; total_spent: number; avg_order_value: number };
-      occasional: { customers: number; total_spent: number; avg_order_value: number };
+      regular: {
+        customers: number;
+        total_spent: number;
+        avg_order_value: number;
+      };
+      occasional: {
+        customers: number;
+        total_spent: number;
+        avg_order_value: number;
+      };
       new: { customers: number; total_spent: number; avg_order_value: number };
     };
     total_customers_analyzed: number;
@@ -274,27 +282,96 @@ export interface CustomerSegmentation {
 
 class AnalyticsService {
   private baseUrl = "/api"; // Use proxy configuration
+  private cache = new Map<
+    string,
+    { data: any; timestamp: number; ttl: number }
+  >();
+  private pendingRequests = new Map<string, Promise<any>>();
+
+  // Cache TTL in milliseconds (5 minutes for most data, 1 minute for real-time data)
+  private readonly DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
+  private readonly REALTIME_TTL = 1 * 60 * 1000; // 1 minute
+
+  private getCacheKey(url: string, params?: any): string {
+    return `${url}${params ? JSON.stringify(params) : ""}`;
+  }
+
+  private isValidCache(key: string): boolean {
+    const cached = this.cache.get(key);
+    if (!cached) return false;
+    return Date.now() - cached.timestamp < cached.ttl;
+  }
+
+  private setCache(
+    key: string,
+    data: any,
+    ttl: number = this.DEFAULT_TTL
+  ): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl,
+    });
+  }
+
+  private async fetchWithCache<T>(
+    url: string,
+    options: RequestInit,
+    cacheKey: string,
+    ttl: number = this.DEFAULT_TTL,
+    fallbackData?: T
+  ): Promise<T> {
+    // Check cache first
+    if (this.isValidCache(cacheKey)) {
+      return this.cache.get(cacheKey)!.data;
+    }
+
+    // Check for pending request
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    // Create new request
+    const request = fetch(url, options)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        this.setCache(cacheKey, data, ttl);
+        this.pendingRequests.delete(cacheKey);
+        return data;
+      })
+      .catch((error) => {
+        this.pendingRequests.delete(cacheKey);
+        console.error(`API request failed for ${url}:`, error);
+        if (fallbackData !== undefined) {
+          return fallbackData;
+        }
+        throw error;
+      });
+
+    this.pendingRequests.set(cacheKey, request);
+    return request;
+  }
 
   async getDashboardStats(): Promise<DashboardStats> {
-    try {
-      const response = await fetch(`${this.baseUrl}/admin-management/dashboard/stats/`, {
+    const cacheKey = this.getCacheKey(
+      `${this.baseUrl}/admin-management/dashboard/stats/`
+    );
+
+    return this.fetchWithCache(
+      `${this.baseUrl}/admin-management/dashboard/stats/`,
+      {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
         },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
-      throw error;
-    }
+      },
+      cacheKey,
+      this.REALTIME_TTL // Use shorter TTL for dashboard stats
+    );
   }
 
   // Advanced Analytics Methods
@@ -305,38 +382,35 @@ class AnalyticsService {
   async getRevenueAnalytics(
     timeRange: string = "30d"
   ): Promise<RevenueAnalytics> {
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/admin-management/dashboard/revenue_analytics/?range=${timeRange}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-        }
-      );
+    const cacheKey = this.getCacheKey(
+      `${this.baseUrl}/admin-management/dashboard/revenue_analytics/`,
+      { timeRange }
+    );
+    const fallbackData: RevenueAnalytics = {
+      current: 0,
+      previous: 0,
+      trend: "stable" as const,
+      forecast: [],
+      breakdown: {
+        daily: [],
+        weekly: [],
+        monthly: [],
+      },
+    };
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Error fetching revenue analytics:", error);
-      // Return fallback data instead of throwing
-      return {
-        current: 0,
-        previous: 0,
-        trend: "stable" as const,
-        forecast: [],
-        breakdown: {
-          daily: [],
-          weekly: [],
-          monthly: []
-        }
-      };
-    }
+    return this.fetchWithCache(
+      `${this.baseUrl}/admin-management/dashboard/revenue_analytics/?range=${timeRange}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+      },
+      cacheKey,
+      this.DEFAULT_TTL,
+      fallbackData
+    );
   }
 
   /**
@@ -401,8 +475,8 @@ class AnalyticsService {
         behavior: {
           avgOrderFrequency: 0,
           avgSessionDuration: 0,
-          conversionRate: 0
-        }
+          conversionRate: 0,
+        },
       };
     }
   }
@@ -440,7 +514,7 @@ class AnalyticsService {
         systemUptime: 0,
         errorRate: 0,
         responseTime: 0,
-        throughput: 0
+        throughput: 0,
       };
     }
   }
@@ -537,13 +611,16 @@ class AnalyticsService {
    */
   async getReportTemplates(): Promise<ReportTemplate[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/admin-management/reports/templates/`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-      });
+      const response = await fetch(
+        `${this.baseUrl}/admin-management/reports/templates/`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -565,8 +642,8 @@ class AnalyticsService {
           aiInsights: false,
           automatedDelivery: false,
           recipients: [],
-          status: "active" as const
-        }
+          status: "active" as const,
+        },
       ];
     }
   }
@@ -914,20 +991,17 @@ class AnalyticsService {
   // Export functionality
   async exportData(format: "csv" | "pdf" | "excel", filters: any = {}) {
     try {
-      const response = await fetch(
-        `${this.baseUrl}/admin/analytics/export/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-          body: JSON.stringify({
-            format,
-            filters,
-          }),
-        }
-      );
+      const response = await fetch(`${this.baseUrl}/analytics/export/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        body: JSON.stringify({
+          format,
+          filters,
+        }),
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -940,7 +1014,7 @@ class AnalyticsService {
       return {
         data: "Mock export data",
         status: 200,
-        statusText: "OK"
+        statusText: "OK",
       };
     }
   }
@@ -949,7 +1023,7 @@ class AnalyticsService {
   async scheduleReport(templateId: string, schedule: any) {
     try {
       const response = await fetch(
-        `${this.baseUrl}/admin/analytics/reports/schedule/`,
+        `${this.baseUrl}/analytics/reports/schedule/`,
         {
           method: "POST",
           headers: {
@@ -976,35 +1050,46 @@ class AnalyticsService {
 
   // Get scheduled reports
   async getScheduledReports() {
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/admin/analytics/reports/scheduled/`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-        }
-      );
+    const cacheKey = this.getCacheKey(
+      `${this.baseUrl}/analytics/reports/scheduled/`
+    );
+    const fallbackData: any[] = [];
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+    return this.fetchWithCache(
+      `${this.baseUrl}/analytics/reports/scheduled/`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+      },
+      cacheKey,
+      this.DEFAULT_TTL,
+      fallbackData
+    );
+  }
 
-      return await response.json();
-    } catch (error) {
-      console.error("Failed to get scheduled reports:", error);
-      // Return mock data for development
-      return [];
-    }
+  // Cache management methods
+  clearCache(): void {
+    this.cache.clear();
+    this.pendingRequests.clear();
+  }
+
+  clearCacheByPattern(pattern: string): void {
+    const keysToDelete = Array.from(this.cache.keys()).filter((key) =>
+      key.includes(pattern)
+    );
+    keysToDelete.forEach((key) => this.cache.delete(key));
   }
 
   // Advanced Analytics endpoint
-  async getAdvancedAnalytics(timeRange: string = "30d"): Promise<AdvancedAnalyticsData> {
+  async getAdvancedAnalytics(
+    timeRange: string = "30d"
+  ): Promise<AdvancedAnalyticsData> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/admin/analytics/dashboard/advanced_analytics/?range=${timeRange}`,
+        `${this.baseUrl}/analytics/admin/analytics/dashboard/advanced_analytics/?range=${timeRange}`,
         {
           method: "GET",
           headers: {
@@ -1040,35 +1125,34 @@ class AnalyticsService {
           revenue_growth_rate: 0,
           avg_daily_revenue: 0,
           avg_daily_users: 0,
-          avg_daily_orders: 0
-        }
+          avg_daily_orders: 0,
+        },
       },
       predictive: {
         predictions: [],
         model_type: "linear_regression",
         accuracy_score: 0.75,
-        prediction_period_days: 7
+        prediction_period_days: 7,
       },
       segmentation: {
         segments: {
           vip: { customers: 0, total_spent: 0, avg_order_value: 0 },
           regular: { customers: 0, total_spent: 0, avg_order_value: 0 },
           occasional: { customers: 0, total_spent: 0, avg_order_value: 0 },
-          new: { customers: 0, total_spent: 0, avg_order_value: 0 }
+          new: { customers: 0, total_spent: 0, avg_order_value: 0 },
         },
         total_customers_analyzed: 0,
         segmentation_criteria: {
           vip: "≥ $1000 spent AND ≥ 10 orders",
           regular: "≥ $500 spent OR ≥ 5 orders",
           occasional: "≥ $100 spent",
-          new: "< $100 spent"
-        }
+          new: "< $100 spent",
+        },
       },
       period: timeRange,
-      generated_at: new Date().toISOString()
+      generated_at: new Date().toISOString(),
     };
   }
-
 }
 
 export const analyticsService = new AnalyticsService();

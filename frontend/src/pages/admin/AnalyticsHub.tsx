@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 // Import shared components
 import {
   AnimatedStats,
@@ -22,7 +22,10 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Import services
-import { analyticsService, AdvancedAnalyticsData } from "@/services/analyticsService";
+import {
+  AdvancedAnalyticsData,
+  analyticsService,
+} from "@/services/analyticsService";
 
 // Import icons
 import {
@@ -158,15 +161,27 @@ const AnalyticsHub: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRealTimeActive, setIsRealTimeActive] = useState(false);
 
-  // Load analytics data
+  // Refs to prevent memory leaks and manage intervals
+  const autoRefreshInterval = useRef<NodeJS.Timeout | null>(null);
+  const realTimeInterval = useRef<NodeJS.Timeout | null>(null);
+  const loadingRef = useRef(false);
+
+  // Load analytics data with better error handling and overlap prevention
   const loadAnalyticsData = useCallback(async () => {
+    if (loadingRef.current) return; // Prevent overlapping calls
+
     try {
+      loadingRef.current = true;
       setLoading(true);
       setError(null);
 
       const [orderData, customerData] = await Promise.all([
-        analyticsService.getOrderAnalytics(timeRange),
-        analyticsService.getCustomerAnalytics(timeRange),
+        analyticsService
+          .getOrderAnalytics(timeRange)
+          .catch(() => ({ total: 0, avgOrderValue: 0, trend: 0 })),
+        analyticsService
+          .getCustomerAnalytics(timeRange)
+          .catch(() => ({ total: 0, retention: 0 })),
       ]);
 
       // Transform API data to match backend response shape
@@ -187,18 +202,31 @@ const AnalyticsHub: React.FC = () => {
     } catch (error) {
       console.error("Error loading analytics:", error);
       setError("Failed to load analytics data");
+      // Set fallback data to prevent UI crashes
+      setAnalyticsData({
+        revenue: 0,
+        orders: 0,
+        users: 0,
+        avgOrderValue: 0,
+        growth: { revenue: 0, orders: 0, users: 0 },
+      });
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, [timeRange]);
 
-  // Load business metrics
+  // Load business metrics with better error handling
   const loadBusinessMetrics = useCallback(async () => {
     try {
-      const metrics = await analyticsService.getRevenueAnalytics(timeRange);
-      const performance = await analyticsService.getPerformanceMetrics(
-        timeRange
-      );
+      const [metrics, performance] = await Promise.all([
+        analyticsService
+          .getRevenueAnalytics(timeRange)
+          .catch(() => ({ current: 0, previous: 0, trend: "stable" as const })),
+        analyticsService
+          .getPerformanceMetrics(timeRange)
+          .catch(() => ({ avgDeliveryTime: 0, customerSatisfaction: 0 })),
+      ]);
 
       const transformedMetrics: BusinessMetrics = {
         revenue: {
@@ -226,10 +254,17 @@ const AnalyticsHub: React.FC = () => {
       setBusinessMetrics(transformedMetrics);
     } catch (error) {
       console.error("Error loading business metrics:", error);
+      // Set fallback data
+      setBusinessMetrics({
+        revenue: { current: 0, previous: 0, trend: "stable" },
+        orders: { total: 0, completed: 0, pending: 0, trend: 0 },
+        customers: { total: 0, active: 0, retention: 0 },
+        performance: { avgDeliveryTime: 0, customerSatisfaction: 0 },
+      });
     }
   }, [timeRange]);
 
-  // Load business insights
+  // Load business insights with better error handling
   const loadBusinessInsights = useCallback(async () => {
     try {
       const response = await fetch(
@@ -245,34 +280,111 @@ const AnalyticsHub: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setBusinessInsights(data.data?.insights || null);
+      } else {
+        // Set fallback data for better UX
+        setBusinessInsights({
+          sales_forecast: { next_7_days_revenue: 0, confidence: 0 },
+          customer_insights: {
+            total_customers: 0,
+            total_revenue: 0,
+            avg_order_value: 0,
+          },
+          anomaly_detection: { total_anomalies: 0, high_severity_count: 0 },
+          product_recommendations: { total_recommendations: 0 },
+        });
       }
     } catch (error) {
       console.error("Error loading business insights:", error);
+      // Set fallback data on error
+      setBusinessInsights({
+        sales_forecast: { next_7_days_revenue: 0, confidence: 0 },
+        customer_insights: {
+          total_customers: 0,
+          total_revenue: 0,
+          avg_order_value: 0,
+        },
+        anomaly_detection: { total_anomalies: 0, high_severity_count: 0 },
+        product_recommendations: { total_recommendations: 0 },
+      });
     }
-  }, []);
+  }, []); // Remove dependencies to prevent infinite loops
 
-  // Load advanced analytics data
+  // Load advanced analytics data with better error handling
   const loadAdvancedAnalytics = useCallback(async () => {
+    if (loadingRef.current) return; // Prevent overlapping calls
+
     try {
+      loadingRef.current = true;
       const data = await analyticsService.getAdvancedAnalytics(timeRange);
       setAdvancedAnalytics(data);
     } catch (error) {
       console.error("Error loading advanced analytics:", error);
-      // Keep null state on error - component will handle gracefully
+      // Set fallback data instead of null to prevent UI crashes
+      setAdvancedAnalytics({
+        trends: {
+          revenue_trends: [],
+          user_trends: [],
+          order_trends: [],
+          summary: {
+            total_revenue: 0,
+            total_new_users: 0,
+            total_orders: 0,
+            revenue_growth_rate: 0,
+            avg_daily_revenue: 0,
+            avg_daily_users: 0,
+            avg_daily_orders: 0,
+          },
+        },
+        predictive: {
+          predictions: [],
+          model_type: "linear_regression",
+          accuracy_score: 0.75,
+          prediction_period_days: 7,
+        },
+        segmentation: {
+          segments: {
+            vip: { customers: 0, total_spent: 0, avg_order_value: 0 },
+            regular: { customers: 0, total_spent: 0, avg_order_value: 0 },
+            occasional: { customers: 0, total_spent: 0, avg_order_value: 0 },
+            new: { customers: 0, total_spent: 0, avg_order_value: 0 },
+          },
+          total_customers_analyzed: 0,
+          segmentation_criteria: {
+            vip: "≥ $1000 spent AND ≥ 10 orders",
+            regular: "≥ $500 spent OR ≥ 5 orders",
+            occasional: "≥ $100 spent",
+            new: "< $100 spent",
+          },
+        },
+        period: timeRange,
+        generated_at: new Date().toISOString(),
+      });
+    } finally {
+      loadingRef.current = false;
     }
   }, [timeRange]);
 
-  // Load report templates
+  // Load report templates with better error handling
   const loadReportTemplates = useCallback(async () => {
     try {
       const templates = await analyticsService.getReportTemplates();
-      setReportTemplates(templates);
+      setReportTemplates(templates || []);
     } catch (error) {
       console.error("Error loading report templates:", error);
-      // Set empty array on error instead of mock data
-      setReportTemplates([]);
+      // Set fallback data instead of empty array
+      setReportTemplates([
+        {
+          id: "sales_summary",
+          name: "Sales Summary Report",
+          description: "Comprehensive sales analytics and trends",
+          type: "financial" as const,
+          frequency: "monthly" as const,
+          format: "pdf" as const,
+          status: "active" as const,
+        },
+      ]);
     }
-  }, []);
+  }, []); // Remove dependencies to prevent infinite loops
 
   // Generate report
   const generateReport = async (templateId: string) => {
@@ -289,15 +401,18 @@ const AnalyticsHub: React.FC = () => {
   };
 
   // Export data functionality
-  const handleExport = async (type: "csv" | "pdf" | "excel", reportType?: string) => {
+  const handleExport = async (
+    type: "csv" | "pdf" | "excel",
+    reportType?: string
+  ) => {
     setExportingData(true);
     try {
       const response = await analyticsService.exportData(type, {
         reportType: reportType || selectedReportType,
         timeRange,
-        filters: customReportFilters
+        filters: customReportFilters,
       });
-      
+
       // Handle file download
       if (response instanceof Response) {
         const blob = await response.blob();
@@ -309,7 +424,11 @@ const AnalyticsHub: React.FC = () => {
         window.URL.revokeObjectURL(url);
       } else {
         // Handle mock data
-        const mockResponse = response as { data: string; status: number; statusText: string };
+        const mockResponse = response as {
+          data: string;
+          status: number;
+          statusText: string;
+        };
         const blob = new Blob([mockResponse.data]);
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -336,17 +455,44 @@ const AnalyticsHub: React.FC = () => {
     }
   };
 
-  // Load scheduled reports
-  const loadScheduledReports = async () => {
+  // Load scheduled reports with better error handling and retry logic
+  const loadScheduledReports = async (retryCount = 0) => {
+    const maxRetries = 2;
     try {
       const reports = await analyticsService.getScheduledReports();
-      setScheduledReports(reports);
+      setScheduledReports(reports || []);
     } catch (error) {
       console.error("Error loading scheduled reports:", error);
+
+      // Retry logic for transient failures
+      if (
+        retryCount < maxRetries &&
+        error instanceof Error &&
+        (error.message.includes("404") || error.message.includes("500"))
+      ) {
+        console.log(
+          `Retrying scheduled reports load (attempt ${
+            retryCount + 1
+          }/${maxRetries})`
+        );
+        setTimeout(
+          () => loadScheduledReports(retryCount + 1),
+          1000 * (retryCount + 1)
+        );
+        return;
+      }
+
+      // Set empty array as fallback to prevent UI crashes
+      setScheduledReports([]);
+
+      // Set error message for user feedback
+      if (error instanceof Error && error.message.includes("404")) {
+        setError("Scheduled reports feature is currently unavailable");
+      }
     }
   };
 
-  // Load all data
+  // Load all data - Only run on mount and timeRange change
   useEffect(() => {
     loadAnalyticsData();
     loadBusinessMetrics();
@@ -354,50 +500,106 @@ const AnalyticsHub: React.FC = () => {
     loadAdvancedAnalytics();
     loadReportTemplates();
     loadScheduledReports();
-  }, [
-    loadAnalyticsData,
-    loadBusinessMetrics,
-    loadBusinessInsights,
-    loadAdvancedAnalytics,
-    loadReportTemplates,
-    loadScheduledReports,
-  ]);
+  }, [timeRange]); // Only depend on timeRange to prevent infinite loops
 
-  // Auto-refresh functionality
+  // Auto-refresh functionality - Fixed to prevent memory leaks and overlapping intervals
   useEffect(() => {
+    // Clear existing interval
+    if (autoRefreshInterval.current) {
+      clearInterval(autoRefreshInterval.current);
+      autoRefreshInterval.current = null;
+    }
+
     if (autoRefresh) {
-      const interval = setInterval(() => {
+      autoRefreshInterval.current = setInterval(() => {
+        // Prevent overlapping calls
+        if (loadingRef.current) return;
+
+        // Call the functions directly to avoid dependency issues
         loadAnalyticsData();
         loadBusinessMetrics();
         loadBusinessInsights();
         loadAdvancedAnalytics();
       }, 30000); // Refresh every 30 seconds
-
-      return () => clearInterval(interval);
     }
-  }, [
-    autoRefresh,
-    loadAnalyticsData,
-    loadBusinessMetrics,
-    loadBusinessInsights,
-    loadAdvancedAnalytics,
-  ]);
 
-  // Real-time updates (faster polling)
+    return () => {
+      if (autoRefreshInterval.current) {
+        clearInterval(autoRefreshInterval.current);
+        autoRefreshInterval.current = null;
+      }
+    };
+  }, [autoRefresh]); // Only depend on autoRefresh state
+
+  // Real-time updates (faster polling) - Fixed to prevent memory leaks and overlapping intervals
   useEffect(() => {
+    // Clear existing interval
+    if (realTimeInterval.current) {
+      clearInterval(realTimeInterval.current);
+      realTimeInterval.current = null;
+    }
+
     if (isRealTimeActive) {
-      const interval = setInterval(() => {
+      realTimeInterval.current = setInterval(() => {
+        // Prevent overlapping calls
+        if (loadingRef.current) return;
+
         // Only update advanced analytics for real-time to avoid overloading
         loadAdvancedAnalytics();
         setLastUpdated(new Date());
       }, 10000); // Update every 10 seconds for real-time
-
-      return () => clearInterval(interval);
     }
-  }, [
-    isRealTimeActive,
-    loadAdvancedAnalytics,
-  ]);
+
+    return () => {
+      if (realTimeInterval.current) {
+        clearInterval(realTimeInterval.current);
+        realTimeInterval.current = null;
+      }
+    };
+  }, [isRealTimeActive]); // Only depend on isRealTimeActive state
+
+  // Manual refresh function with cache clearing
+  const handleManualRefresh = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Clear analytics service cache for fresh data
+      analyticsService.clearCache();
+
+      // Record start time for performance monitoring
+      const startTime = performance.now();
+
+      // Reload all data
+      await Promise.all([
+        loadAnalyticsData(),
+        loadBusinessMetrics(),
+        loadBusinessInsights(),
+        loadAdvancedAnalytics(),
+        loadReportTemplates(),
+        loadScheduledReports(),
+      ]);
+
+      // Log performance metrics
+      const loadTime = performance.now() - startTime;
+      if (loadTime > 2000) {
+        console.warn(
+          `Analytics refresh took ${loadTime.toFixed(2)}ms (threshold: 2000ms)`
+        );
+      } else {
+        console.log(
+          `Analytics refreshed successfully in ${loadTime.toFixed(2)}ms`
+        );
+      }
+
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error("Error during manual refresh:", error);
+      setError("Failed to refresh analytics data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Render Overview Tab
   const renderOverviewTab = () => (
@@ -876,20 +1078,28 @@ const AnalyticsHub: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {advancedAnalytics.trends.summary.revenue_growth_rate >= 0 ? '+' : ''}
-                      {advancedAnalytics.trends.summary.revenue_growth_rate.toFixed(1)}%
+                      {advancedAnalytics.trends.summary.revenue_growth_rate >= 0
+                        ? "+"
+                        : ""}
+                      {advancedAnalytics.trends.summary.revenue_growth_rate.toFixed(
+                        1
+                      )}
+                      %
                     </div>
                     <p className="text-sm text-gray-600">Revenue Growth Rate</p>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600">
-                      LKR {advancedAnalytics.trends.summary.avg_daily_revenue.toLocaleString()}
+                      LKR{" "}
+                      {advancedAnalytics.trends.summary.avg_daily_revenue.toLocaleString()}
                     </div>
                     <p className="text-sm text-gray-600">Avg Daily Revenue</p>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-purple-600">
-                      {advancedAnalytics.trends.summary.avg_daily_orders.toFixed(1)}
+                      {advancedAnalytics.trends.summary.avg_daily_orders.toFixed(
+                        1
+                      )}
                     </div>
                     <p className="text-sm text-gray-600">Avg Daily Orders</p>
                   </div>
@@ -899,14 +1109,16 @@ const AnalyticsHub: React.FC = () => {
                 <div className="mt-6">
                   <h4 className="font-medium mb-3">Revenue Trends</h4>
                   <LineChart
-                    data={advancedAnalytics.trends.revenue_trends.map(item => ({
-                      name: item.day_name,
-                      value: item.revenue
-                    }))}
-                    dataKeys={['value']}
+                    data={advancedAnalytics.trends.revenue_trends.map(
+                      (item) => ({
+                        name: item.day_name,
+                        value: item.revenue,
+                      })
+                    )}
+                    dataKeys={["value"]}
                     xAxisDataKey="name"
                     height={200}
-                    colors={['#3B82F6']}
+                    colors={["#3B82F6"]}
                   />
                 </div>
               </GlassCard>
@@ -920,13 +1132,21 @@ const AnalyticsHub: React.FC = () => {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium">Model Accuracy</span>
                     <Badge variant="outline">
-                      {advancedAnalytics.predictive.model_type} - {(advancedAnalytics.predictive.accuracy_score * 100).toFixed(0)}%
+                      {advancedAnalytics.predictive.model_type} -{" "}
+                      {(
+                        advancedAnalytics.predictive.accuracy_score * 100
+                      ).toFixed(0)}
+                      %
                     </Badge>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className="bg-blue-600 h-2 rounded-full"
-                      style={{ width: `${advancedAnalytics.predictive.accuracy_score * 100}%` }}
+                      style={{
+                        width: `${
+                          advancedAnalytics.predictive.accuracy_score * 100
+                        }%`,
+                      }}
                     ></div>
                   </div>
                 </div>
@@ -935,35 +1155,54 @@ const AnalyticsHub: React.FC = () => {
                   <div>
                     <h4 className="font-medium mb-3">Next 7 Days Forecast</h4>
                     <div className="space-y-2">
-                      {advancedAnalytics.predictive.predictions.slice(0, 3).map((pred, index) => (
-                        <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                          <span className="text-sm">{pred.date.split('-')[2]}/{pred.date.split('-')[1]}</span>
-                          <div className="text-right">
-                            <div className="text-sm font-medium">LKR {pred.predicted_revenue.toLocaleString()}</div>
-                            <div className="text-xs text-gray-600">{pred.predicted_orders} orders</div>
+                      {advancedAnalytics.predictive.predictions
+                        .slice(0, 3)
+                        .map((pred, index) => (
+                          <div
+                            key={index}
+                            className="flex justify-between items-center p-2 bg-gray-50 rounded"
+                          >
+                            <span className="text-sm">
+                              {pred.date.split("-")[2]}/
+                              {pred.date.split("-")[1]}
+                            </span>
+                            <div className="text-right">
+                              <div className="text-sm font-medium">
+                                LKR {pred.predicted_revenue.toLocaleString()}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {pred.predicted_orders} orders
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
 
                   <div>
                     <h4 className="font-medium mb-3">Prediction Confidence</h4>
                     <div className="space-y-2">
-                      {advancedAnalytics.predictive.predictions.slice(0, 3).map((pred, index) => (
-                        <div key={index} className="flex justify-between items-center">
-                          <span className="text-sm">Day {index + 1}</span>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-16 bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-green-600 h-2 rounded-full"
-                                style={{ width: `${pred.confidence * 100}%` }}
-                              ></div>
+                      {advancedAnalytics.predictive.predictions
+                        .slice(0, 3)
+                        .map((pred, index) => (
+                          <div
+                            key={index}
+                            className="flex justify-between items-center"
+                          >
+                            <span className="text-sm">Day {index + 1}</span>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-16 bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-green-600 h-2 rounded-full"
+                                  style={{ width: `${pred.confidence * 100}%` }}
+                                ></div>
+                              </div>
+                              <span className="text-xs text-gray-600">
+                                {(pred.confidence * 100).toFixed(0)}%
+                              </span>
                             </div>
-                            <span className="text-xs text-gray-600">{(pred.confidence * 100).toFixed(0)}%</span>
                           </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 </div>
@@ -975,32 +1214,44 @@ const AnalyticsHub: React.FC = () => {
                   Customer Segmentation
                 </h3>
                 <p className="text-sm text-gray-600 mb-6">
-                  Total customers analyzed: {advancedAnalytics.segmentation.total_customers_analyzed}
+                  Total customers analyzed:{" "}
+                  {advancedAnalytics.segmentation.total_customers_analyzed}
                 </p>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {Object.entries(advancedAnalytics.segmentation.segments).map(([segment, data]) => (
-                    <div key={segment} className="text-center p-4 bg-gray-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600 mb-1">
-                        {data.customers}
+                  {Object.entries(advancedAnalytics.segmentation.segments).map(
+                    ([segment, data]) => (
+                      <div
+                        key={segment}
+                        className="text-center p-4 bg-gray-50 rounded-lg"
+                      >
+                        <div className="text-2xl font-bold text-blue-600 mb-1">
+                          {data.customers}
+                        </div>
+                        <div className="text-sm font-medium capitalize mb-1">
+                          {segment}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          Avg: LKR {data.avg_order_value}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Total: LKR {data.total_spent.toLocaleString()}
+                        </div>
                       </div>
-                      <div className="text-sm font-medium capitalize mb-1">{segment}</div>
-                      <div className="text-xs text-gray-600">
-                        Avg: LKR {data.avg_order_value}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Total: LKR {data.total_spent.toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
 
                 <div className="mt-6">
                   <h4 className="font-medium mb-3">Segmentation Criteria</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(advancedAnalytics.segmentation.segmentation_criteria).map(([segment, criteria]) => (
+                    {Object.entries(
+                      advancedAnalytics.segmentation.segmentation_criteria
+                    ).map(([segment, criteria]) => (
                       <div key={segment} className="p-3 bg-blue-50 rounded-lg">
-                        <div className="font-medium capitalize text-blue-800">{segment}</div>
+                        <div className="font-medium capitalize text-blue-800">
+                          {segment}
+                        </div>
                         <div className="text-sm text-blue-600">{criteria}</div>
                       </div>
                     ))}
@@ -1140,7 +1391,9 @@ const AnalyticsHub: React.FC = () => {
           <Button
             variant="outline"
             className="flex flex-col items-center p-4 h-auto"
-            onClick={() => scheduleReport("comprehensive", { frequency: "weekly" })}
+            onClick={() =>
+              scheduleReport("comprehensive", { frequency: "weekly" })
+            }
             disabled={exportingData}
           >
             <Calendar className="h-6 w-6 mb-2" />
@@ -1156,12 +1409,17 @@ const AnalyticsHub: React.FC = () => {
           <div className="space-y-4">
             <div>
               <Label htmlFor="report-type">Report Type</Label>
-              <Select value={selectedReportType} onValueChange={setSelectedReportType}>
+              <Select
+                value={selectedReportType}
+                onValueChange={setSelectedReportType}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select report type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="comprehensive">Comprehensive Report</SelectItem>
+                  <SelectItem value="comprehensive">
+                    Comprehensive Report
+                  </SelectItem>
                   <SelectItem value="sales">Sales Analysis</SelectItem>
                   <SelectItem value="customers">Customer Insights</SelectItem>
                   <SelectItem value="operations">Operations Report</SelectItem>
@@ -1171,7 +1429,12 @@ const AnalyticsHub: React.FC = () => {
             </div>
             <div>
               <Label htmlFor="time-range">Time Range</Label>
-              <Select value={timeRange} onValueChange={(value: "7d" | "30d" | "90d") => setTimeRange(value)}>
+              <Select
+                value={timeRange}
+                onValueChange={(value: "7d" | "30d" | "90d") =>
+                  setTimeRange(value)
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1194,7 +1457,9 @@ const AnalyticsHub: React.FC = () => {
             </div>
             <div className="flex items-center space-x-2">
               <Switch id="include-recommendations" />
-              <Label htmlFor="include-recommendations">Include Recommendations</Label>
+              <Label htmlFor="include-recommendations">
+                Include Recommendations
+              </Label>
             </div>
           </div>
         </div>
@@ -1226,7 +1491,11 @@ const AnalyticsHub: React.FC = () => {
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Badge variant={report.status === "active" ? "default" : "secondary"}>
+                  <Badge
+                    variant={
+                      report.status === "active" ? "default" : "secondary"
+                    }
+                  >
                     {report.status}
                   </Badge>
                   <Button size="sm" variant="ghost">
@@ -1239,7 +1508,9 @@ const AnalyticsHub: React.FC = () => {
             <div className="text-center py-8">
               <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
               <p className="text-gray-600">No scheduled reports</p>
-              <p className="text-sm text-gray-500">Create your first scheduled report above</p>
+              <p className="text-sm text-gray-500">
+                Create your first scheduled report above
+              </p>
             </div>
           )}
         </div>
@@ -1260,7 +1531,11 @@ const AnalyticsHub: React.FC = () => {
           </p>
           {lastUpdated && (
             <div className="flex items-center space-x-2 mt-2">
-              <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  autoRefresh ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                }`}
+              ></div>
               <span className="text-sm text-gray-500">
                 Last updated: {lastUpdated.toLocaleTimeString()}
               </span>
@@ -1312,13 +1587,9 @@ const AnalyticsHub: React.FC = () => {
 
           <Button
             variant="outline"
-            onClick={() => {
-              loadAnalyticsData();
-              loadBusinessMetrics();
-              loadBusinessInsights();
-              loadAdvancedAnalytics();
-            }}
+            onClick={handleManualRefresh}
             disabled={loading}
+            title="Refresh all analytics data (clears cache)"
           >
             <RefreshCw
               className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
