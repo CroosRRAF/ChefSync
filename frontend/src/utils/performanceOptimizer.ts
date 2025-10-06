@@ -30,17 +30,20 @@ export const throttle = <T extends (...args: any[]) => any>(
 };
 
 // Click performance monitor
-export const measureClickPerformance = (handler: () => void, label: string = 'Click') => {
+export const measureClickPerformance = (
+  handler: () => void,
+  label: string = "Click"
+) => {
   return () => {
     const startTime = performance.now();
     handler();
     const endTime = performance.now();
     const duration = endTime - startTime;
-    
+
     if (duration > 100) {
       console.warn(`Slow ${label} handler: ${duration.toFixed(2)}ms`);
     }
-    
+
     return duration;
   };
 };
@@ -59,7 +62,7 @@ export const createOptimizedClickHandler = <T extends (...args: any[]) => any>(
     debounceMs = 0,
     throttleMs = 0,
     measurePerformance = false,
-    label = 'Click'
+    label = "Click",
   } = options;
 
   let optimizedHandler = handler;
@@ -85,7 +88,7 @@ export const createOptimizedClickHandler = <T extends (...args: any[]) => any>(
 // Batch DOM updates for better performance
 export const batchDOMUpdates = (updates: (() => void)[]) => {
   requestAnimationFrame(() => {
-    updates.forEach(update => update());
+    updates.forEach((update) => update());
   });
 };
 
@@ -107,7 +110,10 @@ export const createOptimizedResizeHandler = (
 
 // Memory-efficient event listener management
 export class EventListenerManager {
-  private listeners: Map<string, { element: EventTarget; event: string; handler: EventListener }[]> = new Map();
+  private listeners: Map<
+    string,
+    { element: EventTarget; event: string; handler: EventListener }[]
+  > = new Map();
 
   addListener(
     id: string,
@@ -117,14 +123,14 @@ export class EventListenerManager {
     options?: AddEventListenerOptions
   ) {
     element.addEventListener(event, handler, options);
-    
+
     if (!this.listeners.has(id)) {
       this.listeners.set(id, []);
     }
     this.listeners.get(id)!.push({ element, event, handler });
   }
 
-  removeAllListeners(id: string) {
+  removeAllListenersForId(id: string) {
     const listeners = this.listeners.get(id);
     if (listeners) {
       listeners.forEach(({ element, event, handler }) => {
@@ -156,14 +162,19 @@ export const withPerformanceMonitoring = <P extends object>(
     const renderStart = performance.now();
     const result = React.createElement(Component, props);
     const renderEnd = performance.now();
-    
-    if (renderEnd - renderStart > 16) { // More than one frame
-      console.warn(`Slow render for ${componentName}: ${(renderEnd - renderStart).toFixed(2)}ms`);
+
+    if (renderEnd - renderStart > 16) {
+      // More than one frame
+      console.warn(
+        `Slow render for ${componentName}: ${(renderEnd - renderStart).toFixed(
+          2
+        )}ms`
+      );
     }
-    
+
     return result;
   });
 };
 
 // Export React for the HOC
-import React from 'react';
+import React from "react";

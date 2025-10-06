@@ -379,6 +379,13 @@ const DashboardContent: React.FC = () => {
 
         // Fetch real data from API
         const days = timeFilter === "7d" ? 7 : timeFilter === "90d" ? 90 : 30;
+        console.log(
+          "[Dashboard] Starting API calls with timeFilter:",
+          timeFilter,
+          "days:",
+          days
+        );
+
         const [
           dashboardStats,
           recentOrdersData,
@@ -402,6 +409,11 @@ const DashboardContent: React.FC = () => {
           adminService.getOrdersDistribution(days),
           adminService.getNewUsersData(days),
         ]);
+
+        // Log the raw API response data
+        console.log("[Dashboard] All API calls completed");
+        console.log("[Dashboard] recentOrdersData:", recentOrdersData);
+        console.log("[Dashboard] recentDeliveriesData:", recentDeliveriesData);
 
         // Transform API data to match component state
         const transformedStats: DashboardStats = {
@@ -454,6 +466,9 @@ const DashboardContent: React.FC = () => {
           })
         );
 
+        console.log("Dashboard Debug - Recent Orders Data:", recentOrdersData);
+        console.log("Dashboard Debug - Transformed Orders:", transformedOrders);
+
         // Transform recent deliveries
         const transformedDeliveries: RecentDelivery[] =
           recentDeliveriesData.map((delivery) => ({
@@ -468,6 +483,15 @@ const DashboardContent: React.FC = () => {
             actual_time: delivery.actual_time,
             tracking_code: delivery.tracking_code || `TRK${delivery.id}`,
           }));
+
+        console.log(
+          "Dashboard Debug - Recent Deliveries Data:",
+          recentDeliveriesData
+        );
+        console.log(
+          "Dashboard Debug - Transformed Deliveries:",
+          transformedDeliveries
+        );
 
         // Transform recent activities
         const transformedActivities: ActivityItem[] = recentActivitiesData.map(
@@ -486,6 +510,10 @@ const DashboardContent: React.FC = () => {
         setRecentOrders(transformedOrders);
         setRecentDeliveries(transformedDeliveries);
         setRecentActivities(transformedActivities);
+
+        console.log("Dashboard Debug - Setting state:");
+        console.log("Recent Orders to set:", transformedOrders);
+        console.log("Recent Deliveries to set:", transformedDeliveries);
 
         // Set chart data with fallbacks
         setRevenueTrend(
@@ -543,6 +571,10 @@ const DashboardContent: React.FC = () => {
           responseTime: 0,
           systemHealth: 0,
         });
+
+        // Don't set fallback data for tables - let them be empty if API fails
+        setRecentOrders([]);
+        setRecentDeliveries([]);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -640,11 +672,17 @@ const DashboardContent: React.FC = () => {
     }
   }, []);
 
-  // Initial data load
+  // Debug: Log state changes
   useEffect(() => {
-    loadDashboardData();
-    loadAIInsights();
-  }, [loadDashboardData, loadAIInsights]);
+    console.log("Dashboard Debug - recentOrders state changed:", recentOrders);
+  }, [recentOrders]);
+
+  useEffect(() => {
+    console.log(
+      "Dashboard Debug - recentDeliveries state changed:",
+      recentDeliveries
+    );
+  }, [recentDeliveries]);
 
   // Manual refresh with debouncing
   const handleRefresh = useCallback(() => {
@@ -1698,6 +1736,13 @@ const DashboardContent: React.FC = () => {
           </div>
         </div>
         <div className="p-6">
+          {(() => {
+            console.log(
+              "Dashboard Debug - Rendering Recent Orders Table with data:",
+              recentOrders
+            );
+            return null;
+          })()}
           <MemoizedDataTable
             data={recentOrders}
             columns={[
@@ -1799,6 +1844,13 @@ const DashboardContent: React.FC = () => {
           </div>
         </div>
         <div className="p-6">
+          {(() => {
+            console.log(
+              "Dashboard Debug - Rendering Recent Deliveries Table with data:",
+              recentDeliveries
+            );
+            return null;
+          })()}
           <MemoizedDataTable
             data={recentDeliveries}
             columns={[
@@ -1925,7 +1977,6 @@ const DashboardContent: React.FC = () => {
 const Dashboard: React.FC = () => {
   return (
     <ErrorBoundary
-      level="page"
       onError={(error, errorInfo) => {
         console.error("Dashboard error:", error, errorInfo);
       }}

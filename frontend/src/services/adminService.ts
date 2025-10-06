@@ -649,12 +649,9 @@ class AdminService {
     count: number;
   }> {
     try {
-      const response = await apiClient.get(
-        `/auth/admin/pending-approvals/`,
-        {
-          params: role ? { role } : {},
-        }
-      );
+      const response = await apiClient.get(`/auth/admin/pending-approvals/`, {
+        params: role ? { role } : {},
+      });
       return response.data;
     } catch (error) {
       console.error("Error fetching pending approvals:", error);
@@ -663,11 +660,13 @@ class AdminService {
   }
 
   // Enhanced pending approvals from admin management
-  async getPendingApprovalsEnhanced(params: {
-    page?: number;
-    limit?: number;
-    role?: string;
-  } = {}): Promise<{
+  async getPendingApprovalsEnhanced(
+    params: {
+      page?: number;
+      limit?: number;
+      role?: string;
+    } = {}
+  ): Promise<{
     users: Array<{
       id: number;
       name: string;
@@ -1197,16 +1196,31 @@ class AdminService {
     }
   }
 
-  // Get new users data (30-day area chart)
-  async getNewUsersData(days: number = 30) {
+  // Get new users data for area chart
+  async getNewUsersData(days: number = 30): Promise<{
+    data: {
+      labels: string[];
+      datasets: Array<{ label: string; data: number[] }>;
+    };
+  }> {
     try {
-      // Try the new endpoint first
       const response = await apiClient.get(
         `/admin-management/dashboard/new_users/?days=${days}`
       );
       return response.data;
     } catch (error) {
       console.error("Error fetching new users data:", error);
+      throw new Error("Failed to fetch new users data");
+    }
+  }
+
+  // Get food statistics
+  async getFoodStats() {
+    try {
+      const response = await apiClient.get("/food/stats/");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching food stats:", error);
       throw error;
     }
   }
@@ -1214,24 +1228,20 @@ class AdminService {
   // Get recent deliveries
   async getRecentDeliveries(limit: number = 5) {
     try {
+      console.log(
+        `[AdminService] Calling getRecentDeliveries with limit=${limit}`
+      );
       // Try the new endpoint first
       const response = await apiClient.get(
         `/admin-management/dashboard/recent_deliveries/?limit=${limit}`
       );
+      console.log(
+        `[AdminService] getRecentDeliveries response:`,
+        response.data
+      );
       return response.data;
     } catch (error) {
-      console.error("Error fetching recent deliveries:", error);
-      throw error;
-    }
-  }
-
-  // Get food statistics
-  async getFoodStats() {
-    try {
-      const response = await apiClient.get('/food/stats/');
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching food stats:", error);
+      console.error("[AdminService] Error fetching recent deliveries:", error);
       throw error;
     }
   }

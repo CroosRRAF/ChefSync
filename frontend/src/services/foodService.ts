@@ -197,16 +197,19 @@ export const bulkUpdateFoodAvailability = async (
   foodIds: number[],
   available: boolean
 ): Promise<void> => {
-  await api.patch(`/food/foods/bulk_availability/`, {
-    food_ids: foodIds,
-    available: available,
-  });
+  // Use PATCH requests to individual foods since bulk endpoint doesn't exist
+  await Promise.all(
+    foodIds.map((id) =>
+      api.patch(`/food/admin/foods/${id}/`, { is_available: available })
+    )
+  );
 };
 
 export const bulkDeleteFoods = async (foodIds: number[]): Promise<void> => {
-  await api.delete(`/food/foods/bulk_delete/`, {
-    data: { food_ids: foodIds },
-  });
+  // Use DELETE requests to individual foods since bulk endpoint doesn't exist
+  await Promise.all(
+    foodIds.map((id) => api.delete(`/food/admin/foods/${id}/`))
+  );
 };
 
 // Default export with all functions

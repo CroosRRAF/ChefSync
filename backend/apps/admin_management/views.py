@@ -229,14 +229,24 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get recent orders for admin dashboard"""
         try:
             limit = int(request.query_params.get("limit", 10))  # type: ignore
+            logger.info(f"recent_orders called with limit={limit}")
+
             from apps.orders.models import Order
 
             recent_orders = Order.objects.select_related("customer", "chef").order_by(
                 "-created_at"
             )[:limit]
+
+            logger.info(f"Found {len(recent_orders)} recent orders")
+
             serializer = AdminOrderSummarySerializer(recent_orders, many=True)
+            logger.info(
+                f"Serialized data: {serializer.data[:1] if serializer.data else 'empty'}"
+            )
+
             return Response(serializer.data)
         except Exception as e:
+            logger.error(f"Error in recent_orders: {str(e)}", exc_info=True)
             return Response(
                 {"error": f"Failed to fetch recent orders: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -722,9 +732,15 @@ class AdminDashboardViewSet(viewsets.ViewSet):
     def revenue_analytics(self, request):
         """Get comprehensive revenue analytics with trends and forecasts"""
         try:
-            logger.debug(f"revenue_analytics called with params: {request.query_params}")
-            logger.debug(f"User: {request.user}, Is authenticated: {request.user.is_authenticated}")
-            logger.debug(f"User is staff: {request.user.is_staff if request.user.is_authenticated else 'N/A'}")
+            logger.debug(
+                f"revenue_analytics called with params: {request.query_params}"
+            )
+            logger.debug(
+                f"User: {request.user}, Is authenticated: {request.user.is_authenticated}"
+            )
+            logger.debug(
+                f"User is staff: {request.user.is_staff if request.user.is_authenticated else 'N/A'}"
+            )
             # Get time range parameter (default 30d)
             time_range = request.query_params.get("range", "30d")
             days = int(time_range.replace("d", ""))
@@ -1721,6 +1737,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
         """Get recent deliveries data"""
         try:
             limit = int(request.query_params.get("limit", 5))
+            logger.info(f"recent_deliveries called with limit={limit}")
 
             # Try to get delivery data from orders
             from apps.orders.models import Order
@@ -1733,41 +1750,43 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 .order_by("-created_at")[:limit]
             )
 
+            logger.info(f"Found {len(recent_orders)} recent orders for deliveries")
+
             deliveries = []
             for order in recent_orders:
-                deliveries.append(
-                    {
-                        "id": order.id,
-                        "order_id": order.id,
-                        "delivery_agent": (
-                            order.delivery_partner.get_full_name()
-                            if order.delivery_partner
-                            else "Unassigned"
-                        ),
-                        "customer_name": (
-                            order.customer.get_full_name()
-                            if order.customer
-                            else "Unknown"
-                        ),
-                        "delivery_address": getattr(
-                            order, "delivery_address", "Address not available"
-                        ),
-                        "status": order.status,
-                        "estimated_time": (
-                            order.created_at + timedelta(hours=1)
-                        ).isoformat(),
-                        "actual_time": (
-                            order.updated_at.isoformat()
-                            if order.status == "delivered"
-                            else None
-                        ),
-                        "tracking_code": f"TRK{str(order.id).zfill(6)}",
-                    }
-                )
+                delivery_data = {
+                    "id": order.id,
+                    "order_id": order.id,
+                    "delivery_agent": (
+                        order.delivery_partner.name
+                        if order.delivery_partner
+                        else "Unassigned"
+                    ),
+                    "customer_name": (
+                        order.customer.name if order.customer else "Unknown"
+                    ),
+                    "delivery_address": getattr(
+                        order, "delivery_address", "Address not available"
+                    ),
+                    "status": order.status,
+                    "estimated_time": (
+                        order.created_at + timedelta(hours=1)
+                    ).isoformat(),
+                    "actual_time": (
+                        order.updated_at.isoformat()
+                        if order.status == "delivered"
+                        else None
+                    ),
+                    "tracking_code": f"TRK{str(order.id).zfill(6)}",
+                }
+                deliveries.append(delivery_data)
+                logger.debug(f"Delivery data: {delivery_data}")
 
+            logger.info(f"Returning {len(deliveries)} deliveries")
             return Response(deliveries)
 
         except Exception as e:
+            logger.error(f"Error in recent_deliveries: {str(e)}", exc_info=True)
             return Response(
                 {"error": f"Failed to get recent deliveries: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -2103,7 +2122,11 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
         except Exception as e:
             # Enhanced error logging
-            logger.error(f"Error in list_users: {str(e)}", exc_info=True, extra={'request_data': request.query_params})
+            logger.error(
+                f"Error in list_users: {str(e)}",
+                exc_info=True,
+                extra={"request_data": request.query_params},
+            )
 
             return Response(
                 {"error": f"Failed to fetch users: {str(e)}"},
@@ -2122,8 +2145,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
             # Build query for pending approvals
             queryset = User.objects.select_related("profile").filter(
-                approval_status="pending",
-                is_active=True
+                approval_status="pending", is_active=True
             )
             logger.debug(f"Found {queryset.count()} pending users")
 
@@ -2149,48 +2171,65 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 documents = []
                 try:
                     from apps.authentication.models import UserDocument
+
                     user_docs = UserDocument.objects.filter(
                         user=user, is_visible_to_admin=True
-                    ).select_related('document_type')
+                    ).select_related("document_type")
 
                     for doc in user_docs:
-                        documents.append({
-                            "id": doc.id,
-                            "file_name": doc.file_name,
-                            "document_type": doc.document_type.name if doc.document_type else "Unknown",
-                            "uploaded_at": doc.uploaded_at.isoformat(),
-                            "file_url": doc.file,
-                            "status": doc.status,
-                            "admin_notes": doc.admin_notes
-                        })
+                        documents.append(
+                            {
+                                "id": doc.id,
+                                "file_name": doc.file_name,
+                                "document_type": (
+                                    doc.document_type.name
+                                    if doc.document_type
+                                    else "Unknown"
+                                ),
+                                "uploaded_at": doc.uploaded_at.isoformat(),
+                                "file_url": doc.file,
+                                "status": doc.status,
+                                "admin_notes": doc.admin_notes,
+                            }
+                        )
                 except Exception as e:
-                    logger.warning(f"Error fetching documents for user {user.user_id}: {e}")
+                    logger.warning(
+                        f"Error fetching documents for user {user.user_id}: {e}"
+                    )
 
-                user_data.append({
-                    "id": user.user_id,
-                    "name": user.name,
-                    "email": user.email,
-                    "phone_no": user.phone_no or "",
-                    "role": user.role,
-                    "is_active": user.is_active,
-                    "approval_status": user.approval_status,
-                    "approval_notes": user.approval_notes or "",
-                    "date_joined": user.date_joined.isoformat() if user.date_joined else None,
-                    "last_login": user.last_login.isoformat() if user.last_login else None,
-                    "address": user.address or "",
-                    "gender": user.gender or "",
-                    "documents": documents,
-                })
+                user_data.append(
+                    {
+                        "id": user.user_id,
+                        "name": user.name,
+                        "email": user.email,
+                        "phone_no": user.phone_no or "",
+                        "role": user.role,
+                        "is_active": user.is_active,
+                        "approval_status": user.approval_status,
+                        "approval_notes": user.approval_notes or "",
+                        "date_joined": (
+                            user.date_joined.isoformat() if user.date_joined else None
+                        ),
+                        "last_login": (
+                            user.last_login.isoformat() if user.last_login else None
+                        ),
+                        "address": user.address or "",
+                        "gender": user.gender or "",
+                        "documents": documents,
+                    }
+                )
 
-            return Response({
-                "users": user_data,
-                "pagination": {
-                    "page": page,
-                    "limit": limit,
-                    "total": total_count,
-                    "pages": (total_count + limit - 1) // limit,
-                },
-            })
+            return Response(
+                {
+                    "users": user_data,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit,
+                    },
+                }
+            )
 
         except Exception as e:
             logger.error(f"Error in pending_approvals: {str(e)}")
@@ -2355,22 +2394,33 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             documents = []
             try:
                 from apps.authentication.models import UserDocument
-                user_docs = UserDocument.objects.filter(
-                    user=user
-                ).select_related('document_type')
+
+                user_docs = UserDocument.objects.filter(user=user).select_related(
+                    "document_type"
+                )
 
                 for doc in user_docs:
-                    documents.append({
-                        "id": doc.id,
-                        "file_name": doc.file_name,
-                        "document_type": doc.document_type.name if doc.document_type else "Unknown",
-                        "uploaded_at": doc.uploaded_at.isoformat(),
-                        "file_url": doc.file,
-                        "status": doc.status,
-                        "admin_notes": doc.admin_notes,
-                        "reviewed_by": doc.reviewed_by.name if doc.reviewed_by else None,
-                        "reviewed_at": doc.reviewed_at.isoformat() if doc.reviewed_at else None
-                    })
+                    documents.append(
+                        {
+                            "id": doc.id,
+                            "file_name": doc.file_name,
+                            "document_type": (
+                                doc.document_type.name
+                                if doc.document_type
+                                else "Unknown"
+                            ),
+                            "uploaded_at": doc.uploaded_at.isoformat(),
+                            "file_url": doc.file,
+                            "status": doc.status,
+                            "admin_notes": doc.admin_notes,
+                            "reviewed_by": (
+                                doc.reviewed_by.name if doc.reviewed_by else None
+                            ),
+                            "reviewed_at": (
+                                doc.reviewed_at.isoformat() if doc.reviewed_at else None
+                            ),
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Error fetching documents for user {user.user_id}: {e}")
 
@@ -2378,19 +2428,28 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             orders = []
             try:
                 from apps.orders.models import Order
-                user_orders = Order.objects.filter(customer=user).order_by('-created_at')[:10]
+
+                user_orders = Order.objects.filter(customer=user).order_by(
+                    "-created_at"
+                )[:10]
 
                 for order in user_orders:
-                    orders.append({
-                        "id": order.id,
-                        "order_number": getattr(order, 'order_number', f'ORD-{order.id}'),
-                        "status": order.status,
-                        "total_amount": float(order.total_amount) if order.total_amount else 0.0,
-                        "payment_status": order.payment_status,
-                        "created_at": order.created_at.isoformat(),
-                        "delivery_address": getattr(order, 'delivery_address', ''),
-                        "items_count": getattr(order, 'items_count', 0)
-                    })
+                    orders.append(
+                        {
+                            "id": order.id,
+                            "order_number": getattr(
+                                order, "order_number", f"ORD-{order.id}"
+                            ),
+                            "status": order.status,
+                            "total_amount": (
+                                float(order.total_amount) if order.total_amount else 0.0
+                            ),
+                            "payment_status": order.payment_status,
+                            "created_at": order.created_at.isoformat(),
+                            "delivery_address": getattr(order, "delivery_address", ""),
+                            "items_count": getattr(order, "items_count", 0),
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Error fetching orders for user {user.user_id}: {e}")
 
@@ -2398,42 +2457,54 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             complaints = []
             try:
                 from apps.communications.models import Communication
+
                 user_complaints = Communication.objects.filter(
                     user=user,
-                    communication_type__in=['complaint', 'feedback', 'suggestion']
-                ).order_by('-created_at')[:10]
+                    communication_type__in=["complaint", "feedback", "suggestion"],
+                ).order_by("-created_at")[:10]
 
                 for complaint in user_complaints:
-                    complaints.append({
-                        "id": complaint.id,
-                        "reference_number": complaint.reference_number,
-                        "communication_type": complaint.communication_type,
-                        "subject": complaint.subject,
-                        "message": complaint.message,
-                        "status": complaint.status,
-                        "priority": complaint.priority,
-                        "created_at": complaint.created_at.isoformat(),
-                        "admin_response": complaint.admin_response,
-                        "resolved_at": complaint.resolved_at.isoformat() if complaint.resolved_at else None
-                    })
+                    complaints.append(
+                        {
+                            "id": complaint.id,
+                            "reference_number": complaint.reference_number,
+                            "communication_type": complaint.communication_type,
+                            "subject": complaint.subject,
+                            "message": complaint.message,
+                            "status": complaint.status,
+                            "priority": complaint.priority,
+                            "created_at": complaint.created_at.isoformat(),
+                            "admin_response": complaint.admin_response,
+                            "resolved_at": (
+                                complaint.resolved_at.isoformat()
+                                if complaint.resolved_at
+                                else None
+                            ),
+                        }
+                    )
             except Exception as e:
-                logger.warning(f"Error fetching complaints for user {user.user_id}: {e}")
+                logger.warning(
+                    f"Error fetching complaints for user {user.user_id}: {e}"
+                )
 
             # Get user addresses
             addresses = []
             try:
                 from apps.users.models import Address
+
                 user_addresses = Address.objects.filter(user=user, is_active=True)
 
                 for address in user_addresses:
-                    addresses.append({
-                        "id": address.id,
-                        "address_type": address.address_type,
-                        "label": address.label,
-                        "full_address": address.full_address,
-                        "is_default": address.is_default,
-                        "created_at": address.created_at.isoformat()
-                    })
+                    addresses.append(
+                        {
+                            "id": address.id,
+                            "address_type": address.address_type,
+                            "label": address.label,
+                            "full_address": address.full_address,
+                            "is_default": address.is_default,
+                            "created_at": address.created_at.isoformat(),
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Error fetching addresses for user {user.user_id}: {e}")
 
@@ -2442,40 +2513,62 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 "total_orders": len(orders),
                 "total_spent": sum(order["total_amount"] for order in orders),
                 "total_complaints": len(complaints),
-                "pending_complaints": len([c for c in complaints if c["status"] == "pending"]),
+                "pending_complaints": len(
+                    [c for c in complaints if c["status"] == "pending"]
+                ),
                 "total_documents": len(documents),
-                "approved_documents": len([d for d in documents if d["status"] == "approved"]),
-                "pending_documents": len([d for d in documents if d["status"] == "pending"])
+                "approved_documents": len(
+                    [d for d in documents if d["status"] == "approved"]
+                ),
+                "pending_documents": len(
+                    [d for d in documents if d["status"] == "pending"]
+                ),
             }
 
-            return Response({
-                "user": {
-                    "id": user.user_id,
-                    "name": user.name or "",
-                "email": user.email,
-                    "phone_no": user.phone_no or "",
-                    "role": user.role or "",
-                    "is_active": user.is_active,
-                    "approval_status": getattr(user, "approval_status", None),
-                    "approval_notes": getattr(user, "approval_notes", ""),
-                    "approved_by": user.approved_by.name if hasattr(user, 'approved_by') and user.approved_by else None,
-                    "approved_at": user.approved_at.isoformat() if hasattr(user, 'approved_at') and user.approved_at else None,
-                    "date_joined": user.date_joined.isoformat() if user.date_joined else None,
-                    "last_login": user.last_login.isoformat() if user.last_login else None,
-                    "address": user.address or "",
-                    "gender": getattr(user, "gender", ""),
-                    "email_verified": getattr(user, "email_verified", False),
-                    "failed_login_attempts": getattr(user, "failed_login_attempts", 0),
-                    "account_locked": getattr(user, "account_locked", False),
-                    "referral_code": getattr(user, "referral_code", None),
-                    "total_referrals": getattr(user, "total_referrals", 0)
-                },
-                "documents": documents,
-                "orders": orders,
-                "complaints": complaints,
-                "addresses": addresses,
-                "stats": stats
-            })
+            return Response(
+                {
+                    "user": {
+                        "id": user.user_id,
+                        "name": user.name or "",
+                        "email": user.email,
+                        "phone_no": user.phone_no or "",
+                        "role": user.role or "",
+                        "is_active": user.is_active,
+                        "approval_status": getattr(user, "approval_status", None),
+                        "approval_notes": getattr(user, "approval_notes", ""),
+                        "approved_by": (
+                            user.approved_by.name
+                            if hasattr(user, "approved_by") and user.approved_by
+                            else None
+                        ),
+                        "approved_at": (
+                            user.approved_at.isoformat()
+                            if hasattr(user, "approved_at") and user.approved_at
+                            else None
+                        ),
+                        "date_joined": (
+                            user.date_joined.isoformat() if user.date_joined else None
+                        ),
+                        "last_login": (
+                            user.last_login.isoformat() if user.last_login else None
+                        ),
+                        "address": user.address or "",
+                        "gender": getattr(user, "gender", ""),
+                        "email_verified": getattr(user, "email_verified", False),
+                        "failed_login_attempts": getattr(
+                            user, "failed_login_attempts", 0
+                        ),
+                        "account_locked": getattr(user, "account_locked", False),
+                        "referral_code": getattr(user, "referral_code", None),
+                        "total_referrals": getattr(user, "total_referrals", 0),
+                    },
+                    "documents": documents,
+                    "orders": orders,
+                    "complaints": complaints,
+                    "addresses": addresses,
+                    "stats": stats,
+                }
+            )
 
         except User.DoesNotExist:
             return Response(
