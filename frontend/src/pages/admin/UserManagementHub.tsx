@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useState } from "react";
 // Import shared components
 import { AnimatedStats, DataTable, GlassCard } from "@/components/admin/shared";
 import type { Column } from "@/components/admin/shared/tables/DataTable";
+import EnhancedUserTable from "@/components/admin/shared/tables/EnhancedUserTable";
+import UserDetailsModal from "@/components/admin/shared/modals/UserDetailsModal";
 import { useOptimisticUpdates } from "@/hooks";
 
 // Import UI components
@@ -57,7 +59,6 @@ import {
   Trash2,
   User,
   UserCheck,
-  UserPlus,
   Users,
   UserX,
 } from "lucide-react";
@@ -162,7 +163,6 @@ const UserManagementHub: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [showUserModal, setShowUserModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
@@ -172,6 +172,10 @@ const UserManagementHub: React.FC = () => {
   const [showUserDetails, setShowUserDetails] = useState(false);
   const [selectedUserDetails, setSelectedUserDetails] = useState<any>(null);
   const [loadingUserDetails, setLoadingUserDetails] = useState(false);
+  const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
+  const [pendingUsersLoading, setPendingUsersLoading] = useState(false);
 
   // Profile Management States
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
@@ -192,9 +196,7 @@ const UserManagementHub: React.FC = () => {
   // Load user statistics
   const loadUserStats = useCallback(async () => {
     try {
-      console.log("Loading user stats...");
       const token = localStorage.getItem("access_token");
-      console.log("Auth token:", token ? "Present" : "Missing");
 
       // Fetch real user stats from API
       const response = await fetch("/api/admin-management/users/stats/", {
@@ -204,21 +206,10 @@ const UserManagementHub: React.FC = () => {
         },
       });
 
-      console.log("User stats response status:", response.status);
-
       if (response.ok) {
         const statsData = await response.json();
-        console.log("User stats data:", statsData);
         setUserStats(statsData);
       } else {
-        console.error(
-          "User stats API failed:",
-          response.status,
-          response.statusText
-        );
-        const errorText = await response.text();
-        console.error("Error response:", errorText);
-
         // Fallback stats if API fails
         const fallbackStats: UserStats = {
           totalUsers: 0,
@@ -256,12 +247,6 @@ const UserManagementHub: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      console.log("Loading users with filters:", {
-        search: searchQuery,
-        role: roleFilter === "all" ? undefined : roleFilter,
-        status: statusFilter === "all" ? undefined : statusFilter,
-      });
-
       const response: UserListResponse = await adminService.getUsers({
         search: searchQuery,
         role: roleFilter === "all" ? undefined : roleFilter,
@@ -270,14 +255,8 @@ const UserManagementHub: React.FC = () => {
         limit: 50,
       });
 
-      console.log("Users API response:", response);
-
       const usersData = response.users || [];
-      console.log("Processed users data:", usersData);
-
-      console.log("Setting users state:", usersData.length);
       setUsers(usersData);
-      console.log("Calling updateData with:", usersData.length);
       updateData(usersData);
     } catch (error) {
       console.error("Error loading users:", error);
@@ -493,6 +472,116 @@ const UserManagementHub: React.FC = () => {
     }
   };
 
+  // Handle user row click for enhanced details modal
+  const handleUserRowClick = (user: User) => {
+    setSelectedUserId(user.id);
+    setShowUserDetailsModal(true);
+  };
+
+  // Handle approval from modal
+  const handleApproveFromModal = (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      setShowUserDetailsModal(false);
+      handleApprove(user);
+    }
+  };
+
+  // Handle rejection from modal
+  const handleRejectFromModal = (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      setShowUserDetailsModal(false);
+      handleReject(user);
+    }
+  };
+
+  // Load pending users from API
+  const loadPendingUsers = async () => {
+    console.log("Loading pending users...");
+    setPendingUsersLoading(true);
+    try {
+      const response = await adminService.getPendingApprovalsEnhanced({
+        page: 1,
+        limit: 100,
+      });
+      console.log("Pending approvals response:", response);
+      console.log("Number of pending users:", response.users?.length || 0);
+
+      // Transform the response to match AdminUser interface
+      const transformedUsers: AdminUser[] = response.users.map((user: any) => ({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        is_active: user.is_active || true,
+        approval_status: user.approval_status,
+        status: user.approval_status, // Map approval_status to status for compatibility
+        last_login: user.last_login,
+        date_joined: user.date_joined,
+        total_orders: 0, // Default values since not provided in pending approvals
+        total_spent: 0,
+        // Additional fields from pending approvals response
+        phone_no: user.phone_no,
+        address: user.address,
+        gender: user.gender,
+        approval_notes: user.approval_notes,
+        documents: user.documents,
+      }));
+      console.log("Transformed pending users:", transformedUsers);
+      setPendingUsers(transformedUsers);
+    } catch (error) {
+      console.error("Error loading pending users:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load pending approvals",
+        variant: "destructive",
+      });
+    } finally {
+      setPendingUsersLoading(false);
+    }
+  };
+
+  // Handle approve from pending users table
+  const handleApprovePending = async (user: User) => {
+    try {
+      await adminService.approveUser(user.id, "approve", "");
+      toast({
+        title: "Success",
+        description: `User ${user.name} has been approved`,
+      });
+      loadPendingUsers(); // Refresh pending users
+      loadUsers(); // Refresh main users list
+    } catch (error) {
+      console.error("Error approving user:", error);
+      toast({
+        title: "Error",
+        description: "Failed to approve user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle reject from pending users table
+  const handleRejectPending = async (user: User) => {
+    try {
+      await adminService.approveUser(user.id, "reject", "Application rejected by admin");
+      toast({
+        title: "Success",
+        description: `User ${user.name} has been rejected`,
+      });
+      loadPendingUsers(); // Refresh pending users
+      loadUsers(); // Refresh main users list
+    } catch (error) {
+      console.error("Error rejecting user:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reject user",
+        variant: "destructive",
+      });
+    }
+  };
+
   const confirmDeleteUser = async () => {
     if (!userToDelete) return;
 
@@ -555,36 +644,24 @@ const UserManagementHub: React.FC = () => {
   // Load data on mount and tab changes
   useEffect(() => {
     loadUserStats();
-    if (activeTab === "users" || activeTab === "pending") {
+    if (activeTab === "users") {
       loadUsers();
+    } else if (activeTab === "pending") {
+      loadPendingUsers();
     } else if (activeTab === "profile") {
       loadAdminProfile();
     } else if (activeTab === "activity") {
       loadActivityLogs();
       loadSessions();
     }
-  }, [
-    activeTab,
-    loadUsers,
-    loadUserStats,
-    loadAdminProfile,
-    loadActivityLogs,
-    loadSessions,
-  ]);
+  }, [activeTab]); // Remove function dependencies to prevent infinite loops
 
   // Sync optimistic users with users state
   useEffect(() => {
-    console.log(
-      "Users state changed:",
-      users.length,
-      "Optimistic users:",
-      optimisticUsers.length
-    );
     if (users.length > 0) {
-      console.log("Syncing users to optimistic users:", users.length);
       updateData(users);
     }
-  }, [users, updateData]);
+  }, [users]); // Remove updateData dependency to prevent loops
 
   // User table columns
   const userColumns: Column<AdminUser>[] = [
@@ -747,7 +824,7 @@ const UserManagementHub: React.FC = () => {
           <AnimatedStats
             value={userStats.newThisMonth}
             label="New This Month"
-            icon={UserPlus}
+            icon={User}
             trend={8.7}
             gradient="purple"
           />
@@ -801,10 +878,9 @@ const UserManagementHub: React.FC = () => {
       <GlassCard className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Users</h3>
-          <Button onClick={() => setShowUserModal(true)}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add User
-          </Button>
+          <div className="text-sm text-gray-500">
+            Manage users and their activities
+          </div>
         </div>
 
         {error && (
@@ -819,58 +895,31 @@ const UserManagementHub: React.FC = () => {
           </div>
         )}
 
-        <DataTable
+        <EnhancedUserTable
           data={optimisticUsers}
-          columns={userColumns}
+          title="Users"
+          searchable={true}
+          selectable={false}
           loading={loading}
+          onRowClick={handleUserRowClick}
+          onRefresh={loadUsers}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          pagination={{
+            page: 1,
+            pageSize: 25,
+            total: optimisticUsers.length,
+            onPageChange: () => {},
+            onPageSizeChange: () => {},
+          }}
         />
 
-        {/* Debug info - remove this after fixing */}
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-          <div className="font-semibold text-blue-800 mb-2">🔍 Debug Info:</div>
-          <div className="space-y-1 text-blue-700">
-            <div>
-              Users state length:{" "}
-              <span className="font-mono bg-blue-100 px-1 rounded">
-                {users.length}
-              </span>
-            </div>
-            <div>
-              Optimistic users length:{" "}
-              <span className="font-mono bg-blue-100 px-1 rounded">
-                {optimisticUsers.length}
-              </span>
-            </div>
-            <div>
-              Loading:{" "}
-              <span className="font-mono bg-blue-100 px-1 rounded">
-                {loading.toString()}
-              </span>
-            </div>
-            <div>
-              Error:{" "}
-              <span className="font-mono bg-blue-100 px-1 rounded">
-                {error || "None"}
-              </span>
-            </div>
-            {optimisticUsers.length > 0 && (
-              <div className="mt-2">
-                <div className="font-semibold">First user data:</div>
-                <pre className="bg-blue-100 p-2 rounded text-xs overflow-auto max-h-32">
-                  {JSON.stringify(optimisticUsers[0], null, 2)}
-                </pre>
-              </div>
-            )}
-          </div>
-        </div>
       </GlassCard>
     </div>
   );
 
   // Render Pending Approvals Tab
   const renderPendingApprovalsTab = () => {
-    const pendingUsers = users.filter(user => user.approval_status === "pending");
-    
     return (
       <div className="space-y-6">
         {/* Pending Approvals Header */}
@@ -888,79 +937,25 @@ const UserManagementHub: React.FC = () => {
           </div>
         </GlassCard>
 
-        {/* Pending Users List */}
-        {pendingUsers.length > 0 ? (
-          <div className="space-y-4">
-            {pendingUsers.map((user) => (
-              <GlassCard key={user.id} className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src="" />
-                      <AvatarFallback>
-                        {user?.name
-                          ? user.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                              .toUpperCase()
-                          : "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">{user?.name || "Unknown User"}</div>
-                      <div className="text-sm text-gray-500">{user?.email || "No email"}</div>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Badge variant="secondary">{user?.role?.replace("_", " ") || "Unknown"}</Badge>
-                        <Badge variant="outline" className="text-orange-600 border-orange-200">
-                          Pending Approval
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      onClick={() => handleApprove(user)}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <UserCheck className="h-4 w-4 mr-2" />
-                      Approve
-                    </Button>
-                    <Button
-                      onClick={() => handleReject(user)}
-                      size="sm"
-                      variant="destructive"
-                    >
-                      <UserX className="h-4 w-4 mr-2" />
-                      Reject
-                    </Button>
-                    <Button
-                      onClick={() => loadUserDetails(user.id)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Details
-                    </Button>
-                  </div>
-                </div>
-              </GlassCard>
-            ))}
-          </div>
-        ) : (
-          <GlassCard className="p-6">
-            <div className="text-center py-8">
-              <UserCheck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                No Pending Approvals
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400">
-                All user applications have been reviewed and processed.
-              </p>
-            </div>
-          </GlassCard>
-        )}
+        {/* Pending Users Table */}
+        <EnhancedUserTable
+          data={pendingUsers}
+          title="Users Awaiting Approval"
+          searchable={true}
+          selectable={false}
+          loading={pendingUsersLoading}
+          onRowClick={handleUserRowClick}
+          onRefresh={loadPendingUsers}
+          onApprove={handleApprovePending}
+          onReject={handleRejectPending}
+          pagination={{
+            page: 1,
+            pageSize: 25,
+            total: pendingUsers.length,
+            onPageChange: () => {},
+            onPageSizeChange: () => {},
+          }}
+        />
       </div>
     );
   };
@@ -1687,6 +1682,15 @@ const UserManagementHub: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Enhanced User Details Modal */}
+      <UserDetailsModal
+        isOpen={showUserDetailsModal}
+        onClose={() => setShowUserDetailsModal(false)}
+        userId={selectedUserId}
+        onApprove={handleApproveFromModal}
+        onReject={handleRejectFromModal}
+      />
     </div>
   );
 };

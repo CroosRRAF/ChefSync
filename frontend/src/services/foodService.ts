@@ -36,17 +36,25 @@ api.interceptors.request.use(
 export const fetchFoods = async (
   params: FoodFilterParams
 ): Promise<PaginatedResponse<Food>> => {
-  const response = await api.get(`/food/foods/`, { params });
+  const response = await api.get(`/food/admin/foods/`, { params });
+  return response.data;
+};
+
+// Customer-specific food fetching (for menu page)
+export const fetchCustomerFoods = async (
+  params: FoodFilterParams = {}
+): Promise<PaginatedResponse<Food>> => {
+  const response = await api.get(`/food/customer/foods/`, { params });
   return response.data;
 };
 
 export const fetchFood = async (id: number): Promise<Food> => {
-  const response = await api.get(`/food/foods/${id}/`);
+  const response = await api.get(`/food/admin/foods/${id}/`);
   return response.data;
 };
 
 export const createFood = async (formData: FormData): Promise<Food> => {
-  const response = await api.post(`/food/foods/`, formData, {
+  const response = await api.post(`/food/admin/foods/`, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -58,7 +66,7 @@ export const updateFood = async (
   id: number,
   formData: FormData
 ): Promise<Food> => {
-  const response = await api.patch(`/food/foods/${id}/`, formData, {
+  const response = await api.patch(`/food/admin/foods/${id}/`, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -67,7 +75,7 @@ export const updateFood = async (
 };
 
 export const deleteFood = async (id: number): Promise<void> => {
-  await api.delete(`/food/foods/${id}/`);
+  await api.delete(`/food/admin/foods/${id}/`);
 };
 
 // Cuisine API endpoints

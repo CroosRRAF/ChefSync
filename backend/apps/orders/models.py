@@ -128,12 +128,9 @@ class Order(models.Model):
     )  # Deprecated
 
     # New address system - reference to apps.users.address_models.Address
-    delivery_address_new = models.ForeignKey(
-        'users.Address',
-        on_delete=models.SET_NULL,
+    delivery_address_new_id = models.BigIntegerField(
         null=True,
         blank=True,
-        related_name='delivery_orders',
         help_text='New address system reference'
     )
 
@@ -155,12 +152,9 @@ class Order(models.Model):
 
 
     # Kitchen location reference
-    kitchen_location = models.ForeignKey(
-        'users.Address',
-        on_delete=models.SET_NULL,
+    kitchen_location_id = models.BigIntegerField(
         null=True,
         blank=True,
-        related_name='kitchen_orders',
         help_text='Kitchen location for this order'
     )
 

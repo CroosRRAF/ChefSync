@@ -14,6 +14,7 @@ router.register(r'offers', views.OfferViewSet, basename='offers')
 
 # Admin approval endpoints
 router.register(r'admin/approvals', views.AdminFoodApprovalViewSet, basename='admin-approvals')
+router.register(r'admin/foods', views.AdminFoodViewSet, basename='admin-foods')
 
 urlpatterns = [
     # Include all router URLs
@@ -30,4 +31,7 @@ urlpatterns = [
     
     # Image upload endpoint
     path('upload-image/', views.upload_image, name='upload-image'),
+    
+    # Food statistics endpoint
+    path('stats/', views.food_stats, name='food-stats'),
 ]

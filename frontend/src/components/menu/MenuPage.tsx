@@ -9,6 +9,7 @@ import { useCartService, CartSummary } from '@/services/cartService';
 import SimpleAddToCartModal from './SimpleAddToCartModal';
 import ShoppingCartModal from '../checkout/ShoppingCartModal';
 import { toast } from 'sonner';
+import { fetchCustomerFoods } from '@/services/foodService';
 
 interface Food {
   id: number;
@@ -84,127 +85,20 @@ const MenuPage: React.FC = () => {
   const loadMenuItems = async () => {
     setLoading(true);
     try {
-      // Mock data for demonstration
-      const mockFoods: Food[] = [
-        {
-          id: 1,
-          name: "Spicy Chicken Kottu",
-          description: "Authentic Sri Lankan street food with tender chicken pieces, fresh vegetables, and aromatic spices",
-          image_url: "/media/food_10_2.jpg",
-          chef: {
-            id: 1,
-            name: "Chef Priya",
-            rating: 4.8,
-            cuisine_type: "Sri Lankan"
-          },
-          prices: [
-            { id: 1, size: "Regular", price: 850 },
-            { id: 2, size: "Large", price: 1200 }
-          ],
-          category: { id: 1, name: "Main Course" },
-          tags: ["Spicy", "Popular", "Street Food"],
-          preparation_time: 25,
-          rating: 4.6,
-          reviews_count: 124,
-          is_available: true,
-          is_featured: true
-        },
-        {
-          id: 2,
-          name: "Margherita Pizza",
-          description: "Classic Italian pizza with fresh mozzarella, tomatoes, and basil on a wood-fired crust",
-          image_url: "/media/food_11_1.jpg",
-          chef: {
-            id: 2,
-            name: "Chef Marco",
-            rating: 4.9,
-            cuisine_type: "Italian"
-          },
-          prices: [
-            { id: 3, size: "Personal", price: 1200 },
-            { id: 4, size: "Medium", price: 1800 },
-            { id: 5, size: "Family", price: 2500 }
-          ],
-          category: { id: 2, name: "Pizza" },
-          tags: ["Vegetarian", "Classic", "Cheese"],
-          preparation_time: 15,
-          rating: 4.8,
-          reviews_count: 89,
-          is_available: true,
-          is_featured: false
-        },
-        {
-          id: 3,
-          name: "Beef Biriyani",
-          description: "Fragrant basmati rice layered with tender beef, aromatic spices, and caramelized onions",
-          image_url: "/media/food_12_1.jpg",
-          chef: {
-            id: 3,
-            name: "Chef Ahmed",
-            rating: 4.7,
-            cuisine_type: "Indian"
-          },
-          prices: [
-            { id: 6, size: "Regular", price: 1450 },
-            { id: 7, size: "Family Pack", price: 2800 }
-          ],
-          category: { id: 3, name: "Rice & Biriyani" },
-          tags: ["Spicy", "Traditional", "Rice"],
-          preparation_time: 45,
-          rating: 4.9,
-          reviews_count: 156,
-          is_available: true,
-          is_featured: true
-        },
-        {
-          id: 4,
-          name: "Fish & Chips",
-          description: "Crispy beer-battered fish served with golden fries and homemade tartar sauce",
-          image_url: "/media/food_13_1.jpg",
-          chef: {
-            id: 4,
-            name: "Chef James",
-            rating: 4.5,
-            cuisine_type: "British"
-          },
-          prices: [
-            { id: 8, size: "Regular", price: 1350 }
-          ],
-          category: { id: 4, name: "Seafood" },
-          tags: ["Crispy", "Traditional", "Fish"],
-          preparation_time: 20,
-          rating: 4.4,
-          reviews_count: 67,
-          is_available: true,
-          is_featured: false
-        },
-        {
-          id: 5,
-          name: "Chocolate Lava Cake",
-          description: "Decadent chocolate cake with a molten center, served with vanilla ice cream",
-          image_url: "/media/food_14_1.jpg",
-          chef: {
-            id: 5,
-            name: "Chef Sarah",
-            rating: 4.9,
-            cuisine_type: "Desserts"
-          },
-          prices: [
-            { id: 9, size: "Single", price: 650 },
-            { id: 10, size: "Double", price: 1100 }
-          ],
-          category: { id: 5, name: "Desserts" },
-          tags: ["Sweet", "Chocolate", "Popular"],
-          preparation_time: 12,
-          rating: 4.7,
-          reviews_count: 93,
-          is_available: true,
-          is_featured: false
-        }
-      ];
+      // Fetch real data from API
+      const response = await fetchCustomerFoods({
+        search: filters.search,
+        category: filters.category !== "all" ? filters.category : "",
+        availability: "available", // Only show available foods
+        page: 1,
+        limit: 100 // Get more items for better filtering
+      });
+
+      // Use API data instead of mock data
+      const foods = response.results || [];
 
       // Apply filters
-      let filteredFoods = mockFoods;
+      let filteredFoods = foods;
 
       if (filters.search) {
         filteredFoods = filteredFoods.filter(food => 
@@ -214,13 +108,13 @@ const MenuPage: React.FC = () => {
         );
       }
 
-      if (filters.category) {
+      if (filters.category && filters.category !== "all") {
         filteredFoods = filteredFoods.filter(food => 
           food.category.name.toLowerCase() === filters.category.toLowerCase()
         );
       }
 
-      if (filters.priceRange) {
+      if (filters.priceRange && filters.priceRange !== "all") {
         const [min, max] = filters.priceRange.split('-').map(Number);
         filteredFoods = filteredFoods.filter(food => {
           const minPrice = Math.min(...food.prices.map(p => p.price));
@@ -228,7 +122,7 @@ const MenuPage: React.FC = () => {
         });
       }
 
-      if (filters.rating) {
+      if (filters.rating && filters.rating !== "all") {
         const minRating = Number(filters.rating);
         filteredFoods = filteredFoods.filter(food => 
           (food.rating || 0) >= minRating
@@ -363,7 +257,7 @@ const MenuPage: React.FC = () => {
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 <SelectItem value="main course">Main Course</SelectItem>
                 <SelectItem value="pizza">Pizza</SelectItem>
                 <SelectItem value="rice & biriyani">Rice & Biriyani</SelectItem>
@@ -377,7 +271,7 @@ const MenuPage: React.FC = () => {
                 <SelectValue placeholder="Price Range" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Any Price</SelectItem>
+                <SelectItem value="all">Any Price</SelectItem>
                 <SelectItem value="0-500">Under Rs. 500</SelectItem>
                 <SelectItem value="500-1000">Rs. 500 - 1000</SelectItem>
                 <SelectItem value="1000-1500">Rs. 1000 - 1500</SelectItem>
@@ -390,7 +284,7 @@ const MenuPage: React.FC = () => {
                 <SelectValue placeholder="Rating" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Any Rating</SelectItem>
+                <SelectItem value="all">Any Rating</SelectItem>
                 <SelectItem value="4">4+ Stars</SelectItem>
                 <SelectItem value="4.5">4.5+ Stars</SelectItem>
               </SelectContent>

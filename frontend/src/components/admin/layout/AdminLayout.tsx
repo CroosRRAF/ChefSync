@@ -46,11 +46,13 @@ import {
   Gift,
   Brain,
   UserPlus,
+  Clock,
 } from "lucide-react";
 import React, { memo, useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AdminBreadcrumb from "./AdminBreadcrumb";
 import { CommandPalette, AIAssistantButton, GlassCard } from "../shared";
+import PerformanceMonitor from "../shared/PerformanceMonitor";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -508,6 +510,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
 
       {/* AI Assistant Button */}
       <AIAssistantButton />
+      
+      {/* Performance Monitor */}
+      <PerformanceMonitor />
     </div>
   );
 });

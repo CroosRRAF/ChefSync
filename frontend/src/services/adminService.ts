@@ -162,6 +162,20 @@ export interface AdminUser {
   date_joined: string;
   total_orders: number;
   total_spent: number;
+  // Additional fields for enhanced user data
+  phone_no?: string;
+  address?: string;
+  gender?: string;
+  approval_notes?: string;
+  documents?: Array<{
+    id: number;
+    file_name: string;
+    document_type: string;
+    uploaded_at: string;
+    file_url: string;
+    status: string;
+    admin_notes: string;
+  }>;
 }
 
 export interface AdminOrder {
@@ -648,6 +662,144 @@ class AdminService {
     }
   }
 
+  // Enhanced pending approvals from admin management
+  async getPendingApprovalsEnhanced(params: {
+    page?: number;
+    limit?: number;
+    role?: string;
+  } = {}): Promise<{
+    users: Array<{
+      id: number;
+      name: string;
+      email: string;
+      role: string;
+      phone_no: string;
+      address: string;
+      gender: string;
+      approval_status: string;
+      approval_notes: string;
+      date_joined: string;
+      last_login: string | null;
+      documents: Array<{
+        id: number;
+        file_name: string;
+        document_type: string;
+        uploaded_at: string;
+        file_url: string;
+        status: string;
+        admin_notes: string;
+      }>;
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }> {
+    try {
+      const response = await apiClient.get(
+        `${this.baseUrl}/users/pending_approvals/`,
+        {
+          params: {
+            page: params.page || 1,
+            limit: params.limit || 25,
+            role: params.role || "",
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching enhanced pending approvals:", error);
+      throw new Error("Failed to fetch pending approvals");
+    }
+  }
+
+  // Get comprehensive user details
+  async getUserDetailsComprehensive(userId: number): Promise<{
+    user: {
+      id: number;
+      name: string;
+      email: string;
+      phone_no: string;
+      role: string;
+      is_active: boolean;
+      approval_status: string;
+      approval_notes: string;
+      approved_by: string | null;
+      approved_at: string | null;
+      date_joined: string;
+      last_login: string | null;
+      address: string;
+      gender: string;
+      email_verified: boolean;
+      failed_login_attempts: number;
+      account_locked: boolean;
+      referral_code: string | null;
+      total_referrals: number;
+    };
+    documents: Array<{
+      id: number;
+      file_name: string;
+      document_type: string;
+      uploaded_at: string;
+      file_url: string;
+      status: string;
+      admin_notes: string;
+      reviewed_by: string | null;
+      reviewed_at: string | null;
+    }>;
+    orders: Array<{
+      id: number;
+      order_number: string;
+      status: string;
+      total_amount: number;
+      payment_status: string;
+      created_at: string;
+      delivery_address: string;
+      items_count: number;
+    }>;
+    complaints: Array<{
+      id: number;
+      reference_number: string;
+      communication_type: string;
+      subject: string;
+      message: string;
+      status: string;
+      priority: string;
+      created_at: string;
+      admin_response: string;
+      resolved_at: string | null;
+    }>;
+    addresses: Array<{
+      id: number;
+      address_type: string;
+      label: string;
+      full_address: string;
+      is_default: boolean;
+      created_at: string;
+    }>;
+    stats: {
+      total_orders: number;
+      total_spent: number;
+      total_complaints: number;
+      pending_complaints: number;
+      total_documents: number;
+      approved_documents: number;
+      pending_documents: number;
+    };
+  }> {
+    try {
+      const response = await apiClient.get(
+        `${this.baseUrl}/users/${userId}/details/`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching comprehensive user details:", error);
+      throw new Error("Failed to fetch user details");
+    }
+  }
+
   async approveUser(
     userId: number,
     action: "approve" | "reject",
@@ -1069,6 +1221,17 @@ class AdminService {
       return response.data;
     } catch (error) {
       console.error("Error fetching recent deliveries:", error);
+      throw error;
+    }
+  }
+
+  // Get food statistics
+  async getFoodStats() {
+    try {
+      const response = await apiClient.get('/food/stats/');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching food stats:", error);
       throw error;
     }
   }

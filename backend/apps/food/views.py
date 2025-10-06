@@ -1,8 +1,12 @@
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.db.models import Q
+import logging
+
+logger = logging.getLogger(__name__)
+
 from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
 from .serializers import (
     CuisineSerializer, FoodCategorySerializer, FoodSerializer, 
@@ -387,6 +391,52 @@ class OfferViewSet(viewsets.ModelViewSet):
 # ADMIN FOOD APPROVAL SYSTEM
 # ================================
 
+class AdminFoodViewSet(viewsets.ModelViewSet):
+    """Admin endpoints for complete food management"""
+    
+    serializer_class = FoodSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Admin can access all foods"""
+        if not self.request.user.is_staff:
+            return Food.objects.none()
+        
+        # Get all foods for admin management
+        queryset = Food.objects.all().order_by('-created_at')
+        
+        # Apply filters
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+            
+        category_filter = self.request.query_params.get('category')
+        if category_filter:
+            queryset = queryset.filter(food_category__name__icontains=category_filter)
+            
+        cuisine_filter = self.request.query_params.get('cuisine')
+        if cuisine_filter:
+            queryset = queryset.filter(food_category__cuisine__name__icontains=cuisine_filter)
+            
+        search_filter = self.request.query_params.get('search')
+        if search_filter:
+            queryset = queryset.filter(name__icontains=search_filter)
+            
+        availability_filter = self.request.query_params.get('availability')
+        if availability_filter == 'available':
+            queryset = queryset.filter(is_available=True)
+        elif availability_filter == 'unavailable':
+            queryset = queryset.filter(is_available=False)
+            
+        featured_filter = self.request.query_params.get('featured')
+        if featured_filter == 'featured':
+            queryset = queryset.filter(is_featured=True)
+        elif featured_filter == 'not_featured':
+            queryset = queryset.filter(is_featured=False)
+        
+        return queryset
+
+
 class AdminFoodApprovalViewSet(viewsets.ReadOnlyModelViewSet):
     """Admin endpoints for food approval workflow"""
     
@@ -577,3 +627,86 @@ def chef_food_status(request):
         'recent_submissions': FoodSerializer(recent_foods, many=True, context={'request': request}).data,
         'total_foods': chef_foods.count()
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def food_stats(request):
+    """Get food statistics for admin dashboard"""
+    try:
+        from django.db.models import Avg, Count, Min, Max
+        
+        # Food statistics
+        total_foods = Food.objects.count()
+        approved_foods = Food.objects.filter(status='Approved').count()
+        pending_foods = Food.objects.filter(status='Pending').count()
+        rejected_foods = Food.objects.filter(status='Rejected').count()
+        
+        # Category and cuisine counts
+        total_categories = FoodCategory.objects.count()
+        total_cuisines = Cuisine.objects.count()
+        
+        # Rating statistics
+        avg_rating = FoodReview.objects.aggregate(
+            avg_rating=Avg('rating')
+        )['avg_rating'] or 0
+        
+        # Price statistics
+        price_stats = FoodPrice.objects.aggregate(
+            avg_price=Avg('price'),
+            min_price=Min('price'),
+            max_price=Max('price')
+        )
+        
+        # Recent submissions (last 7 days)
+        from datetime import timedelta
+        from django.utils import timezone
+        week_ago = timezone.now() - timedelta(days=7)
+        recent_submissions = Food.objects.filter(created_at__gte=week_ago).count()
+        
+        # Top categories by food count
+        top_categories = FoodCategory.objects.annotate(
+            food_count=Count('foods')
+        ).order_by('-food_count')[:5]
+        
+        # Top cuisines by food count (through categories)
+        top_cuisines = Cuisine.objects.annotate(
+            food_count=Count('categories__foods')
+        ).order_by('-food_count')[:5]
+        
+        return Response({
+            'total_foods': total_foods,
+            'approved_foods': approved_foods,
+            'pending_foods': pending_foods,
+            'rejected_foods': rejected_foods,
+            'total_categories': total_categories,
+            'total_cuisines': total_cuisines,
+            'average_rating': round(avg_rating, 2),
+            'price_stats': {
+                'average_price': round(price_stats['avg_price'] or 0, 2),
+                'min_price': price_stats['min_price'] or 0,
+                'max_price': price_stats['max_price'] or 0,
+            },
+            'recent_submissions': recent_submissions,
+            'top_categories': [
+                {
+                    'id': cat.id,
+                    'name': cat.name,
+                    'food_count': cat.food_count
+                } for cat in top_categories
+            ],
+            'top_cuisines': [
+                {
+                    'id': cuisine.id,
+                    'name': cuisine.name,
+                    'food_count': cuisine.food_count
+                } for cuisine in top_cuisines
+            ]
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Food stats error: {str(e)}", exc_info=True)
+        return Response({
+            'error': 'Failed to fetch food statistics',
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

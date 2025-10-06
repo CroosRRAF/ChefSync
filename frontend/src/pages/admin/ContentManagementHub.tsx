@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { createOptimizedClickHandler } from "@/utils/performanceOptimizer";
 
 // Import shared components
 import { 
@@ -88,12 +89,19 @@ import {
 } from "lucide-react";
 
 // Import services
-import foodService, {
+import { adminService } from "@/services/adminService";
+import { 
+  fetchFoods, 
+  fetchFoodCategories, 
+  fetchCuisines,
+  deleteFood
+} from "@/services/foodService";
+import {
   type Cuisine,
   type Food,
   type FoodCategory,
   type FoodFilterParams,
-} from "@/services/foodService";
+} from "@/types/food";
 import {
   referralService,
   type ReferralStats,
@@ -187,10 +195,10 @@ const ContentManagementHub: React.FC = () => {
   const [expiresAt, setExpiresAt] = useState<string>("");
   
   // Filters
-  const [foodFilters, setFoodFilters] = useState<FoodFilterParams>({
+  const [foodFilters, setFoodFilters] = useState<any>({
     search: "",
-    category: "",
-    cuisine: "",
+    category: "all",
+    cuisine: "all",
     availability: "all",
     featured: "all",
     page: 1,
@@ -200,35 +208,26 @@ const ContentManagementHub: React.FC = () => {
   // Load food statistics
   const loadFoodStats = useCallback(async () => {
     try {
-      // Fetch real food stats from API
-      const response = await fetch('/api/food/stats/', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const statsData = await response.json();
-        setFoodStats(statsData);
-      } else {
-        // Fallback stats if API fails
-        const fallbackStats: FoodStats = {
-          totalFoods: 0,
-          availableFoods: 0,
-          featuredFoods: 0,
-          totalCategories: 0,
-          totalCuisines: 0,
-          averageRating: 0,
-          totalOrders: 0,
-          averagePrice: 0,
-        };
-        setFoodStats(fallbackStats);
-      }
+      // Fetch real food stats from API using adminService
+      const statsData = await adminService.getFoodStats();
+      
+      // Map the API response to our local interface
+      const mappedStats: FoodStats = {
+        totalFoods: statsData.total_foods || 0,
+        availableFoods: statsData.approved_foods || 0,
+        featuredFoods: 0, // This would need to be added to the backend
+        totalCategories: statsData.total_categories || 0,
+        totalCuisines: statsData.total_cuisines || 0,
+        averageRating: statsData.average_rating || 0,
+        totalOrders: 0, // This would need to be added to the backend
+        averagePrice: statsData.price_stats?.average_price || 0,
+      };
+      
+      setFoodStats(mappedStats);
     } catch (error) {
       console.error("Error loading food stats:", error);
       
-      // Set fallback data on error
+      // Fallback stats if API fails
       const fallbackStats: FoodStats = {
         totalFoods: 0,
         availableFoods: 0,
@@ -243,20 +242,41 @@ const ContentManagementHub: React.FC = () => {
     }
   }, []);
 
+  // Process filters to handle "all" values
+  const processFilters = (filters: any): FoodFilterParams => {
+    const processed: FoodFilterParams = {
+      page: filters.page,
+      search: filters.search,
+      category: filters.category === "all" ? undefined : (typeof filters.category === "string" ? parseInt(filters.category) : filters.category),
+      cuisine: filters.cuisine === "all" ? undefined : (typeof filters.cuisine === "string" ? parseInt(filters.cuisine) : filters.cuisine),
+      is_available: filters.availability === "all" ? undefined : filters.availability === "available",
+      is_featured: filters.featured === "all" ? undefined : filters.featured === "featured",
+      is_vegetarian: filters.is_vegetarian,
+      is_vegan: filters.is_vegan,
+      is_gluten_free: filters.is_gluten_free,
+      spice_level: filters.spice_level,
+      min_price: filters.min_price,
+      max_price: filters.max_price,
+      sort_by: filters.sort_by,
+    };
+    return processed;
+  };
+
   // Load foods
   const loadFoods = useCallback(async () => {
     try {
       setFoodLoading(true);
       
+      const processedFilters = processFilters(foodFilters);
       const [foodsData, categoriesData, cuisinesData] = await Promise.all([
-        foodService.getFoods(foodFilters),
-        foodService.getCategories(),
-        foodService.getCuisines(),
+        fetchFoods(processedFilters),
+        fetchFoodCategories({}),
+        fetchCuisines({}),
       ]);
       
-      setFoods(foodsData.results || foodsData);
-      setCategories(categoriesData);
-      setCuisines(cuisinesData);
+      setFoods(foodsData.results || []);
+      setCategories(categoriesData.results || []);
+      setCuisines(cuisinesData.results || []);
     } catch (error) {
       console.error("Error loading foods:", error);
     } finally {
@@ -307,7 +327,7 @@ const ContentManagementHub: React.FC = () => {
   // Delete food item
   const handleDeleteFood = async (food: Food) => {
     try {
-      await foodService.deleteFood(food.id);
+      await deleteFood(food?.id);
       await loadFoods();
       setShowDeleteFoodDialog(false);
       setSelectedFood(null);
@@ -416,7 +436,7 @@ const ContentManagementHub: React.FC = () => {
   const handleDeleteOffer = async (offer: Offer) => {
     try {
       const token = localStorage.getItem("access_token");
-      await axios.delete(`${API_BASE_URL}/food/offers/${offer.offer_id}/`, {
+      await axios.delete(`${API_BASE_URL}/food/offers/${offer?.offer_id}/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -490,7 +510,7 @@ const ContentManagementHub: React.FC = () => {
   }, [activeTab, loadFoods, loadFoodStats, loadOffers, loadReferralData]);
 
   // Get availability color
-  const getAvailabilityColor = (available: boolean) => {
+  const getAvailabilityColor = (available?: boolean) => {
     return available ? "green" : "red";
   };
 
@@ -508,15 +528,15 @@ const ContentManagementHub: React.FC = () => {
       render: (food: Food) => (
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-            {food.image ? (
-              <img src={food.image} alt={food.name} className="w-full h-full object-cover rounded-lg" />
+            {food?.images?.[0]?.image ? (
+              <img src={food?.images?.[0]?.image} alt={food?.name} className="w-full h-full object-cover rounded-lg" />
             ) : (
               <Utensils className="h-5 w-5 text-gray-400" />
             )}
           </div>
           <div>
-            <div className="font-medium">{food.name}</div>
-            <div className="text-sm text-gray-500">{food.description?.substring(0, 50)}...</div>
+            <div className="font-medium">{food?.name || "Unnamed"}</div>
+            <div className="text-sm text-gray-500">{food?.description?.substring(0, 50)}...</div>
           </div>
         </div>
       ),
@@ -526,7 +546,7 @@ const ContentManagementHub: React.FC = () => {
       title: "Category",
       render: (food: Food) => (
         <Badge variant="outline">
-          {food.category?.name || "Uncategorized"}
+          {food?.category_name || "Uncategorized"}
         </Badge>
       ),
     },
@@ -535,7 +555,7 @@ const ContentManagementHub: React.FC = () => {
       title: "Price",
       render: (food: Food) => (
         <div className="font-medium">
-          LKR {food.price?.toFixed(2)}
+          LKR {food?.price?.toFixed(2) || "0.00"}
         </div>
       ),
     },
@@ -545,9 +565,9 @@ const ContentManagementHub: React.FC = () => {
       render: (food: Food) => (
         <Badge 
           variant="outline" 
-          className={`border-${getAvailabilityColor(food.available)}-500 text-${getAvailabilityColor(food.available)}-700`}
+          className={`border-${getAvailabilityColor(food?.is_available)}-500 text-${getAvailabilityColor(food?.is_available)}-700`}
         >
-          {food.available ? "Available" : "Unavailable"}
+          {food?.is_available ? "Available" : "Unavailable"}
         </Badge>
       ),
     },
@@ -557,7 +577,7 @@ const ContentManagementHub: React.FC = () => {
       render: (food: Food) => (
         <div className="flex items-center space-x-1">
           <Star className="h-4 w-4 text-yellow-400 fill-current" />
-          <span className="text-sm">{food.rating?.toFixed(1) || "N/A"}</span>
+          <span className="text-sm">{food?.rating_average?.toFixed(1) || "N/A"}</span>
         </div>
       ),
     },
@@ -653,16 +673,16 @@ const ContentManagementHub: React.FC = () => {
           </div>
           <Select 
             value={foodFilters.category} 
-            onValueChange={(value) => setFoodFilters(prev => ({ ...prev, category: value }))}
+            onValueChange={(value) => setFoodFilters(prev => ({ ...prev, category: value === "all" ? undefined : parseInt(value) }))}
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Categories</SelectItem>
+              <SelectItem value="all">All Categories</SelectItem>
               {categories.map((category) => (
-                <SelectItem key={category.id} value={category.id.toString()}>
-                  {category.name}
+                <SelectItem key={category?.id} value={category?.id?.toString()}>
+                  {category?.name || "Unnamed"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -680,7 +700,7 @@ const ContentManagementHub: React.FC = () => {
               <SelectItem value="unavailable">Unavailable</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={loadFoods} variant="outline">
+          <Button onClick={createOptimizedClickHandler(loadFoods, { measurePerformance: true, label: 'Refresh Foods' })} variant="outline">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -736,10 +756,10 @@ const ContentManagementHub: React.FC = () => {
           label="Expired Offers"
           icon={XCircle}
           trend={-12.1}
-          gradient="red"
+          gradient="pink"
         />
         <AnimatedStats
-          value={offers.reduce((avg, offer) => avg + offer.discount, 0) / offers.length || 0}
+          value={offers.reduce((avg, offer) => avg + (offer?.discount || 0), 0) / offers.length || 0}
           label="Avg Discount"
           icon={TrendingUp}
           trend={5.3}
@@ -775,7 +795,7 @@ const ContentManagementHub: React.FC = () => {
               <TableRow key={offer.offer_id}>
                 <TableCell>{offer.description}</TableCell>
                 <TableCell>{offer.discount}%</TableCell>
-                <TableCell>LKR {offer.price.toFixed(2)}</TableCell>
+                <TableCell>LKR {offer?.price?.toFixed(2) || "0.00"}</TableCell>
                 <TableCell>{new Date(offer.valid_until).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <Badge 
@@ -796,7 +816,7 @@ const ContentManagementHub: React.FC = () => {
                           description: offer.description,
                           discount: offer.discount.toString(),
                           valid_until: offer.valid_until.split('T')[0],
-                          price: offer.price.toString(),
+                          price: offer?.price?.toString() || "0",
                         });
                         setShowEditOfferDialog(true);
                       }}
@@ -1009,14 +1029,14 @@ const ContentManagementHub: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Category</Label>
-                <Select defaultValue={selectedFood?.category?.id?.toString()}>
+                <Select defaultValue={selectedFood?.category?.toString()}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
-                        {category.name}
+                      <SelectItem key={category?.id} value={category?.id?.toString()}>
+                        {category?.name || "Unnamed"}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1024,7 +1044,7 @@ const ContentManagementHub: React.FC = () => {
               </div>
               <div>
                 <Label>Cuisine</Label>
-                <Select defaultValue={selectedFood?.cuisine?.id?.toString()}>
+                <Select defaultValue={selectedFood?.cuisine_name}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select cuisine" />
                   </SelectTrigger>

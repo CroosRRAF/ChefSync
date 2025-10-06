@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 
 from django.contrib.auth import get_user_model
@@ -14,6 +15,8 @@ try:
 except ImportError:
     psutil = None
 import os
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     AdminActivityLog,
@@ -719,15 +722,9 @@ class AdminDashboardViewSet(viewsets.ViewSet):
     def revenue_analytics(self, request):
         """Get comprehensive revenue analytics with trends and forecasts"""
         try:
-            print(
-                f"DEBUG: revenue_analytics called with params: {request.query_params}"
-            )
-            print(
-                f"DEBUG: User: {request.user}, Is authenticated: {request.user.is_authenticated}"
-            )
-            print(
-                f"DEBUG: User is staff: {request.user.is_staff if request.user.is_authenticated else 'N/A'}"
-            )
+            logger.debug(f"revenue_analytics called with params: {request.query_params}")
+            logger.debug(f"User: {request.user}, Is authenticated: {request.user.is_authenticated}")
+            logger.debug(f"User is staff: {request.user.is_staff if request.user.is_authenticated else 'N/A'}")
             # Get time range parameter (default 30d)
             time_range = request.query_params.get("range", "30d")
             days = int(time_range.replace("d", ""))
@@ -791,7 +788,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                     for item in daily_revenue
                 ]
             except Exception as date_error:
-                print(f"Daily revenue query failed: {date_error}")
+                logger.warning(f"Daily revenue query failed: {date_error}")
                 # Fallback: create mock daily data
                 daily_data = []
                 for i in range(min(days, 30)):
@@ -882,11 +879,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             )
 
         except Exception as e:
-            print(f"DEBUG: revenue_analytics error: {str(e)}")
-            print(f"DEBUG: Error type: {type(e)}")
-            import traceback
-
-            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            logger.error(f"Revenue analytics error: {str(e)}", exc_info=True)
             # Return graceful fallback instead of 500 to avoid breaking UI
             fallback_response = {
                 "current": float(0),
@@ -1839,7 +1832,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             )
 
         except Exception as e:
-            print(f"Error in user stats: {str(e)}")
+            logger.error(f"Error in user stats: {str(e)}")
             return Response(
                 {"error": f"Failed to fetch user stats: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1917,7 +1910,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
         except Exception as e:
-            print(f"Error in profile: {str(e)}")
+            logger.error(f"Error in profile: {str(e)}")
             return Response(
                 {"error": f"Failed to process profile: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1941,7 +1934,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             ]
             return Response(sessions)
         except Exception as e:
-            print(f"Error fetching sessions: {str(e)}")
+            logger.error(f"Error fetching sessions: {str(e)}")
             return Response(
                 {"error": f"Failed to fetch sessions: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -2022,7 +2015,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     try:
                         total_orders = Order.objects.filter(customer=user).count()
                     except Exception as e:
-                        print(f"Error counting orders for user {user.user_id}: {e}")  # type: ignore
+                        logger.warning(f"Error counting orders for user {user.user_id}: {e}")  # type: ignore
                         total_orders = 0
 
                     # Calculate total spent safely
@@ -2032,7 +2025,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                         ).aggregate(total=Sum("total_amount"))
                         total_spent = total_spent_result["total"] or 0
                     except Exception as e:
-                        print(f"Error calculating total spent for user {user.user_id}: {e}")  # type: ignore
+                        logger.warning(f"Error calculating total spent for user {user.user_id}: {e}")  # type: ignore
                         total_spent = 0
 
                     # Build safe, normalized user payload for frontend
@@ -2076,7 +2069,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     )
 
                 except Exception as e:
-                    print(f"Error processing user {user.user_id}: {e}")  # type: ignore
+                    logger.error(f"Error processing user {user.user_id}: {e}")  # type: ignore
                     # Add user with default values if processing fails
                     user_data.append(
                         {
@@ -2110,14 +2103,99 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
         except Exception as e:
             # Enhanced error logging
-            import traceback
-
-            print(f"Error in list_users: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
-            print(f"Request data: {request.query_params}")
+            logger.error(f"Error in list_users: {str(e)}", exc_info=True, extra={'request_data': request.query_params})
 
             return Response(
                 {"error": f"Failed to fetch users: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    def pending_approvals(self, request):
+        """Get users waiting for admin approval (pending status and is_active=True)"""
+        logger.debug("pending_approvals endpoint called")
+        try:
+            # Get query parameters
+            page = int(request.query_params.get("page", 1))
+            limit = int(request.query_params.get("limit", 25))
+            role = request.query_params.get("role", "")
+
+            # Build query for pending approvals
+            queryset = User.objects.select_related("profile").filter(
+                approval_status="pending",
+                is_active=True
+            )
+            logger.debug(f"Found {queryset.count()} pending users")
+
+            # Filter by role if specified
+            if role:
+                queryset = queryset.filter(role__iexact=role)
+
+            # Sort by date joined (newest first)
+            queryset = queryset.order_by("-date_joined")
+
+            # Get total count before pagination
+            total_count = queryset.count()
+
+            # Pagination
+            start = (page - 1) * limit
+            end = start + limit
+            users = queryset[start:end]
+
+            # Prepare response data with documents
+            user_data = []
+            for user in users:
+                # Get user documents
+                documents = []
+                try:
+                    from apps.authentication.models import UserDocument
+                    user_docs = UserDocument.objects.filter(
+                        user=user, is_visible_to_admin=True
+                    ).select_related('document_type')
+
+                    for doc in user_docs:
+                        documents.append({
+                            "id": doc.id,
+                            "file_name": doc.file_name,
+                            "document_type": doc.document_type.name if doc.document_type else "Unknown",
+                            "uploaded_at": doc.uploaded_at.isoformat(),
+                            "file_url": doc.file,
+                            "status": doc.status,
+                            "admin_notes": doc.admin_notes
+                        })
+                except Exception as e:
+                    logger.warning(f"Error fetching documents for user {user.user_id}: {e}")
+
+                user_data.append({
+                    "id": user.user_id,
+                    "name": user.name,
+                    "email": user.email,
+                    "phone_no": user.phone_no or "",
+                    "role": user.role,
+                    "is_active": user.is_active,
+                    "approval_status": user.approval_status,
+                    "approval_notes": user.approval_notes or "",
+                    "date_joined": user.date_joined.isoformat() if user.date_joined else None,
+                    "last_login": user.last_login.isoformat() if user.last_login else None,
+                    "address": user.address or "",
+                    "gender": user.gender or "",
+                    "documents": documents,
+                })
+
+            return Response({
+                "users": user_data,
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total": total_count,
+                    "pages": (total_count + limit - 1) // limit,
+                },
+            })
+
+        except Exception as e:
+            logger.error(f"Error in pending_approvals: {str(e)}")
+            return Response(
+                {"error": f"Failed to fetch pending approvals: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -2269,76 +2347,135 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=["get"])
     def details(self, request, pk=None):
-        """Get detailed user information"""
+        """Get comprehensive user details including documents, orders, complaints, and addresses"""
         try:
             user = User.objects.get(pk=pk)
 
-            # Get user statistics
-            from apps.orders.models import Order
+            # Get user documents
+            documents = []
+            try:
+                from apps.authentication.models import UserDocument
+                user_docs = UserDocument.objects.filter(
+                    user=user
+                ).select_related('document_type')
 
-            total_orders = Order.objects.filter(customer=user).count()
-            total_spent = (
-                Order.objects.filter(customer=user, payment_status="paid").aggregate(
-                    total=Sum("total_amount")
-                )["total"]
-                or 0
-            )
+                for doc in user_docs:
+                    documents.append({
+                        "id": doc.id,
+                        "file_name": doc.file_name,
+                        "document_type": doc.document_type.name if doc.document_type else "Unknown",
+                        "uploaded_at": doc.uploaded_at.isoformat(),
+                        "file_url": doc.file,
+                        "status": doc.status,
+                        "admin_notes": doc.admin_notes,
+                        "reviewed_by": doc.reviewed_by.name if doc.reviewed_by else None,
+                        "reviewed_at": doc.reviewed_at.isoformat() if doc.reviewed_at else None
+                    })
+            except Exception as e:
+                logger.warning(f"Error fetching documents for user {user.user_id}: {e}")
 
-            # Get recent orders
-            recent_orders = Order.objects.filter(customer=user).order_by("-created_at")[
-                :5
-            ]
-            recent_orders_data = []
-            for order in recent_orders:
-                recent_orders_data.append(
-                    {
-                        "id": order.id,  # type: ignore
-                        "order_number": order.order_number,
+            # Get user orders
+            orders = []
+            try:
+                from apps.orders.models import Order
+                user_orders = Order.objects.filter(customer=user).order_by('-created_at')[:10]
+
+                for order in user_orders:
+                    orders.append({
+                        "id": order.id,
+                        "order_number": getattr(order, 'order_number', f'ORD-{order.id}'),
                         "status": order.status,
-                        "total_amount": float(order.total_amount),
-                        "created_at": order.created_at,
-                    }
-                )
+                        "total_amount": float(order.total_amount) if order.total_amount else 0.0,
+                        "payment_status": order.payment_status,
+                        "created_at": order.created_at.isoformat(),
+                        "delivery_address": getattr(order, 'delivery_address', ''),
+                        "items_count": getattr(order, 'items_count', 0)
+                    })
+            except Exception as e:
+                logger.warning(f"Error fetching orders for user {user.user_id}: {e}")
 
-            # Get user activity logs
-            activity_logs = AdminActivityLog.objects.filter(admin=user).order_by(
-                "-timestamp"
-            )[:10]
+            # Get user complaints/feedback
+            complaints = []
+            try:
+                from apps.communications.models import Communication
+                user_complaints = Communication.objects.filter(
+                    user=user,
+                    communication_type__in=['complaint', 'feedback', 'suggestion']
+                ).order_by('-created_at')[:10]
 
-            activity_data = []
-            for log in activity_logs:
-                activity_data.append(
-                    {
-                        "id": log.id,  # type: ignore
-                        "action": log.action,
-                        "resource_type": log.resource_type,
-                        "description": log.description,
-                        "timestamp": log.timestamp,
-                    }
-                )
+                for complaint in user_complaints:
+                    complaints.append({
+                        "id": complaint.id,
+                        "reference_number": complaint.reference_number,
+                        "communication_type": complaint.communication_type,
+                        "subject": complaint.subject,
+                        "message": complaint.message,
+                        "status": complaint.status,
+                        "priority": complaint.priority,
+                        "created_at": complaint.created_at.isoformat(),
+                        "admin_response": complaint.admin_response,
+                        "resolved_at": complaint.resolved_at.isoformat() if complaint.resolved_at else None
+                    })
+            except Exception as e:
+                logger.warning(f"Error fetching complaints for user {user.user_id}: {e}")
 
-            user_data = {
-                "id": user.user_id,  # type: ignore
-                "email": user.email,
-                "name": user.name,  # type: ignore
-                "phone_no": user.phone_no,  # type: ignore
-                "address": user.address,  # type: ignore
-                "role": user.role,  # type: ignore
-                "is_active": user.approval_status == "approved",
-                "email_verified": user.email_verified,  # type: ignore
-                "last_login": user.last_login,
-                "date_joined": user.date_joined,
-                "failed_login_attempts": user.failed_login_attempts,  # type: ignore
-                "account_locked": user.account_locked,  # type: ignore
-                "statistics": {
-                    "total_orders": total_orders,
-                    "total_spent": float(total_spent),
-                },
-                "recent_orders": recent_orders_data,
-                "activity_logs": activity_data,
+            # Get user addresses
+            addresses = []
+            try:
+                from apps.users.models import Address
+                user_addresses = Address.objects.filter(user=user, is_active=True)
+
+                for address in user_addresses:
+                    addresses.append({
+                        "id": address.id,
+                        "address_type": address.address_type,
+                        "label": address.label,
+                        "full_address": address.full_address,
+                        "is_default": address.is_default,
+                        "created_at": address.created_at.isoformat()
+                    })
+            except Exception as e:
+                logger.warning(f"Error fetching addresses for user {user.user_id}: {e}")
+
+            # Get user statistics
+            stats = {
+                "total_orders": len(orders),
+                "total_spent": sum(order["total_amount"] for order in orders),
+                "total_complaints": len(complaints),
+                "pending_complaints": len([c for c in complaints if c["status"] == "pending"]),
+                "total_documents": len(documents),
+                "approved_documents": len([d for d in documents if d["status"] == "approved"]),
+                "pending_documents": len([d for d in documents if d["status"] == "pending"])
             }
 
-            return Response(user_data)
+            return Response({
+                "user": {
+                    "id": user.user_id,
+                    "name": user.name or "",
+                "email": user.email,
+                    "phone_no": user.phone_no or "",
+                    "role": user.role or "",
+                    "is_active": user.is_active,
+                    "approval_status": getattr(user, "approval_status", None),
+                    "approval_notes": getattr(user, "approval_notes", ""),
+                    "approved_by": user.approved_by.name if hasattr(user, 'approved_by') and user.approved_by else None,
+                    "approved_at": user.approved_at.isoformat() if hasattr(user, 'approved_at') and user.approved_at else None,
+                    "date_joined": user.date_joined.isoformat() if user.date_joined else None,
+                    "last_login": user.last_login.isoformat() if user.last_login else None,
+                    "address": user.address or "",
+                    "gender": getattr(user, "gender", ""),
+                    "email_verified": getattr(user, "email_verified", False),
+                    "failed_login_attempts": getattr(user, "failed_login_attempts", 0),
+                    "account_locked": getattr(user, "account_locked", False),
+                    "referral_code": getattr(user, "referral_code", None),
+                    "total_referrals": getattr(user, "total_referrals", 0)
+                },
+                "documents": documents,
+                "orders": orders,
+                "complaints": complaints,
+                "addresses": addresses,
+                "stats": stats
+            })
 
         except User.DoesNotExist:
             return Response(
@@ -2543,7 +2680,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     user, activated=True
                 )
             except Exception as email_error:
-                print(f"Failed to send activation email: {str(email_error)}")
+                logger.warning(f"Failed to send activation email: {str(email_error)}")
                 # Don't fail the activation if email fails
 
             # Log activity
@@ -2612,7 +2749,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     user, activated=False
                 )
             except Exception as email_error:
-                print(f"Failed to send deactivation email: {str(email_error)}")
+                logger.warning(f"Failed to send deactivation email: {str(email_error)}")
                 # Don't fail the deactivation if email fails
 
             # Log activity
@@ -2793,8 +2930,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
         except Exception as e:
             import traceback
 
-            print(f"Error in order stats: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"Error in order stats: {str(e)}", exc_info=True)
             return Response(
                 {"error": f"Failed to fetch order stats: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -2967,7 +3103,7 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                         }
                     )
             except Exception as e:
-                print(f"Error fetching order items: {e}")
+                logger.warning(f"Error fetching order items: {e}")
                 items = []
 
             order_data = {
@@ -3231,7 +3367,7 @@ class AdminNotificationViewSet(viewsets.ModelViewSet):
 
             return queryset.order_by("-created_at")
         except Exception as e:
-            print(f"Error in AdminNotificationViewSet.get_queryset: {e}")
+            logger.error(f"Error in AdminNotificationViewSet.get_queryset: {e}")
             import traceback
 
             traceback.print_exc()
@@ -3245,7 +3381,7 @@ class AdminNotificationViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(queryset, many=True)
             return Response({"notifications": serializer.data})
         except Exception as e:
-            print(f"Error in AdminNotificationViewSet.list: {e}")
+            logger.error(f"Error in AdminNotificationViewSet.list: {e}")
             import traceback
 
             traceback.print_exc()
@@ -3337,7 +3473,7 @@ class AdminSystemSettingsViewSet(viewsets.ModelViewSet):
             return Response(stats)
 
         except Exception as e:
-            print(f"Error in realtime_stats: {str(e)}")
+            logger.error(f"Error in realtime_stats: {str(e)}")
             return Response(
                 {"error": f"Failed to fetch real-time stats: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -3847,7 +3983,7 @@ class AdminDocumentManagementViewSet(viewsets.ViewSet):
 
         except Exception as e:
             # Log error but don't fail the document approval
-            print(f"Error checking user approval status: {e}")
+            logger.warning(f"Error checking user approval status: {e}")
 
 
 @api_view(["GET"])
