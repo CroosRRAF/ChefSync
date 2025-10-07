@@ -197,6 +197,7 @@ class CommunicationService {
       status?: string;
       priority?: string;
       type?: string;
+      communication_type?: string;
       search?: string;
     } = {}
   ): Promise<PaginatedResponse<Communication>> {
@@ -290,7 +291,7 @@ class CommunicationService {
       search?: string;
     } = {}
   ): Promise<PaginatedResponse<Communication>> {
-    return this.getCommunications({ ...params, type: "feedback" });
+    return this.getCommunications({ ...params, communication_type: "feedback" });
   }
 
   async getComplaints(
@@ -302,7 +303,7 @@ class CommunicationService {
       search?: string;
     } = {}
   ): Promise<PaginatedResponse<Communication>> {
-    return this.getCommunications({ ...params, type: "complaint" });
+    return this.getCommunications({ ...params, communication_type: "complaint" });
   }
 
   // Email Templates
@@ -677,6 +678,7 @@ class CommunicationService {
 
   async sendCommunication(payload: any): Promise<any> {
     try {
+      // Try the send endpoint which might have different validation
       const response = await apiClient.post(
         "/communications/communications/send/",
         payload

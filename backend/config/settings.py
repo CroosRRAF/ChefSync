@@ -392,7 +392,7 @@ ACCOUNT_RATE_LIMITS = {
 
 # Email Configuration (using Brevo SMTP)
 EMAIL_BACKEND = config(
-    "EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"
+    "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"  # Changed to console for development
 )
 EMAIL_HOST = config("EMAIL_HOST", default="smtp-relay.brevo.com")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)

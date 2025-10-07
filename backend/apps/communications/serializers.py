@@ -72,11 +72,6 @@ class CommunicationResponseSerializer(serializers.ModelSerializer):
             if obj.responder
             else None
         )
-        fields = "__all__"
-        read_only_fields = ("created_at", "updated_at", "responder")
-
-    def get_responder_name(self, obj):
-        return obj.responder.name if obj.responder else None
 
 
 class CommunicationSerializer(serializers.ModelSerializer):
@@ -88,6 +83,7 @@ class CommunicationSerializer(serializers.ModelSerializer):
     )
     user_name = serializers.SerializerMethodField()
     assigned_to_name = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
 
     class Meta:
         model = Communication
@@ -107,6 +103,16 @@ class CommunicationSerializer(serializers.ModelSerializer):
     def get_assigned_to_name(self, obj):
         return obj.assigned_to.name if obj.assigned_to else None
 
+    def get_user(self, obj):
+        if obj.user:
+            return {
+                'id': obj.user.user_id,
+                'name': obj.user.name,
+                'email': obj.user.email,
+                'role': obj.user.role
+            }
+        return None
+
 
 class CommunicationListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for list views"""
@@ -115,6 +121,7 @@ class CommunicationListSerializer(serializers.ModelSerializer):
     assigned_to_name = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
     response_count = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
 
     class Meta:
         model = Communication
@@ -128,6 +135,7 @@ class CommunicationListSerializer(serializers.ModelSerializer):
             "is_read",
             "user_name",
             "assigned_to_name",
+            "user",
             "created_at",
             "updated_at",
             "tags",
@@ -139,6 +147,16 @@ class CommunicationListSerializer(serializers.ModelSerializer):
 
     def get_assigned_to_name(self, obj):
         return obj.assigned_to.name if obj.assigned_to else None
+
+    def get_user(self, obj):
+        if obj.user:
+            return {
+                'id': obj.user.user_id,
+                'name': obj.user.name,
+                'email': obj.user.email,
+                'role': obj.user.role
+            }
+        return None
 
     def get_tags(self, obj):
         return [

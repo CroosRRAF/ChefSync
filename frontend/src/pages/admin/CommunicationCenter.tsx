@@ -227,6 +227,76 @@ const CommunicationCenter: React.FC = () => {
     scheduleType: "immediate",
     priority: "medium",
   });
+
+  // Handle sending new communication
+  const handleSendCommunication = async () => {
+    try {
+      // Validate required fields
+      if (!newCommunication.title.trim() || !newCommunication.content.trim()) {
+        toast({
+          title: "Error",
+          description: "Please fill in both title and content",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Map frontend types to backend communication_type choices
+      const typeMapping: { [key: string]: string } = {
+        "email": "inquiry",
+        "notification": "inquiry", 
+        "alert": "complaint",
+        "push": "inquiry"
+      };
+
+      // Prepare payload for the API (Communication model format)
+      const payload = {
+        subject: newCommunication.title,
+        message: newCommunication.content,
+        communication_type: typeMapping[newCommunication.type] || "inquiry",
+        priority: newCommunication.priority,
+        // user field will be automatically set by the backend from the authenticated user
+      };
+
+      console.log("Sending payload:", payload);
+      console.log("Access token:", localStorage.getItem("access_token") ? "Present" : "Missing");
+
+      // Send communication
+      await communicationService.sendCommunication(payload);
+
+      // Reset form
+      setNewCommunication({
+        type: "email",
+        title: "",
+        content: "",
+        target: "all",
+        scheduleType: "immediate",
+        priority: "medium",
+      });
+
+      // Close modal
+      setShowNewCommunicationModal(false);
+
+      // Refresh communications list
+      loadCommunications();
+
+    } catch (error) {
+      console.error("Error sending communication:", error);
+      
+      // Log detailed error information
+      if (error.response) {
+        console.error("Error response data:", error.response.data);
+        console.error("Error response status:", error.response.status);
+        console.error("Error response headers:", error.response.headers);
+      }
+      
+      toast({
+        title: "Error",
+        description: `Failed to send communication: ${error.response?.data?.error || error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
   
   // Filters
   const [communicationFilters, setCommunicationFilters] = useState<CommunicationFilters>({
@@ -397,11 +467,19 @@ const CommunicationCenter: React.FC = () => {
       if (feedbackFilters.search) params.search = feedbackFilters.search;
       if (feedbackFilters.status !== "all") params.status = feedbackFilters.status;
       if (feedbackFilters.priority !== "all") params.priority = feedbackFilters.priority;
-      if (feedbackFilters.type !== "all") params.type = feedbackFilters.type;
+      if (feedbackFilters.type !== "all") params.communication_type = feedbackFilters.type;
 
       const response: PaginatedResponse<Communication> =
         await communicationService.getFeedbacks(params);
 
+      // Debug: Log the actual response data
+      console.log("Raw feedback response:", response);
+      console.log("Feedback results:", response.results);
+      if (response.results && response.results.length > 0) {
+        console.log("First feedback item:", response.results[0]);
+        console.log("First feedback keys:", Object.keys(response.results[0]));
+      }
+      
       setFeedbacks(response.results || []);
       setTotalPages(Math.ceil((response.count || 0) / itemsPerPage));
       setTotalItems(response.count || 0);
@@ -631,104 +709,140 @@ const CommunicationCenter: React.FC = () => {
     {
       key: "type",
       title: "Type",
-      render: (feedback: Communication) => (
-        <Badge variant="outline">
-          {feedback.communication_type?.charAt(0).toUpperCase() + feedback.communication_type?.slice(1)}
-        </Badge>
-      ),
+      render: (value: any, feedback: Communication, index: number) => {
+        console.log("Rendering type for feedback:", feedback);
+        console.log("communication_type:", feedback?.communication_type);
+        return (
+          <Badge variant="outline">
+            {feedback?.communication_type 
+              ? feedback.communication_type.charAt(0).toUpperCase() + feedback.communication_type.slice(1)
+              : 'Unknown'
+            }
+          </Badge>
+        );
+      },
     },
     {
       key: "subject",
       title: "Subject",
-      render: (feedback: Communication) => (
-        <div>
-          <div className="font-medium">{feedback.subject}</div>
-          <div className="text-sm text-gray-500">
-            {feedback.message?.substring(0, 60)}...
+      render: (value: any, feedback: Communication, index: number) => {
+        console.log("Rendering subject for feedback:", feedback);
+        console.log("subject:", feedback?.subject);
+        console.log("message:", feedback?.message);
+        return (
+          <div>
+            <div className="font-medium">{feedback?.subject || 'No Subject'}</div>
+            <div className="text-sm text-gray-500">
+              {feedback?.message 
+                ? feedback.message.substring(0, 60) + (feedback.message.length > 60 ? '...' : '')
+                : 'No message'
+              }
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "user",
       title: "User",
-      render: (feedback: Communication) => (
-        <div className="text-sm">
-          {feedback.user?.name}
-          <div className="text-gray-500">{feedback.user?.email}</div>
-        </div>
-      ),
+      render: (value: any, feedback: Communication, index: number) => {
+        console.log("Rendering user for feedback:", feedback);
+        console.log("user object:", feedback?.user);
+        return (
+          <div className="text-sm">
+            {feedback?.user?.name || 'Unknown User'}
+            <div className="text-gray-500">{feedback?.user?.email || 'No email'}</div>
+          </div>
+        );
+      },
     },
     {
       key: "priority",
       title: "Priority",
-      render: (feedback: Communication) => (
-        <Badge 
-          variant="outline" 
-          className={`border-${getPriorityColor(feedback.priority || "medium")}-500 text-${getPriorityColor(feedback.priority || "medium")}-700`}
-        >
-          {feedback.priority?.charAt(0).toUpperCase() + feedback.priority?.slice(1)}
-        </Badge>
-      ),
+      render: (value: any, feedback: Communication, index: number) => {
+        const priority = feedback?.priority || "medium";
+        const color = getPriorityColor(priority);
+        return (
+          <Badge 
+            variant="outline" 
+            className={`border-${color}-500 text-${color}-700`}
+          >
+            {priority.charAt(0).toUpperCase() + priority.slice(1)}
+          </Badge>
+        );
+      },
     },
     {
       key: "status",
       title: "Status",
-      render: (feedback: Communication) => (
-        <Badge 
-          variant="outline" 
-          className={`border-${getStatusColor(feedback.status || "pending")}-500 text-${getStatusColor(feedback.status || "pending")}-700`}
-        >
-          {feedback.status?.charAt(0).toUpperCase() + feedback.status?.slice(1)}
-        </Badge>
-      ),
+      render: (value: any, feedback: Communication, index: number) => {
+        const status = feedback?.status || "pending";
+        const color = getStatusColor(status);
+        return (
+          <Badge 
+            variant="outline" 
+            className={`border-${color}-500 text-${color}-700`}
+          >
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </Badge>
+        );
+      },
     },
     {
       key: "created_at",
       title: "Date",
-      render: (feedback: Communication) => (
+      render: (value: any, feedback: Communication, index: number) => (
         <div className="text-sm">
-          {new Date(feedback.created_at).toLocaleDateString()}
+          {feedback?.created_at 
+            ? new Date(feedback.created_at).toLocaleDateString()
+            : 'Unknown Date'
+          }
         </div>
       ),
     },
     {
       key: "actions",
       title: "Actions",
-      render: (feedback: Communication) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => {
-              setSelectedFeedback(feedback);
-              setShowDetailModal(true);
-            }}>
-              <Eye className="h-4 w-4 mr-2" />
-              View Details
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {
-              setSelectedFeedback(feedback);
-              setShowResponseModal(true);
-            }}>
-              <Reply className="h-4 w-4 mr-2" />
-              Send Response
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleStatusUpdate(feedback.id, "resolved")}>
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Mark Resolved
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleStatusUpdate(feedback.id, "closed")}>
-              <Archive className="h-4 w-4 mr-2" />
-              Close
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+      render: (value: any, feedback: Communication, index: number) => {
+        if (!feedback?.id) {
+          return <span className="text-gray-400">No actions</span>;
+        }
+        
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => {
+                setSelectedFeedback(feedback);
+                setShowDetailModal(true);
+              }}>
+                <Eye className="h-4 w-4 mr-2" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                setSelectedFeedback(feedback);
+                setShowResponseModal(true);
+              }}>
+                <Reply className="h-4 w-4 mr-2" />
+                Send Response
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleStatusUpdate(feedback.id, "resolved")}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Mark Resolved
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleStatusUpdate(feedback.id, "closed")}>
+                <Archive className="h-4 w-4 mr-2" />
+                Close
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
   ];
 
@@ -1061,10 +1175,15 @@ const CommunicationCenter: React.FC = () => {
         </div>
 
         <DataTable
-          data={feedbacks}
+          data={feedbacks || []}
           columns={feedbackColumns}
           loading={feedbackLoading}
         />
+        {/* Debug info */}
+        <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
+          <div>Feedbacks count: {feedbacks?.length || 0}</div>
+          <div>Feedbacks data: {JSON.stringify(feedbacks, null, 2)}</div>
+        </div>
       </GlassCard>
     </div>
   );
@@ -1619,7 +1738,7 @@ const CommunicationCenter: React.FC = () => {
             <Button variant="outline" onClick={() => setShowNewCommunicationModal(false)}>
               Cancel
             </Button>
-            <Button>
+            <Button onClick={handleSendCommunication}>
               <Send className="h-4 w-4 mr-2" />
               Send Communication
             </Button>

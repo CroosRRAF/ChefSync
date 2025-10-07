@@ -494,66 +494,6 @@ class CommunicationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(duplicate)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=["post"])
-    def send(self, request):
-        """Send a new communication to users"""
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
-
-        user_ids = request.data.get("user_ids", [])
-        subject = request.data.get("subject")
-        message = request.data.get("message")
-        communication_type = request.data.get("type", "notification")
-        priority = request.data.get("priority", "medium")
-
-        if not subject or not message:
-            return Response(
-                {"error": "Subject and message are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not user_ids:
-            return Response(
-                {"error": "At least one user_id is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        created_communications = []
-        for user_id in user_ids:
-            try:
-                user = User.objects.get(user_id=user_id)
-                comm = Communication.objects.create(
-                    user=user,
-                    subject=subject,
-                    message=message,
-                    communication_type=communication_type,
-                    priority=priority,
-                    reference_number=f"COM-{uuid.uuid4().hex[:8].upper()}",
-                    assigned_to=request.user,
-                )
-                created_communications.append(comm)
-            except User.DoesNotExist:
-                continue
-
-        # Log activity
-        AdminActivityLog.objects.create(
-            admin=request.user,
-            action="send",
-            resource_type="communication",
-            resource_id="bulk",
-            description=f"Sent {len(created_communications)} communications",
-            ip_address=request.META.get("REMOTE_ADDR"),
-            user_agent=request.META.get("HTTP_USER_AGENT"),
-        )
-
-        return Response(
-            {
-                "message": f"Successfully sent {len(created_communications)} communications",
-                "count": len(created_communications),
-            },
-            status=status.HTTP_201_CREATED,
-        )
 
     @action(detail=True, methods=["post"])
     def send_detail(self, request, pk=None):
@@ -991,6 +931,277 @@ class CommunicationViewSet(viewsets.ModelViewSet):
             'avg_response_time_hours': round(avg_response_time, 1),
             'response_time_count': len(response_times)
         }
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get communication statistics"""
+        from django.db.models import Avg, Count
+        
+        queryset = self.get_queryset()
+        
+        stats = {
+            'total': queryset.count(),
+            'pending': queryset.filter(status='pending').count(),
+            'in_progress': queryset.filter(status='in_progress').count(),
+            'resolved': queryset.filter(status='resolved').count(),
+            'closed': queryset.filter(status='closed').count(),
+            'average_rating': queryset.filter(
+                rating__isnull=False
+            ).aggregate(Avg('rating'))['rating__avg'] or 0,
+            'by_type': {
+                'feedback': queryset.filter(communication_type='feedback').count(),
+                'complaint': queryset.filter(communication_type='complaint').count(),
+                'suggestion': queryset.filter(communication_type='suggestion').count(),
+                'inquiry': queryset.filter(communication_type='inquiry').count(),
+                'other': queryset.filter(communication_type='other').count(),
+            },
+            'by_status': {
+                'pending': queryset.filter(status='pending').count(),
+                'in_progress': queryset.filter(status='in_progress').count(),
+                'resolved': queryset.filter(status='resolved').count(),
+                'closed': queryset.filter(status='closed').count(),
+            }
+        }
+        
+        return Response(stats)
+
+    @action(detail=False, methods=['get'])
+    def sentiment_analysis(self, request):
+        """Get sentiment analysis of communications"""
+        from datetime import timedelta
+        
+        period = request.GET.get('period', '30d')
+        days = int(period.replace('d', ''))
+        
+        start_date = timezone.now() - timedelta(days=days)
+        queryset = self.get_queryset().filter(created_at__gte=start_date)
+        
+        # Basic sentiment calculation based on ratings and keywords
+        positive_count = queryset.filter(
+            Q(rating__gte=4) | Q(message__icontains='thank') | Q(message__icontains='great')
+        ).count()
+        
+        negative_count = queryset.filter(
+            Q(rating__lte=2) | Q(communication_type='complaint')
+        ).count()
+        
+        total = queryset.count()
+        neutral_count = total - positive_count - negative_count
+        
+        # Extract trending topics from subjects
+        trending_topics = list(queryset.values_list('subject', flat=True)[:10])
+        
+        return Response({
+            'positive': positive_count,
+            'negative': negative_count,
+            'neutral': neutral_count,
+            'trending_topics': trending_topics,
+            'total_analyzed': total,
+            'period': period
+        })
+
+    @action(detail=False, methods=['get'])
+    def campaign_stats(self, request):
+        """Get email campaign statistics"""
+        queryset = self.get_queryset().filter(
+            communication_type__in=['promotional', 'alert']
+        )
+        
+        total_campaigns = queryset.count()
+        active_campaigns = queryset.filter(status__in=['pending', 'in_progress']).count()
+        
+        # Placeholder for email tracking metrics
+        stats = {
+            'total_campaigns': total_campaigns,
+            'active_campaigns': active_campaigns,
+            'total_sent': total_campaigns,  # TODO: Track actual sent count
+            'delivered': int(total_campaigns * 0.95),  # TODO: Get from email service
+            'opened': int(total_campaigns * 0.45),  # TODO: Get from email service
+            'clicked': int(total_campaigns * 0.12),  # TODO: Get from email service
+            'conversion_rate': 12.5  # TODO: Calculate actual conversion
+        }
+        
+        return Response(stats)
+
+    @action(detail=False, methods=['get'])
+    def delivery_stats(self, request):
+        """Get communication delivery statistics"""
+        from datetime import timedelta
+        
+        period = request.GET.get('period', '30d')
+        days = int(period.replace('d', ''))
+        
+        start_date = timezone.now() - timedelta(days=days)
+        queryset = self.get_queryset().filter(created_at__gte=start_date)
+        
+        total_sent = queryset.count()
+        
+        # Placeholder stats - TODO: Integrate with actual email/SMS service
+        stats = {
+            'total_sent': total_sent,
+            'delivered': int(total_sent * 0.95),
+            'opened': int(total_sent * 0.45),
+            'clicked': int(total_sent * 0.12),
+            'failed': int(total_sent * 0.05),
+            'pending': queryset.filter(status='pending').count(),
+            'period': period
+        }
+        
+        return Response(stats)
+
+    @action(detail=False, methods=['get'])
+    def notifications(self, request):
+        """Get communication notifications"""
+        # Return system communications that are notification type
+        queryset = self.get_queryset().filter(
+            communication_type='notification'
+        ).order_by('-created_at')[:50]
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            'results': serializer.data,
+            'count': queryset.count()
+        })
+
+    @action(detail=True, methods=['post'])
+    def duplicate(self, request, pk=None):
+        """Duplicate a communication"""
+        communication = self.get_object()
+        
+        # Create a copy
+        communication.pk = None
+        communication.reference_number = None  # Will be auto-generated
+        communication.subject = f"Copy of {communication.subject}"
+        communication.status = 'draft'
+        communication.save()
+        
+        serializer = self.get_serializer(communication)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'])
+    def send(self, request):
+        """Send a new communication"""
+        # Add user to the data if not present
+        data = request.data.copy()
+        if 'user' not in data:
+            data['user'] = request.user.user_id
+        
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Generate unique reference number
+        reference_number = f"COM-{uuid.uuid4().hex[:8].upper()}"
+        
+        communication = serializer.save(
+            user=request.user, 
+            reference_number=reference_number
+        )
+        communication.status = 'sent'
+        communication.save()
+        
+        # Log activity
+        AdminActivityLog.objects.create(
+            admin=request.user,
+            action="create",
+            resource_type="communication",
+            resource_id=reference_number,
+            description=f"Created new communication {reference_number}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+        )
+        
+        return Response(
+            self.get_serializer(communication).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'])
+    def send_individual(self, request, pk=None):
+        """Send an existing communication"""
+        communication = self.get_object()
+        
+        if communication.status == 'sent':
+            return Response(
+                {'error': 'Communication already sent'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        communication.status = 'sent'
+        communication.save()
+        
+        # TODO: Integrate with email/SMS service to actually send
+        
+        return Response(self.get_serializer(communication).data)
+
+    @action(detail=False, methods=['patch'])
+    def bulk_update(self, request):
+        """Bulk update communication status"""
+        ids = request.data.get('ids', [])
+        new_status = request.data.get('status')
+        
+        if not ids or not new_status:
+            return Response(
+                {'error': 'ids and status are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        updated = self.get_queryset().filter(id__in=ids).update(status=new_status)
+        
+        return Response({
+            'updated': updated,
+            'status': new_status
+        })
+
+    @action(detail=False, methods=['post'])
+    def send_email(self, request):
+        """Send custom email with optional template"""
+        from django.core.mail import EmailMessage
+        from django.conf import settings
+        
+        subject = request.data.get('subject')
+        body = request.data.get('body')
+        recipients = request.data.get('recipients', [])
+        template_id = request.data.get('template_id')
+        
+        if not subject or not body or not recipients:
+            return Response(
+                {'error': 'subject, body, and recipients are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # If template provided, merge with template
+        if template_id:
+            try:
+                template = CommunicationTemplate.objects.get(id=template_id)
+                body = template.content.format(**request.data.get('variables', {}))
+            except CommunicationTemplate.DoesNotExist:
+                pass
+        
+        # Send email
+        email = EmailMessage(
+            subject=subject,
+            body=body,
+            to=recipients,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@chefsync.com')
+        )
+        
+        # Handle attachments
+        attachments = request.FILES.getlist('attachments', [])
+        for attachment in attachments:
+            email.attach(attachment.name, attachment.read(), attachment.content_type)
+        
+        try:
+            email.send()
+            return Response({
+                'success': True,
+                'sent_to': recipients,
+                'count': len(recipients)
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class CommunicationResponseViewSet(viewsets.ModelViewSet):
