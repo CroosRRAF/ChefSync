@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 // Import shared components
 import { AnimatedStats, DataTable, GlassCard } from "@/components/admin/shared";
@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -82,6 +83,16 @@ interface PaymentAnalytics {
   monthlyGrowth: number;
 }
 
+type AnalyticsCard = {
+  title: string;
+  value: string;
+  sublabel: string;
+  trend: number;
+  trendLabel: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  positive: boolean;
+};
+
 const PaymentManagementHub: React.FC = () => {
   const { toast } = useToast();
 
@@ -98,6 +109,9 @@ const PaymentManagementHub: React.FC = () => {
   // Transactions
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [transactionsTotal, setTransactionsTotal] = useState(0);
+  const [transactionsPage, setTransactionsPage] = useState(1);
+  const [transactionsPageSize, setTransactionsPageSize] = useState(10);
   const [transactionFilters, setTransactionFilters] = useState({
     status: "all",
     dateRange: "30d",
@@ -107,8 +121,72 @@ const PaymentManagementHub: React.FC = () => {
   // Refunds
   const [refunds, setRefunds] = useState<Refund[]>([]);
   const [refundsLoading, setRefundsLoading] = useState(false);
+  const [refundsTotal, setRefundsTotal] = useState(0);
+  const [refundsPage, setRefundsPage] = useState(1);
+  const [refundsPageSize, setRefundsPageSize] = useState(10);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   const [selectedRefund, setSelectedRefund] = useState<Refund | null>(null);
+  const [refundActionLoading, setRefundActionLoading] = useState(false);
+  const [refundActionNote, setRefundActionNote] = useState("");
+
+  const formatCurrency = useCallback((value: number) => {
+    return new Intl.NumberFormat("en-LK", {
+      style: "currency",
+      currency: "LKR",
+      maximumFractionDigits: 2,
+    }).format(value || 0);
+  }, []);
+
+  const totalRefundAmount = useMemo(
+    () => parseFloat(paymentStats?.total_refunds ?? "0"),
+    [paymentStats]
+  );
+
+  const analyticsSummary = useMemo<AnalyticsCard[]>(() => {
+    if (!analytics) return [];
+
+    return [
+      {
+        title: "Total Revenue",
+        value: formatCurrency(analytics.totalRevenue),
+        sublabel: "Cumulative revenue processed",
+        trend: analytics.monthlyGrowth,
+        trendLabel: `${analytics.monthlyGrowth >= 0 ? "+" : ""}${analytics.monthlyGrowth.toFixed(1)}% vs previous month`,
+        icon: TrendingUp,
+        positive: analytics.monthlyGrowth >= 0,
+      },
+      {
+        title: "Total Transactions",
+        value: analytics.totalTransactions.toLocaleString(),
+        sublabel: "Completed payment attempts",
+        trend: analytics.monthlyGrowth,
+        trendLabel: `${analytics.monthlyGrowth >= 0 ? "+" : ""}${analytics.monthlyGrowth.toFixed(1)}% change`,
+        icon: CreditCard,
+        positive: analytics.monthlyGrowth >= 0,
+      },
+      {
+        title: "Refund Volume",
+        value: formatCurrency(totalRefundAmount),
+        sublabel: "Processed refunds to date",
+        trend: -(analytics.refundRate || 0),
+        trendLabel: `${(analytics.refundRate || 0).toFixed(1)}% refund rate`,
+        icon: TrendingDown,
+        positive: (analytics.refundRate || 0) < 5,
+      },
+    ];
+  }, [analytics, formatCurrency, totalRefundAmount]);
+
+  const performanceMetrics = useMemo(
+    () => ({
+      successRate: analytics?.successRate ?? 0,
+      refundRate: analytics?.refundRate ?? 0,
+      averageTransactionValue: analytics?.averageTransactionValue ?? 0,
+      totalTransactions: analytics?.totalTransactions ?? 0,
+      pendingRefunds: paymentStats?.pending_refunds ?? 0,
+      totalRefundAmount,
+    }),
+    [analytics, paymentStats, totalRefundAmount]
+  );
 
   // Load payment statistics
   const loadPaymentStats = useCallback(async () => {
@@ -145,9 +223,12 @@ const PaymentManagementHub: React.FC = () => {
       setTransactionsLoading(true);
       const response = await paymentService.getTransactionHistory({
         status: transactionFilters.status === "all" ? undefined : transactionFilters.status,
-        limit: 50,
+        page: transactionsPage,
+        limit: transactionsPageSize,
+        search: transactionFilters.search ? transactionFilters.search.trim() : undefined,
       });
-      setTransactions(response.results);
+      setTransactions(Array.isArray(response.results) ? response.results : []);
+      setTransactionsTotal(response.count || 0);
     } catch (error) {
       console.error("Error loading transactions:", error);
       toast({
@@ -158,16 +239,18 @@ const PaymentManagementHub: React.FC = () => {
     } finally {
       setTransactionsLoading(false);
     }
-  }, [transactionFilters.status, toast]);
+  }, [transactionFilters.status, transactionFilters.search, transactionsPage, transactionsPageSize, toast]);
 
   // Load refunds
   const loadRefunds = useCallback(async () => {
     try {
       setRefundsLoading(true);
       const response = await paymentService.getRefunds({
-        limit: 50,
+        page: refundsPage,
+        limit: refundsPageSize,
       });
-      setRefunds(response.results);
+      setRefunds(Array.isArray(response.results) ? response.results : []);
+      setRefundsTotal(response.count || 0);
     } catch (error) {
       console.error("Error loading refunds:", error);
       toast({
@@ -178,11 +261,12 @@ const PaymentManagementHub: React.FC = () => {
     } finally {
       setRefundsLoading(false);
     }
-  }, [toast]);
+  }, [refundsPage, refundsPageSize, toast]);
 
   // Process refund
   const handleProcessRefund = async (refundId: number, action: "approve" | "reject", note?: string) => {
     try {
+      setRefundActionLoading(true);
       await paymentService.processRefund(refundId, action, note);
       toast({
         title: "Success",
@@ -191,6 +275,7 @@ const PaymentManagementHub: React.FC = () => {
       loadRefunds();
       setShowRefundDialog(false);
       setSelectedRefund(null);
+      setRefundActionNote("");
     } catch (error) {
       console.error(`Error ${action}ing refund:`, error);
       toast({
@@ -198,39 +283,58 @@ const PaymentManagementHub: React.FC = () => {
         description: `Failed to ${action} refund`,
         variant: "destructive",
       });
+    } finally {
+      setRefundActionLoading(false);
     }
   };
 
   // Load data on mount and tab changes
   useEffect(() => {
     loadPaymentStats();
+  }, [loadPaymentStats]);
+
+  useEffect(() => {
     if (activeTab === "transactions") {
-      loadTransactions();
-    } else if (activeTab === "refunds") {
+      const handler = setTimeout(() => {
+        loadTransactions();
+      }, 300);
+      return () => clearTimeout(handler);
+    }
+  }, [activeTab, loadTransactions]);
+
+  useEffect(() => {
+    if (activeTab === "refunds") {
       loadRefunds();
     }
-  }, [activeTab, loadPaymentStats, loadTransactions, loadRefunds]);
+  }, [activeTab, loadRefunds]);
+
+  useEffect(() => {
+    if (!showRefundDialog) {
+      setRefundActionNote("");
+      setRefundActionLoading(false);
+    }
+  }, [showRefundDialog]);
 
   // Transaction table columns
   const transactionColumns: Column<Transaction>[] = [
     {
       key: "id",
       title: "Transaction ID",
-      render: (value: any, transaction: Transaction) => (
+      render: (transaction: Transaction) => (
         <div className="font-mono text-sm">#{transaction.id}</div>
       ),
     },
     {
       key: "amount",
       title: "Amount",
-      render: (value: any, transaction: Transaction) => (
+      render: (transaction: Transaction) => (
         <div className="font-medium">LKR {parseFloat(transaction.amount).toLocaleString()}</div>
       ),
     },
     {
       key: "type",
       title: "Type",
-      render: (value: any, transaction: Transaction) => (
+      render: (transaction: Transaction) => (
         <Badge variant={transaction.type === "payment" ? "default" : "secondary"}>
           {transaction.type}
         </Badge>
@@ -239,7 +343,7 @@ const PaymentManagementHub: React.FC = () => {
     {
       key: "status",
       title: "Status",
-      render: (value: any, transaction: Transaction) => {
+      render: (transaction: Transaction) => {
         const statusColors = {
           completed: "bg-green-100 text-green-800",
           pending: "bg-yellow-100 text-yellow-800",
@@ -256,7 +360,7 @@ const PaymentManagementHub: React.FC = () => {
     {
       key: "transaction_date",
       title: "Date",
-      render: (value: any, transaction: Transaction) => (
+      render: (transaction: Transaction) => (
         <div className="text-sm">
           {new Date(transaction.transaction_date).toLocaleDateString()}
         </div>
@@ -265,7 +369,7 @@ const PaymentManagementHub: React.FC = () => {
     {
       key: "actions",
       title: "Actions",
-      render: (value: any, transaction: Transaction) => (
+      render: (transaction: Transaction) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -292,28 +396,28 @@ const PaymentManagementHub: React.FC = () => {
     {
       key: "id",
       title: "Refund ID",
-      render: (value: any, refund: Refund) => (
+      render: (refund: Refund) => (
         <div className="font-mono text-sm">#{refund.id}</div>
       ),
     },
     {
       key: "amount",
       title: "Amount",
-      render: (value: any, refund: Refund) => (
+      render: (refund: Refund) => (
         <div className="font-medium">LKR {parseFloat(refund.amount).toLocaleString()}</div>
       ),
     },
     {
       key: "reason",
       title: "Reason",
-      render: (value: any, refund: Refund) => (
+      render: (refund: Refund) => (
         <div className="text-sm max-w-xs truncate">{refund.reason}</div>
       ),
     },
     {
       key: "status",
       title: "Status",
-      render: (value: any, refund: Refund) => {
+      render: (refund: Refund) => {
         const statusColors = {
           pending: "bg-yellow-100 text-yellow-800",
           approved: "bg-green-100 text-green-800",
@@ -330,7 +434,7 @@ const PaymentManagementHub: React.FC = () => {
     {
       key: "created_at",
       title: "Requested",
-      render: (value: any, refund: Refund) => (
+      render: (refund: Refund) => (
         <div className="text-sm">
           {new Date(refund.created_at).toLocaleDateString()}
         </div>
@@ -339,7 +443,7 @@ const PaymentManagementHub: React.FC = () => {
     {
       key: "actions",
       title: "Actions",
-      render: (value: any, refund: Refund) => (
+      render: (refund: Refund) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -357,11 +461,17 @@ const PaymentManagementHub: React.FC = () => {
             {refund.status === "pending" && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleProcessRefund(refund.id, "approve")}>
+                <DropdownMenuItem
+                  disabled={refundActionLoading}
+                  onClick={() => handleProcessRefund(refund.id, "approve")}
+                >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Approve
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleProcessRefund(refund.id, "reject")}>
+                <DropdownMenuItem
+                  disabled={refundActionLoading}
+                  onClick={() => handleProcessRefund(refund.id, "reject")}
+                >
                   <XCircle className="h-4 w-4 mr-2" />
                   Reject
                 </DropdownMenuItem>
@@ -377,7 +487,16 @@ const PaymentManagementHub: React.FC = () => {
   const renderOverviewTab = () => (
     <div className="space-y-6">
       {/* Payment Statistics */}
-      {paymentStats && (
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-28 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : paymentStats ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <AnimatedStats
             value={analytics?.totalRevenue || 0}
@@ -392,14 +511,14 @@ const PaymentManagementHub: React.FC = () => {
             value={analytics?.totalTransactions || 0}
             label="Total Transactions"
             icon={CreditCard}
-            trend={8.2}
+            trend={analytics?.monthlyGrowth || 0}
             gradient="blue"
           />
           <AnimatedStats
             value={analytics?.successRate || 0}
             label="Success Rate"
             icon={CheckCircle}
-            trend={2.1}
+            trend={performanceMetrics.successRate - 80}
             gradient="purple"
             suffix="%"
             decimals={1}
@@ -408,12 +527,16 @@ const PaymentManagementHub: React.FC = () => {
             value={analytics?.refundRate || 0}
             label="Refund Rate"
             icon={TrendingDown}
-            trend={-1.5}
+            trend={-performanceMetrics.refundRate}
             gradient="orange"
             suffix="%"
             decimals={1}
           />
         </div>
+      ) : (
+        <GlassCard className="p-6 text-center text-gray-500 dark:text-gray-400">
+          Payment statistics are currently unavailable. Try refreshing to reload the latest metrics.
+        </GlassCard>
       )}
 
       {/* Recent Transactions */}
@@ -426,9 +549,19 @@ const PaymentManagementHub: React.FC = () => {
           </Button>
         </div>
         <DataTable
-          data={transactions.slice(0, 10)}
+          data={transactions}
           columns={transactionColumns}
           loading={transactionsLoading}
+          pagination={{
+            page: transactionsPage,
+            pageSize: transactionsPageSize,
+            total: transactionsTotal,
+            onPageChange: setTransactionsPage,
+            onPageSizeChange: (size) => {
+              setTransactionsPageSize(size);
+              setTransactionsPage(1);
+            },
+          }}
         />
       </GlassCard>
 
@@ -442,9 +575,19 @@ const PaymentManagementHub: React.FC = () => {
           </Button>
         </div>
         <DataTable
-          data={refunds.filter(r => r.status === "pending").slice(0, 10)}
+          data={refunds.filter(r => r.status === "pending")}
           columns={refundColumns}
           loading={refundsLoading}
+          pagination={{
+            page: refundsPage,
+            pageSize: refundsPageSize,
+            total: refundsTotal,
+            onPageChange: setRefundsPage,
+            onPageSizeChange: (size) => {
+              setRefundsPageSize(size);
+              setRefundsPage(1);
+            },
+          }}
         />
       </GlassCard>
     </div>
@@ -462,12 +605,22 @@ const PaymentManagementHub: React.FC = () => {
               <Input
                 placeholder="Search transactions..."
                 value={transactionFilters.search}
-                onChange={(e) => setTransactionFilters(prev => ({ ...prev, search: e.target.value }))}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setTransactionFilters(prev => ({ ...prev, search: value }));
+                  setTransactionsPage(1);
+                }}
                 className="pl-10"
               />
             </div>
           </div>
-          <Select value={transactionFilters.status} onValueChange={(value) => setTransactionFilters(prev => ({ ...prev, status: value }))}>
+          <Select
+            value={transactionFilters.status}
+            onValueChange={(value) => {
+              setTransactionFilters(prev => ({ ...prev, status: value }));
+              setTransactionsPage(1);
+            }}
+          >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
@@ -499,6 +652,16 @@ const PaymentManagementHub: React.FC = () => {
           data={transactions}
           columns={transactionColumns}
           loading={transactionsLoading}
+          pagination={{
+            page: transactionsPage,
+            pageSize: transactionsPageSize,
+            total: transactionsTotal,
+            onPageChange: setTransactionsPage,
+            onPageSizeChange: (size) => {
+              setTransactionsPageSize(size);
+              setTransactionsPage(1);
+            },
+          }}
         />
       </GlassCard>
     </div>
@@ -520,6 +683,16 @@ const PaymentManagementHub: React.FC = () => {
           data={refunds}
           columns={refundColumns}
           loading={refundsLoading}
+          pagination={{
+            page: refundsPage,
+            pageSize: refundsPageSize,
+            total: refundsTotal,
+            onPageChange: setRefundsPage,
+            onPageSizeChange: (size) => {
+              setRefundsPageSize(size);
+              setRefundsPage(1);
+            },
+          }}
         />
       </GlassCard>
     </div>
@@ -529,16 +702,110 @@ const PaymentManagementHub: React.FC = () => {
   const renderAnalyticsTab = () => (
     <div className="space-y-6">
       <GlassCard className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Payment Analytics</h3>
-        <div className="text-center py-8">
-          <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-            Analytics Coming Soon
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400">
-            Advanced payment analytics and reporting features will be available soon.
-          </p>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold">Revenue & Volume</h3>
+          <Button variant="outline" size="sm" onClick={loadPaymentStats}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="h-32 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            ))}
+          </div>
+        ) : analyticsSummary.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {analyticsSummary.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div key={card.title} className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-500">{card.title}</span>
+                    <Icon className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{card.value}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{card.sublabel}</div>
+                  </div>
+                  <div className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: card.positive ? "rgba(34,197,94,0.12)" : "rgba(248,113,113,0.12)",
+                      color: card.positive ? "#15803d" : "#b91c1c",
+                    }}
+                  >
+                    {card.trend >= 0 ? "▲" : "▼"} {card.trendLabel}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+            Payment analytics data is not available yet. Refresh or check backend analytics endpoints.
+          </div>
+        )}
+      </GlassCard>
+
+      <GlassCard className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Conversion & Risk Metrics</h3>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div key={index} className="h-32 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            ))}
+          </div>
+        ) : analytics ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm font-medium text-gray-600 dark:text-gray-300">
+                  <span>Success Rate</span>
+                  <span>{performanceMetrics.successRate.toFixed(1)}%</span>
+                </div>
+                <Progress value={Math.min(performanceMetrics.successRate, 100)} className="h-2" />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm font-medium text-gray-600 dark:text-gray-300">
+                  <span>Refund Rate</span>
+                  <span>{performanceMetrics.refundRate.toFixed(1)}%</span>
+                </div>
+                <Progress value={Math.min(performanceMetrics.refundRate, 100)} className="h-2" />
+              </div>
+            </div>
+            <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+              <div className="flex items-center justify-between">
+                <span>Average Transaction Value</span>
+                <span className="font-semibold text-gray-900 dark:text-gray-100">
+                  {formatCurrency(performanceMetrics.averageTransactionValue)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Pending Refunds</span>
+                <span className="font-semibold text-gray-900 dark:text-gray-100">
+                  {performanceMetrics.pendingRefunds.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Total Refund Volume</span>
+                <span className="font-semibold text-gray-900 dark:text-gray-100">
+                  {formatCurrency(performanceMetrics.totalRefundAmount)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Total Transactions</span>
+                <span className="font-semibold text-gray-900 dark:text-gray-100">
+                  {performanceMetrics.totalTransactions.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+            Conversion metrics require payment statistics. Refresh to attempt loading again.
+          </div>
+        )}
       </GlassCard>
     </div>
   );
@@ -622,23 +889,38 @@ const PaymentManagementHub: React.FC = () => {
                 <Label className="text-sm font-medium text-gray-500">Requested</Label>
                 <p className="text-sm">{new Date(selectedRefund.created_at).toLocaleDateString()}</p>
               </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Action Note</Label>
+                <Textarea
+                  placeholder="Add a note for this decision (optional)"
+                  value={refundActionNote}
+                  onChange={(event) => setRefundActionNote(event.target.value)}
+                />
+                <p className="text-xs text-gray-400 mt-1">Notes help provide context for the refund decision.</p>
+              </div>
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRefundDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowRefundDialog(false)}
+              disabled={refundActionLoading}
+            >
               Cancel
             </Button>
             <Button
               variant="destructive"
-              onClick={() => selectedRefund && handleProcessRefund(selectedRefund.id, "reject")}
+              disabled={refundActionLoading || !selectedRefund}
+              onClick={() => selectedRefund && handleProcessRefund(selectedRefund.id, "reject", refundActionNote)}
             >
-              Reject
+              {refundActionLoading ? "Processing..." : "Reject"}
             </Button>
             <Button
-              onClick={() => selectedRefund && handleProcessRefund(selectedRefund.id, "approve")}
+              disabled={refundActionLoading || !selectedRefund}
+              onClick={() => selectedRefund && handleProcessRefund(selectedRefund.id, "approve", refundActionNote)}
             >
-              Approve
+              {refundActionLoading ? "Processing..." : "Approve"}
             </Button>
           </DialogFooter>
         </DialogContent>

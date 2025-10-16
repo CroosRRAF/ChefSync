@@ -245,6 +245,7 @@ class PaymentService {
     status?: string;
     start_date?: string;
     end_date?: string;
+    search?: string;
   }): Promise<{ results: Transaction[]; count: number }> {
     try {
       const response = await apiClient.get("/payments/transactions/", { params });

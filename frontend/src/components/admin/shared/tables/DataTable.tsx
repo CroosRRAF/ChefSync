@@ -26,7 +26,7 @@ export interface Column<T> {
   key: keyof T | string;
   title: string;
   sortable?: boolean;
-  render?: (value: any, row: T, index: number) => React.ReactNode;
+  render?: (row: T, index: number, value?: any) => React.ReactNode;
   width?: string;
   align?: "left" | "center" | "right";
 }
@@ -194,7 +194,7 @@ const DataTable = <T extends Record<string, any>>({
 
     if (column.render) {
       try {
-        return column.render(value, row, rowIndex);
+        return column.render(row, rowIndex, value);
       } catch (error) {
         console.error("Error rendering cell:", error, {
           column: column.key,

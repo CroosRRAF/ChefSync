@@ -95,11 +95,11 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ className = '' })
       {/* Notification Bell */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-600 hover:text-primary transition-colors"
+        className="relative p-2 text-gray-600 dark:text-gray-300 hover:text-primary dark:hover:text-blue-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -107,22 +107,22 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ className = '' })
 
       {/* Notification Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[100]">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b">
-            <h3 className="font-semibold text-gray-900">Notifications</h3>
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="text-xs text-primary hover:underline"
+                  className="text-xs text-primary dark:text-blue-400 hover:underline"
                 >
                   Mark all read
                 </button>
               )}
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -132,17 +132,17 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ className = '' })
           {/* Notifications List */}
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">
-                <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
                 <p className="text-sm">No notifications</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 hover:bg-gray-50 transition-colors ${
-                      !notification.read ? 'bg-blue-50' : ''
+                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer ${
+                      !notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                     }`}
                     onClick={() => markAsRead(notification.id)}
                   >
@@ -153,7 +153,7 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ className = '' })
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <h4 className={`text-sm font-medium ${
-                            !notification.read ? 'text-gray-900' : 'text-gray-700'
+                            !notification.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
                           }`}>
                             {notification.title}
                           </h4>
@@ -162,19 +162,19 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ className = '' })
                               e.stopPropagation();
                               removeNotification(notification.id);
                             }}
-                            className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
+                            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                           >
                             <X className="w-3 h-3" />
                           </button>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                           {notification.message}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                           {formatTimestamp(notification.timestamp)}
                         </p>
                         {!notification.read && (
-                          <div className="w-2 h-2 bg-primary rounded-full mt-2"></div>
+                          <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full mt-2"></div>
                         )}
                       </div>
                     </div>
@@ -186,8 +186,8 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ className = '' })
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="p-3 border-t bg-gray-50">
-              <button className="w-full text-sm text-primary hover:underline">
+            <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+              <button className="w-full text-sm text-primary dark:text-blue-400 hover:underline">
                 View all notifications
               </button>
             </div>
@@ -198,7 +198,7 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ className = '' })
       {/* Click outside to close */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40"
+          className="fixed inset-0 z-[90]"
           onClick={() => setIsOpen(false)}
         />
       )}

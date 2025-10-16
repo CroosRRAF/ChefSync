@@ -20,6 +20,7 @@ from apps.authentication.models import User
 from apps.food.models import Food
 from apps.orders.models import Order
 from django.db.models import Avg, Count, Max, Sum
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -161,14 +162,165 @@ Report generation is ready for Phase 10 implementation.
             logger.error(f"Report generation failed: {e}")
             return f"# Report Generation Failed\n\nError: {str(e)}"
 
-    def is_available(self) -> bool:
+    def generate_chatbot_response(
+        self,
+        message: str,
+        admin_context: str = "",
+        conversation_history: list = None
+    ) -> str:
         """
-        Check if AI service is available and configured
-
+        Generate AI chatbot response using real admin data
+        
+        Args:
+            message (str): User's message/query
+            admin_context (str): Current admin statistics and data
+            conversation_history (list): Previous conversation messages
+            
         Returns:
-            bool: True if AI service is ready to use
+            str: AI-generated response with real data insights
         """
-        return self.model is not None
+        message_lower = message.lower()
+        
+        # If AI is not configured, provide intelligent fallback responses using real data
+        if not self.model:
+            logger.warning("Google Gemini AI not configured. Using fallback responses with real data.")
+            return self._generate_fallback_response(message_lower, admin_context)
+        
+        try:
+            # Build conversation context
+            history_text = ""
+            if conversation_history:
+                for msg in conversation_history[-5:]:  # Last 5 messages for context
+                    role = msg.get('type', 'user')
+                    content = msg.get('content', '')
+                    history_text += f"\n{role.upper()}: {content}"
+            
+            # Create comprehensive prompt with real data
+            prompt = f"""
+You are an AI assistant for the ChefSync admin dashboard. You have access to COMPREHENSIVE real-time data from the entire admin management system including:
+- User statistics and growth metrics
+- Order management and fulfillment data
+- Revenue and financial analytics
+- Food menu items and approvals
+- Customer communications and feedback
+- Sentiment analysis (positive/negative/neutral trends)
+- Business performance indicators
+
+{admin_context}
+
+Previous conversation:
+{history_text if history_text else "None"}
+
+User's current question: {message}
+
+Instructions:
+- Provide accurate, helpful responses using the comprehensive real-time data above
+- When asked about sentiment, communications, or feedback - use the SENTIMENT ANALYSIS section
+- When asked about food/menu - use the FOOD MENU STATISTICS section
+- When asked about orders/revenue - use the ORDER and REVENUE sections
+- Be concise but informative with specific numbers
+- Point out trends, patterns, and insights from the data
+- Suggest actionable recommendations when relevant
+- If data is missing for a specific query, explain what you CAN see and suggest related insights
+- Use a professional but friendly tone
+- Format numbers with proper separators (e.g., 1,234 not 1234)
+- Use LKR for currency
+- If you cannot find relevant data, say "I don't have that specific data available, but I can tell you about [related topic]"
+
+Response:
+"""
+            
+            # Generate response
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+            
+        except Exception as e:
+            logger.error(f"Chatbot response generation failed: {e}")
+            # Fall back to rule-based responses if AI fails
+            return self._generate_fallback_response(message_lower, admin_context)
+    
+    def _generate_fallback_response(self, message_lower: str, admin_context: str) -> str:
+        """
+        Generate intelligent fallback responses using real data when AI is unavailable
+        
+        Args:
+            message_lower (str): Lowercase user message
+            admin_context (str): Real-time admin statistics
+            
+        Returns:
+            str: Contextual response with real data
+        """
+        # Extract numbers from admin_context for responses
+        import re
+        
+        # Parse the admin context to extract real data
+        context_lines = admin_context.strip().split('\n')
+        data = {}
+        for line in context_lines:
+            if ':' in line:
+                key_val = line.split(':', 1)
+                if len(key_val) == 2:
+                    key = key_val[0].strip('- ').strip()
+                    val = key_val[1].strip()
+                    data[key.lower()] = val
+        
+        # Greeting responses
+        if any(word in message_lower for word in ['hello', 'hi', 'hey', 'greetings']):
+            return f"👋 Hello! I'm your ChefSync AI assistant. I can help you with:\n\n• View today's performance and statistics\n• Check orders and revenue\n• Monitor pending tasks\n• Get business insights\n\nWhat would you like to know?"
+        
+        # Working/status check
+        if any(word in message_lower for word in ['working', 'online', 'available', 'there', 'alive']):
+            return f"✅ Yes, I'm working and connected to your live database! Here's a quick snapshot:\n\n{admin_context}\n\nI can answer questions about your business data. What would you like to know?"
+        
+        # Performance/summary requests
+        if any(word in message_lower for word in ['performance', 'summary', 'overview', 'status', 'dashboard']):
+            return f"📊 **Performance Summary**\n\n{admin_context}\n\n💡 **Quick Insights:**\n• Monitor pending orders for timely fulfillment\n• Check pending user approvals regularly\n• Weekly trends show your business activity\n\nNeed more details on any specific metric?"
+        
+        # Today's data
+        if 'today' in message_lower:
+            today_orders = data.get('orders today', '0')
+            today_revenue = data.get('revenue today', 'LKR 0.00')
+            return f"📅 **Today's Performance:**\n\n• Orders: {today_orders}\n• Revenue: {today_revenue}\n• Pending Orders: {data.get('pending orders', '0')}\n\nHow can I help you analyze this data?"
+        
+        # Orders information
+        if 'order' in message_lower:
+            return f"📦 **Orders Overview:**\n\n• Orders Today: {data.get('orders today', '0')}\n• This Week: {data.get('orders this week', '0')}\n• Pending: {data.get('pending orders', '0')}\n\nWould you like to see order trends or manage pending orders?"
+        
+        # Revenue information
+        if any(word in message_lower for word in ['revenue', 'sales', 'money', 'earning']):
+            return f"💰 **Revenue Report:**\n\n• Today: {data.get('revenue today', 'LKR 0.00')}\n• This Week: {data.get('revenue this week', 'LKR 0.00')}\n\nI can help you analyze revenue trends or forecast future sales. What would you like to explore?"
+        
+        # Users information
+        if any(word in message_lower for word in ['user', 'customer', 'member']):
+            return f"👥 **User Statistics:**\n\n• Total Users: {data.get('total users', '0')}\n• New Users Today: {data.get('new users today', '0')}\n• New Users This Week: {data.get('new users this week', '0')}\n• Pending Verifications: {data.get('pending email verifications', '0')}\n\nNeed help managing user approvals or viewing user insights?"
+        
+        # Sentiment analysis
+        if any(word in message_lower for word in ['sentiment', 'feedback', 'mood', 'satisfaction', 'complaint']):
+            sentiment_section = admin_context.split('SENTIMENT ANALYSIS')[1] if 'SENTIMENT ANALYSIS' in admin_context else ''
+            return f"😊 **Sentiment Analysis (Last 30 Days):**\n\n{sentiment_section if sentiment_section else 'Analyzing your customer feedback and communications...'}\n\n**Communications Breakdown:**\n• Total Communications: {data.get('total communications', '0')}\n• Pending: {data.get('pending communications', '0')}\n• Resolved: {data.get('resolved communications', '0')}\n• Complaints: {data.get('complaints (30 days)', '0')}\n• Feedback: {data.get('feedback (30 days)', '0')}\n• Suggestions: {data.get('suggestions (30 days)', '0')}\n\nWould you like more detailed sentiment insights?"
+        
+        # Communications
+        if any(word in message_lower for word in ['communication', 'message', 'inquiry']):
+            return f"💬 **Communications Overview:**\n\n• Total Communications: {data.get('total communications', '0')}\n• Pending: {data.get('pending communications', '0')}\n• Resolved: {data.get('resolved communications', '0')}\n• Complaints (30d): {data.get('complaints (30 days)', '0')}\n• Feedback (30d): {data.get('feedback (30 days)', '0')}\n• Suggestions (30d): {data.get('suggestions (30 days)', '0')}\n\nNeed help managing customer communications?"
+        
+        # Food/Menu information
+        if any(word in message_lower for word in ['food', 'menu', 'dish', 'item', 'recipe']):
+            return f"🍽️ **Food Menu Statistics:**\n\n• Total Food Items: {data.get('total food items', '0')}\n• Active Items: {data.get('active food items', '0')}\n• Pending Approvals: {data.get('pending food approvals', '0')}\n\nWould you like to see top-performing dishes or manage food approvals?"
+        
+        # Analytics/insights
+        if any(word in message_lower for word in ['analytic', 'insight', 'trend', 'pattern', 'analysis']):
+            return f"📈 **Business Analytics & Insights:**\n\n{admin_context}\n\n💡 **Key Insights:**\n• Weekly revenue trend: {data.get('revenue this week', 'N/A')}\n• Order completion rate: {(int(data.get('completed orders', 0)) / int(data.get('total orders (all time)', 1)) * 100) if data.get('total orders (all time)') else 0:.1f}%\n• Average order value: {data.get('average order value', 'N/A')}\n\nWhat specific insights would you like to explore?"
+        
+        # Help/capabilities
+        if any(word in message_lower for word in ['help', 'can you', 'what can', 'capabilities', 'commands']):
+            return f"🤖 **I can help you with:**\n\n1. **Business Performance**\n   • Today's metrics & weekly trends\n   • Revenue analysis & forecasting\n   • Order tracking & completion rates\n\n2. **User Management**\n   • User statistics & growth\n   • Pending verifications\n   • New user insights\n\n3. **Communications & Sentiment**\n   • Customer feedback analysis\n   • Complaint management\n   • Sentiment trends\n\n4. **Food & Menu**\n   • Menu item statistics\n   • Food approval management\n   • Popular dishes\n\n5. **Advanced Analytics**\n   • Order patterns\n   • Revenue trends\n   • Customer satisfaction\n\n**Current Data Available:**\n{admin_context}\n\nJust ask me anything about your business!"
+        
+        # Cannot understand
+        if any(word in message_lower for word in ['understand', 'dont get', "don't get", 'unclear', 'what do you mean']):
+            return f"❓ **I'm not sure I understood that correctly.**\n\nI can help you with:\n• Performance metrics (orders, revenue, users)\n• Sentiment analysis & customer feedback\n• Food menu statistics\n• Communications management\n• Business insights & trends\n\nCould you rephrase your question or ask about any of these topics?\n\nExamples:\n• 'What's the sentiment analysis?'\n• 'Show me today's orders'\n• 'How many food items do I have?'"
+        
+        # Default response with comprehensive data
+        return f"🤖 **I'm here to help with your admin management!**\n\nI have access to comprehensive real-time data:\n\n{admin_context}\n\n**You can ask me about:**\n• 📊 Performance & Analytics\n• 💰 Revenue & Sales\n• 👥 Users & Customers\n• 📦 Orders & Deliveries\n• 🍽️ Food Menu & Items\n• 💬 Communications & Feedback\n• 😊 Sentiment Analysis\n• 📈 Business Insights & Trends\n\n**What would you like to know?**\n\n💡 **Tip:** For even more advanced AI insights, configure GOOGLE_AI_API_KEY in your environment variables."
 
     # ==================== PHASE 3: AI/ML FEATURES ====================
 
@@ -194,7 +346,7 @@ Report generation is ready for Phase 10 implementation.
 
         try:
             # Get historical order data
-            end_date = datetime.now()
+            end_date = timezone.now()
             start_date = end_date - timedelta(days=90)  # Use last 90 days for training
 
             orders = Order.objects.filter(
@@ -305,7 +457,7 @@ Report generation is ready for Phase 10 implementation.
             }
 
         try:
-            end_date = datetime.now()
+            end_date = timezone.now()
             start_date = end_date - timedelta(days=days_back)
 
             # Get order data
@@ -460,7 +612,7 @@ Report generation is ready for Phase 10 implementation.
             foods = (
                 Food.objects.annotate(
                     calculated_revenue=Sum("prices__order_items__total_price"),
-                    avg_rating=Avg("rating"),
+                    avg_rating=Avg("rating_average"),
                 )
                 .filter(total_orders__gt=0)
                 .order_by("-calculated_revenue")[: limit * 2]
@@ -476,11 +628,13 @@ Report generation is ready for Phase 10 implementation.
 
             for food in foods:
                 # Calculate recommendation score
-                popularity_score = min(1.0, food.total_orders / 100)  # Normalize to 0-1
-                revenue_score = min(
-                    1.0, (food.calculated_revenue or 0) / 10000
+                popularity_score = min(
+                    1.0, float(food.total_orders) / 100.0
                 )  # Normalize to 0-1
-                rating_score = (food.avg_rating or 0) / 5.0  # Normalize to 0-1
+                revenue_score = min(
+                    1.0, float(food.calculated_revenue or 0) / 10000.0
+                )  # Normalize to 0-1
+                rating_score = float(food.avg_rating or 0) / 5.0  # Normalize to 0-1
 
                 # Weighted score
                 recommendation_score = (
@@ -506,11 +660,14 @@ Report generation is ready for Phase 10 implementation.
 
                 recommendations.append(
                     {
-                        "food_id": food.id,
+                        "food_id": food.pk,  # Use pk instead of id for better compatibility
                         "name": food.name,
                         "cook_name": (
                             food.cook.user.get_full_name()
-                            if food.cook and food.cook.user
+                            if hasattr(food, "cook")
+                            and food.cook
+                            and hasattr(food.cook, "user")
+                            and food.cook.user
                             else "Unknown"
                         ),
                         "recommendation_score": round(recommendation_score, 2),
@@ -518,9 +675,13 @@ Report generation is ready for Phase 10 implementation.
                         "reason": reason,
                         "total_orders": food.total_orders,
                         "total_revenue": float(food.calculated_revenue or 0),
-                        "avg_rating": round(food.avg_rating or 0, 1),
-                        "price": float(food.price),
-                        "image_url": food.image.url if food.image else None,
+                        "avg_rating": round(float(food.avg_rating or 0), 1),
+                        "price": float(getattr(food, "price", 0)),
+                        "image_url": (
+                            food.image.url
+                            if hasattr(food, "image") and food.image
+                            else None
+                        ),
                     }
                 )
 
@@ -594,11 +755,13 @@ Report generation is ready for Phase 10 implementation.
             segments = []
 
             # High-value customers (top 20% by spending)
-            high_value_threshold = (
-                customers.aggregate(
-                    threshold=Sum("total_spent") * 0.8 / Count("total_spent")
-                )["threshold"]
-                or 0
+            agg_data = customers.aggregate(
+                total_spent_sum=Sum("total_spent"), customer_count=Count("user_id")
+            )
+            high_value_threshold = float(
+                float(agg_data["total_spent_sum"] or 0)
+                * 0.8
+                / float(agg_data["customer_count"] or 1)
             )
 
             high_value_customers = customers.filter(
@@ -618,14 +781,9 @@ Report generation is ready for Phase 10 implementation.
             )
 
             # Frequent customers (top 20% by order count)
-            frequent_threshold = (
-                customers.aggregate(
-                    threshold=Count("total_orders") * 0.8 / Count("total_orders")
-                )["threshold"]
-                or 0
-            )
+            frequent_threshold = 5  # Use a fixed threshold for simplicity
 
-            frequent_customers = customers.filter(total_orders__gte=frequent_threshold)
+            frequent_customers = customers.filter(order_count__gte=frequent_threshold)
             segments.append(
                 {
                     "name": "Frequent Customers",
@@ -639,7 +797,7 @@ Report generation is ready for Phase 10 implementation.
             )
 
             # At-risk customers (no orders in last 30 days)
-            thirty_days_ago = datetime.now() - timedelta(days=30)
+            thirty_days_ago = timezone.now() - timedelta(days=30)
             at_risk_customers = customers.filter(last_order_date__lt=thirty_days_ago)
             segments.append(
                 {
@@ -749,7 +907,7 @@ Report generation is ready for Phase 10 implementation.
                     "customer_insights": customer_insights,
                     "ai_summary": summary,
                 },
-                "generated_at": datetime.now().isoformat(),
+                "generated_at": timezone.now().isoformat(),
                 "confidence_score": self._calculate_overall_confidence(
                     sales_forecast, anomalies
                 ),
@@ -815,9 +973,6 @@ Report generation is ready for Phase 10 implementation.
             # Weighted average
             overall_confidence = (sales_confidence * 0.6) + (anomaly_confidence * 0.4)
             return round(overall_confidence, 2)
-
-        except Exception:
-            return 0.5  # Default confidence
 
         except Exception:
             return 0.5  # Default confidence

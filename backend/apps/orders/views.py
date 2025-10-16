@@ -13,17 +13,9 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import (
-    CartItem,
-    DeliveryChat,
-    DeliveryIssue,
-    DeliveryLog,
-    LocationUpdate,
-    Order,
-    OrderItem,
-    OrderStatusHistory,
-    UserAddress,
-)
+from .models import (CartItem, DeliveryChat, DeliveryIssue, DeliveryLog,
+                     LocationUpdate, Order, OrderItem, OrderStatusHistory,
+                     UserAddress)
 from .serializers import CartItemSerializer, UserAddressSerializer
 
 User = get_user_model()
@@ -114,11 +106,11 @@ def _resolve_chef_location(chef, request_data):
             )
             # Update coordinates if already existed but empty or different
             updated = False
-            if kitchen_address.latitude != lat:
-                kitchen_address.latitude = lat
+            if kitchen_address.latitude != (Decimal(str(lat)) if lat is not None else None):
+                kitchen_address.latitude = Decimal(str(lat))
                 updated = True
-            if kitchen_address.longitude != lng:
-                kitchen_address.longitude = lng
+            if kitchen_address.longitude != (Decimal(str(lng)) if lng is not None else None):
+                kitchen_address.longitude = Decimal(str(lng))
                 updated = True
             if (
                 request_data.get("chef_address")
@@ -204,7 +196,7 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
     def get_customer_name(self, obj):
         if obj.customer:
             return (
-                obj.customer.name
+                obj.customer.get_full_name()
                 or obj.customer.name
                 or obj.customer.username
             )
@@ -212,11 +204,7 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
 
     def get_chef(self, obj):
         if obj.chef:
-            return (
-                obj.chef.name
-                or obj.chef.name
-                or obj.chef.username
-            )
+            return obj.chef.get_full_name() or obj.chef.name or obj.chef.username
         return "Unknown Chef"
 
     def get_time_since_order(self, obj):
@@ -239,37 +227,44 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
     def get_items(self, obj):
         items = []
         for order_item in obj.items.select_related("price__food", "price__cook").all():
+            # Get food name with proper fallbacks
+            food_name = order_item.food_name
+            if not food_name and order_item.price and order_item.price.food:
+                food_name = order_item.price.food.name
+            if not food_name:
+                food_name = "Unknown Food"
+
+            # Get food description with proper fallbacks
+            food_description = order_item.food_description
+            if not food_description and order_item.price and order_item.price.food:
+                food_description = order_item.price.food.description or ""
+
+            # Get food image with proper fallbacks
+            food_image = None
+            if order_item.price:
+                if order_item.price.image_url:
+                    food_image = order_item.price.image_url
+                elif order_item.price.food and order_item.price.food.image_url:
+                    food_image = order_item.price.food.image_url
+
+            # Get cook name with proper fallbacks
+            cook_name = "Unknown Cook"
+            if order_item.price and order_item.price.cook:
+                cook = order_item.price.cook
+                cook_name = cook.get_full_name() or cook.name or cook.username
+
             items.append(
                 {
                     "id": order_item.order_item_id,
-                    "quantity": order_item.quantity,
+                    "quantity": order_item.quantity or 0,
                     "unit_price": float(order_item.unit_price or 0),
                     "total_price": float(order_item.total_price or 0),
                     "special_instructions": order_item.special_instructions or "",
-                    "food_name": (
-                        order_item.food_name or order_item.price.food.name
-                        if order_item.price
-                        else "Unknown Food"
-                    ),
-                    "food_description": order_item.food_description
-                    or (order_item.price.food.description if order_item.price else ""),
-                    "food_image": (
-                        order_item.price.image_url
-                        if order_item.price and order_item.price.image_url
-                        else (
-                            order_item.price.food.image_url
-                            if order_item.price and order_item.price.food.image_url
-                            else None
-                        )
-                    ),
+                    "food_name": food_name,
+                    "food_description": food_description,
+                    "food_image": food_image,
                     "size": order_item.price.size if order_item.price else "Medium",
-                    "cook_name": (
-                        order_item.price.cook.name
-                        or order_item.price.cook.name
-                        or order_item.price.cook.username
-                        if order_item.price
-                        else "Unknown Cook"
-                    ),
+                    "cook_name": cook_name,
                 }
             )
         return items
@@ -854,9 +849,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         chef_info = {
             "id": chef.id,
-            "name": chef.name
-            or chef.name
-            or chef.username,
+            "name": chef.get_full_name() or chef.name or chef.username,
             "phone": getattr(chef, "phone_no", None),
             "email": chef.email,
             "location": chef_location,
@@ -885,36 +878,6 @@ class OrderViewSet(viewsets.ModelViewSet):
 #     queryset = OrderStatusHistory.objects.all()
 #     serializer_class = OrderStatusHistorySerializer
 #     permission_classes = [IsAuthenticated]
-
-
-class UserAddressViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing user addresses"""
-
-    serializer_class = UserAddressSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return UserAddress.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-    @action(detail=False, methods=["post"])
-    def set_default(self, request):
-        """Set an address as default"""
-        address_id = request.data.get("address_id")
-        try:
-            address = UserAddress.objects.get(id=address_id, user=request.user)
-            # Remove default from other addresses
-            UserAddress.objects.filter(user=request.user).update(is_default=False)
-            # Set this address as default
-            address.is_default = True
-            address.save()
-            return Response({"success": "Default address updated"})
-        except UserAddress.DoesNotExist:
-            return Response(
-                {"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND
-            )
 
 
 class CartItemViewSet(viewsets.ModelViewSet):
@@ -1252,9 +1215,7 @@ def chef_recent_activity(request):
         # Get basic chef info
         chef_info = {
             "id": chef.id,
-            "name": chef.name
-            or chef.name
-            or chef.username,
+            "name": chef.name or chef.name or chef.username,
             "phone": chef.phone_no,
             "email": chef.email,
             "location": chef_location,
@@ -1372,7 +1333,6 @@ def place_order(request):
                     order=order,
                     price=food_price,
                     quantity=item_data["quantity"],
-                    total_amount=food_price.price * item_data["quantity"],
                 )
 
             except FoodPrice.DoesNotExist:
@@ -1384,7 +1344,14 @@ def place_order(request):
                 )
 
         # Calculate totals
-        subtotal = sum(item.total_amount for item in order.items.all())
+        # Compute totals using OrderItem.total_price (model computes on save)
+        items_qs = OrderItem.objects.filter(order=order)
+        subtotal = sum((item.total_price or Decimal("0.00")) for item in items_qs)
+        # Ensure Decimal type even when empty
+        subtotal = sum(
+            ((item.total_price or Decimal("0.00")) for item in items_qs),
+            start=Decimal("0.00"),
+        )
         delivery_fee = Decimal("15.00")
         tax_amount = subtotal * Decimal("0.08")
         total_amount = subtotal + delivery_fee + tax_amount
@@ -1407,7 +1374,7 @@ def place_order(request):
         return Response(
             {
                 "success": "Order placed successfully",
-                "order_id": order.id,
+                "order_id": order.pk,
                 "order_number": order.order_number,
                 "status": order.status,
                 "total_amount": float(total_amount),
@@ -1450,7 +1417,7 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                 )
                 .select_related("customer", "chef", "delivery_partner")
                 .prefetch_related(
-                    "items__price__food", "location_updates", "delivery_issues"
+                    "items__price__food"
                 )
                 .order_by("-created_at")
             )
@@ -1458,11 +1425,12 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
             deliveries = []
             for order in active_orders:
                 # Get latest location update
-                latest_location = order.location_updates.first()
+                latest_location = LocationUpdate.objects.filter(order=order).first()
 
                 # Get open issues
-                open_issues = order.delivery_issues.filter(
-                    status__in=["reported", "acknowledged", "in_progress"]
+                open_issues = DeliveryIssue.objects.filter(
+                    order=order,
+                    status__in=["reported", "acknowledged", "in_progress"],
                 ).count()
 
                 deliveries.append(
@@ -1473,7 +1441,11 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                         "customer": {
                             "id": order.customer.id if order.customer else None,
                             "name": (
-                                order.customer.name
+                                (
+                                    order.customer.get_full_name()
+                                    or order.customer.name
+                                    or order.customer.username
+                                )
                                 if order.customer
                                 else "Unknown"
                             ),
@@ -1491,7 +1463,11 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                                     else None
                                 ),
                                 "name": (
-                                    order.delivery_partner.name
+                                    (
+                                        order.delivery_partner.get_full_name()
+                                        or order.delivery_partner.name
+                                        or order.delivery_partner.username
+                                    )
                                     if order.delivery_partner
                                     else "Unassigned"
                                 ),
@@ -1642,9 +1618,6 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
             try:
                 order = (
                     Order.objects.select_related("customer", "chef", "delivery_partner")
-                    .prefetch_related(
-                        "location_updates", "delivery_issues", "chat_messages"
-                    )
                     .get(pk=pk)
                 )
             except Order.DoesNotExist:
@@ -1664,16 +1637,17 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                 )
 
             # Get latest location
-            latest_location = order.location_updates.first()
+            latest_location = LocationUpdate.objects.filter(order=order).first()
 
             # Get recent issues
-            recent_issues = order.delivery_issues.filter(
-                status__in=["reported", "acknowledged", "in_progress"]
+            recent_issues = DeliveryIssue.objects.filter(
+                order=order,
+                status__in=["reported", "acknowledged", "in_progress"],
             ).values("issue_id", "issue_type", "description", "status", "created_at")
 
             # Get unread messages count
-            unread_messages = order.chat_messages.filter(
-                receiver=request.user, is_read=False
+            unread_messages = DeliveryChat.objects.filter(
+                order=order, receiver=request.user, is_read=False
             ).count()
 
             return Response(
@@ -1705,7 +1679,11 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                     "delivery_partner": (
                         {
                             "name": (
-                                order.delivery_partner.name
+                                (
+                                    order.delivery_partner.get_full_name()
+                                    or order.delivery_partner.name
+                                    or order.delivery_partner.username
+                                )
                                 if order.delivery_partner
                                 else "Not assigned"
                             ),
@@ -1845,7 +1823,7 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                 )
                 .values(
                     "delivery_partner__id",
-                    "delivery_partner__name",
+                    "delivery_partner__username",
                 )
                 .annotate(delivery_count=Count("id"), total_earned=Sum("delivery_fee"))
                 .order_by("-delivery_count")[:5]
@@ -1868,7 +1846,7 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                     "top_delivery_partners": [
                         {
                             "id": partner["delivery_partner__id"],
-                            "name": partner["delivery_partner__name"] or "Unknown",
+                            "name": partner.get("delivery_partner__username") or "Unknown",
                             "deliveries": partner["delivery_count"],
                             "total_earned": (
                                 float(partner["total_earned"])
@@ -1990,12 +1968,12 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
 
             if request.method == "GET":
                 # Get chat messages
-                messages = order.chat_messages.all().select_related(
+                messages = DeliveryChat.objects.filter(order=order).select_related(
                     "sender", "receiver"
                 )
 
                 # Mark messages as read for current user
-                order.chat_messages.filter(receiver=request.user, is_read=False).update(
+                DeliveryChat.objects.filter(order=order, receiver=request.user, is_read=False).update(
                     is_read=True
                 )
 
@@ -2007,8 +1985,7 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                                 "message_id": str(msg.message_id),
                                 "sender": {
                                     "id": msg.sender.id,
-                                    "name": msg.sender.name
-                                    or msg.sender.username,
+                                    "name": msg.sender.name or msg.sender.username,
                                 },
                                 "message": msg.message,
                                 "message_type": msg.message_type,

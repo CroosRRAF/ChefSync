@@ -53,6 +53,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import AdminBreadcrumb from "./AdminBreadcrumb";
 import { CommandPalette, AIAssistantButton, GlassCard } from "../shared";
 import PerformanceMonitor from "../shared/PerformanceMonitor";
+import NotificationBadge from "@/components/NotificationBadge";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -443,12 +444,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
               </Button>
 
               {/* Notifications */}
-              <Button variant="ghost" size="sm" className="relative">
-                <Bell size={20} />
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  3
-                </span>
-              </Button>
+              <NotificationBadge />
 
               {/* User Menu */}
               <DropdownMenu>

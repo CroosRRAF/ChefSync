@@ -23,6 +23,7 @@ interface LineChartProps {
   showLegend?: boolean;
   showTrend?: boolean;
   className?: string;
+  noCard?: boolean;
 }
 
 const defaultColors = [
@@ -46,6 +47,7 @@ const LineChart: React.FC<LineChartProps> = memo(
     showLegend = true,
     showTrend = false,
     className = "",
+    noCard = false,
   }) => {
     // Calculate trend for the first data key
     const calculateTrend = () => {
@@ -62,6 +64,77 @@ const LineChart: React.FC<LineChartProps> = memo(
     };
 
     const trend = calculateTrend();
+
+    const chartContent = (
+      <ResponsiveContainer width="100%" height={height}>
+        <RechartsLineChart
+          data={data}
+          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+        >
+          {showGrid && (
+            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+          )}
+          <XAxis
+            dataKey={xAxisDataKey}
+            tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "var(--background)",
+              border: "1px solid var(--border)",
+              borderRadius: "6px",
+              fontSize: "12px",
+            }}
+          />
+          {showLegend && <Legend />}
+          {dataKeys.map((key, index) => (
+            <Line
+              key={key}
+              type="monotone"
+              dataKey={key}
+              stroke={colors[index % colors.length]}
+              strokeWidth={2}
+              dot={{ r: 4 }}
+              activeDot={{ r: 6 }}
+            />
+          ))}
+        </RechartsLineChart>
+      </ResponsiveContainer>
+    );
+
+    if (noCard) {
+      return (
+        <div className={className}>
+          {title && trend && (
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-base font-medium">{title}</h4>
+              <div
+                className={`flex items-center space-x-1 text-sm ${
+                  trend.isPositive
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                }`}
+              >
+                {trend.isPositive ? (
+                  <TrendingUp size={16} />
+                ) : (
+                  <TrendingDown size={16} />
+                )}
+                <span>{trend.value}%</span>
+              </div>
+            </div>
+          )}
+          {chartContent}
+        </div>
+      );
+    }
 
     return (
       <Card className={className}>
@@ -88,49 +161,7 @@ const LineChart: React.FC<LineChartProps> = memo(
             </div>
           </CardHeader>
         )}
-        <CardContent>
-          <ResponsiveContainer width="100%" height={height}>
-            <RechartsLineChart
-              data={data}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            >
-              {showGrid && (
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              )}
-              <XAxis
-                dataKey={xAxisDataKey}
-                tick={{ fontSize: 12 }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 12 }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--background)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                }}
-              />
-              {showLegend && <Legend />}
-              {dataKeys.map((key, index) => (
-                <Line
-                  key={key}
-                  type="monotone"
-                  dataKey={key}
-                  stroke={colors[index % colors.length]}
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              ))}
-            </RechartsLineChart>
-          </ResponsiveContainer>
-        </CardContent>
+        <CardContent>{chartContent}</CardContent>
       </Card>
     );
   }

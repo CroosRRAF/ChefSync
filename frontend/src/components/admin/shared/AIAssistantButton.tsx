@@ -4,6 +4,9 @@ import { Bot, MessageSquare, X, Sparkles, Zap, TrendingUp } from "lucide-react";
 import React, { useState } from "react";
 import { GlassCard } from "./GlassCard";
 import { GradientButton } from "./GradientButton";
+import { DraggableWrapper } from "./DraggableWrapper";
+import { aiService } from "@/services/aiService";
+import { toast } from "@/components/ui/use-toast";
 
 export interface AIAssistantButtonProps {
   className?: string;
@@ -55,8 +58,7 @@ export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
       icon: Sparkles,
       description: "View business insights and analytics",
       onClick: () => {
-        addMessage("Show me the latest business insights", "user");
-        addMessage("📊 Here are your key insights:\n• Revenue up 12% this month\n• Peak order time: 7-9 PM\n• Top performing food: Chicken Biryani\n• 3 pending complaints need attention", "ai");
+        handleQuickAction("Show me the latest business insights");
       },
     },
     {
@@ -65,8 +67,7 @@ export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
       icon: TrendingUp,
       description: "Quick performance overview",
       onClick: () => {
-        addMessage("Give me a performance summary", "user");
-        addMessage("🚀 Performance Summary:\n• Total Users: 108 (↑5%)\n• Orders Today: 23 (↑15%)\n• Revenue: LKR 2,840 (↑8%)\n• Customer Satisfaction: 4.6/5", "ai");
+        handleQuickAction("Give me a performance summary for today");
       },
     },
     {
@@ -75,8 +76,7 @@ export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
       icon: Zap,
       description: "Navigate to any admin page",
       onClick: () => {
-        addMessage("Help me navigate to user management", "user");
-        addMessage("🧭 I can help you navigate! Try:\n• 'Go to analytics' - View reports\n• 'Show orders' - Order management\n• 'User approvals' - Pending approvals\n• 'AI insights' - AI dashboard", "ai");
+        handleQuickAction("What can you help me with? Show me available commands");
       },
     },
   ];
@@ -91,16 +91,81 @@ export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
     setMessages(prev => [...prev, newMessage]);
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
     
-    addMessage(inputValue, "user");
+    const userMessage = inputValue;
+    addMessage(userMessage, "user");
     setInputValue("");
     
-    // Simulate AI response
-    setTimeout(() => {
-      addMessage("I understand you need help with that. Let me assist you with your admin tasks!", "ai");
-    }, 1000);
+    // Get AI response from backend
+    try {
+      const response = await fetch('/api/admin-management/ai/chat/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          context: messages.slice(-5) // Last 5 messages for context
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+      
+      const data = await response.json();
+      const aiResponse = data.data?.message || data.message || "I'm here to help with your admin tasks!";
+      
+      addMessage(aiResponse, "ai");
+      
+      // Show a subtle notification if in fallback mode
+      if (data.data?.fallback_mode) {
+        console.log("AI is running in fallback mode with real data");
+      }
+    } catch (error) {
+      console.error('Chatbot error:', error);
+      addMessage("🔧 I'm having a connection issue, but I can still help! Try asking me:\n• 'Are you working?'\n• 'Show me today's performance'\n• 'How many orders today?'\n\nPlease try your question again.", "ai");
+      
+      // Don't show error toast for every failure - keep UX smooth
+      console.warn("Chatbot connection issue:", error);
+    }
+  };
+
+  const handleQuickAction = async (query: string) => {
+    addMessage(query, "user");
+    
+    try {
+      const response = await fetch('/api/admin-management/ai/chat/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({
+          message: query,
+          context: messages.slice(-5)
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+      
+      const data = await response.json();
+      const aiResponse = data.data?.message || data.message || "Here's what I found for you!";
+      
+      addMessage(aiResponse, "ai");
+      
+      if (data.data?.fallback_mode) {
+        console.log("Quick action using fallback mode with real data");
+      }
+    } catch (error) {
+      console.error('Quick action error:', error);
+      addMessage("🔧 Having trouble with that request, but I'm still here! Try asking:\n• 'Are you working?'\n• 'Performance summary'\n• 'Show orders today'", "ai");
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -115,7 +180,7 @@ export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
       {/* Floating Button */}
       <motion.div
         className={cn(
-          "fixed bottom-6 right-6 z-50",
+          "fixed bottom-6 right-6 z-[60]",
           className
         )}
         initial={{ scale: 0 }}
@@ -161,13 +226,18 @@ export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
       {/* Chat Interface */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: 20 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed bottom-24 right-6 z-40 w-96 h-[500px]"
+          <DraggableWrapper
+            initialPosition={{ x: window.innerWidth - 420, y: window.innerHeight - 580 }}
+            storageKey="ai-assistant-position"
+            zIndex={55}
           >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="w-96 h-[500px]"
+            >
             <GlassCard gradient="blue" className="h-full flex flex-col p-0 overflow-hidden">
               {/* Header */}
               <div className="p-4 border-b border-white/10">
@@ -277,6 +347,7 @@ export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
               </div>
             </GlassCard>
           </motion.div>
+          </DraggableWrapper>
         )}
       </AnimatePresence>
     </>

@@ -185,10 +185,12 @@ const CommunicationCenter: React.FC = () => {
   // Communication Tab States
   const [communications, setCommunications] = useState<any[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
-  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [categories, setCategories] = useState<CommunicationCategory[]>([]);
   const [tags, setTags] = useState<CommunicationTag[]>([]);
   const [campaignStats, setCampaignStats] = useState<CampaignStats | null>(null);
@@ -207,6 +209,10 @@ const CommunicationCenter: React.FC = () => {
   // Statistics and Analytics
   const [communicationStats, setCommunicationStats] = useState<CommunicationStats | null>(null);
   const [sentimentData, setSentimentData] = useState<AISentimentData | null>(null);
+  const [sentimentLoading, setSentimentLoading] = useState(false);
+  const [sentimentError, setSentimentError] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds
   
   // Modal States
   const [showNewCommunicationModal, setShowNewCommunicationModal] = useState(false);
@@ -257,9 +263,6 @@ const CommunicationCenter: React.FC = () => {
         priority: newCommunication.priority,
         // user field will be automatically set by the backend from the authenticated user
       };
-
-      console.log("Sending payload:", payload);
-      console.log("Access token:", localStorage.getItem("access_token") ? "Present" : "Missing");
 
       // Send communication
       await communicationService.sendCommunication(payload);
@@ -352,34 +355,71 @@ const CommunicationCenter: React.FC = () => {
       
       // Load sentiment data
       try {
+        setSentimentLoading(true);
+        setSentimentError(null);
+        
         const sentiment = await communicationService.getSentimentAnalysis();
+        
+        // Extract data from the response structure - handle both nested and flat formats
+        const overallSentiment = sentiment.overall_sentiment;
+        const sentimentData = overallSentiment || sentiment;
+        const topics = sentiment.trending_topics || [];
+        const trends = sentiment.sentiment_trends || [];
+        
+        // Calculate percentages from raw counts if percentages not provided
+        const total = overallSentiment?.total || sentiment.positive + sentiment.negative + sentiment.neutral || 1;
+        const posPercentage = overallSentiment?.positive_percentage || 
+                             (sentiment.positive / total) * 100;
+        const negPercentage = overallSentiment?.negative_percentage || 
+                             (sentiment.negative / total) * 100;
+        const neuPercentage = overallSentiment?.neutral_percentage || 
+                             (sentiment.neutral / total) * 100;
+        
         // Transform the response to match our interface
         const transformedSentiment: AISentimentData = {
-          positive: sentiment.positive || 0,
-          negative: sentiment.negative || 0,
-          neutral: sentiment.neutral || 0,
-          total: (sentiment.positive || 0) + (sentiment.negative || 0) + (sentiment.neutral || 0),
-          confidence: 0.85, // Default confidence
-          trending_topics: (sentiment.trending_topics || []).map((t: any) => ({
+          positive: Math.round(posPercentage) || 0,
+          negative: Math.round(negPercentage) || 0,
+          neutral: Math.round(neuPercentage) || 0,
+          total: total,
+          // Use real confidence from AI analysis
+          confidence: overallSentiment?.confidence_score || 
+                     (overallSentiment?.confidence ? overallSentiment.confidence * 100 : 85),
+          trending_topics: topics.map((t: any) => ({
             topic: typeof t === 'string' ? t : (t?.topic || 'Unknown'),
             frequency: typeof t === 'object' ? (t?.frequency || 1) : 1,
             sentiment: typeof t === 'object' ? (t?.sentiment || 'neutral') : 'neutral'
           })),
-          sentiment_trends: []
+          sentiment_trends: trends
         };
         setSentimentData(transformedSentiment);
-      } catch (sentimentError) {
+        
+        console.log("Sentiment analysis loaded successfully:", transformedSentiment);
+      } catch (sentimentError: any) {
         console.error("Error loading sentiment data:", sentimentError);
-        // Set fallback sentiment data on error
-        setSentimentData({
-          positive: 0,
-          negative: 0,
-          neutral: 0,
-          total: 0,
-          confidence: 0,
-          trending_topics: [],
-          sentiment_trends: []
-        });
+        const errorMessage = sentimentError.response?.data?.message || 
+                           sentimentError.message || 
+                           "Failed to load sentiment analysis";
+        setSentimentError(errorMessage);
+        
+        // Show user-friendly error toast
+        if (sentimentError.response?.status !== 404) {
+          toast({
+            title: "AI Service Unavailable",
+            description: "Sentiment analysis is currently unavailable. Please check if the AI service is configured properly.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "No Data Available",
+            description: "No communications found for sentiment analysis.",
+            variant: "default",
+          });
+        }
+        
+        // Do NOT set fallback data - let the UI show empty/error state
+        setSentimentData(null);
+      } finally {
+        setSentimentLoading(false);
       }
     } catch (error) {
       console.error("Error loading communication stats:", error);
@@ -470,16 +510,9 @@ const CommunicationCenter: React.FC = () => {
       if (feedbackFilters.type !== "all") params.communication_type = feedbackFilters.type;
 
       const response: PaginatedResponse<Communication> =
-        await communicationService.getFeedbacks(params);
+        await communicationService.getCommunications(params);
 
       // Debug: Log the actual response data
-      console.log("Raw feedback response:", response);
-      console.log("Feedback results:", response.results);
-      if (response.results && response.results.length > 0) {
-        console.log("First feedback item:", response.results[0]);
-        console.log("First feedback keys:", Object.keys(response.results[0]));
-      }
-      
       setFeedbacks(response.results || []);
       setTotalPages(Math.ceil((response.count || 0) / itemsPerPage));
       setTotalItems(response.count || 0);
@@ -535,7 +568,6 @@ const CommunicationCenter: React.FC = () => {
       // Handle both array and paginated response
       const templates = Array.isArray(response) ? response : response.results || [];
       // Filter out any invalid templates and ensure they have required properties
-      console.log("Raw templates from API:", templates);
       const validTemplates = templates.filter(template => {
         const isValid = template && 
           typeof template === 'object' && 
@@ -543,20 +575,13 @@ const CommunicationCenter: React.FC = () => {
           template.name &&
           template !== null &&
           template !== undefined;
-        if (!isValid) {
-          console.log("Filtered out invalid template:", template);
-        } else {
-          console.log("Valid template structure:", template);
-          console.log("Template properties:", Object.keys(template));
-        }
         return isValid;
       });
-      console.log("Valid templates after filtering:", validTemplates);
-      setEmailTemplates(validTemplates);
+      setTemplates(validTemplates);
     } catch (error) {
       console.error("Error loading email templates:", error);
       // Set empty array on error to prevent rendering issues
-      setEmailTemplates([]);
+      setTemplates([]);
       toast({
         title: "Error",
         description: "Failed to load email templates",
@@ -638,14 +663,40 @@ const CommunicationCenter: React.FC = () => {
   // Notification management functions
   const loadNotifications = useCallback(async () => {
     try {
+      setNotificationsLoading(true);
+      setNotificationsError(null);
+      
       const notificationData = await communicationService.getNotifications();
-      setNotifications(notificationData);
-    } catch (error) {
+      
+      // Ensure we have an array of notifications
+      const notifications = Array.isArray(notificationData) ? notificationData : [];
+      setNotifications(notifications);
+      
+      // Calculate unread count
+      const unread = notifications.filter(n => !n.is_read).length;
+      setUnreadCount(unread);
+      
+      console.log(`Loaded ${notifications.length} notifications, ${unread} unread`);
+    } catch (error: any) {
       console.error("Error loading notifications:", error);
+      setNotificationsError(error.message || "Failed to load notifications");
+      
+      // Don't show toast for expected 404s on optional endpoints
+      if (error.response?.status !== 404) {
+        toast({
+          title: "Error",
+          description: "Failed to load notifications. Using fallback data.",
+          variant: "destructive",
+        });
+      }
+      
       // Set fallback notifications
       setNotifications([]);
+      setUnreadCount(0);
+    } finally {
+      setNotificationsLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   // Handle status update
   const handleStatusUpdate = async (feedbackId: number, newStatus: string) => {
@@ -704,12 +755,29 @@ const CommunicationCenter: React.FC = () => {
     }
   }, [activeTab, loadCommunicationStats, loadFeedbacks, loadEmailTemplates, loadCampaignStats, loadNotifications]);
 
+  // Auto-refresh notifications when on notifications tab
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    if (activeTab === "notifications" && autoRefresh) {
+      intervalId = setInterval(() => {
+        loadNotifications();
+      }, refreshInterval);
+    }
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [activeTab, autoRefresh, refreshInterval, loadNotifications]);
+
   // Feedback table columns
   const feedbackColumns: Column<Communication>[] = [
     {
       key: "type",
       title: "Type",
-      render: (value: any, feedback: Communication, index: number) => {
+      render: (feedback: Communication, index: number) => {
         console.log("Rendering type for feedback:", feedback);
         console.log("communication_type:", feedback?.communication_type);
         return (
@@ -725,7 +793,7 @@ const CommunicationCenter: React.FC = () => {
     {
       key: "subject",
       title: "Subject",
-      render: (value: any, feedback: Communication, index: number) => {
+      render: (feedback: Communication, index: number) => {
         console.log("Rendering subject for feedback:", feedback);
         console.log("subject:", feedback?.subject);
         console.log("message:", feedback?.message);
@@ -745,7 +813,7 @@ const CommunicationCenter: React.FC = () => {
     {
       key: "user",
       title: "User",
-      render: (value: any, feedback: Communication, index: number) => {
+      render: (feedback: Communication, index: number) => {
         console.log("Rendering user for feedback:", feedback);
         console.log("user object:", feedback?.user);
         return (
@@ -759,7 +827,7 @@ const CommunicationCenter: React.FC = () => {
     {
       key: "priority",
       title: "Priority",
-      render: (value: any, feedback: Communication, index: number) => {
+      render: (feedback: Communication, index: number) => {
         const priority = feedback?.priority || "medium";
         const color = getPriorityColor(priority);
         return (
@@ -775,7 +843,7 @@ const CommunicationCenter: React.FC = () => {
     {
       key: "status",
       title: "Status",
-      render: (value: any, feedback: Communication, index: number) => {
+      render: (feedback: Communication, index: number) => {
         const status = feedback?.status || "pending";
         const color = getStatusColor(status);
         return (
@@ -791,7 +859,7 @@ const CommunicationCenter: React.FC = () => {
     {
       key: "created_at",
       title: "Date",
-      render: (value: any, feedback: Communication, index: number) => (
+      render: (feedback: Communication, index: number) => (
         <div className="text-sm">
           {feedback?.created_at 
             ? new Date(feedback.created_at).toLocaleDateString()
@@ -803,7 +871,7 @@ const CommunicationCenter: React.FC = () => {
     {
       key: "actions",
       title: "Actions",
-      render: (value: any, feedback: Communication, index: number) => {
+      render: (feedback: Communication, index: number) => {
         if (!feedback?.id) {
           return <span className="text-gray-400">No actions</span>;
         }
@@ -981,65 +1049,130 @@ const CommunicationCenter: React.FC = () => {
       )}
 
       {/* Sentiment Analysis */}
-      {sentimentData && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GlassCard className="p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center">
-              <Brain className="h-5 w-5 mr-2" />
-              Sentiment Analysis
-            </h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-green-600">Positive</span>
-                <span className="text-sm font-medium">{sentimentData.positive}%</span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <GlassCard className="p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Brain className="h-5 w-5 mr-2" />
+            AI Sentiment Analysis
+            {sentimentLoading && <RefreshCw className="h-4 w-4 ml-2 animate-spin" />}
+          </h3>
+          
+          {/* Loading State */}
+          {sentimentLoading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <Brain className="h-12 w-12 text-blue-500 mx-auto mb-2 animate-pulse" />
+                <p className="text-gray-500">Analyzing sentiment...</p>
               </div>
-              <Progress value={sentimentData.positive} className="h-2" />
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Neutral</span>
-                <span className="text-sm font-medium">{sentimentData.neutral}%</span>
-              </div>
-              <Progress value={sentimentData.neutral} className="h-2" />
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-red-600">Negative</span>
-                <span className="text-sm font-medium">{sentimentData.negative}%</span>
-              </div>
-              <Progress value={sentimentData.negative} className="h-2" />
             </div>
-            <div className="mt-4 text-sm text-gray-500">
-              Confidence: {sentimentData.confidence}%
+          )}
+          
+          {/* Error State */}
+          {sentimentError && !sentimentLoading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-2" />
+                <p className="text-red-600 mb-2">{sentimentError}</p>
+                <Button onClick={() => loadCommunicationStats()} variant="outline" size="sm">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry Analysis
+                </Button>
+              </div>
             </div>
-          </GlassCard>
-
-          <GlassCard className="p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center">
-              <Sparkles className="h-5 w-5 mr-2" />
-              Trending Topics
-            </h3>
-            <div className="space-y-3">
-              {sentimentData.trending_topics.slice(0, 5).map((topic, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <span className="text-sm font-medium">{topic.topic}</span>
-                  <div className="flex items-center space-x-2">
-                    <Badge 
-                      variant="outline"
-                      className={`text-xs ${
-                        topic.sentiment === 'positive' ? 'border-green-500 text-green-700' :
-                        topic.sentiment === 'negative' ? 'border-red-500 text-red-700' :
-                        'border-gray-500 text-gray-700'
-                      }`}
-                    >
-                      {topic.sentiment}
-                    </Badge>
-                    <span className="text-xs text-gray-500">{topic.frequency}</span>
-                  </div>
+          )}
+          
+          {/* Sentiment Data */}
+          {sentimentData && !sentimentLoading && !sentimentError && (
+            <>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-green-600">Positive</span>
+                  <span className="text-sm font-medium">{sentimentData.positive}%</span>
                 </div>
-              ))}
+                <Progress value={sentimentData.positive} className="h-2" />
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Neutral</span>
+                  <span className="text-sm font-medium">{sentimentData.neutral}%</span>
+                </div>
+                <Progress value={sentimentData.neutral} className="h-2" />
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-red-600">Negative</span>
+                  <span className="text-sm font-medium">{sentimentData.negative}%</span>
+                </div>
+                <Progress value={sentimentData.negative} className="h-2" />
+              </div>
+              <div className="mt-4 text-sm text-gray-500">
+                Confidence: {sentimentData.confidence}%
+              </div>
+            </>
+          )}
+        </GlassCard>
+
+        <GlassCard className="p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Sparkles className="h-5 w-5 mr-2" />
+            Trending Topics
+            {sentimentLoading && <RefreshCw className="h-4 w-4 ml-2 animate-spin" />}
+          </h3>
+          
+          {/* Loading State */}
+          {sentimentLoading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <Sparkles className="h-12 w-12 text-purple-500 mx-auto mb-2 animate-pulse" />
+                <p className="text-gray-500">Loading trending topics...</p>
+              </div>
             </div>
-          </GlassCard>
-        </div>
-      )}
+          )}
+          
+          {/* Error State */}
+          {sentimentError && !sentimentLoading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-2" />
+                <p className="text-red-600 mb-2">Failed to load trending topics</p>
+                <Button onClick={() => loadCommunicationStats()} variant="outline" size="sm">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {/* Trending Topics Data */}
+          {sentimentData && !sentimentLoading && !sentimentError && (
+            <div className="space-y-3">
+              {sentimentData.trending_topics.length === 0 ? (
+                <div className="text-center py-8">
+                  <Sparkles className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500">No trending topics found</p>
+                </div>
+              ) : (
+                sentimentData.trending_topics.slice(0, 5).map((topic, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <span className="text-sm font-medium">{topic.topic}</span>
+                    <div className="flex items-center space-x-2">
+                      <Badge 
+                        variant="outline"
+                        className={`text-xs ${
+                          topic.sentiment === 'positive' ? 'border-green-500 text-green-700' :
+                          topic.sentiment === 'negative' ? 'border-red-500 text-red-700' :
+                          'border-gray-500 text-gray-700'
+                        }`}
+                      >
+                        {topic.sentiment}
+                      </Badge>
+                      <span className="text-xs text-gray-500">{topic.frequency}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </GlassCard>
+      </div>
 
       {/* Quick Actions */}
       <GlassCard className="p-6">
@@ -1083,110 +1216,208 @@ const CommunicationCenter: React.FC = () => {
   );
 
   // Render Feedback Tab
-  const renderFeedbackTab = () => (
-    <div className="space-y-6">
-      {/* Feedback Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <AnimatedStats
-          value={totalItems}
-          label="Total Feedback"
-          icon={MessageSquare}
-          trend={12.5}
-          gradient="blue"
-        />
-        <AnimatedStats
-          value={feedbacks.filter(f => f.status === "pending").length}
-          label="Pending Review"
-          icon={Clock}
-          trend={-5.2}
-          gradient="orange"
-        />
-        <AnimatedStats
-          value={feedbacks.filter(f => f.status === "resolved").length}
-          label="Resolved"
-          icon={CheckCircle}
-          trend={18.7}
-          gradient="green"
-        />
-        <AnimatedStats
-          value={feedbacks.filter(f => f.priority === "urgent").length}
-          label="Urgent Issues"
-          icon={AlertTriangle}
-          trend={-15.3}
+  const renderFeedbackTab = () => {
+    const complaints = feedbacks.filter(
+      (item) => item?.communication_type === "complaint"
+    );
+    const complaintsCount = complaints.length;
+    const openComplaints = complaints
+      .filter((item) =>
+        ["pending", "in_progress"].includes(
+          (item.status || "").toLowerCase()
+        )
+      )
+      .slice(0, 3);
+    const urgentComplaints = complaints.filter(
+      (item) => (item.priority || "").toLowerCase() === "urgent"
+    ).length;
+
+    return (
+      <div className="space-y-6">
+        {/* Feedback Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <AnimatedStats
+            value={totalItems}
+            label="Total Feedback"
+            icon={MessageSquare}
+            trend={12.5}
+            gradient="blue"
+          />
+          <AnimatedStats
+            value={feedbacks.filter(f => f.status === "pending").length}
+            label="Pending Review"
+            icon={Clock}
+            trend={-5.2}
+            gradient="orange"
+          />
+          <AnimatedStats
+            value={feedbacks.filter(f => f.status === "resolved").length}
+            label="Resolved"
+            icon={CheckCircle}
+            trend={18.7}
+            gradient="green"
+          />
+          <AnimatedStats
+            value={urgentComplaints}
+            label="Urgent Complaints"
+            icon={AlertTriangle}
+            trend={
+              complaintsCount
+                ? Number(
+                    ((urgentComplaints / Math.max(complaintsCount, 1)) * 100).toFixed(1)
+                  )
+                : 0
+            }
             gradient="pink"
-        />
-      </div>
+          />
+        </div>
 
-      {/* Filters */}
-      <GlassCard className="p-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <Input
-              placeholder="Search feedback..."
-              value={feedbackFilters.search}
-              onChange={(e) => setFeedbackFilters(prev => ({ ...prev, search: e.target.value }))}
-            />
+        {/* Filters */}
+        <GlassCard className="p-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search feedback..."
+                value={feedbackFilters.search}
+                onChange={(e) => setFeedbackFilters(prev => ({ ...prev, search: e.target.value }))}
+              />
+            </div>
+            <Select 
+              value={feedbackFilters.status} 
+              onValueChange={(value) => setFeedbackFilters(prev => ({ ...prev, status: value }))}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select 
+              value={feedbackFilters.priority} 
+              onValueChange={(value) => setFeedbackFilters(prev => ({ ...prev, priority: value }))}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priority</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={feedbackFilters.type}
+              onValueChange={(value) => {
+                setCurrentPage(1);
+                setFeedbackFilters(prev => ({ ...prev, type: value }));
+              }}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="feedback">Feedback</SelectItem>
+                <SelectItem value="complaint">Complaints</SelectItem>
+                <SelectItem value="suggestion">Suggestions</SelectItem>
+                <SelectItem value="inquiry">Inquiries</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={loadFeedbacks} variant="outline">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
           </div>
-          <Select 
-            value={feedbackFilters.status} 
-            onValueChange={(value) => setFeedbackFilters(prev => ({ ...prev, status: value }))}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="resolved">Resolved</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select 
-            value={feedbackFilters.priority} 
-            onValueChange={(value) => setFeedbackFilters(prev => ({ ...prev, priority: value }))}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priority</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={loadFeedbacks} variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
-      </GlassCard>
+        </GlassCard>
 
-      {/* Feedback Table */}
-      <GlassCard className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Customer Feedback</h3>
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-        </div>
+        {openComplaints.length > 0 && (
+          <GlassCard className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center">
+                <AlertTriangle className="h-5 w-5 mr-2 text-orange-500" />
+                Complaints Needing Attention
+              </h3>
+              <Badge variant="outline">
+                {openComplaints.length} of {complaintsCount}
+              </Badge>
+            </div>
+            <div className="space-y-3">
+              {openComplaints.map((complaint) => (
+                <div
+                  key={complaint.id}
+                  className="flex flex-col md:flex-row md:items-center md:justify-between p-4 border rounded-lg gap-3"
+                >
+                  <div>
+                    <div className="font-medium">{complaint.subject || "No Subject"}</div>
+                    <div className="text-sm text-gray-500">
+                      {complaint.user?.name || "Unknown User"}
+                      {" "}•{" "}
+                      {complaint.created_at
+                        ? new Date(complaint.created_at).toLocaleDateString()
+                        : "Unknown date"}
+                    </div>
+                    <div className="mt-2 flex items-center space-x-2">
+                      <Badge variant="outline">{complaint.status || "Pending"}</Badge>
+                      <Badge variant="outline">{complaint.priority || "Medium"}</Badge>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedFeedback(complaint);
+                        setShowDetailModal(true);
+                      }}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedFeedback(complaint);
+                        setShowResponseModal(true);
+                      }}
+                    >
+                      <Reply className="h-4 w-4 mr-2" />
+                      Respond
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        )}
 
-        <DataTable
-          data={feedbacks || []}
-          columns={feedbackColumns}
-          loading={feedbackLoading}
-        />
-        {/* Debug info */}
-        <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
-          <div>Feedbacks count: {feedbacks?.length || 0}</div>
-          <div>Feedbacks data: {JSON.stringify(feedbacks, null, 2)}</div>
-        </div>
-      </GlassCard>
-    </div>
-  );
+        {/* Feedback Table */}
+        <GlassCard className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Customer Feedback</h3>
+            <Button variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </div>
+
+          <DataTable
+            data={feedbacks || []}
+            columns={feedbackColumns}
+            loading={feedbackLoading}
+          />
+        </GlassCard>
+      </div>
+    );
+  };
 
   // Render Templates Tab
   const renderTemplatesTab = () => (
@@ -1383,7 +1614,7 @@ const CommunicationCenter: React.FC = () => {
           gradient="blue"
         />
         <AnimatedStats
-          value={notifications.filter(n => n.is_read === false).length}
+          value={unreadCount}
           label="Unread"
           icon={AlertTriangle}
           trend={-5.1}
@@ -1409,9 +1640,37 @@ const CommunicationCenter: React.FC = () => {
       <GlassCard className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">System Notifications</h3>
-          <div className="flex space-x-2">
-            <Button variant="outline" onClick={loadNotifications}>
-              <RefreshCw className="h-4 w-4 mr-2" />
+          <div className="flex items-center space-x-2">
+            {/* Auto-refresh controls */}
+            <div className="flex items-center space-x-2 px-3 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <input
+                type="checkbox"
+                id="auto-refresh"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <label htmlFor="auto-refresh" className="text-sm">Auto-refresh</label>
+              {autoRefresh && (
+                <select
+                  value={refreshInterval}
+                  onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                  className="text-sm bg-transparent border-none"
+                >
+                  <option value={10000}>10s</option>
+                  <option value={30000}>30s</option>
+                  <option value={60000}>1m</option>
+                  <option value={300000}>5m</option>
+                </select>
+              )}
+            </div>
+            
+            <Button 
+              variant="outline" 
+              onClick={loadNotifications}
+              disabled={notificationsLoading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${notificationsLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
             <Button onClick={() => setShowNewCommunicationModal(true)}>
@@ -1475,36 +1734,69 @@ const CommunicationCenter: React.FC = () => {
         {/* Recent Notifications */}
         <div className="space-y-4">
           <h4 className="font-medium">Recent Notifications</h4>
-          <div className="space-y-3">
-            {notifications.slice(0, 5).map((notification) => (
-              <div key={notification.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    notification.type === 'system' ? 'bg-red-100' :
-                    notification.type === 'user' ? 'bg-blue-100' :
-                    notification.type === 'success' ? 'bg-green-100' : 'bg-yellow-100'
-                  }`}>
-                    {notification.type === 'system' ? <AlertTriangle className="h-4 w-4 text-red-600" /> :
-                     notification.type === 'user' ? <Users className="h-4 w-4 text-blue-600" /> :
-                     notification.type === 'success' ? <CheckCircle className="h-4 w-4 text-green-600" /> :
-                     <Clock className="h-4 w-4 text-yellow-600" />}
-                  </div>
-                  <div>
-                    <h5 className="font-medium">{notification.title}</h5>
-                    <p className="text-sm text-gray-500">{notification.message}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Badge variant={notification.is_read ? "outline" : "default"}>
-                    {notification.is_read ? "Read" : "Unread"}
-                  </Badge>
-                  <Button variant="ghost" size="sm">
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                </div>
+          
+          {/* Loading State */}
+          {notificationsLoading && (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+              <span>Loading notifications...</span>
+            </div>
+          )}
+          
+          {/* Error State */}
+          {notificationsError && !notificationsLoading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-2" />
+                <p className="text-red-600 mb-2">{notificationsError}</p>
+                <Button onClick={loadNotifications} variant="outline">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+          
+          {/* Notifications List */}
+          {!notificationsLoading && !notificationsError && (
+            <div className="space-y-3">
+              {notifications.length === 0 ? (
+                <div className="text-center py-8">
+                  <Bell className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500">No notifications found</p>
+                </div>
+              ) : (
+                notifications.slice(0, 5).map((notification) => (
+                  <div key={notification.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        notification.type === 'system' ? 'bg-red-100' :
+                        notification.type === 'user' ? 'bg-blue-100' :
+                        notification.type === 'success' ? 'bg-green-100' : 'bg-yellow-100'
+                      }`}>
+                        {notification.type === 'system' ? <AlertTriangle className="h-4 w-4 text-red-600" /> :
+                         notification.type === 'user' ? <Users className="h-4 w-4 text-blue-600" /> :
+                         notification.type === 'success' ? <CheckCircle className="h-4 w-4 text-green-600" /> :
+                         <Clock className="h-4 w-4 text-yellow-600" />}
+                      </div>
+                      <div>
+                        <h5 className="font-medium">{notification.title}</h5>
+                        <p className="text-sm text-gray-500">{notification.message}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={notification.is_read ? "outline" : "default"}>
+                        {notification.is_read ? "Read" : "Unread"}
+                      </Badge>
+                      <Button variant="ghost" size="sm">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </GlassCard>
     </div>

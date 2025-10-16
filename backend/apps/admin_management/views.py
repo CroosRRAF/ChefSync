@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import Avg, Count, F, Q, Sum
+from django.db.models import Avg, Count, F, Max, Q, Sum
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -88,6 +88,20 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 role="cook", approval_status="pending"
             ).count()
 
+            # Calculate chef growth
+            new_chefs_this_week = User.objects.filter(
+                role="cook", date_joined__gte=week_ago
+            ).count()
+            previous_week_chefs = User.objects.filter(
+                role="cook",
+                date_joined__gte=week_ago - timedelta(days=7),
+                date_joined__lt=week_ago,
+            ).count()
+            chef_growth = (
+                (new_chefs_this_week - previous_week_chefs)
+                / max(previous_week_chefs, 1)
+            ) * 100
+
             # Order statistics
             total_orders = Order.objects.count()
             orders_today = Order.objects.filter(created_at__date=today).count()
@@ -150,6 +164,36 @@ class AdminDashboardViewSet(viewsets.ViewSet):
             active_foods = Food.objects.filter(is_available=True).count()
             pending_food_approvals = Food.objects.filter(is_available=False).count()
 
+            # Calculate food growth (newly added foods this week)
+            new_foods_this_week = Food.objects.filter(created_at__gte=week_ago).count()
+            previous_week_foods = Food.objects.filter(
+                created_at__gte=week_ago - timedelta(days=7), created_at__lt=week_ago
+            ).count()
+            foods_growth = (
+                (new_foods_this_week - previous_week_foods)
+                / max(previous_week_foods, 1)
+            ) * 100
+
+            # Delivery agent statistics
+            total_delivery_agents = User.objects.filter(role="delivery_agent").count()
+            active_delivery_agents = User.objects.filter(
+                role="delivery_agent", is_active=True
+            ).count()
+
+            # Calculate delivery agent growth
+            new_delivery_agents_this_week = User.objects.filter(
+                role="delivery_agent", date_joined__gte=week_ago
+            ).count()
+            previous_week_delivery_agents = User.objects.filter(
+                role="delivery_agent",
+                date_joined__gte=week_ago - timedelta(days=7),
+                date_joined__lt=week_ago,
+            ).count()
+            delivery_growth = (
+                (new_delivery_agents_this_week - previous_week_delivery_agents)
+                / max(previous_week_delivery_agents, 1)
+            ) * 100
+
             # Pending chef approvals (cooks only)
             pending_chef_approvals = User.objects.filter(
                 role="Cook", approval_status="pending"
@@ -178,7 +222,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 "total_chefs": total_chefs,
                 "active_chefs": active_chefs,
                 "pending_chef_approvals": pending_chef_approvals,  # Chef approvals (cooks only)
-                "chef_growth": 0,  # Calculate based on chef registrations
+                "chef_growth": round(chef_growth, 2),  # Use calculated chef growth
                 "total_orders": total_orders,
                 "orders_today": orders_today,
                 "orders_this_week": orders_this_week,
@@ -192,6 +236,12 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 "total_foods": total_foods,
                 "active_foods": active_foods,
                 "pending_food_approvals": pending_food_approvals,
+                "foods_growth": round(foods_growth, 2),  # Use calculated food growth
+                "total_delivery_agents": total_delivery_agents,
+                "active_delivery_agents": active_delivery_agents,
+                "delivery_growth": round(
+                    delivery_growth, 2
+                ),  # Use calculated delivery growth
                 "pending_user_approvals": pending_user_approvals,  # Add separate field for user approvals
                 "system_health_score": system_health_score,
                 "active_sessions": active_sessions,
@@ -785,20 +835,21 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 revenue_change = 0
                 trend = "stable"
 
-            # Daily revenue breakdown - use Django's date functions instead of raw SQL
-            daily_revenue = (
-                Order.objects.filter(
-                    payment_status="paid",
-                    created_at__gte=start_date,
-                )
-                .extra(select={"date": "DATE(created_at)"})
-                .values("date")
-                .annotate(amount=Sum("total_amount"))
-                .order_by("date")
-            )
+            # Daily revenue breakdown - use TruncDate for database compatibility
+            from django.db.models.functions import TruncDate
 
-            # Fallback if extra() fails
             try:
+                daily_revenue = (
+                    Order.objects.filter(
+                        payment_status="paid",
+                        created_at__gte=start_date,
+                    )
+                    .annotate(date=TruncDate("created_at"))
+                    .values("date")
+                    .annotate(amount=Sum("total_amount"))
+                    .order_by("date")
+                )
+
                 daily_data = [
                     {"date": str(item["date"]), "amount": float(item["amount"])}
                     for item in daily_revenue
@@ -935,7 +986,7 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                     order_count=Count("id"),
                     total_spent=Sum("total_amount"),
                     avg_order_value=Avg("total_amount"),
-                    last_order=models.Max("created_at"),
+                    last_order=Max("created_at"),
                 )
             )
 

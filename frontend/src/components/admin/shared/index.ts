@@ -4,7 +4,6 @@ export type { GlassCardProps } from "./GlassCard";
 
 export { default as AnimatedStats } from "./AnimatedStats";
 export type { AnimatedStatsProps } from "./AnimatedStats";
-
 export { default as GradientButton } from "./GradientButton";
 export type { GradientButtonProps } from "./GradientButton";
 
@@ -13,11 +12,11 @@ export { default as CommandPalette } from "./CommandPalette";
 export { default as AIAssistantButton } from "./AIAssistantButton";
 export type { AIAssistantButtonProps } from "./AIAssistantButton";
 
+export { default as DraggableWrapper } from "./DraggableWrapper";
+
 // Optimistic UI Components
 export { default as OptimisticButton } from "./OptimisticButton";
 export type { OptimisticButtonProps } from "./OptimisticButton";
-
-// Toast Notifications
 export { default as ToastProvider, useToast } from "./Toast";
 export type { Toast } from "./Toast";
 

@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Activity, Zap, Clock, AlertTriangle } from 'lucide-react';
 import { getCacheStats, clearApiCache } from '@/services/apiClient';
+import { DraggableWrapper } from './DraggableWrapper';
 
 interface PerformanceMetrics {
   apiCacheSize: number;
@@ -53,7 +54,7 @@ const PerformanceMonitor: React.FC = () => {
         variant="outline"
         size="sm"
         onClick={() => setIsVisible(true)}
-        className="fixed bottom-4 right-4 z-50"
+        className="fixed bottom-24 right-6 z-[60] shadow-lg"
       >
         <Activity className="h-4 w-4 mr-2" />
         Performance
@@ -62,7 +63,12 @@ const PerformanceMonitor: React.FC = () => {
   }
 
   return (
-    <Card className="fixed bottom-4 right-4 w-80 z-50 shadow-lg">
+    <DraggableWrapper
+      initialPosition={{ x: window.innerWidth - 340, y: window.innerHeight - 400 }}
+      storageKey="performance-monitor-position"
+      zIndex={55}
+    >
+      <Card className="w-80 shadow-xl">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center">
@@ -144,6 +150,7 @@ const PerformanceMonitor: React.FC = () => {
         )}
       </CardContent>
     </Card>
+    </DraggableWrapper>
   );
 };
 

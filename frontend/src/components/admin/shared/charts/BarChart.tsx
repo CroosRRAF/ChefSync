@@ -22,6 +22,7 @@ interface BarChartProps {
   showLegend?: boolean;
   horizontal?: boolean;
   className?: string;
+  noCard?: boolean;
 }
 
 const defaultColors = [
@@ -45,7 +46,58 @@ const BarChart: React.FC<BarChartProps> = memo(
     showLegend = true,
     horizontal = false,
     className = "",
+    noCard = false,
   }) => {
+    const chartContent = (
+      <ResponsiveContainer width="100%" height={height}>
+        <RechartsBarChart
+          data={data}
+          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          layout={horizontal ? "horizontal" : "vertical"}
+        >
+          {showGrid && (
+            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+          )}
+          <XAxis
+            type={horizontal ? "number" : "category"}
+            dataKey={horizontal ? undefined : xAxisDataKey}
+            tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            type={horizontal ? "category" : "number"}
+            dataKey={horizontal ? xAxisDataKey : undefined}
+            tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
+            width={horizontal ? 80 : undefined}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "var(--background)",
+              border: "1px solid var(--border)",
+              borderRadius: "6px",
+              fontSize: "12px",
+            }}
+          />
+          {showLegend && <Legend />}
+          {dataKeys.map((key, index) => (
+            <Bar
+              key={key}
+              dataKey={key}
+              fill={colors[index % colors.length]}
+              radius={[2, 2, 0, 0]}
+            />
+          ))}
+        </RechartsBarChart>
+      </ResponsiveContainer>
+    );
+
+    if (noCard) {
+      return <div className={className}>{chartContent}</div>;
+    }
+
     return (
       <Card className={className}>
         {title && (
@@ -53,51 +105,7 @@ const BarChart: React.FC<BarChartProps> = memo(
             <CardTitle className="text-base font-medium">{title}</CardTitle>
           </CardHeader>
         )}
-        <CardContent>
-          <ResponsiveContainer width="100%" height={height}>
-            <RechartsBarChart
-              data={data}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              layout={horizontal ? "horizontal" : "vertical"}
-            >
-              {showGrid && (
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              )}
-              <XAxis
-                type={horizontal ? "number" : "category"}
-                dataKey={horizontal ? undefined : xAxisDataKey}
-                tick={{ fontSize: 12 }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                type={horizontal ? "category" : "number"}
-                dataKey={horizontal ? xAxisDataKey : undefined}
-                tick={{ fontSize: 12 }}
-                tickLine={false}
-                axisLine={false}
-                width={horizontal ? 80 : undefined}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--background)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                }}
-              />
-              {showLegend && <Legend />}
-              {dataKeys.map((key, index) => (
-                <Bar
-                  key={key}
-                  dataKey={key}
-                  fill={colors[index % colors.length]}
-                  radius={[2, 2, 0, 0]}
-                />
-              ))}
-            </RechartsBarChart>
-          </ResponsiveContainer>
-        </CardContent>
+        <CardContent>{chartContent}</CardContent>
       </Card>
     );
   }

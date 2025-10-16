@@ -1,30 +1,12 @@
-import React, { useCallback, useEffect, useState } from "react";
 import { createOptimizedClickHandler } from "@/utils/performanceOptimizer";
+import { motion } from "framer-motion";
+import React, { useCallback, useEffect, useState } from "react";
 
 // Import shared components
-import { 
-  AnimatedStats,
-  GlassCard,
-  GradientButton,
-  DataTable 
-} from "@/components/admin/shared";
+import { AnimatedStats, DataTable, GlassCard } from "@/components/admin/shared";
 import type { Column } from "@/components/admin/shared/tables/DataTable";
-import DynamicForm from "@/components/admin/shared/forms/DynamicForm";
-import { ActionModal } from "@/components/admin/shared/modals";
-import { StatsWidget as StatsCard } from "@/components/admin/shared/widgets/index";
 
 // Import UI components
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +17,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,8 +43,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -61,6 +51,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 
 // Import icons
@@ -68,55 +60,60 @@ import {
   AlertCircle,
   CheckCircle,
   ChefHat,
-  Clock,
   Copy,
   Download,
   Edit,
   ExternalLink,
   Eye,
-  ImageIcon,
+  Leaf,
   MoreHorizontal,
-  Package,
   Plus,
   RefreshCw,
   Star,
   Tag,
   Trash2,
   TrendingUp,
-  Utensils,
+  User,
   Users,
+  Utensils,
   XCircle,
 } from "lucide-react";
 
 // Import services
 import { adminService } from "@/services/adminService";
-import { 
-  fetchFoods, 
-  fetchFoodCategories, 
+import {
+  createCuisine,
+  createFoodCategory,
+  deleteCuisine,
+  deleteFood,
+  deleteFoodCategory,
   fetchCuisines,
-  deleteFood
+  fetchFoodCategories,
+  fetchFoods,
+  updateCuisine,
+  updateFoodCategory,
 } from "@/services/foodService";
+import {
+  referralService,
+  type ReferralStats,
+  type ReferralToken,
+} from "@/services/referralService";
 import {
   type Cuisine,
   type Food,
   type FoodCategory,
   type FoodFilterParams,
 } from "@/types/food";
-import {
-  referralService,
-  type ReferralStats,
-  type ReferralToken,
-} from "@/services/referralService";
 import axios from "axios";
 
 /**
  * Unified Content Management Hub - Consolidates 3 content-related pages
- * 
+ *
  * Merged from:
  * - FoodMenuManagement.tsx (food items, categories, cuisine management)
  * - OfferManagement.tsx (promotional offers, discounts, campaigns)
  * - ReferralManagement.tsx (referral programs, tokens, tracking)
- * 
+ *
  * Features:
  * - Tabbed interface for organized access
  * - Complete food menu management with categories
@@ -156,12 +153,228 @@ interface OfferFormData {
   price: string;
 }
 
+// Food Hover Preview Component
+interface FoodHoverPreviewProps {
+  food: Food;
+  isVisible: boolean;
+  position: { x: number; y: number };
+}
+
+const FoodHoverPreview: React.FC<FoodHoverPreviewProps> = ({
+  food,
+  isVisible,
+  position,
+}) => {
+  if (!isVisible) return null;
+
+  const getAvailabilityColor = (available?: boolean) => {
+    return available
+      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+      : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+  };
+
+  const getDietaryInfo = (food: Food) => {
+    const dietary = [];
+    if (food.is_vegetarian) dietary.push("Vegetarian");
+    if (food.is_vegan) dietary.push("Vegan");
+    if (food.is_gluten_free) dietary.push("Gluten-Free");
+    return dietary;
+  };
+
+  const getSpiceLevelText = (level?: string) => {
+    switch (level) {
+      case "mild":
+        return "🌶️ Mild";
+      case "medium":
+        return "🌶️🌶️ Medium";
+      case "hot":
+        return "🌶️🌶️🌶️ Hot";
+      case "very_hot":
+        return "🌶️🌶️🌶️🌶️ Very Hot";
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ duration: 0.2 }}
+      className="fixed z-50 pointer-events-none"
+      style={{
+        left: position.x,
+        top: position.y,
+        transform: "translate(-50%, -100%)",
+      }}
+    >
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-4 min-w-80 max-w-sm">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-r from-orange-500 to-red-600">
+              <Utensils className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 dark:text-white text-sm">
+                {food.name}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                ID: {food.id}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-1">
+            <span
+              className={`px-2 py-1 text-xs font-medium rounded-full ${getAvailabilityColor(
+                food.is_available
+              )}`}
+            >
+              {food.is_available ? "Available" : "Unavailable"}
+            </span>
+          </div>
+        </div>
+
+        {/* Description */}
+        {food.description && (
+          <div className="mb-3">
+            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2">
+              {food.description}
+            </p>
+          </div>
+        )}
+
+        {/* Price and Rating */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              Price
+            </div>
+            <div className="text-sm font-semibold text-gray-900 dark:text-white">
+              LKR {food.price?.toFixed(2)}
+            </div>
+          </div>
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              Rating
+            </div>
+            <div className="flex items-center gap-1">
+              <Star className="h-3 w-3 text-yellow-400 fill-current" />
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                {food?.rating_average
+                  ? Number(food.rating_average).toFixed(1)
+                  : "N/A"}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                ({food.total_reviews || 0})
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Category and Cuisine */}
+        <div className="space-y-2 mb-3">
+          <div className="flex items-center gap-2">
+            <Tag className="h-3 w-3 text-gray-400" />
+            <span className="text-xs text-gray-600 dark:text-gray-400">
+              Category:
+            </span>
+            <span className="text-xs font-medium text-gray-900 dark:text-white">
+              {food.category_name || "Uncategorized"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ChefHat className="h-3 w-3 text-gray-400" />
+            <span className="text-xs text-gray-600 dark:text-gray-400">
+              Cuisine:
+            </span>
+            <span className="text-xs font-medium text-gray-900 dark:text-white">
+              {food.cuisine_name || "Unknown"}
+            </span>
+          </div>
+        </div>
+
+        {/* Dietary Information */}
+        {(food.is_vegetarian ||
+          food.is_vegan ||
+          food.is_gluten_free ||
+          food.spice_level) && (
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Leaf className="h-3 w-3 text-gray-400" />
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                Dietary Info:
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {getDietaryInfo(food).map((diet) => (
+                <span
+                  key={diet}
+                  className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                >
+                  {diet}
+                </span>
+              ))}
+              {food.spice_level && (
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                  {getSpiceLevelText(food.spice_level)}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Additional Info */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              Prep Time
+            </div>
+            <div className="text-sm font-semibold text-gray-900 dark:text-white">
+              {food.preparation_time || 0} min
+            </div>
+          </div>
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              Total Orders
+            </div>
+            <div className="text-sm font-semibold text-gray-900 dark:text-white">
+              {food.total_orders || 0}
+            </div>
+          </div>
+        </div>
+
+        {/* Chef Info */}
+        {food.chef_name && (
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2">
+              <User className="h-3 w-3 text-gray-400" />
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                Chef:
+              </span>
+              <span className="text-xs font-medium text-gray-900 dark:text-white">
+                {food.chef_name}
+              </span>
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {food.created_at
+                ? new Date(food.created_at).toLocaleDateString()
+                : "Unknown"}
+            </div>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
 const ContentManagementHub: React.FC = () => {
   // Active tab state
   const [activeTab, setActiveTab] = useState<
-    "food" | "offers" | "referrals"
+    "food" | "categories" | "cuisines" | "offers" | "referrals"
   >("food");
-  
+
   // Food Tab States
   const [foods, setFoods] = useState<Food[]>([]);
   const [categories, setCategories] = useState<FoodCategory[]>([]);
@@ -171,7 +384,34 @@ const ContentManagementHub: React.FC = () => {
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
   const [showFoodDialog, setShowFoodDialog] = useState(false);
   const [showDeleteFoodDialog, setShowDeleteFoodDialog] = useState(false);
-  
+
+  // Categories Tab States
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<FoodCategory | null>(
+    null
+  );
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [showDeleteCategoryDialog, setShowDeleteCategoryDialog] =
+    useState(false);
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: "",
+    description: "",
+    image: null as File | null,
+    cuisine: "",
+  });
+
+  // Cuisines Tab States
+  const [cuisinesLoading, setCuisinesLoading] = useState(false);
+  const [selectedCuisine, setSelectedCuisine] = useState<Cuisine | null>(null);
+  const [showCuisineDialog, setShowCuisineDialog] = useState(false);
+  const [showDeleteCuisineDialog, setShowDeleteCuisineDialog] = useState(false);
+  const [cuisineFormData, setCuisineFormData] = useState({
+    name: "",
+    description: "",
+    image: null as File | null,
+    origin_country: "",
+  });
+
   // Offers Tab States
   const [offers, setOffers] = useState<Offer[]>([]);
   const [offersLoading, setOffersLoading] = useState(false);
@@ -184,16 +424,18 @@ const ContentManagementHub: React.FC = () => {
     valid_until: "",
     price: "",
   });
-  
+
   // Referrals Tab States
-  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
+  const [referralStats, setReferralStats] = useState<ReferralStats | null>(
+    null
+  );
   const [referralTokens, setReferralTokens] = useState<ReferralToken[]>([]);
   const [referralLoading, setReferralLoading] = useState(false);
   const [showCreateTokenDialog, setShowCreateTokenDialog] = useState(false);
   const [creatingToken, setCreatingToken] = useState(false);
   const [maxUses, setMaxUses] = useState<string>("");
   const [expiresAt, setExpiresAt] = useState<string>("");
-  
+
   // Filters
   const [foodFilters, setFoodFilters] = useState<any>({
     search: "",
@@ -205,12 +447,19 @@ const ContentManagementHub: React.FC = () => {
     limit: 25,
   });
 
+  // Hover preview states
+  const [hoveredFood, setHoveredFood] = useState<Food | null>(null);
+  const [foodTooltipPosition, setFoodTooltipPosition] = useState({
+    x: 0,
+    y: 0,
+  });
+
   // Load food statistics
   const loadFoodStats = useCallback(async () => {
     try {
       // Fetch real food stats from API using adminService
       const statsData = await adminService.getFoodStats();
-      
+
       // Map the API response to our local interface
       const mappedStats: FoodStats = {
         totalFoods: statsData.total_foods || 0,
@@ -222,11 +471,11 @@ const ContentManagementHub: React.FC = () => {
         totalOrders: 0, // This would need to be added to the backend
         averagePrice: statsData.price_stats?.average_price || 0,
       };
-      
+
       setFoodStats(mappedStats);
     } catch (error) {
       console.error("Error loading food stats:", error);
-      
+
       // Fallback stats if API fails
       const fallbackStats: FoodStats = {
         totalFoods: 0,
@@ -247,10 +496,26 @@ const ContentManagementHub: React.FC = () => {
     const processed: FoodFilterParams = {
       page: filters.page,
       search: filters.search,
-      category: filters.category === "all" ? undefined : (typeof filters.category === "string" ? parseInt(filters.category) : filters.category),
-      cuisine: filters.cuisine === "all" ? undefined : (typeof filters.cuisine === "string" ? parseInt(filters.cuisine) : filters.cuisine),
-      is_available: filters.availability === "all" ? undefined : filters.availability === "available",
-      is_featured: filters.featured === "all" ? undefined : filters.featured === "featured",
+      category:
+        filters.category === "all"
+          ? undefined
+          : typeof filters.category === "string"
+          ? parseInt(filters.category)
+          : filters.category,
+      cuisine:
+        filters.cuisine === "all"
+          ? undefined
+          : typeof filters.cuisine === "string"
+          ? parseInt(filters.cuisine)
+          : filters.cuisine,
+      is_available:
+        filters.availability === "all"
+          ? undefined
+          : filters.availability === "available",
+      is_featured:
+        filters.featured === "all"
+          ? undefined
+          : filters.featured === "featured",
       is_vegetarian: filters.is_vegetarian,
       is_vegan: filters.is_vegan,
       is_gluten_free: filters.is_gluten_free,
@@ -266,14 +531,14 @@ const ContentManagementHub: React.FC = () => {
   const loadFoods = useCallback(async () => {
     try {
       setFoodLoading(true);
-      
+
       const processedFilters = processFilters(foodFilters);
       const [foodsData, categoriesData, cuisinesData] = await Promise.all([
         fetchFoods(processedFilters),
         fetchFoodCategories({}),
         fetchCuisines({}),
       ]);
-      
+
       setFoods(foodsData.results || []);
       setCategories(categoriesData.results || []);
       setCuisines(cuisinesData.results || []);
@@ -283,6 +548,170 @@ const ContentManagementHub: React.FC = () => {
       setFoodLoading(false);
     }
   }, [foodFilters]);
+
+  // Load categories separately
+  const loadCategories = useCallback(async () => {
+    try {
+      setCategoriesLoading(true);
+      const categoriesData = await fetchFoodCategories({});
+      setCategories(categoriesData.results || []);
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, []);
+
+  // Load cuisines separately
+  const loadCuisines = useCallback(async () => {
+    try {
+      setCuisinesLoading(true);
+      const cuisinesData = await fetchCuisines({});
+      setCuisines(cuisinesData.results || []);
+    } catch (error) {
+      console.error("Error loading cuisines:", error);
+    } finally {
+      setCuisinesLoading(false);
+    }
+  }, []);
+
+  // Create/Update Category
+  const handleCategorySubmit = async () => {
+    try {
+      const formData = new FormData();
+      formData.append("name", categoryFormData.name);
+      formData.append("description", categoryFormData.description);
+      if (categoryFormData.image) {
+        formData.append("image", categoryFormData.image);
+      }
+      if (categoryFormData.cuisine) {
+        formData.append("cuisine", categoryFormData.cuisine);
+      }
+
+      if (selectedCategory) {
+        await updateFoodCategory(selectedCategory.id, formData);
+        toast({
+          title: "Success",
+          description: "Category updated successfully",
+        });
+      } else {
+        await createFoodCategory(formData);
+        toast({
+          title: "Success",
+          description: "Category created successfully",
+        });
+      }
+
+      setShowCategoryDialog(false);
+      setCategoryFormData({
+        name: "",
+        description: "",
+        image: null,
+        cuisine: "",
+      });
+      setSelectedCategory(null);
+      loadCategories();
+    } catch (error) {
+      console.error("Error saving category:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save category",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Delete Category
+  const handleDeleteCategory = async () => {
+    if (!selectedCategory) return;
+
+    try {
+      await deleteFoodCategory(selectedCategory.id);
+      toast({
+        title: "Success",
+        description: "Category deleted successfully",
+      });
+      setShowDeleteCategoryDialog(false);
+      setSelectedCategory(null);
+      loadCategories();
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete category",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Create/Update Cuisine
+  const handleCuisineSubmit = async () => {
+    try {
+      const formData = new FormData();
+      formData.append("name", cuisineFormData.name);
+      formData.append("description", cuisineFormData.description);
+      if (cuisineFormData.image) {
+        formData.append("image", cuisineFormData.image);
+      }
+      if (cuisineFormData.origin_country) {
+        formData.append("origin_country", cuisineFormData.origin_country);
+      }
+
+      if (selectedCuisine) {
+        await updateCuisine(selectedCuisine.id, formData);
+        toast({
+          title: "Success",
+          description: "Cuisine updated successfully",
+        });
+      } else {
+        await createCuisine(formData);
+        toast({
+          title: "Success",
+          description: "Cuisine created successfully",
+        });
+      }
+
+      setShowCuisineDialog(false);
+      setCuisineFormData({
+        name: "",
+        description: "",
+        image: null,
+        origin_country: "",
+      });
+      setSelectedCuisine(null);
+      loadCuisines();
+    } catch (error) {
+      console.error("Error saving cuisine:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save cuisine",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Delete Cuisine
+  const handleDeleteCuisine = async () => {
+    if (!selectedCuisine) return;
+
+    try {
+      await deleteCuisine(selectedCuisine.id);
+      toast({
+        title: "Success",
+        description: "Cuisine deleted successfully",
+      });
+      setShowDeleteCuisineDialog(false);
+      setSelectedCuisine(null);
+      loadCuisines();
+    } catch (error) {
+      console.error("Error deleting cuisine:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete cuisine",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Load offers
   const loadOffers = useCallback(async (silent = false) => {
@@ -319,6 +748,20 @@ const ContentManagementHub: React.FC = () => {
       setReferralTokens(tokensData);
     } catch (error) {
       console.error("Error loading referral data:", error);
+      setReferralStats(null);
+      setReferralTokens([]);
+      if (!silent) {
+        const description =
+          (error as any)?.response?.data?.message ||
+          (error as any)?.response?.data?.detail ||
+          (error as Error)?.message ||
+          "Failed to load referral data";
+        toast({
+          title: "Error",
+          description,
+          variant: "destructive",
+        });
+      }
     } finally {
       setReferralLoading(false);
     }
@@ -363,7 +806,7 @@ const ContentManagementHub: React.FC = () => {
           },
         }
       );
-      
+
       setShowCreateOfferDialog(false);
       setOfferFormData({
         description: "",
@@ -372,7 +815,7 @@ const ContentManagementHub: React.FC = () => {
         price: "",
       });
       await loadOffers(true);
-      
+
       toast({
         title: "Success",
         description: "Offer created successfully",
@@ -390,7 +833,7 @@ const ContentManagementHub: React.FC = () => {
   // Update offer
   const handleUpdateOffer = async () => {
     if (!selectedOffer) return;
-    
+
     try {
       const token = localStorage.getItem("access_token");
       await axios.put(
@@ -407,7 +850,7 @@ const ContentManagementHub: React.FC = () => {
           },
         }
       );
-      
+
       setShowEditOfferDialog(false);
       setSelectedOffer(null);
       setOfferFormData({
@@ -417,7 +860,7 @@ const ContentManagementHub: React.FC = () => {
         price: "",
       });
       await loadOffers(true);
-      
+
       toast({
         title: "Success",
         description: "Offer updated successfully",
@@ -441,7 +884,7 @@ const ContentManagementHub: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-      
+
       await loadOffers(true);
       toast({
         title: "Success",
@@ -469,17 +912,16 @@ const ContentManagementHub: React.FC = () => {
       setShowCreateTokenDialog(false);
       setMaxUses("");
       setExpiresAt("");
-      loadReferralData(true);
-      
-      toast({
-        title: "Success",
-        description: "Referral token created successfully",
-      });
+      await loadReferralData(true);
     } catch (error) {
       console.error("Error creating token:", error);
+      const description =
+        (error as any)?.response?.data?.message ||
+        (error as any)?.response?.data?.detail ||
+        "Failed to create referral token";
       toast({
         title: "Error",
-        description: "Failed to create referral token",
+        description,
         variant: "destructive",
       });
     } finally {
@@ -489,12 +931,7 @@ const ContentManagementHub: React.FC = () => {
 
   // Copy referral link
   const handleCopyLink = (token: string) => {
-    const link = `${window.location.origin}/register?ref=${token}`;
-    navigator.clipboard.writeText(link);
-    toast({
-      title: "Copied",
-      description: "Referral link copied to clipboard",
-    });
+    void referralService.copyReferralLink(token);
   };
 
   // Load data based on active tab
@@ -502,12 +939,24 @@ const ContentManagementHub: React.FC = () => {
     if (activeTab === "food") {
       loadFoodStats();
       loadFoods();
+    } else if (activeTab === "categories") {
+      loadCategories();
+    } else if (activeTab === "cuisines") {
+      loadCuisines();
     } else if (activeTab === "offers") {
       loadOffers();
     } else if (activeTab === "referrals") {
       loadReferralData();
     }
-  }, [activeTab, loadFoods, loadFoodStats, loadOffers, loadReferralData]);
+  }, [
+    activeTab,
+    loadFoods,
+    loadFoodStats,
+    loadCategories,
+    loadCuisines,
+    loadOffers,
+    loadReferralData,
+  ]);
 
   // Get availability color
   const getAvailabilityColor = (available?: boolean) => {
@@ -520,71 +969,53 @@ const ContentManagementHub: React.FC = () => {
     return isExpired ? "red" : "green";
   };
 
-  // Food table columns
-  const foodColumns: Column<Food>[] = [
+  // Categories table columns
+  const categoriesColumns: Column<FoodCategory>[] = [
     {
       key: "name",
-      title: "Food Item",
-      render: (food: Food) => (
+      title: "Category",
+      render: (category: FoodCategory) => (
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-            {food?.images?.[0]?.image ? (
-              <img src={food?.images?.[0]?.image} alt={food?.name} className="w-full h-full object-cover rounded-lg" />
+            {category?.image ? (
+              <img
+                src={category.image}
+                alt={category.name}
+                className="w-full h-full object-cover rounded-lg"
+              />
             ) : (
-              <Utensils className="h-5 w-5 text-gray-400" />
+              <Tag className="h-5 w-5 text-gray-400" />
             )}
           </div>
           <div>
-            <div className="font-medium">{food?.name || "Unnamed"}</div>
-            <div className="text-sm text-gray-500">{food?.description?.substring(0, 50)}...</div>
+            <div className="font-medium">{category?.name || "Unnamed"}</div>
+            <div className="text-sm text-gray-500">
+              {category?.description?.substring(0, 50)}...
+            </div>
           </div>
         </div>
       ),
     },
     {
-      key: "category",
-      title: "Category",
-      render: (food: Food) => (
+      key: "cuisine",
+      title: "Cuisine",
+      render: (category: FoodCategory) => (
         <Badge variant="outline">
-          {food?.category_name || "Uncategorized"}
+          {category?.cuisine_name || "No Cuisine"}
         </Badge>
       ),
     },
     {
-      key: "price",
-      title: "Price",
-      render: (food: Food) => (
-        <div className="font-medium">
-          LKR {food?.price?.toFixed(2) || "0.00"}
-        </div>
-      ),
-    },
-    {
-      key: "availability",
-      title: "Status",
-      render: (food: Food) => (
-        <Badge 
-          variant="outline" 
-          className={`border-${getAvailabilityColor(food?.is_available)}-500 text-${getAvailabilityColor(food?.is_available)}-700`}
-        >
-          {food?.is_available ? "Available" : "Unavailable"}
-        </Badge>
-      ),
-    },
-    {
-      key: "rating",
-      title: "Rating",
-      render: (food: Food) => (
-        <div className="flex items-center space-x-1">
-          <Star className="h-4 w-4 text-yellow-400 fill-current" />
-          <span className="text-sm">{food?.rating_average?.toFixed(1) || "N/A"}</span>
-        </div>
+      key: "food_count",
+      title: "Food Items",
+      render: (category: FoodCategory) => (
+        <div className="font-medium">{category?.food_count || 0} items</div>
       ),
     },
     {
       key: "actions",
       title: "Actions",
-      render: (food: Food) => (
+      render: (category: FoodCategory) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -592,25 +1023,110 @@ const ContentManagementHub: React.FC = () => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => {
-              setSelectedFood(food);
-              setShowFoodDialog(true);
-            }}>
-              <Eye className="h-4 w-4 mr-2" />
-              View Details
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {
-              setSelectedFood(food);
-              setShowFoodDialog(true);
-            }}>
+            <DropdownMenuItem
+              onClick={() => {
+                setSelectedCategory(category);
+                setCategoryFormData({
+                  name: category.name,
+                  description: category.description || "",
+                  image: null,
+                  cuisine: category.cuisine?.toString() || "",
+                });
+                setShowCategoryDialog(true);
+              }}
+            >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => {
-                setSelectedFood(food);
-                setShowDeleteFoodDialog(true);
+                setSelectedCategory(category);
+                setShowDeleteCategoryDialog(true);
+              }}
+              className="text-red-600"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
+
+  // Cuisines table columns
+  const cuisinesColumns: Column<Cuisine>[] = [
+    {
+      key: "name",
+      title: "Cuisine",
+      render: (cuisine: Cuisine) => (
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+            {cuisine?.image ? (
+              <img
+                src={cuisine.image}
+                alt={cuisine.name}
+                className="w-full h-full object-cover rounded-lg"
+              />
+            ) : (
+              <ChefHat className="h-5 w-5 text-gray-400" />
+            )}
+          </div>
+          <div>
+            <div className="font-medium">{cuisine?.name || "Unnamed"}</div>
+            <div className="text-sm text-gray-500">
+              {cuisine?.description?.substring(0, 50)}...
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "origin_country",
+      title: "Origin",
+      render: (cuisine: Cuisine) => (
+        <Badge variant="outline">{cuisine?.origin_country || "Unknown"}</Badge>
+      ),
+    },
+    {
+      key: "food_count",
+      title: "Food Items",
+      render: (cuisine: Cuisine) => (
+        <div className="font-medium">{cuisine?.food_count || 0} items</div>
+      ),
+    },
+    {
+      key: "actions",
+      title: "Actions",
+      render: (cuisine: Cuisine) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => {
+                setSelectedCuisine(cuisine);
+                setCuisineFormData({
+                  name: cuisine.name,
+                  description: cuisine.description || "",
+                  image: null,
+                  origin_country: cuisine.origin_country || "",
+                });
+                setShowCuisineDialog(true);
+              }}
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                setSelectedCuisine(cuisine);
+                setShowDeleteCuisineDialog(true);
               }}
               className="text-red-600"
             >
@@ -668,12 +1184,19 @@ const ContentManagementHub: React.FC = () => {
             <Input
               placeholder="Search food items..."
               value={foodFilters.search}
-              onChange={(e) => setFoodFilters(prev => ({ ...prev, search: e.target.value }))}
+              onChange={(e) =>
+                setFoodFilters((prev) => ({ ...prev, search: e.target.value }))
+              }
             />
           </div>
-          <Select 
-            value={foodFilters.category} 
-            onValueChange={(value) => setFoodFilters(prev => ({ ...prev, category: value === "all" ? undefined : parseInt(value) }))}
+          <Select
+            value={foodFilters.category}
+            onValueChange={(value) =>
+              setFoodFilters((prev) => ({
+                ...prev,
+                category: value === "all" ? undefined : parseInt(value),
+              }))
+            }
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by category" />
@@ -687,9 +1210,11 @@ const ContentManagementHub: React.FC = () => {
               ))}
             </SelectContent>
           </Select>
-          <Select 
-            value={foodFilters.availability} 
-            onValueChange={(value) => setFoodFilters(prev => ({ ...prev, availability: value }))}
+          <Select
+            value={foodFilters.availability}
+            onValueChange={(value) =>
+              setFoodFilters((prev) => ({ ...prev, availability: value }))
+            }
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by availability" />
@@ -700,7 +1225,13 @@ const ContentManagementHub: React.FC = () => {
               <SelectItem value="unavailable">Unavailable</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={createOptimizedClickHandler(loadFoods, { measurePerformance: true, label: 'Refresh Foods' })} variant="outline">
+          <Button
+            onClick={createOptimizedClickHandler(loadFoods, {
+              measurePerformance: true,
+              label: "Refresh Foods",
+            })}
+            variant="outline"
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -709,24 +1240,335 @@ const ContentManagementHub: React.FC = () => {
 
       {/* Foods Table */}
       <GlassCard className="p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <h3 className="text-lg font-semibold">Food Items</h3>
-          <div className="space-x-2">
-            <Button onClick={() => setShowFoodDialog(true)}>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              onClick={() => setShowFoodDialog(true)}
+              size="sm"
+              className="w-full sm:w-auto"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Food
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto">
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
           </div>
         </div>
 
+        {/* Custom Foods Table with Hover Preview */}
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="hidden sm:table-cell">
+                  Food Item
+                </TableHead>
+                <TableHead className="sm:hidden">Item</TableHead>
+                <TableHead className="hidden md:table-cell">Category</TableHead>
+                <TableHead className="hidden lg:table-cell">Price</TableHead>
+                <TableHead className="hidden xl:table-cell">Status</TableHead>
+                <TableHead className="hidden lg:table-cell">Rating</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {foods.map((food, index) => (
+                <TableRow
+                  key={food?.id || index}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors relative"
+                  onMouseEnter={(e) => {
+                    setHoveredFood(food);
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setFoodTooltipPosition({
+                      x: rect.left + rect.width / 2,
+                      y: rect.top - 10,
+                    });
+                  }}
+                  onMouseLeave={() => {
+                    setHoveredFood(null);
+                  }}
+                >
+                  <TableCell>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                        {food?.images?.[0]?.image ? (
+                          <img
+                            src={food?.images?.[0]?.image}
+                            alt={food?.name}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <Utensils className="h-5 w-5 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">
+                          {food?.name || "Unnamed"}
+                        </div>
+                        <div className="text-sm text-gray-500 truncate max-w-32 sm:max-w-none">
+                          {food?.description?.substring(0, 30)}...
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <Badge variant="outline">
+                      {food?.category_name || "Uncategorized"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="font-medium">
+                      LKR {food?.price?.toFixed(2) || "0.00"}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    <Badge
+                      variant="outline"
+                      className={`border-${getAvailabilityColor(
+                        food?.is_available
+                      )}-500 text-${getAvailabilityColor(
+                        food?.is_available
+                      )}-700`}
+                    >
+                      {food?.is_available ? "Available" : "Unavailable"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="flex items-center space-x-1">
+                      <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                      <span className="text-sm">
+                        {food?.rating_average
+                          ? Number(food.rating_average).toFixed(1)
+                          : "N/A"}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedFood(food);
+                            setShowFoodDialog(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedFood(food);
+                            setShowFoodDialog(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedFood(food);
+                            setShowDeleteFoodDialog(true);
+                          }}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {foods.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="text-center py-8 text-gray-500 dark:text-gray-400"
+                  >
+                    No food items available
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Food Hover Preview */}
+        <FoodHoverPreview
+          food={hoveredFood!}
+          isVisible={hoveredFood !== null}
+          position={foodTooltipPosition}
+        />
+      </GlassCard>
+    </div>
+  );
+
+  // Render Categories Tab
+  const renderCategoriesTab = () => (
+    <div className="space-y-6">
+      {/* Categories Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <AnimatedStats
+          value={categories.length}
+          label="Total Categories"
+          icon={Tag}
+          trend={12.5}
+          gradient="blue"
+        />
+        <AnimatedStats
+          value={categories.filter((c) => (c.food_count || 0) > 0).length}
+          label="Active Categories"
+          icon={CheckCircle}
+          trend={8.3}
+          gradient="green"
+        />
+        <AnimatedStats
+          value={categories.filter((c) => (c.food_count || 0) === 0).length}
+          label="Empty Categories"
+          icon={AlertCircle}
+          trend={-2.1}
+          gradient="orange"
+        />
+        <AnimatedStats
+          value={
+            categories.reduce((sum, c) => sum + (c.food_count || 0), 0) /
+            (categories.length || 1)
+          }
+          label="Avg Foods per Category"
+          icon={TrendingUp}
+          trend={5.7}
+          gradient="purple"
+          decimals={1}
+        />
+      </div>
+
+      {/* Categories Table */}
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Food Categories</h3>
+          <div className="space-x-2">
+            <Button
+              onClick={() => {
+                setSelectedCategory(null);
+                setCategoryFormData({
+                  name: "",
+                  description: "",
+                  image: null,
+                  cuisine: "",
+                });
+                setShowCategoryDialog(true);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Category
+            </Button>
+            <Button
+              variant="outline"
+              onClick={createOptimizedClickHandler(loadCategories, {
+                measurePerformance: true,
+                label: "Refresh Categories",
+              })}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
         <DataTable
-          data={foods}
-          columns={foodColumns}
-          loading={foodLoading}
+          data={categories}
+          columns={categoriesColumns}
+          loading={categoriesLoading}
+        />
+      </GlassCard>
+    </div>
+  );
+
+  // Render Cuisines Tab
+  const renderCuisinesTab = () => (
+    <div className="space-y-6">
+      {/* Cuisines Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <AnimatedStats
+          value={cuisines.length}
+          label="Total Cuisines"
+          icon={ChefHat}
+          trend={15.8}
+          gradient="blue"
+        />
+        <AnimatedStats
+          value={cuisines.filter((c) => (c.food_count || 0) > 0).length}
+          label="Active Cuisines"
+          icon={CheckCircle}
+          trend={9.2}
+          gradient="green"
+        />
+        <AnimatedStats
+          value={cuisines.filter((c) => (c.food_count || 0) === 0).length}
+          label="Empty Cuisines"
+          icon={AlertCircle}
+          trend={-1.5}
+          gradient="orange"
+        />
+        <AnimatedStats
+          value={
+            cuisines.reduce((sum, c) => sum + (c.food_count || 0), 0) /
+            (cuisines.length || 1)
+          }
+          label="Avg Foods per Cuisine"
+          icon={TrendingUp}
+          trend={7.3}
+          gradient="purple"
+          decimals={1}
+        />
+      </div>
+
+      {/* Cuisines Table */}
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Cuisines</h3>
+          <div className="space-x-2">
+            <Button
+              onClick={() => {
+                setSelectedCuisine(null);
+                setCuisineFormData({
+                  name: "",
+                  description: "",
+                  image: null,
+                  origin_country: "",
+                });
+                setShowCuisineDialog(true);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Cuisine
+            </Button>
+            <Button
+              variant="outline"
+              onClick={createOptimizedClickHandler(loadCuisines, {
+                measurePerformance: true,
+                label: "Refresh Cuisines",
+              })}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        <DataTable
+          data={cuisines}
+          columns={cuisinesColumns}
+          loading={cuisinesLoading}
         />
       </GlassCard>
     </div>
@@ -745,21 +1587,28 @@ const ContentManagementHub: React.FC = () => {
           gradient="blue"
         />
         <AnimatedStats
-          value={offers.filter(o => new Date(o.valid_until) > new Date()).length}
+          value={
+            offers.filter((o) => new Date(o.valid_until) > new Date()).length
+          }
           label="Active Offers"
           icon={CheckCircle}
           trend={8.7}
           gradient="green"
         />
         <AnimatedStats
-          value={offers.filter(o => new Date(o.valid_until) < new Date()).length}
+          value={
+            offers.filter((o) => new Date(o.valid_until) < new Date()).length
+          }
           label="Expired Offers"
           icon={XCircle}
           trend={-12.1}
           gradient="pink"
         />
         <AnimatedStats
-          value={offers.reduce((avg, offer) => avg + (offer?.discount || 0), 0) / offers.length || 0}
+          value={
+            offers.reduce((avg, offer) => avg + (offer?.discount || 0), 0) /
+              offers.length || 0
+          }
           label="Avg Discount"
           icon={TrendingUp}
           trend={5.3}
@@ -796,13 +1645,19 @@ const ContentManagementHub: React.FC = () => {
                 <TableCell>{offer.description}</TableCell>
                 <TableCell>{offer.discount}%</TableCell>
                 <TableCell>LKR {offer?.price?.toFixed(2) || "0.00"}</TableCell>
-                <TableCell>{new Date(offer.valid_until).toLocaleDateString()}</TableCell>
                 <TableCell>
-                  <Badge 
+                  {new Date(offer.valid_until).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  <Badge
                     variant="outline"
-                    className={`border-${getOfferStatusColor(offer.valid_until)}-500 text-${getOfferStatusColor(offer.valid_until)}-700`}
+                    className={`border-${getOfferStatusColor(
+                      offer.valid_until
+                    )}-500 text-${getOfferStatusColor(offer.valid_until)}-700`}
                   >
-                    {new Date(offer.valid_until) > new Date() ? "Active" : "Expired"}
+                    {new Date(offer.valid_until) > new Date()
+                      ? "Active"
+                      : "Expired"}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -815,7 +1670,7 @@ const ContentManagementHub: React.FC = () => {
                         setOfferFormData({
                           description: offer.description,
                           discount: offer.discount.toString(),
-                          valid_until: offer.valid_until.split('T')[0],
+                          valid_until: offer.valid_until.split("T")[0],
                           price: offer?.price?.toString() || "0",
                         });
                         setShowEditOfferDialog(true);
@@ -901,42 +1756,60 @@ const ContentManagementHub: React.FC = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {referralTokens.map((token) => (
-              <TableRow key={token.id}>
-                <TableCell className="font-mono text-sm">{token.token}</TableCell>
-                <TableCell>{token.uses}</TableCell>
-                <TableCell>{token.max_uses || "Unlimited"}</TableCell>
-                <TableCell>
-                  {token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={token.is_active ? "default" : "secondary"}>
-                    {token.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCopyLink(token.token)}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const link = `${window.location.origin}/register?ref=${token.token}`;
-                        window.open(link, '_blank');
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </div>
+            {referralLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-sm text-gray-500">
+                  Loading referral tokens...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : referralTokens.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-sm text-gray-500">
+                  No referral tokens found
+                </TableCell>
+              </TableRow>
+            ) : (
+              referralTokens.map((token) => (
+                <TableRow key={token.id}>
+                  <TableCell className="font-mono text-sm">
+                    {token.token}
+                  </TableCell>
+                  <TableCell>{token.uses}</TableCell>
+                  <TableCell>{token.max_uses || "Unlimited"}</TableCell>
+                  <TableCell>
+                    {token.expires_at
+                      ? new Date(token.expires_at).toLocaleDateString()
+                      : "Never"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={token.is_active ? "default" : "secondary"}>
+                      {token.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopyLink(token.token)}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const link = referralService.generateReferralLink(token.token);
+                          window.open(link, "_blank");
+                        }}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </GlassCard>
@@ -946,52 +1819,102 @@ const ContentManagementHub: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-blue-600 dark:from-white dark:to-blue-400 bg-clip-text text-transparent">
-            Content Management Hub
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-1">
-            Complete food menu, promotional offers, and referral program management
-          </p>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export All
-          </Button>
-          <Button onClick={() => {
-            if (activeTab === "food") loadFoods();
-            else if (activeTab === "offers") loadOffers();
-            else if (activeTab === "referrals") loadReferralData();
-          }}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <div className="flex flex-col space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-blue-600 dark:from-white dark:to-blue-400 bg-clip-text text-transparent">
+              Content Management Hub
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mt-1">
+              Complete food menu, promotional offers, and referral program
+              management
+            </p>
+          </div>
 
-      {/* Tabbed Interface */}
-      <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="food">Food Menu</TabsTrigger>
-          <TabsTrigger value="offers">Offers</TabsTrigger>
-          <TabsTrigger value="referrals">Referrals</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="food" className="mt-6">
-          {renderFoodTab()}
-        </TabsContent>
-        
-        <TabsContent value="offers" className="mt-6">
-          {renderOffersTab()}
-        </TabsContent>
-        
-        <TabsContent value="referrals" className="mt-6">
-          {renderReferralsTab()}
-        </TabsContent>
-      </Tabs>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto">
+              <Download className="h-4 w-4 mr-2" />
+              <span className="hidden xs:inline">Export All</span>
+              <span className="xs:hidden">Export</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (activeTab === "food") loadFoods();
+                else if (activeTab === "offers") loadOffers();
+                else if (activeTab === "referrals") loadReferralData();
+              }}
+              className="w-full sm:w-auto"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        {/* Tabbed Interface */}
+        <Tabs
+          value={activeTab}
+          onValueChange={(value: any) => setActiveTab(value)}
+        >
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto p-1">
+            <TabsTrigger
+              value="food"
+              className="text-xs sm:text-sm py-2 px-1 sm:px-3"
+            >
+              <span className="hidden sm:inline">Food Menu</span>
+              <span className="sm:hidden">Food</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="categories"
+              className="text-xs sm:text-sm py-2 px-1 sm:px-3"
+            >
+              <span className="hidden sm:inline">Categories</span>
+              <span className="sm:hidden">Cats</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="cuisines"
+              className="text-xs sm:text-sm py-2 px-1 sm:px-3"
+            >
+              <span className="hidden sm:inline">Cuisines</span>
+              <span className="sm:hidden">Cuisine</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="offers"
+              className="text-xs sm:text-sm py-2 px-1 sm:px-3"
+            >
+              Offers
+            </TabsTrigger>
+            <TabsTrigger
+              value="referrals"
+              className="text-xs sm:text-sm py-2 px-1 sm:px-3"
+            >
+              <span className="hidden sm:inline">Referrals</span>
+              <span className="sm:hidden">Refs</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="food" className="mt-6">
+            {renderFoodTab()}
+          </TabsContent>
+
+          <TabsContent value="categories" className="mt-6">
+            {renderCategoriesTab()}
+          </TabsContent>
+
+          <TabsContent value="cuisines" className="mt-6">
+            {renderCuisinesTab()}
+          </TabsContent>
+
+          <TabsContent value="offers" className="mt-6">
+            {renderOffersTab()}
+          </TabsContent>
+
+          <TabsContent value="referrals" className="mt-6">
+            {renderReferralsTab()}
+          </TabsContent>
+        </Tabs>
+      </div>
 
       {/* Food Dialog */}
       <Dialog open={showFoodDialog} onOpenChange={setShowFoodDialog}>
@@ -1001,28 +1924,33 @@ const ContentManagementHub: React.FC = () => {
               {selectedFood ? "Edit Food Item" : "Add New Food Item"}
             </DialogTitle>
             <DialogDescription>
-              {selectedFood ? "Update food item details" : "Create a new food item for the menu"}
+              {selectedFood
+                ? "Update food item details"
+                : "Create a new food item for the menu"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Name</Label>
-                <Input placeholder="Enter food name" defaultValue={selectedFood?.name} />
+                <Input
+                  placeholder="Enter food name"
+                  defaultValue={selectedFood?.name}
+                />
               </div>
               <div>
                 <Label>Price</Label>
-                <Input 
-                  type="number" 
-                  placeholder="0.00" 
-                  defaultValue={selectedFood?.price} 
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  defaultValue={selectedFood?.price}
                 />
               </div>
             </div>
             <div>
               <Label>Description</Label>
-              <Textarea 
-                placeholder="Enter food description..." 
+              <Textarea
+                placeholder="Enter food description..."
                 defaultValue={selectedFood?.description}
               />
             </div>
@@ -1035,7 +1963,10 @@ const ContentManagementHub: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
-                      <SelectItem key={category?.id} value={category?.id?.toString()}>
+                      <SelectItem
+                        key={category?.id}
+                        value={category?.id?.toString()}
+                      >
                         {category?.name || "Unnamed"}
                       </SelectItem>
                     ))}
@@ -1050,7 +1981,10 @@ const ContentManagementHub: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {cuisines.map((cuisine) => (
-                      <SelectItem key={cuisine.id} value={cuisine.id.toString()}>
+                      <SelectItem
+                        key={cuisine.id}
+                        value={cuisine.id.toString()}
+                      >
                         {cuisine.name}
                       </SelectItem>
                     ))}
@@ -1063,20 +1997,22 @@ const ContentManagementHub: React.FC = () => {
             <Button variant="outline" onClick={() => setShowFoodDialog(false)}>
               Cancel
             </Button>
-            <Button>
-              {selectedFood ? "Update" : "Create"}
-            </Button>
+            <Button>{selectedFood ? "Update" : "Create"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Food Dialog */}
-      <AlertDialog open={showDeleteFoodDialog} onOpenChange={setShowDeleteFoodDialog}>
+      <AlertDialog
+        open={showDeleteFoodDialog}
+        onOpenChange={setShowDeleteFoodDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Food Item</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{selectedFood?.name}"? This action cannot be undone.
+              Are you sure you want to delete "{selectedFood?.name}"? This
+              action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1091,8 +2027,231 @@ const ContentManagementHub: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Category Dialog */}
+      <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedCategory ? "Edit Category" : "Create Category"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedCategory
+                ? "Update the category details"
+                : "Create a new food category"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Category Name</Label>
+              <Input
+                placeholder="Enter category name..."
+                value={categoryFormData.name}
+                onChange={(e) =>
+                  setCategoryFormData((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Enter category description..."
+                value={categoryFormData.description}
+                onChange={(e) =>
+                  setCategoryFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <Label>Cuisine (Optional)</Label>
+              <Select
+                value={categoryFormData.cuisine}
+                onValueChange={(value) =>
+                  setCategoryFormData((prev) => ({ ...prev, cuisine: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select cuisine" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No Cuisine</SelectItem>
+                  {cuisines.map((cuisine) => (
+                    <SelectItem key={cuisine.id} value={cuisine.id.toString()}>
+                      {cuisine.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Image (Optional)</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setCategoryFormData((prev) => ({
+                    ...prev,
+                    image: e.target.files?.[0] || null,
+                  }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCategoryDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCategorySubmit}>
+              {selectedCategory ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Category Dialog */}
+      <AlertDialog
+        open={showDeleteCategoryDialog}
+        onOpenChange={setShowDeleteCategoryDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Category</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedCategory?.name}"? This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCategory}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cuisine Dialog */}
+      <Dialog open={showCuisineDialog} onOpenChange={setShowCuisineDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedCuisine ? "Edit Cuisine" : "Create Cuisine"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedCuisine
+                ? "Update the cuisine details"
+                : "Create a new cuisine type"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Cuisine Name</Label>
+              <Input
+                placeholder="Enter cuisine name..."
+                value={cuisineFormData.name}
+                onChange={(e) =>
+                  setCuisineFormData((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Enter cuisine description..."
+                value={cuisineFormData.description}
+                onChange={(e) =>
+                  setCuisineFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <Label>Origin Country (Optional)</Label>
+              <Input
+                placeholder="Enter origin country..."
+                value={cuisineFormData.origin_country}
+                onChange={(e) =>
+                  setCuisineFormData((prev) => ({
+                    ...prev,
+                    origin_country: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <Label>Image (Optional)</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setCuisineFormData((prev) => ({
+                    ...prev,
+                    image: e.target.files?.[0] || null,
+                  }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCuisineDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCuisineSubmit}>
+              {selectedCuisine ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Cuisine Dialog */}
+      <AlertDialog
+        open={showDeleteCuisineDialog}
+        onOpenChange={setShowDeleteCuisineDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Cuisine</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedCuisine?.name}"? This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCuisine}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Create Offer Dialog */}
-      <Dialog open={showCreateOfferDialog} onOpenChange={setShowCreateOfferDialog}>
+      <Dialog
+        open={showCreateOfferDialog}
+        onOpenChange={setShowCreateOfferDialog}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Offer</DialogTitle>
@@ -1106,7 +2265,12 @@ const ContentManagementHub: React.FC = () => {
               <Textarea
                 placeholder="Enter offer description..."
                 value={offerFormData.description}
-                onChange={(e) => setOfferFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) =>
+                  setOfferFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1116,7 +2280,12 @@ const ContentManagementHub: React.FC = () => {
                   type="number"
                   placeholder="0"
                   value={offerFormData.discount}
-                  onChange={(e) => setOfferFormData(prev => ({ ...prev, discount: e.target.value }))}
+                  onChange={(e) =>
+                    setOfferFormData((prev) => ({
+                      ...prev,
+                      discount: e.target.value,
+                    }))
+                  }
                 />
               </div>
               <div>
@@ -1125,7 +2294,12 @@ const ContentManagementHub: React.FC = () => {
                   type="number"
                   placeholder="0.00"
                   value={offerFormData.price}
-                  onChange={(e) => setOfferFormData(prev => ({ ...prev, price: e.target.value }))}
+                  onChange={(e) =>
+                    setOfferFormData((prev) => ({
+                      ...prev,
+                      price: e.target.value,
+                    }))
+                  }
                 />
               </div>
             </div>
@@ -1134,17 +2308,23 @@ const ContentManagementHub: React.FC = () => {
               <Input
                 type="date"
                 value={offerFormData.valid_until}
-                onChange={(e) => setOfferFormData(prev => ({ ...prev, valid_until: e.target.value }))}
+                onChange={(e) =>
+                  setOfferFormData((prev) => ({
+                    ...prev,
+                    valid_until: e.target.value,
+                  }))
+                }
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateOfferDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateOfferDialog(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={handleCreateOffer}>
-              Create Offer
-            </Button>
+            <Button onClick={handleCreateOffer}>Create Offer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1164,7 +2344,12 @@ const ContentManagementHub: React.FC = () => {
               <Textarea
                 placeholder="Enter offer description..."
                 value={offerFormData.description}
-                onChange={(e) => setOfferFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) =>
+                  setOfferFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1174,7 +2359,12 @@ const ContentManagementHub: React.FC = () => {
                   type="number"
                   placeholder="0"
                   value={offerFormData.discount}
-                  onChange={(e) => setOfferFormData(prev => ({ ...prev, discount: e.target.value }))}
+                  onChange={(e) =>
+                    setOfferFormData((prev) => ({
+                      ...prev,
+                      discount: e.target.value,
+                    }))
+                  }
                 />
               </div>
               <div>
@@ -1183,7 +2373,12 @@ const ContentManagementHub: React.FC = () => {
                   type="number"
                   placeholder="0.00"
                   value={offerFormData.price}
-                  onChange={(e) => setOfferFormData(prev => ({ ...prev, price: e.target.value }))}
+                  onChange={(e) =>
+                    setOfferFormData((prev) => ({
+                      ...prev,
+                      price: e.target.value,
+                    }))
+                  }
                 />
               </div>
             </div>
@@ -1192,23 +2387,32 @@ const ContentManagementHub: React.FC = () => {
               <Input
                 type="date"
                 value={offerFormData.valid_until}
-                onChange={(e) => setOfferFormData(prev => ({ ...prev, valid_until: e.target.value }))}
+                onChange={(e) =>
+                  setOfferFormData((prev) => ({
+                    ...prev,
+                    valid_until: e.target.value,
+                  }))
+                }
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditOfferDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditOfferDialog(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={handleUpdateOffer}>
-              Update Offer
-            </Button>
+            <Button onClick={handleUpdateOffer}>Update Offer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Create Referral Token Dialog */}
-      <Dialog open={showCreateTokenDialog} onOpenChange={setShowCreateTokenDialog}>
+      <Dialog
+        open={showCreateTokenDialog}
+        onOpenChange={setShowCreateTokenDialog}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Referral Token</DialogTitle>
@@ -1236,7 +2440,10 @@ const ContentManagementHub: React.FC = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateTokenDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateTokenDialog(false)}
+            >
               Cancel
             </Button>
             <Button onClick={handleCreateToken} disabled={creatingToken}>

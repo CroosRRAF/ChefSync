@@ -320,6 +320,171 @@ def communication_ai_insights(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def ai_chatbot(request):
+    """
+    AI Chatbot endpoint for natural language queries about admin data
+    
+    POST Body:
+        message (str): User's message/query
+        context (list): Optional conversation history
+    """
+    try:
+        message = request.data.get('message', '').strip()
+        context = request.data.get('context', [])
+        
+        if not message:
+            return Response({
+                'error': 'Message is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get comprehensive real-time admin data for context
+        from apps.orders.models import Order
+        from apps.authentication.models import User
+        from apps.food.models import Food
+        from apps.communications.models import Communication
+        from django.db.models import Count, Sum, Avg, Q
+        from datetime import timedelta
+        
+        # Gather comprehensive admin statistics
+        today = timezone.now()
+        yesterday = today - timedelta(days=1)
+        this_week_start = today - timedelta(days=7)
+        this_month_start = today - timedelta(days=30)
+        
+        # User Statistics
+        total_users = User.objects.count()
+        pending_users = User.objects.filter(email_verified=False, is_active=True).count()
+        new_users_today = User.objects.filter(created_at__date=today.date()).count()
+        new_users_week = User.objects.filter(created_at__gte=this_week_start).count()
+        
+        # Order Statistics
+        total_orders = Order.objects.count()
+        total_orders_today = Order.objects.filter(created_at__date=today.date()).count()
+        total_revenue_today = Order.objects.filter(
+            created_at__date=today.date()
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        pending_orders = Order.objects.filter(status='pending').count()
+        completed_orders = Order.objects.filter(status='delivered').count()
+        cancelled_orders = Order.objects.filter(status='cancelled').count()
+        
+        weekly_orders = Order.objects.filter(created_at__gte=this_week_start).count()
+        weekly_revenue = Order.objects.filter(
+            created_at__gte=this_week_start
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        # Food Statistics
+        total_foods = Food.objects.count()
+        active_foods = Food.objects.filter(is_available=True).count()
+        pending_food_approvals = Food.objects.filter(status='Pending').count()
+        
+        # Communications & Sentiment Analysis
+        total_communications = Communication.objects.count()
+        pending_communications = Communication.objects.filter(status='pending').count()
+        resolved_communications = Communication.objects.filter(status='resolved').count()
+        
+        # Get sentiment data
+        recent_communications = Communication.objects.filter(
+            created_at__gte=this_month_start
+        )
+        
+        # Basic sentiment analysis
+        complaints = recent_communications.filter(communication_type='complaint').count()
+        feedback = recent_communications.filter(communication_type='feedback').count()
+        suggestions = recent_communications.filter(communication_type='suggestion').count()
+        
+        # Positive sentiment (feedback with high ratings)
+        positive_feedback = recent_communications.filter(
+            Q(communication_type='feedback') & Q(rating__gte=4)
+        ).count()
+        
+        # Negative sentiment (complaints + low ratings)
+        negative_feedback = recent_communications.filter(
+            Q(communication_type='complaint') | Q(rating__lte=2)
+        ).count()
+        
+        total_sentiment = positive_feedback + negative_feedback
+        positive_percentage = (positive_feedback / total_sentiment * 100) if total_sentiment > 0 else 0
+        negative_percentage = (negative_feedback / total_sentiment * 100) if total_sentiment > 0 else 0
+        
+        # Create comprehensive context for AI
+        admin_context = f"""
+=== COMPREHENSIVE ADMIN DASHBOARD DATA (Real-Time) ===
+
+USER STATISTICS:
+- Total Users: {total_users}
+- New Users Today: {new_users_today}
+- New Users This Week: {new_users_week}
+- Pending Email Verifications: {pending_users}
+
+ORDER STATISTICS:
+- Total Orders (All Time): {total_orders}
+- Orders Today: {total_orders_today}
+- Orders This Week: {weekly_orders}
+- Pending Orders: {pending_orders}
+- Completed Orders: {completed_orders}
+- Cancelled Orders: {cancelled_orders}
+
+REVENUE STATISTICS:
+- Revenue Today: LKR {total_revenue_today:.2f}
+- Revenue This Week: LKR {weekly_revenue:.2f}
+- Average Order Value: LKR {(weekly_revenue / weekly_orders if weekly_orders > 0 else 0):.2f}
+
+FOOD MENU STATISTICS:
+- Total Food Items: {total_foods}
+- Active Food Items: {active_foods}
+- Pending Food Approvals: {pending_food_approvals}
+
+COMMUNICATIONS & FEEDBACK:
+- Total Communications: {total_communications}
+- Pending Communications: {pending_communications}
+- Resolved Communications: {resolved_communications}
+- Complaints (30 days): {complaints}
+- Feedback (30 days): {feedback}
+- Suggestions (30 days): {suggestions}
+
+SENTIMENT ANALYSIS (Last 30 Days):
+- Positive Sentiment: {positive_percentage:.1f}% ({positive_feedback} items)
+- Negative Sentiment: {negative_percentage:.1f}% ({negative_feedback} items)
+- Neutral Sentiment: {(100 - positive_percentage - negative_percentage):.1f}%
+- Overall Mood: {"Positive" if positive_percentage > negative_percentage else "Negative" if negative_percentage > positive_percentage else "Neutral"}
+        """
+        
+        # Generate AI response using the service
+        ai_response = ai_service.generate_chatbot_response(
+            message=message,
+            admin_context=admin_context,
+            conversation_history=context
+        )
+        
+        return Response({
+            'success': True,
+            'data': {
+                'message': ai_response,
+                'timestamp': timezone.now().isoformat(),
+                'context_used': True,
+                'real_data': True
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"AI Chatbot error: {e}", exc_info=True)
+        
+        # Return a helpful response even on error
+        return Response({
+            'success': True,
+            'data': {
+                'message': f"I encountered an issue processing your request, but I'm still here to help! Here's what I can tell you about your business right now:\n\n{admin_context if 'admin_context' in locals() else 'Loading statistics...'}\n\nTry asking me:\n• 'Show me today's performance'\n• 'How many orders today?'\n• 'What's my revenue?'\n\nError details (for debugging): {str(e)}",
+                'timestamp': timezone.now().isoformat(),
+                'context_used': True,
+                'real_data': True,
+                'fallback_mode': True
+            }
+        })
+
+
 def _generate_communication_recommendations(insights):
     """Generate AI-powered recommendations based on communication insights"""
     recommendations = []

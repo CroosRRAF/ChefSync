@@ -152,14 +152,15 @@ const AnalyticsHub: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d">("30d");
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true); // Default to true for automatic refreshing
+  const [refreshInterval, setRefreshInterval] = useState<"30s" | "1m" | "5m">("30s");
   const [generatingReport, setGeneratingReport] = useState(false);
   const [exportingData, setExportingData] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState<string>("");
   const [customReportFilters, setCustomReportFilters] = useState<any>({});
   const [scheduledReports, setScheduledReports] = useState<any[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isRealTimeActive, setIsRealTimeActive] = useState(false);
+  const [isRealTimeActive, setIsRealTimeActive] = useState(true); // Default to true for real-time updates
 
   // Refs to prevent memory leaks and manage intervals
   const autoRefreshInterval = useRef<NodeJS.Timeout | null>(null);
@@ -511,6 +512,13 @@ const AnalyticsHub: React.FC = () => {
     }
 
     if (autoRefresh) {
+      // Convert interval string to milliseconds
+      const intervalMs = {
+        "30s": 30000,
+        "1m": 60000,
+        "5m": 300000,
+      }[refreshInterval];
+
       autoRefreshInterval.current = setInterval(() => {
         // Prevent overlapping calls
         if (loadingRef.current) return;
@@ -520,7 +528,7 @@ const AnalyticsHub: React.FC = () => {
         loadBusinessMetrics();
         loadBusinessInsights();
         loadAdvancedAnalytics();
-      }, 30000); // Refresh every 30 seconds
+      }, intervalMs);
     }
 
     return () => {
@@ -529,7 +537,7 @@ const AnalyticsHub: React.FC = () => {
         autoRefreshInterval.current = null;
       }
     };
-  }, [autoRefresh]); // Only depend on autoRefresh state
+  }, [autoRefresh, refreshInterval]); // Include refreshInterval in dependencies
 
   // Real-time updates (faster polling) - Fixed to prevent memory leaks and overlapping intervals
   useEffect(() => {
@@ -673,6 +681,7 @@ const AnalyticsHub: React.FC = () => {
             xAxisDataKey="name"
             height={280}
             colors={["#3B82F6"]}
+            noCard={true}
           />
         </GlassCard>
 
@@ -701,6 +710,7 @@ const AnalyticsHub: React.FC = () => {
             ]}
             height={280}
             colors={["#22c55e", "#f59e0b", "#ef4444"]}
+            noCard={true}
           />
         </GlassCard>
 
@@ -736,6 +746,7 @@ const AnalyticsHub: React.FC = () => {
             height={280}
             showTrend={true}
             colors={["#06B6D4", "#3B82F6"]}
+            noCard={true}
           />
         </GlassCard>
 
@@ -767,6 +778,7 @@ const AnalyticsHub: React.FC = () => {
             xAxisDataKey="name"
             height={280}
             colors={["#EC4899", "#F59E0B", "#10B981"]}
+            noCard={true}
           />
         </GlassCard>
 
@@ -807,6 +819,7 @@ const AnalyticsHub: React.FC = () => {
               "#3B82F6",
               "#6366F1",
             ]}
+            noCard={true}
           />
         </GlassCard>
 
@@ -842,6 +855,7 @@ const AnalyticsHub: React.FC = () => {
             xAxisDataKey="name"
             height={280}
             colors={["#F97316", "#EF4444", "#8B5CF6"]}
+            noCard={true}
           />
         </GlassCard>
       </div>
@@ -907,6 +921,7 @@ const AnalyticsHub: React.FC = () => {
                 dataKeys={["value"]}
                 xAxisDataKey="name"
                 height={300}
+                noCard={true}
               />
             </GlassCard>
 
@@ -931,6 +946,7 @@ const AnalyticsHub: React.FC = () => {
                 dataKeys={["value"]}
                 xAxisDataKey="name"
                 height={300}
+                noCard={true}
               />
             </GlassCard>
           </div>
@@ -1119,6 +1135,7 @@ const AnalyticsHub: React.FC = () => {
                     xAxisDataKey="name"
                     height={200}
                     colors={["#3B82F6"]}
+                    noCard={true}
                   />
                 </div>
               </GlassCard>
@@ -1562,6 +1579,23 @@ const AnalyticsHub: React.FC = () => {
               onCheckedChange={setAutoRefresh}
             />
           </div>
+          
+          {autoRefresh && (
+            <Select
+              value={refreshInterval}
+              onValueChange={(value: "30s" | "1m" | "5m") => setRefreshInterval(value)}
+            >
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="30s">30s</SelectItem>
+                <SelectItem value="1m">1m</SelectItem>
+                <SelectItem value="5m">5m</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          
           <div className="flex items-center space-x-2">
             <Label htmlFor="real-time">Real-time</Label>
             <Switch

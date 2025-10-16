@@ -46,8 +46,10 @@ export interface Cuisine {
   name: string;
   description?: string;
   image?: string;
+  origin_country?: string;
   is_active: boolean;
   sort_order: number;
+  food_count?: number;
 }
 
 export interface FoodCategory {
@@ -58,6 +60,7 @@ export interface FoodCategory {
   image?: string;
   is_active: boolean;
   sort_order: number;
+  food_count?: number;
   
   // Populated fields from relationships
   cuisine_name?: string;

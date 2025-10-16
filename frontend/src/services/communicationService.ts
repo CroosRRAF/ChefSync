@@ -538,7 +538,35 @@ class CommunicationService {
     positive: number;
     negative: number;
     neutral: number;
-    trending_topics: string[];
+    trending_topics: Array<string | {
+      topic: string;
+      frequency: number;
+      sentiment: string;
+    }>;
+    overall_sentiment?: {
+      positive: number;
+      negative: number;
+      neutral: number;
+      total: number;
+      positive_percentage?: number;
+      negative_percentage?: number;
+      neutral_percentage?: number;
+      confidence?: number;
+      confidence_score?: number;
+      ai_analysis?: any;
+      analysis_method?: string;
+    };
+    sentiment_trends?: Array<{
+      date: string;
+      total: number;
+      positive: number;
+      negative: number;
+      neutral: number;
+    }>;
+    type_breakdown?: any;
+    period_days?: number;
+    ai_analysis?: boolean;
+    last_updated?: string;
   }> {
     try {
       const response = await apiClient.get(

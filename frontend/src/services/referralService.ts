@@ -123,7 +123,7 @@ class ReferralService {
       return response.data.results || response.data || [];
     } catch (error) {
       console.error("Error fetching referral tokens:", error);
-      return [];
+      throw error;
     }
   }
 

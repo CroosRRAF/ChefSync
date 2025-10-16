@@ -31,4 +31,5 @@ urlpatterns = [
     path('ai/service-status/', ai_views.ai_service_status, name='ai-service-status'),
     path('ai/business-insights/', ai_views.business_insights, name='ai-business-insights'),
     path('ai/recommendations/', ai_views.ai_recommendations, name='ai-recommendations'),
+    path('ai/chat/', ai_views.ai_chatbot, name='ai-chatbot'),
 ]

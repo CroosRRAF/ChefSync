@@ -71,5 +71,6 @@ export * from "./scroll-area";
 // Custom components (Phase 7 additions)
 export * from "./enhanced-loading";
 export * from "./error-boundary";
+export * from "./HelpTooltip";
 // Note: loading-skeleton conflicts with skeleton - import explicitly if needed
 export * from "./FallbackImage";

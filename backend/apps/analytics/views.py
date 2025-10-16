@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 from apps.authentication.permissions import IsAdminUser
 from apps.food.models import FoodReview
 from apps.orders.models import Order
-from django.db.models import Avg, Count, Sum
+from django.db.models import Avg, Count, Max, Sum
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import viewsets
@@ -216,13 +216,15 @@ class DashboardViewSet(viewsets.ViewSet):
         # Get customer segmentation
         segmentation_data = self._calculate_customer_segmentation(start_date, now)
 
-        return Response({
-            "trends": trends_data,
-            "predictive": predictive_data,
-            "segmentation": segmentation_data,
-            "period": range_param,
-            "generated_at": now.isoformat()
-        })
+        return Response(
+            {
+                "trends": trends_data,
+                "predictive": predictive_data,
+                "segmentation": segmentation_data,
+                "period": range_param,
+                "generated_at": now.isoformat(),
+            }
+        )
 
     def _calculate_real_trends(self, start_date, end_date):
         """Calculate real trend data instead of mock data"""
@@ -235,16 +237,20 @@ class DashboardViewSet(viewsets.ViewSet):
         revenue_trends = []
         current_date = start_date
         while current_date <= end_date:
-            daily_revenue = Order.objects.filter(
-                payment_status="paid",
-                created_at__date=current_date.date()
-            ).aggregate(total=Sum("total_amount"))["total"] or 0
+            daily_revenue = (
+                Order.objects.filter(
+                    payment_status="paid", created_at__date=current_date.date()
+                ).aggregate(total=Sum("total_amount"))["total"]
+                or 0
+            )
 
-            revenue_trends.append({
-                "date": current_date.date().isoformat(),
-                "revenue": float(daily_revenue),
-                "day_name": current_date.strftime("%a")
-            })
+            revenue_trends.append(
+                {
+                    "date": current_date.date().isoformat(),
+                    "revenue": float(daily_revenue),
+                    "day_name": current_date.strftime("%a"),
+                }
+            )
             current_date += timedelta(days=1)
 
         # User growth trends - real calculation
@@ -255,11 +261,13 @@ class DashboardViewSet(viewsets.ViewSet):
                 date_joined__date=current_date.date()
             ).count()
 
-            user_trends.append({
-                "date": current_date.date().isoformat(),
-                "new_users": daily_users,
-                "day_name": current_date.strftime("%a")
-            })
+            user_trends.append(
+                {
+                    "date": current_date.date().isoformat(),
+                    "new_users": daily_users,
+                    "day_name": current_date.strftime("%a"),
+                }
+            )
             current_date += timedelta(days=1)
 
         # Order volume trends
@@ -270,11 +278,13 @@ class DashboardViewSet(viewsets.ViewSet):
                 created_at__date=current_date.date()
             ).count()
 
-            order_trends.append({
-                "date": current_date.date().isoformat(),
-                "orders": daily_orders,
-                "day_name": current_date.strftime("%a")
-            })
+            order_trends.append(
+                {
+                    "date": current_date.date().isoformat(),
+                    "orders": daily_orders,
+                    "day_name": current_date.strftime("%a"),
+                }
+            )
             current_date += timedelta(days=1)
 
         # Calculate growth rates
@@ -287,8 +297,11 @@ class DashboardViewSet(viewsets.ViewSet):
         first_half_revenue = sum(item["revenue"] for item in revenue_trends[:midpoint])
         second_half_revenue = sum(item["revenue"] for item in revenue_trends[midpoint:])
         revenue_growth_rate = (
-            (second_half_revenue - first_half_revenue) / max(first_half_revenue, 1) * 100
-            if first_half_revenue > 0 else 0
+            (second_half_revenue - first_half_revenue)
+            / max(first_half_revenue, 1)
+            * 100
+            if first_half_revenue > 0
+            else 0
         )
 
         return {
@@ -300,10 +313,12 @@ class DashboardViewSet(viewsets.ViewSet):
                 "total_new_users": total_period_users,
                 "total_orders": total_period_orders,
                 "revenue_growth_rate": round(revenue_growth_rate, 2),
-                "avg_daily_revenue": float(total_period_revenue / max(len(revenue_trends), 1)),
+                "avg_daily_revenue": float(
+                    total_period_revenue / max(len(revenue_trends), 1)
+                ),
                 "avg_daily_users": total_period_users / max(len(user_trends), 1),
-                "avg_daily_orders": total_period_orders / max(len(order_trends), 1)
-            }
+                "avg_daily_orders": total_period_orders / max(len(order_trends), 1),
+            },
         }
 
     def _calculate_predictive_analytics(self, start_date, end_date):
@@ -314,20 +329,22 @@ class DashboardViewSet(viewsets.ViewSet):
         User = get_user_model()
 
         # Get historical data for prediction
-        historical_orders = Order.objects.filter(
-            created_at__gte=start_date,
-            created_at__lte=end_date
-        ).values('created_at__date').annotate(
-            count=Count('id'),
-            revenue=Sum('total_amount')
-        ).order_by('created_at__date')
+        historical_orders = (
+            Order.objects.filter(created_at__gte=start_date, created_at__lte=end_date)
+            .values("created_at__date")
+            .annotate(
+                count=Count("pk"),
+                revenue=Sum("total_amount"),
+            )
+            .order_by("created_at__date")
+        )
 
-        historical_users = User.objects.filter(
-            date_joined__gte=start_date,
-            date_joined__lte=end_date
-        ).values('date_joined__date').annotate(
-            count=Count('id')
-        ).order_by('date_joined__date')
+        historical_users = (
+            User.objects.filter(date_joined__gte=start_date, date_joined__lte=end_date)
+            .values("date_joined__date")
+            .annotate(count=Count("user_id"))  # Use the correct primary key field
+            .order_by("date_joined__date")
+        )
 
         # Simple linear regression for prediction (basic implementation)
         orders_data = list(historical_orders)
@@ -344,28 +361,36 @@ class DashboardViewSet(viewsets.ViewSet):
             recent_orders = orders_data[-7:] if len(orders_data) >= 7 else orders_data
             recent_users = users_data[-7:] if len(users_data) >= 7 else users_data
 
-            avg_orders = sum(item['count'] for item in recent_orders) / max(len(recent_orders), 1)
-            avg_revenue = sum(float(item['revenue'] or 0) for item in recent_orders) / max(len(recent_orders), 1)
-            avg_users = sum(item['count'] for item in recent_users) / max(len(recent_users), 1)
+            avg_orders = sum(item["count"] for item in recent_orders) / max(
+                len(recent_orders), 1
+            )
+            avg_revenue = sum(
+                float(item["revenue"] or 0) for item in recent_orders
+            ) / max(len(recent_orders), 1)
+            avg_users = sum(item["count"] for item in recent_users) / max(
+                len(recent_users), 1
+            )
 
             # Apply slight growth factor (1.02 = 2% growth)
             predicted_orders = int(avg_orders * 1.02)
             predicted_revenue = float(avg_revenue * 1.02)
             predicted_users = int(avg_users * 1.02)
 
-            predictions.append({
-                "date": predict_date.isoformat(),
-                "predicted_orders": predicted_orders,
-                "predicted_revenue": predicted_revenue,
-                "predicted_users": predicted_users,
-                "confidence": 0.75  # 75% confidence for basic prediction
-            })
+            predictions.append(
+                {
+                    "date": predict_date.isoformat(),
+                    "predicted_orders": predicted_orders,
+                    "predicted_revenue": predicted_revenue,
+                    "predicted_users": predicted_users,
+                    "confidence": 0.75,  # 75% confidence for basic prediction
+                }
+            )
 
         return {
             "predictions": predictions,
             "model_type": "linear_regression",
             "accuracy_score": 0.75,
-            "prediction_period_days": 7
+            "prediction_period_days": 7,
         }
 
     def _calculate_customer_segmentation(self, start_date, end_date):
@@ -376,28 +401,34 @@ class DashboardViewSet(viewsets.ViewSet):
         User = get_user_model()
 
         # Get customer order data
-        customer_data = Order.objects.filter(
-            created_at__gte=start_date,
-            created_at__lte=end_date,
-            payment_status="paid"
-        ).values('customer').annotate(
-            total_orders=Count('id'),
-            total_spent=Sum('total_amount'),
-            avg_order_value=Avg('total_amount'),
-            last_order=Max('created_at')
+        customer_data = (
+            Order.objects.filter(
+                created_at__gte=start_date,
+                created_at__lte=end_date,
+                payment_status="paid",
+            )
+            .values("customer")
+            .annotate(
+                total_orders=Count(
+                    "order_number"
+                ),  # Count by a field that definitely exists
+                total_spent=Sum("total_amount"),
+                avg_order_value=Avg("total_amount"),
+                last_order=Max("created_at"),
+            )
         )
 
         segments = {
             "vip": {"customers": 0, "total_spent": 0, "avg_order_value": 0},
             "regular": {"customers": 0, "total_spent": 0, "avg_order_value": 0},
             "occasional": {"customers": 0, "total_spent": 0, "avg_order_value": 0},
-            "new": {"customers": 0, "total_spent": 0, "avg_order_value": 0}
+            "new": {"customers": 0, "total_spent": 0, "avg_order_value": 0},
         }
 
         for customer in customer_data:
-            total_spent = float(customer['total_spent'] or 0)
-            total_orders = customer['total_orders']
-            avg_value = float(customer['avg_order_value'] or 0)
+            total_spent = float(customer["total_spent"] or 0)
+            total_orders = customer["total_orders"]
+            avg_value = float(customer["avg_order_value"] or 0)
 
             # Segmentation logic
             if total_spent >= 1000 and total_orders >= 10:
@@ -420,7 +451,9 @@ class DashboardViewSet(viewsets.ViewSet):
                 segments[segment]["avg_order_value"] = round(
                     segments[segment]["avg_order_value"] / customer_count, 2
                 )
-            segments[segment]["total_spent"] = round(segments[segment]["total_spent"], 2)
+            segments[segment]["total_spent"] = round(
+                segments[segment]["total_spent"], 2
+            )
 
         return {
             "segments": segments,
@@ -429,8 +462,8 @@ class DashboardViewSet(viewsets.ViewSet):
                 "vip": "≥ $1000 spent AND ≥ 10 orders",
                 "regular": "≥ $500 spent OR ≥ 5 orders",
                 "occasional": "≥ $100 spent",
-                "new": "< $100 spent"
-            }
+                "new": "< $100 spent",
+            },
         }
 
 
@@ -500,286 +533,292 @@ class SystemMaintenanceViewSet(viewsets.ModelViewSet):
 
 
 # Additional analytics endpoints for frontend compatibility
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdminUser])
 def order_analytics(request):
     """Get order analytics data"""
     try:
-        range_param = request.GET.get('range', '30d')
-        days = int(range_param.replace('d', ''))
-        
+        range_param = request.GET.get("range", "30d")
+        days = int(range_param.replace("d", ""))
+
         end_date = timezone.now()
         start_date = end_date - timedelta(days=days)
-        
+
         # Get order statistics
         orders = Order.objects.filter(
-            created_at__gte=start_date,
-            created_at__lte=end_date
+            created_at__gte=start_date, created_at__lte=end_date
         )
-        
+
         total_orders = orders.count()
-        total_revenue = orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-        
+        total_revenue = orders.aggregate(Sum("total_amount"))["total_amount__sum"] or 0
+
         # Orders by status
-        status_stats = orders.values('status').annotate(count=Count('id'))
-        
-        # Daily breakdown
-        daily_stats = orders.extra(
-            select={'day': 'DATE(created_at)'}  # MySQL DATE function
-        ).values('day').annotate(
-            count=Count('id'),
-            revenue=Sum('total_amount')
-        ).order_by('day')
-        
-        return Response({
-            'total_orders': total_orders,
-            'total_revenue': float(total_revenue),
-            'status_breakdown': list(status_stats),
-            'daily_breakdown': list(daily_stats),
-            'period': range_param
-        })
-        
+        status_stats = orders.values("status").annotate(count=Count("order_number"))
+
+        # Daily breakdown - use TruncDate for database compatibility
+        from django.db.models.functions import TruncDate
+
+        daily_stats = (
+            orders.annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(count=Count("order_number"), revenue=Sum("total_amount"))
+            .order_by("day")
+        )
+
+        return Response(
+            {
+                "total_orders": total_orders,
+                "total_revenue": float(total_revenue),
+                "status_breakdown": list(status_stats),
+                "daily_breakdown": list(daily_stats),
+                "period": range_param,
+            }
+        )
+
     except Exception as e:
-        return Response({'error': str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdminUser])
 def customer_analytics(request):
     """Get customer analytics data with improved error handling"""
     try:
-        range_param = request.GET.get('range', '30d')
-        days = int(range_param.replace('d', ''))
-        
+        range_param = request.GET.get("range", "30d")
+        days = int(range_param.replace("d", ""))
+
         end_date = timezone.now()
         start_date = end_date - timedelta(days=days)
-        
+
         from django.contrib.auth import get_user_model
+
         User = get_user_model()
-        
+
         # Get customer statistics with safe queries
-        customers = User.objects.filter(role='customer')
+        customers = User.objects.filter(role="customer")
         new_customers = customers.filter(date_joined__gte=start_date).count()
         total_customers = customers.count()
-        
+
         # Customer activity - use safer query approach
         try:
             from apps.orders.models import Order
+
             # Get customers who have orders in the period
-            customer_ids_with_orders = Order.objects.filter(
-                created_at__gte=start_date
-            ).values_list('customer', flat=True).distinct()
-            
-            active_customers = customers.filter(
-                id__in=customer_ids_with_orders
-            ).count()
-            
+            customer_ids_with_orders = (
+                Order.objects.filter(created_at__gte=start_date)
+                .values_list("customer", flat=True)
+                .distinct()
+            )
+
+            active_customers = customers.filter(pk__in=customer_ids_with_orders).count()
+
             # High value customers - get from orders aggregation
-            high_value_customer_ids = Order.objects.values('customer').annotate(
-                total_spent=Sum('total_amount')
-            ).filter(total_spent__gte=1000).values_list('customer', flat=True)
-            
-            high_value = customers.filter(
-                id__in=high_value_customer_ids
-            ).count()
-            
+            high_value_customer_ids = (
+                Order.objects.values("customer")
+                .annotate(total_spent=Sum("total_amount"))
+                .filter(total_spent__gte=1000)
+                .values_list("customer", flat=True)
+            )
+
+            high_value = customers.filter(pk__in=high_value_customer_ids).count()
+
         except Exception as order_error:
             # Fallback if order model has issues
             print(f"Order-related query failed: {order_error}")
             active_customers = 0
             high_value = 0
-        
+
         # Customer growth calculation
         previous_period_start = start_date - timedelta(days=days)
         previous_new_customers = customers.filter(
-            date_joined__gte=previous_period_start,
-            date_joined__lt=start_date
+            date_joined__gte=previous_period_start, date_joined__lt=start_date
         ).count()
-        
+
         growth_rate = 0
         if previous_new_customers > 0:
-            growth_rate = ((new_customers - previous_new_customers) / previous_new_customers) * 100
-        
-        return Response({
-            'total_customers': total_customers,
-            'new_customers': new_customers,
-            'active_customers': active_customers,
-            'high_value_customers': high_value,
-            'growth_rate': round(growth_rate, 2),
-            'period': range_param,
-            'period_days': days
-        })
-        
+            growth_rate = (
+                (new_customers - previous_new_customers) / previous_new_customers
+            ) * 100
+
+        return Response(
+            {
+                "total_customers": total_customers,
+                "new_customers": new_customers,
+                "active_customers": active_customers,
+                "high_value_customers": high_value,
+                "growth_rate": round(growth_rate, 2),
+                "period": range_param,
+                "period_days": days,
+            }
+        )
+
     except ValueError as ve:
-        return Response({
-            'error': f'Invalid range parameter: {str(ve)}'
-        }, status=400)
+        return Response({"error": f"Invalid range parameter: {str(ve)}"}, status=400)
     except Exception as e:
-        return Response({
-            'error': f'Failed to fetch customer analytics: {str(e)}'
-        }, status=500)
+        return Response(
+            {"error": f"Failed to fetch customer analytics: {str(e)}"}, status=500
+        )
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdminUser])
 def performance_analytics(request):
     """Get system performance analytics data"""
     try:
-        range_param = request.GET.get('range', '30d')
-        days = int(range_param.replace('d', ''))
-        
+        range_param = request.GET.get("range", "30d")
+        days = int(range_param.replace("d", ""))
+
         end_date = timezone.now()
         start_date = end_date - timedelta(days=days)
-        
+
         from django.contrib.auth import get_user_model
+
         User = get_user_model()
-        
+
         # System performance metrics
         total_users = User.objects.count()
         active_users = User.objects.filter(last_login__gte=start_date).count()
-        
+
         # Order performance metrics
         try:
             from apps.orders.models import Order
+
             total_orders = Order.objects.filter(created_at__gte=start_date).count()
             completed_orders = Order.objects.filter(
-                created_at__gte=start_date,
-                status='completed'
+                created_at__gte=start_date, status="completed"
             ).count()
-            
+
             # Calculate completion rate
             completion_rate = (completed_orders / max(total_orders, 1)) * 100
-            
+
             # Average order processing time (mock calculation)
             avg_processing_time = 25.5  # minutes
-            
+
         except Exception as order_error:
             print(f"Order performance query failed: {order_error}")
             total_orders = 0
             completed_orders = 0
             completion_rate = 0
             avg_processing_time = 0
-        
+
         # System health metrics (mock data for now)
         system_health = {
-            'cpu_usage': 45.2,
-            'memory_usage': 67.8,
-            'disk_usage': 23.1,
-            'response_time': 1.2,  # seconds
-            'uptime': 99.9  # percentage
+            "cpu_usage": 45.2,
+            "memory_usage": 67.8,
+            "disk_usage": 23.1,
+            "response_time": 1.2,  # seconds
+            "uptime": 99.9,  # percentage
         }
-        
+
         # Performance trends (mock data)
         performance_trends = {
-            'response_time_trend': 'stable',
-            'error_rate_trend': 'improving',
-            'throughput_trend': 'increasing'
+            "response_time_trend": "stable",
+            "error_rate_trend": "improving",
+            "throughput_trend": "increasing",
         }
-        
-        return Response({
-            'total_users': total_users,
-            'active_users': active_users,
-            'total_orders': total_orders,
-            'completed_orders': completed_orders,
-            'completion_rate': round(completion_rate, 2),
-            'avg_processing_time': avg_processing_time,
-            'system_health': system_health,
-            'performance_trends': performance_trends,
-            'period': range_param,
-            'period_days': days
-        })
-        
+
+        return Response(
+            {
+                "total_users": total_users,
+                "active_users": active_users,
+                "total_orders": total_orders,
+                "completed_orders": completed_orders,
+                "completion_rate": round(completion_rate, 2),
+                "avg_processing_time": avg_processing_time,
+                "system_health": system_health,
+                "performance_trends": performance_trends,
+                "period": range_param,
+                "period_days": days,
+            }
+        )
+
     except ValueError as ve:
-        return Response({
-            'error': f'Invalid range parameter: {str(ve)}'
-        }, status=400)
+        return Response({"error": f"Invalid range parameter: {str(ve)}"}, status=400)
     except Exception as e:
-        return Response({
-            'error': f'Failed to fetch performance analytics: {str(e)}'
-        }, status=500)
+        return Response(
+            {"error": f"Failed to fetch performance analytics: {str(e)}"}, status=500
+        )
 
 
 # Export and Report Scheduling Endpoints
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated, IsAdminUser])
 def export_data(request):
     """Export analytics data in various formats (CSV, PDF, Excel)"""
     try:
-        format_type = request.data.get('format', 'csv')
-        filters = request.data.get('filters', {})
-        report_type = filters.get('reportType', 'comprehensive')
-        time_range = filters.get('timeRange', '30d')
-        
+        format_type = request.data.get("format", "csv")
+        filters = request.data.get("filters", {})
+        report_type = filters.get("reportType", "comprehensive")
+        time_range = filters.get("timeRange", "30d")
+
         # Calculate date range
-        days = int(time_range.replace('d', ''))
+        days = int(time_range.replace("d", ""))
         end_date = timezone.now()
         start_date = end_date - timedelta(days=days)
-        
+
         # Get data based on report type
-        if report_type == 'sales':
+        if report_type == "sales":
             data = _get_sales_export_data(start_date, end_date)
-        elif report_type == 'customers':
+        elif report_type == "customers":
             data = _get_customer_export_data(start_date, end_date)
-        elif report_type == 'operations':
+        elif report_type == "operations":
             data = _get_operations_export_data(start_date, end_date)
-        elif report_type == 'financial':
+        elif report_type == "financial":
             data = _get_financial_export_data(start_date, end_date)
         else:  # comprehensive
             data = _get_comprehensive_export_data(start_date, end_date)
-        
+
         # Generate file based on format
-        if format_type == 'csv':
+        if format_type == "csv":
             return _generate_csv_response(data, report_type)
-        elif format_type == 'pdf':
+        elif format_type == "pdf":
             return _generate_pdf_response(data, report_type)
-        elif format_type == 'excel':
+        elif format_type == "excel":
             return _generate_excel_response(data, report_type)
         else:
-            return Response({'error': 'Unsupported format'}, status=400)
-            
+            return Response({"error": "Unsupported format"}, status=400)
+
     except Exception as e:
-        return Response({
-            'error': f'Export failed: {str(e)}'
-        }, status=500)
+        return Response({"error": f"Export failed: {str(e)}"}, status=500)
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated, IsAdminUser])
 def schedule_report(request):
     """Schedule automated report generation"""
     try:
-        template_id = request.data.get('templateId')
-        schedule = request.data.get('schedule', {})
-        
+        template_id = request.data.get("templateId")
+        schedule = request.data.get("schedule", {})
+
         if not template_id:
-            return Response({'error': 'Template ID is required'}, status=400)
-        
+            return Response({"error": "Template ID is required"}, status=400)
+
         # Create scheduled report entry
         scheduled_report = {
-            'id': f"schedule_{template_id}_{int(timezone.now().timestamp())}",
-            'template_id': template_id,
-            'schedule': schedule,
-            'created_by': request.user.id,
-            'created_at': timezone.now(),
-            'status': 'active',
-            'next_run': _calculate_next_run(schedule)
+            "id": f"schedule_{template_id}_{int(timezone.now().timestamp())}",
+            "template_id": template_id,
+            "schedule": schedule,
+            "created_by": request.user.id,
+            "created_at": timezone.now(),
+            "status": "active",
+            "next_run": _calculate_next_run(schedule),
         }
-        
+
         # In a real implementation, you would save this to a database
         # For now, we'll return success
-        return Response({
-            'success': True,
-            'message': 'Report scheduled successfully',
-            'scheduled_report': scheduled_report
-        })
-        
+        return Response(
+            {
+                "success": True,
+                "message": "Report scheduled successfully",
+                "scheduled_report": scheduled_report,
+            }
+        )
+
     except Exception as e:
-        return Response({
-            'error': f'Scheduling failed: {str(e)}'
-        }, status=500)
+        return Response({"error": f"Scheduling failed: {str(e)}"}, status=500)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdminUser])
 def get_scheduled_reports(request):
     """Get all scheduled reports"""
@@ -788,34 +827,33 @@ def get_scheduled_reports(request):
         # For now, return mock data
         scheduled_reports = [
             {
-                'id': 'schedule_1',
-                'name': 'Weekly Sales Report',
-                'template_id': 'sales',
-                'frequency': 'weekly',
-                'status': 'active',
-                'next_run': '2024-01-15 09:00:00',
-                'created_at': '2024-01-01 10:00:00'
+                "id": "schedule_1",
+                "name": "Weekly Sales Report",
+                "template_id": "sales",
+                "frequency": "weekly",
+                "status": "active",
+                "next_run": "2024-01-15 09:00:00",
+                "created_at": "2024-01-01 10:00:00",
             },
             {
-                'id': 'schedule_2', 
-                'name': 'Monthly Customer Analytics',
-                'template_id': 'customers',
-                'frequency': 'monthly',
-                'status': 'active',
-                'next_run': '2024-02-01 08:00:00',
-                'created_at': '2024-01-01 10:00:00'
-            }
+                "id": "schedule_2",
+                "name": "Monthly Customer Analytics",
+                "template_id": "customers",
+                "frequency": "monthly",
+                "status": "active",
+                "next_run": "2024-02-01 08:00:00",
+                "created_at": "2024-01-01 10:00:00",
+            },
         ]
-        
-        return Response({
-            'scheduled_reports': scheduled_reports,
-            'total': len(scheduled_reports)
-        })
-        
+
+        return Response(
+            {"scheduled_reports": scheduled_reports, "total": len(scheduled_reports)}
+        )
+
     except Exception as e:
-        return Response({
-            'error': f'Failed to fetch scheduled reports: {str(e)}'
-        }, status=500)
+        return Response(
+            {"error": f"Failed to fetch scheduled reports: {str(e)}"}, status=500
+        )
 
 
 # Helper functions for export data generation
@@ -823,94 +861,106 @@ def _get_sales_export_data(start_date, end_date):
     """Get sales data for export"""
     try:
         from apps.orders.models import Order
+
         orders = Order.objects.filter(
-            created_at__gte=start_date,
-            created_at__lte=end_date
+            created_at__gte=start_date, created_at__lte=end_date
         )
-        
+
+        # Use TruncDate for database compatibility
+        from django.db.models.functions import TruncDate
+
         return {
-            'total_orders': orders.count(),
-            'total_revenue': orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0,
-            'orders_by_status': list(orders.values('status').annotate(count=Count('id'))),
-            'daily_breakdown': list(orders.extra(
-                select={'day': 'DATE(created_at)'}
-            ).values('day').annotate(
-                count=Count('id'),
-                revenue=Sum('total_amount')
-            ).order_by('day'))
+            "total_orders": orders.count(),
+            "total_revenue": orders.aggregate(Sum("total_amount"))["total_amount__sum"]
+            or 0,
+            "orders_by_status": list(
+                orders.values("status").annotate(count=Count("order_number"))
+            ),
+            "daily_breakdown": list(
+                orders.annotate(day=TruncDate("created_at"))
+                .values("day")
+                .annotate(count=Count("order_number"), revenue=Sum("total_amount"))
+                .order_by("day")
+            ),
         }
     except Exception as e:
         print(f"Error getting sales data: {e}")
-        return {'error': str(e)}
+        return {"error": str(e)}
 
 
 def _get_customer_export_data(start_date, end_date):
     """Get customer data for export"""
     try:
         from django.contrib.auth import get_user_model
+
         User = get_user_model()
-        customers = User.objects.filter(role='customer')
-        
+        customers = User.objects.filter(role="customer")
+
         return {
-            'total_customers': customers.count(),
-            'new_customers': customers.filter(date_joined__gte=start_date).count(),
-            'active_customers': customers.filter(is_active=True).count(),
-            'customer_segments': list(customers.values('date_joined__date').annotate(
-                count=Count('id')
-            ).order_by('date_joined__date'))
+            "total_customers": customers.count(),
+            "new_customers": customers.filter(date_joined__gte=start_date).count(),
+            "active_customers": customers.filter(is_active=True).count(),
+            "customer_segments": list(
+                customers.values("date_joined__date")
+                .annotate(count=Count("user_id"))  # Use the correct primary key field
+                .order_by("date_joined__date")
+            ),
         }
     except Exception as e:
         print(f"Error getting customer data: {e}")
-        return {'error': str(e)}
+        return {"error": str(e)}
 
 
 def _get_operations_export_data(start_date, end_date):
     """Get operations data for export"""
     try:
         from apps.orders.models import Order
+
         orders = Order.objects.filter(
-            created_at__gte=start_date,
-            created_at__lte=end_date
+            created_at__gte=start_date, created_at__lte=end_date
         )
-        
+
         return {
-            'total_orders': orders.count(),
-            'completed_orders': orders.filter(status='completed').count(),
-            'pending_orders': orders.filter(status='pending').count(),
-            'cancelled_orders': orders.filter(status='cancelled').count(),
-            'avg_processing_time': 25.5,  # Mock data
-            'completion_rate': (orders.filter(status='completed').count() / max(orders.count(), 1)) * 100
+            "total_orders": orders.count(),
+            "completed_orders": orders.filter(status="completed").count(),
+            "pending_orders": orders.filter(status="pending").count(),
+            "cancelled_orders": orders.filter(status="cancelled").count(),
+            "avg_processing_time": 25.5,  # Mock data
+            "completion_rate": (
+                orders.filter(status="completed").count() / max(orders.count(), 1)
+            )
+            * 100,
         }
     except Exception as e:
         print(f"Error getting operations data: {e}")
-        return {'error': str(e)}
+        return {"error": str(e)}
 
 
 def _get_financial_export_data(start_date, end_date):
     """Get financial data for export"""
     try:
         from apps.orders.models import Order
+
         orders = Order.objects.filter(
-            created_at__gte=start_date,
-            created_at__lte=end_date,
-            payment_status='paid'
+            created_at__gte=start_date, created_at__lte=end_date, payment_status="paid"
         )
-        
-        total_revenue = orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-        
+
+        total_revenue = orders.aggregate(Sum("total_amount"))["total_amount__sum"] or 0
+
         return {
-            'total_revenue': float(total_revenue),
-            'paid_orders': orders.count(),
-            'avg_order_value': float(total_revenue / max(orders.count(), 1)),
-            'revenue_by_day': list(orders.extra(
-                select={'day': 'DATE(created_at)'}
-            ).values('day').annotate(
-                revenue=Sum('total_amount')
-            ).order_by('day'))
+            "total_revenue": float(total_revenue),
+            "paid_orders": orders.count(),
+            "avg_order_value": float(total_revenue / max(orders.count(), 1)),
+            "revenue_by_day": list(
+                orders.extra(select={"day": "DATE(created_at)"})
+                .values("day")
+                .annotate(revenue=Sum("total_amount"))
+                .order_by("day")
+            ),
         }
     except Exception as e:
         print(f"Error getting financial data: {e}")
-        return {'error': str(e)}
+        return {"error": str(e)}
 
 
 def _get_comprehensive_export_data(start_date, end_date):
@@ -919,16 +969,16 @@ def _get_comprehensive_export_data(start_date, end_date):
     customer_data = _get_customer_export_data(start_date, end_date)
     operations_data = _get_operations_export_data(start_date, end_date)
     financial_data = _get_financial_export_data(start_date, end_date)
-    
+
     return {
-        'sales': sales_data,
-        'customers': customer_data,
-        'operations': operations_data,
-        'financial': financial_data,
-        'period': {
-            'start_date': start_date.isoformat(),
-            'end_date': end_date.isoformat()
-        }
+        "sales": sales_data,
+        "customers": customer_data,
+        "operations": operations_data,
+        "financial": financial_data,
+        "period": {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+        },
     }
 
 
@@ -936,45 +986,56 @@ def _generate_csv_response(data, report_type):
     """Generate CSV response"""
     import csv
     import io
-    
+
     output = io.StringIO()
     writer = csv.writer(output)
-    
+
     # Write headers
-    writer.writerow(['Report Type', 'Generated At', 'Data'])
+    writer.writerow(["Report Type", "Generated At", "Data"])
     writer.writerow([report_type, timezone.now().isoformat(), str(data)])
-    
-    response = HttpResponse(output.getvalue(), content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{report_type}_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+
+    response = HttpResponse(output.getvalue(), content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="{report_type}_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    )
     return response
 
 
 def _generate_pdf_response(data, report_type):
     """Generate PDF response (mock implementation)"""
     # In a real implementation, you would use a PDF library like ReportLab
-    response = HttpResponse(f"PDF Report: {report_type}\n\n{str(data)}", content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{report_type}_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.pdf"'
+    response = HttpResponse(
+        f"PDF Report: {report_type}\n\n{str(data)}", content_type="application/pdf"
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="{report_type}_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.pdf"'
+    )
     return response
 
 
 def _generate_excel_response(data, report_type):
     """Generate Excel response (mock implementation)"""
     # In a real implementation, you would use openpyxl or xlsxwriter
-    response = HttpResponse(f"Excel Report: {report_type}\n\n{str(data)}", content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename="{report_type}_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+    response = HttpResponse(
+        f"Excel Report: {report_type}\n\n{str(data)}",
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="{report_type}_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+    )
     return response
 
 
 def _calculate_next_run(schedule):
     """Calculate next run time based on schedule"""
-    frequency = schedule.get('frequency', 'weekly')
+    frequency = schedule.get("frequency", "weekly")
     now = timezone.now()
-    
-    if frequency == 'daily':
+
+    if frequency == "daily":
         return (now + timedelta(days=1)).isoformat()
-    elif frequency == 'weekly':
+    elif frequency == "weekly":
         return (now + timedelta(weeks=1)).isoformat()
-    elif frequency == 'monthly':
+    elif frequency == "monthly":
         return (now + timedelta(days=30)).isoformat()
     else:
         return (now + timedelta(days=1)).isoformat()

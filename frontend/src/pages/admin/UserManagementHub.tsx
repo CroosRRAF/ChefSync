@@ -2,10 +2,9 @@ import { useAuth } from "@/context/AuthContext";
 import React, { useCallback, useEffect, useState } from "react";
 
 // Import shared components
-import { AnimatedStats, DataTable, GlassCard } from "@/components/admin/shared";
-import type { Column } from "@/components/admin/shared/tables/DataTable";
-import EnhancedUserTable from "@/components/admin/shared/tables/EnhancedUserTable";
+import { AnimatedStats, GlassCard } from "@/components/admin/shared";
 import UserDetailsModal from "@/components/admin/shared/modals/UserDetailsModal";
+import EnhancedUserTable from "@/components/admin/shared/tables/EnhancedUserTable";
 import { useOptimisticUpdates } from "@/hooks";
 
 // Import UI components
@@ -22,13 +21,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -52,11 +44,9 @@ import {
   Loader2,
   Lock,
   Monitor,
-  MoreHorizontal,
   RefreshCw,
   Save,
   Search,
-  Trash2,
   User,
   UserCheck,
   Users,
@@ -70,6 +60,7 @@ import {
   type AdminUser,
   type UserListResponse,
 } from "@/services/adminService";
+import authService from "@/services/authService";
 
 /**
  * Unified User Management Hub - Consolidates 2 user-related pages
@@ -145,14 +136,69 @@ interface Session {
   current: boolean;
 }
 
+const ADMIN_PREF_STORAGE_KEY = "chefsync_admin_profile_preferences";
+const ADMIN_PREF_FIELDS: (keyof AdminProfile)[] = [
+  "timezone",
+  "language",
+  "theme",
+  "emailNotifications",
+  "pushNotifications",
+  "smsNotifications",
+  "twoFactorEnabled",
+];
+
+const getStoredAdminPreferences = (): Partial<AdminProfile> => {
+  try {
+    const raw = localStorage.getItem(ADMIN_PREF_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const filtered: Partial<AdminProfile> = {};
+    ADMIN_PREF_FIELDS.forEach((key) => {
+      if (key in parsed) {
+        const value = parsed[key];
+        if (value !== undefined) {
+          (filtered as any)[key] = value;
+        }
+      }
+    });
+    return filtered;
+  } catch (error) {
+    console.error("Failed to parse admin preferences:", error);
+    return {};
+  }
+};
+
+const persistAdminPreferences = (updates: Partial<AdminProfile>) => {
+  try {
+    const current = getStoredAdminPreferences();
+    const trimmed: Partial<AdminProfile> = {};
+    ADMIN_PREF_FIELDS.forEach((key) => {
+      if (key in updates) {
+        (trimmed as any)[key] = updates[key as keyof AdminProfile];
+      }
+    });
+
+    if (Object.keys(trimmed).length === 0) {
+      return;
+    }
+
+    const merged = { ...current, ...trimmed };
+    localStorage.setItem(ADMIN_PREF_STORAGE_KEY, JSON.stringify(merged));
+  } catch (error) {
+    console.error("Failed to persist admin preferences:", error);
+  }
+};
+
 const UserManagementHub: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
   // Active tab state
-  const [activeTab, setActiveTab] = useState<
-    "users" | "pending" | "profile" | "security" | "activity"
-  >("users");
+  const [activeTab, setActiveTab] = useState<"users" | "pending" | "profile">(
+    "users"
+  );
 
   // User Management States
   const [users, setUsers] = useState<User[]>([]);
@@ -166,7 +212,9 @@ const UserManagementHub: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
-  const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
+  const [approvalAction, setApprovalAction] = useState<
+    "approve" | "reject" | null
+  >(null);
   const [userToApprove, setUserToApprove] = useState<User | null>(null);
   const [approvalNotes, setApprovalNotes] = useState("");
   const [showUserDetails, setShowUserDetails] = useState(false);
@@ -183,6 +231,27 @@ const UserManagementHub: React.FC = () => {
   const [profileSaving, setSaving] = useState(false);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [passwordForm, setPasswordForm] = useState({
+    current: "",
+    newPassword: "",
+    confirmNewPassword: "",
+  });
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
+  const applyPreferenceUpdates = useCallback(
+    (updates: Partial<AdminProfile>) => {
+      setAdminProfile((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const nextProfile = { ...prev, ...updates };
+        persistAdminPreferences(updates);
+        return nextProfile;
+      });
+    },
+    []
+  );
 
   // Optimistic updates hook
   const {
@@ -260,20 +329,26 @@ const UserManagementHub: React.FC = () => {
       updateData(usersData);
     } catch (error) {
       console.error("Error loading users:", error);
-      setError("Failed to load users");
+      setError("Failed to load users. Please try again.");
+      toast({
+        title: "Error",
+        description:
+          "Failed to load users. Please refresh or check your connection.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, roleFilter, statusFilter, updateData]);
+  }, [searchQuery, roleFilter, statusFilter, updateData, toast]);
 
   // Load admin profile
   const loadAdminProfile = useCallback(async () => {
-    if (!user) return;
+    if (!user?.id) {
+      return;
+    }
 
+    setProfileLoading(true);
     try {
-      setProfileLoading(true);
-
-      // Fetch real profile data from API
       const response = await fetch(
         `/api/admin-management/profile/${user.id}/`,
         {
@@ -284,40 +359,53 @@ const UserManagementHub: React.FC = () => {
         }
       );
 
-      if (response.ok) {
-        const profileData = await response.json();
-        setAdminProfile(profileData);
-      } else {
-        // Fallback profile data if API fails
-        const fallbackProfile: AdminProfile = {
-          id: user.id?.toString() || "1",
-          firstName: user.name?.split(" ")[0] || "Admin",
-          lastName: user.name?.split(" ")[1] || "User",
-          email: user.email || "",
-          phone: user.phone || "",
-          role: user.role || "admin",
-          avatar: "",
-          bio: "System Administrator",
-          location: "Sri Lanka",
-          timezone: "Asia/Colombo",
-          language: "en",
-          theme: "system",
-          emailNotifications: true,
-          pushNotifications: true,
-          smsNotifications: false,
-          twoFactorEnabled: false,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString(),
-          loginCount: 0,
-        };
-        setAdminProfile(fallbackProfile);
+      if (!response.ok) {
+        throw new Error(
+          `Profile request failed with status ${response.status}`
+        );
       }
+
+      const profileData = (await response.json()) as AdminProfile;
+      const preferences = getStoredAdminPreferences();
+      setAdminProfile({ ...profileData, ...preferences });
     } catch (error) {
       console.error("Error loading admin profile:", error);
+
+      const nameParts = (user.name || "Admin").split(" ");
+      const fallbackProfile: AdminProfile = {
+        id: user.id?.toString() || "1",
+        firstName: nameParts[0] || "Admin",
+        lastName: nameParts.slice(1).join(" ") || "User",
+        email: user.email || "",
+        phone: user.phone || "",
+        role: user.role || "admin",
+        avatar: "",
+        bio: "System Administrator",
+        location: user.address || "Sri Lanka",
+        timezone: "Asia/Colombo",
+        language: "en",
+        theme: "system",
+        emailNotifications: true,
+        pushNotifications: true,
+        smsNotifications: false,
+        twoFactorEnabled: false,
+        createdAt: user.createdAt || new Date().toISOString(),
+        lastLogin: user.updatedAt || new Date().toISOString(),
+        loginCount: 0,
+      };
+
+      const preferences = getStoredAdminPreferences();
+      setAdminProfile({ ...fallbackProfile, ...preferences });
+
+      toast({
+        title: "Profile unavailable",
+        description: "Showing cached administrator details.",
+        variant: "destructive",
+      });
     } finally {
       setProfileLoading(false);
     }
-  }, [user]);
+  }, [toast, user]);
 
   // Load activity logs
   const loadActivityLogs = useCallback(async () => {
@@ -410,21 +498,40 @@ const UserManagementHub: React.FC = () => {
     if (!userToApprove || !approvalAction) return;
 
     try {
-      await adminService.approveUser(userToApprove.id, approvalAction, approvalNotes);
+      const response = await adminService.approveUser(
+        userToApprove.id,
+        approvalAction,
+        approvalNotes
+      );
+
       toast({
         title: "Success",
-        description: `User ${approvalAction}d successfully`,
+        description: response.message || `User ${approvalAction}d successfully`,
       });
-      loadUsers(); // Refresh the list
+
+      // Refresh both lists to ensure consistency
+      loadUsers();
+      if (activeTab === "pending") {
+        loadPendingUsers();
+      }
+
       setShowApprovalDialog(false);
       setUserToApprove(null);
       setApprovalAction(null);
       setApprovalNotes("");
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error ${approvalAction}ing user:`, error);
+
+      // Extract error message from response if available
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        `Failed to ${approvalAction} user`;
+
       toast({
         title: "Error",
-        description: `Failed to ${approvalAction} user`,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -434,7 +541,7 @@ const UserManagementHub: React.FC = () => {
   const loadUserDetails = async (userId: number) => {
     try {
       setLoadingUserDetails(true);
-      
+
       // First, try to get user details from admin management (works for all user types)
       try {
         const userDetails = await adminService.getUserDetails(userId);
@@ -480,7 +587,7 @@ const UserManagementHub: React.FC = () => {
 
   // Handle approval from modal
   const handleApproveFromModal = (userId: number) => {
-    const user = users.find(u => u.id === userId);
+    const user = users.find((u) => u.id === userId);
     if (user) {
       setShowUserDetailsModal(false);
       handleApprove(user);
@@ -489,7 +596,7 @@ const UserManagementHub: React.FC = () => {
 
   // Handle rejection from modal
   const handleRejectFromModal = (userId: number) => {
-    const user = users.find(u => u.id === userId);
+    const user = users.find((u) => u.id === userId);
     if (user) {
       setShowUserDetailsModal(false);
       handleReject(user);
@@ -497,38 +604,35 @@ const UserManagementHub: React.FC = () => {
   };
 
   // Load pending users from API
-  const loadPendingUsers = async () => {
-    console.log("Loading pending users...");
+  const loadPendingUsers = useCallback(async () => {
     setPendingUsersLoading(true);
     try {
       const response = await adminService.getPendingApprovalsEnhanced({
         page: 1,
         limit: 100,
       });
-      console.log("Pending approvals response:", response);
-      console.log("Number of pending users:", response.users?.length || 0);
 
-      // Transform the response to match AdminUser interface
-      const transformedUsers: AdminUser[] = response.users.map((user: any) => ({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        is_active: user.is_active || true,
-        approval_status: user.approval_status,
-        status: user.approval_status, // Map approval_status to status for compatibility
-        last_login: user.last_login,
-        date_joined: user.date_joined,
-        total_orders: 0, // Default values since not provided in pending approvals
+      const pendingList = response.users || [];
+
+      const transformedUsers: AdminUser[] = pendingList.map((pending: any) => ({
+        id: pending.id,
+        email: pending.email,
+        name: pending.name,
+        role: pending.role,
+        is_active: pending.is_active ?? true,
+        approval_status: pending.approval_status,
+        status: pending.approval_status,
+        last_login: pending.last_login,
+        date_joined: pending.date_joined,
+        total_orders: 0,
         total_spent: 0,
-        // Additional fields from pending approvals response
-        phone_no: user.phone_no,
-        address: user.address,
-        gender: user.gender,
-        approval_notes: user.approval_notes,
-        documents: user.documents,
+        phone_no: pending.phone_no,
+        address: pending.address,
+        gender: pending.gender,
+        approval_notes: pending.approval_notes,
+        documents: pending.documents,
       }));
-      console.log("Transformed pending users:", transformedUsers);
+
       setPendingUsers(transformedUsers);
     } catch (error) {
       console.error("Error loading pending users:", error);
@@ -540,23 +644,30 @@ const UserManagementHub: React.FC = () => {
     } finally {
       setPendingUsersLoading(false);
     }
-  };
+  }, [toast]);
 
   // Handle approve from pending users table
   const handleApprovePending = async (user: User) => {
     try {
-      await adminService.approveUser(user.id, "approve", "");
+      const response = await adminService.approveUser(user.id, "approve", "");
       toast({
         title: "Success",
-        description: `User ${user.name} has been approved`,
+        description: response.message || `User ${user.name} has been approved`,
       });
       loadPendingUsers(); // Refresh pending users
       loadUsers(); // Refresh main users list
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error approving user:", error);
+
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to approve user";
+
       toast({
         title: "Error",
-        description: "Failed to approve user",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -565,18 +676,29 @@ const UserManagementHub: React.FC = () => {
   // Handle reject from pending users table
   const handleRejectPending = async (user: User) => {
     try {
-      await adminService.approveUser(user.id, "reject", "Application rejected by admin");
+      const response = await adminService.approveUser(
+        user.id,
+        "reject",
+        "Application rejected by admin"
+      );
       toast({
         title: "Success",
-        description: `User ${user.name} has been rejected`,
+        description: response.message || `User ${user.name} has been rejected`,
       });
       loadPendingUsers(); // Refresh pending users
       loadUsers(); // Refresh main users list
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error rejecting user:", error);
+
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to reject user";
+
       toast({
         title: "Error",
-        description: "Failed to reject user",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -606,6 +728,14 @@ const UserManagementHub: React.FC = () => {
     try {
       setSaving(true);
 
+      const payload = {
+        firstName: updatedProfile.firstName ?? adminProfile.firstName,
+        lastName: updatedProfile.lastName ?? adminProfile.lastName,
+        phone: updatedProfile.phone ?? adminProfile.phone,
+        location: updatedProfile.location ?? adminProfile.location,
+        bio: updatedProfile.bio ?? adminProfile.bio,
+      };
+
       // Save profile via API
       const response = await fetch(
         `/api/admin-management/profile/${adminProfile.id}/`,
@@ -615,25 +745,53 @@ const UserManagementHub: React.FC = () => {
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(updatedProfile),
+          body: JSON.stringify(payload),
         }
       );
 
-      if (response.ok) {
-        const savedProfile = await response.json();
-        setAdminProfile(savedProfile);
-        toast({
-          title: "Success",
-          description: "Profile updated successfully",
-        });
-      } else {
-        throw new Error("Failed to save profile");
+      const data = await response.json();
+
+      if (!response.ok || data?.error) {
+        throw new Error(
+          data?.error || data?.message || "Failed to save profile"
+        );
       }
-    } catch (error) {
+
+      const updatedName =
+        (data?.user?.name as string | undefined) ||
+        `${payload.firstName} ${payload.lastName}`.trim();
+      const nameParts = updatedName.trim().split(" ");
+
+      setAdminProfile((prev) => {
+        if (!prev) {
+          return prev;
+        }
+
+        const firstName = nameParts[0] || prev.firstName;
+        const lastName = nameParts.slice(1).join(" ") || prev.lastName;
+
+        return {
+          ...prev,
+          firstName,
+          lastName,
+          phone: payload.phone ?? prev.phone,
+          location: payload.location ?? prev.location,
+          bio: payload.bio ?? prev.bio,
+        };
+      });
+
+      toast({
+        title: "Profile updated",
+        description: data?.message || "Profile updated successfully",
+      });
+    } catch (error: any) {
       console.error("Error saving profile:", error);
       toast({
         title: "Error",
-        description: "Failed to save profile",
+        description:
+          error?.message ||
+          error?.response?.data?.error ||
+          "Failed to save profile",
         variant: "destructive",
       });
     } finally {
@@ -641,158 +799,102 @@ const UserManagementHub: React.FC = () => {
     }
   };
 
+  const handlePasswordChange = async () => {
+    if (
+      !passwordForm.current ||
+      !passwordForm.newPassword ||
+      !passwordForm.confirmNewPassword
+    ) {
+      setPasswordError("All password fields are required");
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordError("Password must be at least 8 characters long");
+      return;
+    }
+
+    setPasswordError(null);
+    setPasswordSaving(true);
+
+    try {
+      await authService.changePassword(
+        passwordForm.current,
+        passwordForm.newPassword,
+        passwordForm.confirmNewPassword
+      );
+
+      toast({
+        title: "Password updated",
+        description: "Your password has been changed successfully.",
+      });
+
+      setPasswordForm({ current: "", newPassword: "", confirmNewPassword: "" });
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Failed to change password";
+
+      setPasswordError(message);
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
   // Load data on mount and tab changes
   useEffect(() => {
-    loadUserStats();
+    if (activeTab === "users" || activeTab === "pending") {
+      loadUserStats();
+    }
+
     if (activeTab === "users") {
       loadUsers();
     } else if (activeTab === "pending") {
       loadPendingUsers();
     } else if (activeTab === "profile") {
       loadAdminProfile();
-    } else if (activeTab === "activity") {
       loadActivityLogs();
       loadSessions();
     }
-  }, [activeTab]); // Remove function dependencies to prevent infinite loops
+  }, [
+    activeTab,
+    loadActivityLogs,
+    loadAdminProfile,
+    loadSessions,
+    loadPendingUsers,
+    loadUserStats,
+    loadUsers,
+  ]);
 
   // Sync optimistic users with users state
   useEffect(() => {
     if (users.length > 0) {
       updateData(users);
     }
-  }, [users]); // Remove updateData dependency to prevent loops
+  }, [updateData, users]);
 
-  // User table columns
-  const userColumns: Column<AdminUser>[] = [
-    {
-      key: "name", // Changed from "user" to "name" to match the data structure
-      title: "User",
-      render: (value: any, user: AdminUser) => (
-        <div className="flex items-center space-x-3">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src="" />
-            <AvatarFallback>
-              {user?.name
-                ? user.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()
-                : "U"}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <div className="font-medium">{user?.name || "Unknown User"}</div>
-            <div className="text-sm text-gray-500">
-              {user?.email || "No email"}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "role",
-      title: "Role",
-      render: (value: any, user: AdminUser) => (
-        <Badge variant={user?.role === "admin" ? "default" : "secondary"}>
-          {user?.role?.replace("_", " ") || "Unknown"}
-        </Badge>
-      ),
-    },
-    {
-      key: "status",
-      title: "Status",
-      render: (value: any, user: AdminUser) => (
-        <div className="flex items-center space-x-2">
-          <Badge variant={user?.is_active ? "default" : "secondary"}>
-            {user?.is_active ? "Active" : "Inactive"}
-          </Badge>
-          {user?.approval_status === "pending" && (
-            <Badge variant="outline">Pending Approval</Badge>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "stats",
-      title: "Stats",
-      render: (value: any, user: AdminUser) => (
-        <div className="text-sm">
-          <div>{user?.total_orders || 0} orders</div>
-          <div className="text-gray-500">
-            LKR {user?.total_spent?.toLocaleString() || "0"}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "joined",
-      title: "Joined",
-      render: (value: any, user: AdminUser) => (
-        <div className="text-sm">
-          {user?.date_joined
-            ? new Date(user.date_joined).toLocaleDateString()
-            : "Unknown"}
-        </div>
-      ),
-    },
-    {
-      key: "actions",
-      title: "Actions",
-      render: (value: any, user: AdminUser) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => loadUserDetails(user.id)}>
-              <Eye className="h-4 w-4 mr-2" />
-              View Details
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleToggleStatus(user?.id, user?.is_active)}
-            >
-              {user?.is_active ? (
-                <>
-                  <UserX className="h-4 w-4 mr-2" />
-                  Deactivate
-                </>
-              ) : (
-                <>
-                  <UserCheck className="h-4 w-4 mr-2" />
-                  Activate
-                </>
-              )}
-            </DropdownMenuItem>
-            {user?.approval_status === "pending" && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleApprove(user)}>
-                  <UserCheck className="h-4 w-4 mr-2" />
-                  Approve User
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleReject(user)}>
-                  <UserX className="h-4 w-4 mr-2" />
-                  Reject User
-                </DropdownMenuItem>
-              </>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => handleDeleteUser(user)}
-              className="text-red-600"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
+  // Auto-trigger search when filters change
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      if (activeTab === "users") {
+        loadUsers();
+      }
+    }, 300);
+
+    return () => clearTimeout(delayedSearch);
+  }, [activeTab, loadUsers, roleFilter, searchQuery, statusFilter]);
 
   // Render Users Tab
   const renderUsersTab = () => (
@@ -895,25 +997,31 @@ const UserManagementHub: React.FC = () => {
           </div>
         )}
 
-        <EnhancedUserTable
-          data={optimisticUsers}
-          title="Users"
-          searchable={true}
-          selectable={false}
-          loading={loading}
-          onRowClick={handleUserRowClick}
-          onRefresh={loadUsers}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          pagination={{
-            page: 1,
-            pageSize: 25,
-            total: optimisticUsers.length,
-            onPageChange: () => {},
-            onPageSizeChange: () => {},
-          }}
-        />
-
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="ml-2">Loading users...</span>
+          </div>
+        ) : (
+          <EnhancedUserTable
+            data={optimisticUsers}
+            title="Users"
+            searchable={false}
+            selectable={false}
+            loading={loading}
+            onRowClick={handleUserRowClick}
+            onRefresh={loadUsers}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            pagination={{
+              page: 1,
+              pageSize: 25,
+              total: optimisticUsers.length,
+              onPageChange: () => {},
+              onPageSizeChange: () => {},
+            }}
+          />
+        )}
       </GlassCard>
     </div>
   );
@@ -931,7 +1039,10 @@ const UserManagementHub: React.FC = () => {
                 Review and approve cook and delivery agent applications
               </p>
             </div>
-            <Badge variant="outline" className="text-orange-600 border-orange-200">
+            <Badge
+              variant="outline"
+              className="text-orange-600 border-orange-200"
+            >
               {pendingUsers.length} Pending
             </Badge>
           </div>
@@ -941,7 +1052,7 @@ const UserManagementHub: React.FC = () => {
         <EnhancedUserTable
           data={pendingUsers}
           title="Users Awaiting Approval"
-          searchable={true}
+          searchable={false}
           selectable={false}
           loading={pendingUsersLoading}
           onRowClick={handleUserRowClick}
@@ -963,17 +1074,22 @@ const UserManagementHub: React.FC = () => {
   // Render Profile Tab
   const renderProfileTab = () => (
     <div className="space-y-6">
-      {adminProfile && (
+      {profileLoading ? (
+        <div className="flex items-center justify-center py-16 text-sm text-gray-500">
+          <Loader2 className="h-6 w-6 animate-spin mr-2" />
+          Loading profile details...
+        </div>
+      ) : adminProfile ? (
         <>
-          {/* Profile Header */}
           <GlassCard className="p-6">
-            <div className="flex items-center space-x-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-6 space-y-4 sm:space-y-0">
               <div className="relative">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src={adminProfile.avatar} />
                   <AvatarFallback>
-                    {adminProfile.firstName[0]}
-                    {adminProfile.lastName[0]}
+                    {`${adminProfile.firstName?.[0]?.toUpperCase() || "A"}${
+                      adminProfile.lastName?.[0]?.toUpperCase() || "D"
+                    }`}
                   </AvatarFallback>
                 </Avatar>
                 <Button
@@ -984,40 +1100,40 @@ const UserManagementHub: React.FC = () => {
                   <Camera className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="flex-1">
+              <div className="flex-1 space-y-1">
                 <h2 className="text-2xl font-bold">
                   {adminProfile.firstName} {adminProfile.lastName}
                 </h2>
                 <p className="text-gray-600">{adminProfile.role}</p>
                 <p className="text-sm text-gray-500">{adminProfile.email}</p>
               </div>
-              <div className="text-right">
-                <div className="text-sm text-gray-500">Last login</div>
+              <div className="text-sm text-gray-500 text-right">
+                <div>Last login</div>
                 <div className="font-medium">
-                  {new Date(adminProfile.lastLogin).toLocaleDateString()}
+                  {adminProfile.lastLogin
+                    ? new Date(adminProfile.lastLogin).toLocaleDateString()
+                    : "N/A"}
                 </div>
               </div>
             </div>
           </GlassCard>
 
-          {/* Profile Settings */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <GlassCard className="p-6">
               <h3 className="text-lg font-semibold mb-4">
                 Personal Information
               </h3>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="firstName">First Name</Label>
                     <Input
                       id="firstName"
                       value={adminProfile.firstName}
                       onChange={(e) =>
-                        setAdminProfile({
-                          ...adminProfile,
-                          firstName: e.target.value,
-                        })
+                        setAdminProfile((prev) =>
+                          prev ? { ...prev, firstName: e.target.value } : prev
+                        )
                       }
                     />
                   </div>
@@ -1027,10 +1143,9 @@ const UserManagementHub: React.FC = () => {
                       id="lastName"
                       value={adminProfile.lastName}
                       onChange={(e) =>
-                        setAdminProfile({
-                          ...adminProfile,
-                          lastName: e.target.value,
-                        })
+                        setAdminProfile((prev) =>
+                          prev ? { ...prev, lastName: e.target.value } : prev
+                        )
                       }
                     />
                   </div>
@@ -1041,26 +1156,37 @@ const UserManagementHub: React.FC = () => {
                     id="email"
                     type="email"
                     value={adminProfile.email}
-                    onChange={(e) =>
-                      setAdminProfile({
-                        ...adminProfile,
-                        email: e.target.value,
-                      })
-                    }
+                    disabled
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Contact support to update your email address.
+                  </p>
                 </div>
-                <div>
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={adminProfile.phone}
-                    onChange={(e) =>
-                      setAdminProfile({
-                        ...adminProfile,
-                        phone: e.target.value,
-                      })
-                    }
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      value={adminProfile.phone}
+                      onChange={(e) =>
+                        setAdminProfile((prev) =>
+                          prev ? { ...prev, phone: e.target.value } : prev
+                        )
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="location">Location</Label>
+                    <Input
+                      id="location"
+                      value={adminProfile.location}
+                      onChange={(e) =>
+                        setAdminProfile((prev) =>
+                          prev ? { ...prev, location: e.target.value } : prev
+                        )
+                      }
+                    />
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="bio">Bio</Label>
@@ -1068,10 +1194,9 @@ const UserManagementHub: React.FC = () => {
                     id="bio"
                     value={adminProfile.bio}
                     onChange={(e) =>
-                      setAdminProfile({
-                        ...adminProfile,
-                        bio: e.target.value,
-                      })
+                      setAdminProfile((prev) =>
+                        prev ? { ...prev, bio: e.target.value } : prev
+                      )
                     }
                     rows={3}
                   />
@@ -1087,10 +1212,7 @@ const UserManagementHub: React.FC = () => {
                   <Select
                     value={adminProfile.timezone}
                     onValueChange={(value) =>
-                      setAdminProfile({
-                        ...adminProfile,
-                        timezone: value,
-                      })
+                      applyPreferenceUpdates({ timezone: value })
                     }
                   >
                     <SelectTrigger>
@@ -1110,10 +1232,7 @@ const UserManagementHub: React.FC = () => {
                   <Select
                     value={adminProfile.language}
                     onValueChange={(value) =>
-                      setAdminProfile({
-                        ...adminProfile,
-                        language: value,
-                      })
+                      applyPreferenceUpdates({ language: value })
                     }
                   >
                     <SelectTrigger>
@@ -1130,10 +1249,9 @@ const UserManagementHub: React.FC = () => {
                   <Label htmlFor="theme">Theme</Label>
                   <Select
                     value={adminProfile.theme}
-                    onValueChange={(value: "light" | "dark" | "system") =>
-                      setAdminProfile({
-                        ...adminProfile,
-                        theme: value,
+                    onValueChange={(value) =>
+                      applyPreferenceUpdates({
+                        theme: value as AdminProfile["theme"],
                       })
                     }
                   >
@@ -1151,7 +1269,6 @@ const UserManagementHub: React.FC = () => {
             </GlassCard>
           </div>
 
-          {/* Save Button */}
           <div className="flex justify-end">
             <Button
               onClick={() => handleSaveProfile(adminProfile)}
@@ -1165,183 +1282,268 @@ const UserManagementHub: React.FC = () => {
               Save Changes
             </Button>
           </div>
-        </>
-      )}
-    </div>
-  );
 
-  // Render Security Tab
-  const renderSecurityTab = () => (
-    <div className="space-y-6">
-      {adminProfile && (
-        <>
-          {/* Notification Settings */}
-          <GlassCard className="p-6">
-            <h3 className="text-lg font-semibold mb-4">
-              Notification Preferences
-            </h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Email Notifications</div>
-                  <div className="text-sm text-gray-500">
-                    Receive notifications via email
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <GlassCard className="p-6">
+              <h3 className="text-lg font-semibold mb-4">
+                Notification Preferences
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Email Notifications</div>
+                    <div className="text-sm text-gray-500">
+                      Receive notifications via email
+                    </div>
                   </div>
+                  <Switch
+                    checked={adminProfile.emailNotifications}
+                    onCheckedChange={(checked) =>
+                      applyPreferenceUpdates({ emailNotifications: checked })
+                    }
+                  />
                 </div>
-                <Switch
-                  checked={adminProfile.emailNotifications}
-                  onCheckedChange={(checked) =>
-                    setAdminProfile({
-                      ...adminProfile,
-                      emailNotifications: checked,
-                    })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Push Notifications</div>
-                  <div className="text-sm text-gray-500">
-                    Receive push notifications in browser
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Push Notifications</div>
+                    <div className="text-sm text-gray-500">
+                      Receive push notifications in browser
+                    </div>
                   </div>
+                  <Switch
+                    checked={adminProfile.pushNotifications}
+                    onCheckedChange={(checked) =>
+                      applyPreferenceUpdates({ pushNotifications: checked })
+                    }
+                  />
                 </div>
-                <Switch
-                  checked={adminProfile.pushNotifications}
-                  onCheckedChange={(checked) =>
-                    setAdminProfile({
-                      ...adminProfile,
-                      pushNotifications: checked,
-                    })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">SMS Notifications</div>
-                  <div className="text-sm text-gray-500">
-                    Receive notifications via SMS
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">SMS Notifications</div>
+                    <div className="text-sm text-gray-500">
+                      Receive notifications via SMS
+                    </div>
                   </div>
+                  <Switch
+                    checked={adminProfile.smsNotifications}
+                    onCheckedChange={(checked) =>
+                      applyPreferenceUpdates({ smsNotifications: checked })
+                    }
+                  />
                 </div>
-                <Switch
-                  checked={adminProfile.smsNotifications}
-                  onCheckedChange={(checked) =>
-                    setAdminProfile({
-                      ...adminProfile,
-                      smsNotifications: checked,
-                    })
-                  }
-                />
               </div>
-            </div>
-          </GlassCard>
+            </GlassCard>
 
-          {/* Security Settings */}
-          <GlassCard className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Security</h3>
-            <div className="space-y-4">
+            <GlassCard className="p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Two-Factor Authentication</div>
-                  <div className="text-sm text-gray-500">
-                    Add an extra layer of security to your account
-                  </div>
-                </div>
-                <Button variant="outline" size="sm">
-                  {adminProfile.twoFactorEnabled ? "Disable" : "Enable"}
-                </Button>
+                <h3 className="text-lg font-semibold">Security</h3>
+                <Badge variant="outline">
+                  {adminProfile.twoFactorEnabled
+                    ? "2FA Enabled"
+                    : "2FA Disabled"}
+                </Badge>
               </div>
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Two-Factor Authentication</div>
+                    <div className="text-sm text-gray-500">
+                      Add an extra layer of security to your account
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      applyPreferenceUpdates({
+                        twoFactorEnabled: !adminProfile.twoFactorEnabled,
+                      })
+                    }
+                  >
+                    {adminProfile.twoFactorEnabled ? "Disable" : "Enable"}
+                  </Button>
+                </div>
+                <div className="space-y-3">
                   <div className="font-medium">Change Password</div>
-                  <div className="text-sm text-gray-500">
-                    Update your account password
+                  <div className="grid gap-3">
+                    <div>
+                      <Label htmlFor="current-password">Current Password</Label>
+                      <Input
+                        id="current-password"
+                        type="password"
+                        value={passwordForm.current}
+                        onChange={(e) =>
+                          setPasswordForm((prev) => ({
+                            ...prev,
+                            current: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="new-password">New Password</Label>
+                      <Input
+                        id="new-password"
+                        type="password"
+                        value={passwordForm.newPassword}
+                        onChange={(e) =>
+                          setPasswordForm((prev) => ({
+                            ...prev,
+                            newPassword: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="confirm-password">
+                        Confirm New Password
+                      </Label>
+                      <Input
+                        id="confirm-password"
+                        type="password"
+                        value={passwordForm.confirmNewPassword}
+                        onChange={(e) =>
+                          setPasswordForm((prev) => ({
+                            ...prev,
+                            confirmNewPassword: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
                   </div>
+                  {passwordError && (
+                    <p className="text-sm text-red-500">{passwordError}</p>
+                  )}
+                  <Button
+                    onClick={handlePasswordChange}
+                    disabled={passwordSaving}
+                  >
+                    {passwordSaving ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Lock className="h-4 w-4 mr-2" />
+                    )}
+                    Update Password
+                  </Button>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Lock className="h-4 w-4 mr-2" />
-                  Change
-                </Button>
               </div>
+              <p className="text-xs text-gray-500">
+                Two-factor preferences are stored locally until backend support
+                is enabled.
+              </p>
+            </GlassCard>
+          </div>
+
+          <GlassCard className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Active Sessions</h3>
+              <Button variant="ghost" size="sm" onClick={loadSessions}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {sessions.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No additional active sessions detected.
+                </p>
+              ) : (
+                sessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Monitor className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <div className="font-medium">
+                          {session.device} - {session.browser}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {session.location} • {session.ipAddress}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          Last active:{" "}
+                          {new Date(session.lastActive).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {session.current && (
+                        <Badge variant="default" className="text-xs">
+                          Current
+                        </Badge>
+                      )}
+                      {!session.current && (
+                        <Button variant="outline" size="sm">
+                          Revoke
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </GlassCard>
 
-          {/* Active Sessions */}
           <GlassCard className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Active Sessions</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Recent Activity</h3>
+              <Button variant="ghost" size="sm" onClick={loadActivityLogs}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
             <div className="space-y-3">
-              {sessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <Monitor className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <div className="font-medium">
-                        {session.device} - {session.browser}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {session.location} • {session.ipAddress}
+              {activityLogs.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No recent administrator activity recorded.
+                </p>
+              ) : (
+                activityLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-center space-x-3 p-3 border rounded-lg"
+                  >
+                    <div
+                      className={`h-3 w-3 rounded-full ${
+                        log.status === "success"
+                          ? "bg-green-500"
+                          : log.status === "warning"
+                          ? "bg-yellow-500"
+                          : "bg-red-500"
+                      }`}
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">{log.action}</div>
+                      <div className="text-sm text-gray-600">
+                        {log.description}
                       </div>
                       <div className="text-xs text-gray-400">
-                        Last active:{" "}
-                        {new Date(session.lastActive).toLocaleString()}
+                        {new Date(log.timestamp).toLocaleString()} •{" "}
+                        {log.device} • {log.location}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {session.current && (
-                      <Badge variant="default" className="text-xs">
-                        Current
-                      </Badge>
-                    )}
-                    {!session.current && (
-                      <Button variant="outline" size="sm">
-                        Revoke
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </GlassCard>
         </>
+      ) : (
+        <GlassCard className="p-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Profile unavailable</h3>
+            <p className="text-gray-600">
+              We could not load your administrator profile. Please try again.
+            </p>
+            <Button onClick={loadAdminProfile} variant="outline">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </div>
+        </GlassCard>
       )}
-    </div>
-  );
-
-  // Render Activity Tab
-  const renderActivityTab = () => (
-    <div className="space-y-6">
-      <GlassCard className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-        <div className="space-y-3">
-          {activityLogs.map((log) => (
-            <div
-              key={log.id}
-              className="flex items-center space-x-3 p-3 border rounded-lg"
-            >
-              <div
-                className={`h-3 w-3 rounded-full ${
-                  log.status === "success"
-                    ? "bg-green-500"
-                    : log.status === "warning"
-                    ? "bg-yellow-500"
-                    : "bg-red-500"
-                }`}
-              />
-              <div className="flex-1">
-                <div className="font-medium">{log.action}</div>
-                <div className="text-sm text-gray-600">{log.description}</div>
-                <div className="text-xs text-gray-400">
-                  {new Date(log.timestamp).toLocaleString()} • {log.device} •{" "}
-                  {log.location}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </GlassCard>
     </div>
   );
 
@@ -1375,14 +1577,15 @@ const UserManagementHub: React.FC = () => {
         value={activeTab}
         onValueChange={(value: any) => setActiveTab(value)}
       >
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="pending">
-            Pending Approvals {userStats?.pendingApprovals ? `(${userStats.pendingApprovals})` : ''}
+            Pending Approvals{" "}
+            {userStats?.pendingApprovals
+              ? `(${userStats.pendingApprovals})`
+              : ""}
           </TabsTrigger>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="profile">Profile &amp; Security</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="mt-6">
@@ -1395,14 +1598,6 @@ const UserManagementHub: React.FC = () => {
 
         <TabsContent value="profile" className="mt-6">
           {renderProfileTab()}
-        </TabsContent>
-
-        <TabsContent value="security" className="mt-6">
-          {renderSecurityTab()}
-        </TabsContent>
-
-        <TabsContent value="activity" className="mt-6">
-          {renderActivityTab()}
         </TabsContent>
       </Tabs>
 
@@ -1429,29 +1624,33 @@ const UserManagementHub: React.FC = () => {
       </AlertDialog>
 
       {/* Approval Dialog */}
-      <AlertDialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
+      <AlertDialog
+        open={showApprovalDialog}
+        onOpenChange={setShowApprovalDialog}
+      >
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {approvalAction === "approve" ? "Approve User" : "Reject User"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {approvalAction === "approve" 
+              {approvalAction === "approve"
                 ? `Are you sure you want to approve ${userToApprove?.name}? This will activate their account and send them a notification email.`
-                : `Are you sure you want to reject ${userToApprove?.name}? This will prevent them from using the platform and send them a notification email.`
-              }
+                : `Are you sure you want to reject ${userToApprove?.name}? This will prevent them from using the platform and send them a notification email.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="approval-notes">
-                {approvalAction === "approve" ? "Approval Notes (Optional)" : "Rejection Reason (Required)"}
+                {approvalAction === "approve"
+                  ? "Approval Notes (Optional)"
+                  : "Rejection Reason (Required)"}
               </Label>
               <Textarea
                 id="approval-notes"
                 placeholder={
-                  approvalAction === "approve" 
+                  approvalAction === "approve"
                     ? "Add any notes about the approval..."
                     : "Please provide a reason for rejection..."
                 }
@@ -1468,8 +1667,8 @@ const UserManagementHub: React.FC = () => {
             <AlertDialogAction
               onClick={confirmApprovalAction}
               className={
-                approvalAction === "approve" 
-                  ? "bg-green-600 hover:bg-green-700" 
+                approvalAction === "approve"
+                  ? "bg-green-600 hover:bg-green-700"
                   : "bg-red-600 hover:bg-red-700"
               }
               disabled={approvalAction === "reject" && !approvalNotes.trim()}
@@ -1489,7 +1688,7 @@ const UserManagementHub: React.FC = () => {
               Complete information about {selectedUserDetails?.name}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           {loadingUserDetails ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -1499,61 +1698,106 @@ const UserManagementHub: React.FC = () => {
             <div className="space-y-6">
               {/* User Basic Info */}
               <GlassCard className="p-4">
-                <h3 className="text-lg font-semibold mb-3">Basic Information</h3>
+                <h3 className="text-lg font-semibold mb-3">
+                  Basic Information
+                </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm font-medium text-gray-500">Name</Label>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Name
+                    </Label>
                     <p className="text-sm">{selectedUserDetails.name}</p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-500">Email</Label>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Email
+                    </Label>
                     <p className="text-sm">{selectedUserDetails.email}</p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-500">Role</Label>
-                    <Badge variant="secondary">{selectedUserDetails.role}</Badge>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500">Status</Label>
-                    <Badge variant={
-                      selectedUserDetails.approval_status === "approved" || selectedUserDetails.is_active 
-                        ? "default" : "outline"
-                    }>
-                      {selectedUserDetails.approval_status_display || 
-                       (selectedUserDetails.is_active ? "Active" : "Inactive")}
+                    <Label className="text-sm font-medium text-gray-500">
+                      Role
+                    </Label>
+                    <Badge variant="secondary">
+                      {selectedUserDetails.role}
                     </Badge>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-500">Phone</Label>
-                    <p className="text-sm">{selectedUserDetails.phone_no || "Not provided"}</p>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Status
+                    </Label>
+                    <Badge
+                      variant={
+                        selectedUserDetails.approval_status === "approved" ||
+                        selectedUserDetails.is_active
+                          ? "default"
+                          : "outline"
+                      }
+                    >
+                      {selectedUserDetails.approval_status_display ||
+                        (selectedUserDetails.is_active ? "Active" : "Inactive")}
+                    </Badge>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-500">Created</Label>
-                    <p className="text-sm">{new Date(selectedUserDetails.date_joined || selectedUserDetails.created_at).toLocaleDateString()}</p>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Phone
+                    </Label>
+                    <p className="text-sm">
+                      {selectedUserDetails.phone_no || "Not provided"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Created
+                    </Label>
+                    <p className="text-sm">
+                      {new Date(
+                        selectedUserDetails.date_joined ||
+                          selectedUserDetails.created_at
+                      ).toLocaleDateString()}
+                    </p>
                   </div>
                   {selectedUserDetails.approved_at && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-500">Approved</Label>
-                      <p className="text-sm">{new Date(selectedUserDetails.approved_at).toLocaleDateString()}</p>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Approved
+                      </Label>
+                      <p className="text-sm">
+                        {new Date(
+                          selectedUserDetails.approved_at
+                        ).toLocaleDateString()}
+                      </p>
                     </div>
                   )}
                   {selectedUserDetails.last_login && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-500">Last Login</Label>
-                      <p className="text-sm">{new Date(selectedUserDetails.last_login).toLocaleDateString()}</p>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Last Login
+                      </Label>
+                      <p className="text-sm">
+                        {new Date(
+                          selectedUserDetails.last_login
+                        ).toLocaleDateString()}
+                      </p>
                     </div>
                   )}
                 </div>
                 {selectedUserDetails.address && (
                   <div className="mt-4">
-                    <Label className="text-sm font-medium text-gray-500">Address</Label>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Address
+                    </Label>
                     <p className="text-sm">{selectedUserDetails.address}</p>
                   </div>
                 )}
                 {selectedUserDetails.approval_notes && (
                   <div className="mt-4">
-                    <Label className="text-sm font-medium text-gray-500">Approval Notes</Label>
-                    <p className="text-sm bg-gray-50 p-2 rounded">{selectedUserDetails.approval_notes}</p>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Approval Notes
+                    </Label>
+                    <p className="text-sm bg-gray-50 p-2 rounded">
+                      {selectedUserDetails.approval_notes}
+                    </p>
                   </div>
                 )}
               </GlassCard>
@@ -1561,99 +1805,138 @@ const UserManagementHub: React.FC = () => {
               {/* User Statistics (if available) */}
               {selectedUserDetails.statistics && (
                 <GlassCard className="p-4">
-                  <h3 className="text-lg font-semibold mb-3">User Statistics</h3>
+                  <h3 className="text-lg font-semibold mb-3">
+                    User Statistics
+                  </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-sm font-medium text-gray-500">Total Orders</Label>
-                      <p className="text-sm font-medium">{selectedUserDetails.statistics.total_orders || 0}</p>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Total Orders
+                      </Label>
+                      <p className="text-sm font-medium">
+                        {selectedUserDetails.statistics.total_orders || 0}
+                      </p>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium text-gray-500">Total Spent</Label>
-                      <p className="text-sm font-medium">LKR {selectedUserDetails.statistics.total_spent?.toLocaleString() || "0"}</p>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Total Spent
+                      </Label>
+                      <p className="text-sm font-medium">
+                        LKR{" "}
+                        {selectedUserDetails.statistics.total_spent?.toLocaleString() ||
+                          "0"}
+                      </p>
                     </div>
                   </div>
                 </GlassCard>
               )}
 
               {/* Recent Orders (if available) */}
-              {selectedUserDetails.recent_orders && selectedUserDetails.recent_orders.length > 0 && (
-                <GlassCard className="p-4">
-                  <h3 className="text-lg font-semibold mb-3">Recent Orders</h3>
-                  <div className="space-y-2">
-                    {selectedUserDetails.recent_orders.map((order: any) => (
-                      <div key={order.id} className="flex items-center justify-between p-2 border rounded">
-                        <div>
-                          <p className="font-medium">#{order.order_number}</p>
-                          <p className="text-sm text-gray-500">{new Date(order.created_at).toLocaleDateString()}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium">LKR {order.total_amount?.toLocaleString()}</p>
-                          <Badge variant="outline">{order.status}</Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </GlassCard>
-              )}
-
-              {/* Documents Section */}
-              {selectedUserDetails.documents && selectedUserDetails.documents.length > 0 && (
-                <GlassCard className="p-4">
-                  <h3 className="text-lg font-semibold mb-3">Submitted Documents</h3>
-                  <div className="space-y-3">
-                    {selectedUserDetails.documents.map((doc: any) => (
-                      <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <Download className="h-5 w-5 text-blue-600" />
-                          </div>
+              {selectedUserDetails.recent_orders &&
+                selectedUserDetails.recent_orders.length > 0 && (
+                  <GlassCard className="p-4">
+                    <h3 className="text-lg font-semibold mb-3">
+                      Recent Orders
+                    </h3>
+                    <div className="space-y-2">
+                      {selectedUserDetails.recent_orders.map((order: any) => (
+                        <div
+                          key={order.id}
+                          className="flex items-center justify-between p-2 border rounded"
+                        >
                           <div>
-                            <p className="font-medium">{doc.file_name}</p>
-                            <p className="text-sm text-gray-500">{doc.document_type}</p>
-                            <p className="text-xs text-gray-400">
-                              Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}
+                            <p className="font-medium">#{order.order_number}</p>
+                            <p className="text-sm text-gray-500">
+                              {new Date(order.created_at).toLocaleDateString()}
                             </p>
                           </div>
+                          <div className="text-right">
+                            <p className="font-medium">
+                              LKR {order.total_amount?.toLocaleString()}
+                            </p>
+                            <Badge variant="outline">{order.status}</Badge>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open(doc.file_url, '_blank')}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = doc.file_url;
-                              link.download = doc.file_name;
-                              link.click();
-                            }}
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </Button>
+                      ))}
+                    </div>
+                  </GlassCard>
+                )}
+
+              {/* Documents Section */}
+              {selectedUserDetails.documents &&
+                selectedUserDetails.documents.length > 0 && (
+                  <GlassCard className="p-4">
+                    <h3 className="text-lg font-semibold mb-3">
+                      Submitted Documents
+                    </h3>
+                    <div className="space-y-3">
+                      {selectedUserDetails.documents.map((doc: any) => (
+                        <div
+                          key={doc.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <Download className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{doc.file_name}</p>
+                              <p className="text-sm text-gray-500">
+                                {doc.document_type}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                Uploaded:{" "}
+                                {new Date(doc.uploaded_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                window.open(doc.file_url, "_blank")
+                              }
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const link = document.createElement("a");
+                                link.href = doc.file_url;
+                                link.download = doc.file_name;
+                                link.click();
+                              }}
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </GlassCard>
-              )}
+                      ))}
+                    </div>
+                  </GlassCard>
+                )}
 
               {/* Approval Actions */}
               {selectedUserDetails.approval_status === "pending" && (
                 <GlassCard className="p-4">
-                  <h3 className="text-lg font-semibold mb-3">Approval Actions</h3>
+                  <h3 className="text-lg font-semibold mb-3">
+                    Approval Actions
+                  </h3>
                   <div className="flex space-x-3">
                     <Button
                       onClick={() => {
                         setShowUserDetails(false);
-                        const userId = selectedUserDetails.user_id || selectedUserDetails.id;
-                        handleApprove({ id: userId, name: selectedUserDetails.name } as User);
+                        const userId =
+                          selectedUserDetails.user_id || selectedUserDetails.id;
+                        handleApprove({
+                          id: userId,
+                          name: selectedUserDetails.name,
+                        } as User);
                       }}
                       className="bg-green-600 hover:bg-green-700"
                     >
@@ -1663,8 +1946,12 @@ const UserManagementHub: React.FC = () => {
                     <Button
                       onClick={() => {
                         setShowUserDetails(false);
-                        const userId = selectedUserDetails.user_id || selectedUserDetails.id;
-                        handleReject({ id: userId, name: selectedUserDetails.name } as User);
+                        const userId =
+                          selectedUserDetails.user_id || selectedUserDetails.id;
+                        handleReject({
+                          id: userId,
+                          name: selectedUserDetails.name,
+                        } as User);
                       }}
                       variant="destructive"
                     >
@@ -1676,7 +1963,7 @@ const UserManagementHub: React.FC = () => {
               )}
             </div>
           ) : null}
-          
+
           <AlertDialogFooter>
             <AlertDialogCancel>Close</AlertDialogCancel>
           </AlertDialogFooter>

@@ -18,6 +18,7 @@ interface PieChartProps {
   showLabels?: boolean;
   innerRadius?: number;
   className?: string;
+  noCard?: boolean;
 }
 
 const defaultColors = [
@@ -41,6 +42,7 @@ const PieChart: React.FC<PieChartProps> = memo(
     showLabels = false,
     innerRadius = 0,
     className = "",
+    noCard = false,
   }) => {
     const renderCustomLabel = (entry: any) => {
       const percent = (
@@ -50,6 +52,45 @@ const PieChart: React.FC<PieChartProps> = memo(
       return `${entry.name}: ${percent}%`;
     };
 
+    const chartContent = (
+      <ResponsiveContainer width="100%" height={height}>
+        <RechartsPieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            outerRadius={80}
+            innerRadius={innerRadius}
+            paddingAngle={2}
+            dataKey="value"
+            label={showLabels ? renderCustomLabel : false}
+            labelLine={false}
+          >
+            {data.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={colors[index % colors.length]}
+              />
+            ))}
+          </Pie>
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "var(--background)",
+              border: "1px solid var(--border)",
+              borderRadius: "6px",
+              fontSize: "12px",
+            }}
+            formatter={(value: number) => [value, "Value"]}
+          />
+          {showLegend && <Legend />}
+        </RechartsPieChart>
+      </ResponsiveContainer>
+    );
+
+    if (noCard) {
+      return <div className={className}>{chartContent}</div>;
+    }
+
     return (
       <Card className={className}>
         {title && (
@@ -57,40 +98,7 @@ const PieChart: React.FC<PieChartProps> = memo(
             <CardTitle className="text-base font-medium">{title}</CardTitle>
           </CardHeader>
         )}
-        <CardContent>
-          <ResponsiveContainer width="100%" height={height}>
-            <RechartsPieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                innerRadius={innerRadius}
-                paddingAngle={2}
-                dataKey="value"
-                label={showLabels ? renderCustomLabel : false}
-                labelLine={false}
-              >
-                {data.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={colors[index % colors.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--background)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                }}
-                formatter={(value: number) => [value, "Value"]}
-              />
-              {showLegend && <Legend />}
-            </RechartsPieChart>
-          </ResponsiveContainer>
-        </CardContent>
+        <CardContent>{chartContent}</CardContent>
       </Card>
     );
   }
