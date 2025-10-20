@@ -1,178 +1,87 @@
 # Admin Configuration Directory
 
-This directory contains all configuration files for the ChefSync Kitchen admin system.
+This directory contains configuration files for the ChefSync Admin Management System.
 
-## 📁 Files Overview
-
-### `.env.admin`
-Admin-specific environment variables and settings.
-- Dashboard configuration
-- Notification settings
-- Security parameters
-- Feature flags
-- Performance settings
+## Files
 
 ### `admin-settings.json`
-Admin dashboard UI and functionality configuration.
-- Dashboard widget settings
-- Navigation structure
-- User permissions
-- UI preferences
-- Data management settings
+Main configuration file for admin dashboard settings, navigation, and UI preferences.
+
+**Key Settings:**
+- Dashboard configuration (refresh intervals, widgets)
+- Navigation settings (collapsed state, menu items)
+- Feature flags for different admin modules
+- UI preferences (theme, sidebar, descriptions)
+- Notification settings
+- Search configuration
+- System monitoring settings
 
 ### `system-config.yaml`
-System-wide configuration for the entire ChefSync platform.
-- System information
-- Feature flags
-- Security configuration
-- Database settings
-- Cache configuration
-- Email settings
-- File storage
-- Logging configuration
-- Monitoring settings
-- API configuration
-- Business logic rules
+System-wide configuration for the admin management system.
 
-### `backup-config.json`
-Backup and recovery configuration.
-- Backup schedules
-- Retention policies
-- Compression and encryption
-- Destination settings
-- Verification settings
-- Monitoring and notifications
+**Key Sections:**
+- System information (name, version, environment)
+- Feature toggles
+- Security settings (session timeout, login attempts, password policy)
+- API configuration (rate limiting, caching)
+- Database settings (connection pool, query optimization)
+- Monitoring configuration (health checks, metrics, alerts)
+- Logging settings (level, format, retention)
 
-## 🔧 Usage
+### `admin.env`
+Environment variables for admin-specific features.
 
-### Environment Variables
-Copy `.env.admin` to your backend directory and load it in your Django settings:
+**Key Variables:**
+- Feature flags for different admin modules
+- Dashboard and notification settings
+- Search and monitoring configuration
+- Security and performance settings
+- Backup and maintenance mode settings
+- API and database configuration
+- Logging and audit settings
 
-```python
-# In settings.py
-from decouple import Config, RepositoryEnv
+## Usage
 
-admin_config = Config(RepositoryEnv(BASE_DIR / 'admin-config' / '.env.admin'))
+1. **Development**: Use the default settings for local development
+2. **Production**: Modify settings according to your production requirements
+3. **Feature Flags**: Enable/disable specific admin features using the feature flags
+4. **Customization**: Adjust UI preferences, refresh intervals, and other settings as needed
 
-# Use admin config
-ADMIN_DASHBOARD_REFRESH_INTERVAL = admin_config('ADMIN_DASHBOARD_REFRESH_INTERVAL', default=30000, cast=int)
-```
+## Feature Flags
 
-### Admin Settings
-Load admin settings in your frontend:
+The following feature flags control different admin modules:
 
-```typescript
-// In your admin service
-import adminSettings from '../admin-config/admin-settings.json';
+- `ADMIN_FEATURES_V2`: Enable enhanced admin features
+- `ADMIN_NOTIFICATIONS_V2`: Enable advanced notification system
+- `ADMIN_ORDERS_TIMELINE`: Enable order timeline view
+- `ADMIN_COMMS_SENTIMENT`: Enable sentiment analysis for communications
+- `ADMIN_MAPS_V1`: Enable map integration (requires API key)
+- `ADMIN_EXPORTS_AI_REPORTS`: Enable AI-powered report generation
 
-const getDashboardConfig = () => {
-  return adminSettings.dashboard;
-};
-```
+## Security
 
-### System Configuration
-Load system config in your backend:
+- All configuration files should be kept secure
+- Environment variables should not be committed to version control
+- Use strong passwords and secure session timeouts
+- Enable audit logging for sensitive operations
 
-```python
-# In settings.py
-import yaml
+## Monitoring
 
-with open('admin-config/system-config.yaml', 'r') as file:
-    system_config = yaml.safe_load(file)
+The system includes comprehensive monitoring capabilities:
 
-# Use system config
-FEATURES = system_config['features']
-SECURITY_SETTINGS = system_config['security']
-```
+- Health checks for system components
+- Performance metrics collection
+- Alert system for critical issues
+- Audit logging for admin actions
+- System resource monitoring
 
-## 🚀 Quick Setup
+## Backup
 
-1. **Copy configuration files to appropriate locations:**
-   ```bash
-   # Backend
-   cp admin-config/.env.admin backend/.env.admin
-   cp admin-config/system-config.yaml backend/config/
-   
-   # Frontend
-   cp admin-config/admin-settings.json frontend/src/config/
-   ```
+- Automated backup system for admin data
+- Configurable backup schedules and retention
+- Backup compression and encryption options
+- Recovery procedures for data restoration
 
-2. **Update environment variables:**
-   - Edit `.env.admin` with your specific settings
-   - Update database credentials in `system-config.yaml`
-   - Configure email settings
-   - Set up backup destinations
+## Support
 
-3. **Load configurations in your application:**
-   - Backend: Update Django settings to load admin config
-   - Frontend: Import admin settings in your admin components
-
-## 📋 Configuration Categories
-
-### Dashboard Settings
-- Refresh intervals
-- Widget configuration
-- Default views
-- Auto-refresh settings
-
-### Navigation Settings
-- Menu structure
-- Permission-based visibility
-- Icon configuration
-- Sub-menu organization
-
-### Security Settings
-- Session timeouts
-- Login attempt limits
-- Password policies
-- CORS configuration
-
-### Performance Settings
-- Cache configuration
-- Pagination sizes
-- Bulk operation limits
-- API rate limits
-
-### Monitoring Settings
-- Health check endpoints
-- Metrics collection
-- Performance thresholds
-- Alert configurations
-
-## 🔒 Security Notes
-
-- Never commit sensitive configuration files to version control
-- Use environment variables for secrets
-- Regularly rotate encryption keys
-- Monitor configuration changes
-- Implement access controls for configuration management
-
-## 📊 Monitoring
-
-The configuration files support comprehensive monitoring:
-- System health checks
-- Performance metrics
-- Security event logging
-- Backup status monitoring
-- User activity tracking
-
-## 🛠️ Maintenance
-
-- Regularly review and update configurations
-- Test configuration changes in development first
-- Document any custom configurations
-- Keep backup copies of working configurations
-- Monitor configuration impact on system performance
-
-## 📞 Support
-
-For configuration-related issues:
-1. Check the configuration file syntax
-2. Verify environment variable loading
-3. Test configuration changes in isolation
-4. Review system logs for configuration errors
-5. Consult the main system documentation
-
----
-
-**Note**: Always test configuration changes in a development environment before applying them to production.
+For questions or issues with admin configuration, please refer to the main project documentation or contact the development team.

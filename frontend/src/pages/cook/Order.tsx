@@ -398,7 +398,7 @@ const DashboardStats: React.FC<{ stats: ChefDashboardStats | null }> = ({ stats 
     },
     {
       title: 'Today Revenue',
-      value: `$${stats.today_revenue.toFixed(2)}`,
+      value: `LKR ${stats.today_revenue.toFixed(2)}`,
       icon: DollarSign,
       color: 'text-green-600'
     }

@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChefSync - Account Activated</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        line-height: 1.6;
+        min-height: 100vh;
+      }
+
+      .email-container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
+      }
+
+      .header {
+        background: linear-gradient(
+          135deg,
+          #4caf50 0%,
+          #66bb6a 50%,
+          #81c784 100%
+        );
+        padding: 50px 40px;
+        text-align: center;
+        color: white;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .header::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="2" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100%" height="100%" fill="url(%23pattern)"/></svg>');
+        animation: float 20s ease-in-out infinite;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(-20px) rotate(0deg);
+        }
+        50% {
+          transform: translateY(20px) rotate(180deg);
+        }
+      }
+
+      .brand-container {
+        position: relative;
+        z-index: 2;
+      }
+
+      .brand-icon {
+        font-size: 60px;
+        margin-bottom: 20px;
+        display: block;
+        text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .brand-title {
+        font-size: 42px;
+        font-weight: 900;
+        margin-bottom: 10px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        letter-spacing: -1px;
+      }
+
+      .brand-subtitle {
+        font-size: 18px;
+        opacity: 0.9;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+
+      .content {
+        padding: 60px 50px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      }
+
+      .status-badge {
+        display: inline-block;
+        padding: 12px 24px;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 30px;
+        border: 2px solid;
+        background: linear-gradient(135deg, #e8f5e8 0%, #e0f2f1 100%);
+        color: #2e7d32;
+        border-color: #4caf50;
+      }
+
+      .greeting {
+        font-size: 32px;
+        color: #2c3e50;
+        margin-bottom: 20px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .message {
+        font-size: 18px;
+        color: #5a6c7d;
+        line-height: 1.8;
+        margin-bottom: 40px;
+        text-align: center;
+      }
+
+      .success-section {
+        background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
+        border-radius: 20px;
+        padding: 50px 30px;
+        text-align: center;
+        margin: 40px 0;
+        border: 2px solid #4caf50;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .success-section::before {
+        content: "✅🎉";
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        font-size: 32px;
+        opacity: 0.3;
+      }
+
+      .success-icon {
+        font-size: 64px;
+        margin-bottom: 20px;
+        display: block;
+      }
+
+      .success-title {
+        font-size: 28px;
+        color: #2e7d32;
+        margin-bottom: 20px;
+        font-weight: 800;
+      }
+
+      .success-message {
+        font-size: 18px;
+        color: #388e3c;
+        line-height: 1.7;
+        font-weight: 600;
+      }
+
+      .features-section {
+        background: linear-gradient(135deg, #fff3e0 0%, #fce4ec 100%);
+        border: 2px solid #ff9800;
+        border-radius: 15px;
+        padding: 30px;
+        margin: 30px 0;
+      }
+
+      .features-section h3 {
+        color: #e65100;
+        font-size: 22px;
+        margin-bottom: 20px;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-top: 25px;
+      }
+
+      .feature-item {
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        border: 2px solid rgba(255, 152, 0, 0.2);
+      }
+
+      .feature-icon {
+        font-size: 32px;
+        margin-bottom: 10px;
+        display: block;
+      }
+
+      .feature-title {
+        font-size: 16px;
+        color: #e65100;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      .feature-description {
+        font-size: 14px;
+        color: #bf360c;
+        line-height: 1.5;
+      }
+
+      .info-card {
+        background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+        border: 2px solid #2196f3;
+        border-radius: 15px;
+        padding: 30px;
+        margin: 30px 0;
+        text-align: center;
+      }
+
+      .info-card h3 {
+        color: #0d47a1;
+        font-size: 20px;
+        margin-bottom: 15px;
+        font-weight: 700;
+      }
+
+      .info-card p {
+        color: #0d47a1;
+        font-size: 16px;
+        margin: 8px 0;
+        font-weight: 500;
+      }
+
+      .cta-section {
+        text-align: center;
+        margin: 40px 0;
+      }
+
+      .cta-button {
+        display: inline-block;
+        background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
+        color: white;
+        text-decoration: none;
+        padding: 18px 40px;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 18px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+      }
+
+      .cta-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 35px rgba(76, 175, 80, 0.6);
+      }
+
+      .divider {
+        height: 4px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          #4caf50,
+          #66bb6a,
+          #81c784,
+          transparent
+        );
+        margin: 40px 0;
+        border-radius: 2px;
+      }
+
+      .welcome-section {
+        text-align: center;
+        margin: 40px 0;
+        padding: 30px;
+        background: rgba(76, 175, 80, 0.05);
+        border-radius: 15px;
+      }
+
+      .welcome-section h3 {
+        color: #2c3e50;
+        font-size: 22px;
+        margin-bottom: 15px;
+        font-weight: 700;
+      }
+
+      .welcome-section p {
+        color: #5a6c7d;
+        font-size: 16px;
+        margin: 8px 0;
+      }
+
+      .footer {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        color: white;
+        padding: 50px 40px;
+        text-align: center;
+      }
+
+      .footer-brand {
+        font-size: 28px;
+        font-weight: 900;
+        margin-bottom: 10px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .footer-tagline {
+        font-size: 16px;
+        opacity: 0.8;
+        margin-bottom: 30px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .footer-links {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        margin: 30px 0;
+        flex-wrap: wrap;
+      }
+
+      .footer-links a {
+        color: #66bb6a;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 16px;
+        padding: 8px 16px;
+        border-radius: 25px;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+      }
+
+      .footer-links a:hover {
+        background: rgba(102, 187, 106, 0.2);
+        border-color: #66bb6a;
+      }
+
+      .footer-disclaimer {
+        font-size: 14px;
+        opacity: 0.7;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        line-height: 1.6;
+      }
+
+      /* Mobile Responsive */
+      @media only screen and (max-width: 600px) {
+        body {
+          padding: 10px;
+        }
+        .email-container {
+          border-radius: 16px;
+        }
+        .header {
+          padding: 40px 30px;
+        }
+        .content {
+          padding: 40px 30px;
+        }
+        .footer {
+          padding: 40px 30px;
+        }
+        .brand-title {
+          font-size: 32px;
+        }
+        .greeting {
+          font-size: 26px;
+        }
+        .success-section {
+          padding: 40px 20px;
+        }
+        .features-grid {
+          grid-template-columns: 1fr;
+        }
+        .footer-links {
+          flex-direction: column;
+          gap: 15px;
+        }
+        .cta-button {
+          padding: 16px 35px;
+          font-size: 16px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="email-container">
+      <div class="header">
+        <div class="brand-container">
+          <span class="brand-icon">🍽️</span>
+          <h1 class="brand-title">ChefSync</h1>
+          <p class="brand-subtitle">Culinary Excellence Delivered</p>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="status-badge">✅ Account Activated</div>
+
+        <div class="greeting">Welcome to ChefSync, {{ user_name }}!</div>
+
+        <div class="message">
+          <p><strong>Congratulations! 🎉</strong></p>
+          <p>
+            Your ChefSync account has been successfully activated. You now have
+            full access to all our culinary features and can start connecting
+            with chefs, food lovers, and delivery experts worldwide.
+          </p>
+        </div>
+
+        <div class="success-section">
+          <span class="success-icon">🎊</span>
+          <h2 class="success-title">Account Successfully Activated!</h2>
+          <p class="success-message">
+            Your account is now active and ready to use. Start exploring the
+            world of culinary excellence with ChefSync!
+          </p>
+        </div>
+
+        <div class="features-section">
+          <h3>🚀 What You Can Do Now</h3>
+          <div class="features-grid">
+            <div class="feature-item">
+              <span class="feature-icon">👨‍🍳</span>
+              <div class="feature-title">Connect with Chefs</div>
+              <div class="feature-description">
+                Find and collaborate with professional chefs in your area
+              </div>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">📱</span>
+              <div class="feature-title">Order Food</div>
+              <div class="feature-description">
+                Browse menus and place orders from top-rated restaurants
+              </div>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">🚚</span>
+              <div class="feature-title">Delivery Tracking</div>
+              <div class="feature-description">
+                Track your orders in real-time from kitchen to doorstep
+              </div>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">⭐</span>
+              <div class="feature-title">Rate & Review</div>
+              <div class="feature-description">
+                Share your experiences and help others discover great food
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <h3>📋 Account Details</h3>
+          <p><strong>Account Type:</strong> {{ account_type }}</p>
+          <p><strong>Activation Date:</strong> {{ activation_date }}</p>
+          <p><strong>Account ID:</strong> {{ account_id }}</p>
+        </div>
+
+        <div class="cta-section">
+          <a href="{{ frontend_url }}/dashboard" class="cta-button"
+            >Start Exploring</a
+          >
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="welcome-section">
+          <h3>Welcome to the ChefSync Community! 👋</h3>
+          <p>
+            You're now part of a vibrant community of culinary enthusiasts,
+            professional chefs, and food lovers.
+          </p>
+          <p>
+            Explore, order, connect, and enjoy the best culinary experiences
+            ChefSync has to offer!
+          </p>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="footer-brand">ChefSync Team</div>
+        <div class="footer-tagline">Connecting Culinary Talents Worldwide</div>
+
+        <div class="footer-links">
+          <a href="{{ frontend_url }}">Visit Website</a>
+          <a href="{{ frontend_url }}/dashboard">My Dashboard</a>
+          <a href="{{ frontend_url }}/contact">Get Support</a>
+          <a href="{{ frontend_url }}/privacy">Privacy Policy</a>
+        </div>
+
+        <div class="footer-disclaimer">
+          This email was sent to <strong>{{ email }}</strong><br />
+          If you didn't create this account, please contact our support team
+          immediately.<br />
+          © 2025 ChefSync. All rights reserved.
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -405,7 +405,7 @@ const DeliveryDashboard: React.FC = () => {
               <div>
                 <p className="text-green-100 text-sm">Today's Earnings</p>
                 <p className="text-3xl font-bold text-white">
-                  ${totalEarnings.toFixed(2)}
+                  LKR ${totalEarnings.toFixed(2)}
                 </p>
               </div>
               <DollarSign className="h-10 w-10 text-green-200 group-hover:scale-110 transition-transform duration-300" />
@@ -854,7 +854,7 @@ const DeliveryDashboard: React.FC = () => {
                     <div>
                       <div className="flex justify-between mb-2">
                         <span>Earnings</span>
-                        <span>${totalEarnings.toFixed(2)}/$200</span>
+                        <span>LKR ${totalEarnings.toFixed(2)}/LKR 200</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div

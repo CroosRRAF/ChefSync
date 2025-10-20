@@ -39,6 +39,15 @@ def health_check(request):
         'timestamp': timezone.now(),
         'message': 'ChefSync API is running'
     }, status=status.HTTP_200_OK)
+from django.http import JsonResponse
+from django.middleware.csrf import get_token
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def csrf_token(request):
+    """Get CSRF token for frontend"""
+    return JsonResponse({'csrfToken': get_token(request)})
 import requests
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -57,7 +66,7 @@ def user_registration(request):
         # Get referral token from request data
         referral_token = request.data.get('referral_token')
         referral_result = None
-        
+
         # Validate referral token if provided
         if referral_token:
             from .services.referral_service import ReferralService
@@ -67,10 +76,10 @@ def user_registration(request):
                     'error': 'Invalid referral token',
                     'details': validation_result['message']
                 }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Save user
         user = serializer.save()
-        
+
         # Use referral token if valid
         if referral_token:
             from .services.referral_service import ReferralService
@@ -78,7 +87,7 @@ def user_registration(request):
             if not referral_result['success']:
                 # Log error but don't fail registration
                 print(f"Referral token usage failed: {referral_result['message']}")
-        
+
         # Send email verification
         try:
             verification_url = f"{settings.FRONTEND_URL}/verify-email?token={user.email_verification_token}"
@@ -92,12 +101,12 @@ def user_registration(request):
         except Exception as e:
             # Log error but don't fail registration
             print(f"Email sending failed: {e}")
-        
+
         response_data = {
             'message': 'User registered successfully. Please check your email for verification.',
             'user_id': user.user_id
         }
-        
+
         # Add referral information to response if applicable
         if referral_result and referral_result['success']:
             response_data['referral'] = {
@@ -105,9 +114,9 @@ def user_registration(request):
                 'referrer': referral_result['referrer'].name,
                 'rewards': referral_result['rewards']
             }
-        
+
         return Response(response_data, status=status.HTTP_201_CREATED)
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -120,14 +129,14 @@ def create_referral_token(request):
     try:
         user = request.user
         data = request.data
-        
+
         # Get parameters
         expires_days = data.get('expires_days', 30)
         max_uses = data.get('max_uses', 1)
         referrer_reward = data.get('referrer_reward', 0)
         referee_reward = data.get('referee_reward', 0)
         campaign_name = data.get('campaign_name')
-        
+
         # Create referral token
         from .services.referral_service import ReferralService
         result = ReferralService.create_referral_token(
@@ -138,7 +147,7 @@ def create_referral_token(request):
             referee_reward=referee_reward,
             campaign_name=campaign_name
         )
-        
+
         if result['success']:
             return Response({
                 'message': result['message'],
@@ -151,7 +160,7 @@ def create_referral_token(request):
             return Response({
                 'error': result['message']
             }, status=status.HTTP_400_BAD_REQUEST)
-            
+
     except Exception as e:
         return Response({
             'error': 'Failed to create referral token'
@@ -166,20 +175,20 @@ def get_referral_stats(request):
     """
     try:
         user = request.user
-        
+
         from .services.referral_service import ReferralService
         stats = ReferralService.get_user_referral_stats(user)
-        
+
         # Get referral code and URL
         referral_code = user.get_referral_code()
         referral_url = user.get_referral_url()
-        
+
         return Response({
             'referral_code': referral_code,
             'referral_url': referral_url,
             'stats': stats
         }, status=status.HTTP_200_OK)
-        
+
     except Exception as e:
         return Response({
             'error': 'Failed to get referral statistics'
@@ -194,10 +203,10 @@ def get_referral_tokens(request):
     """
     try:
         user = request.user
-        
+
         from .services.referral_service import ReferralService
         tokens = ReferralService.get_user_referral_tokens(user)
-        
+
         token_data = []
         for token in tokens:
             token_data.append({
@@ -213,12 +222,12 @@ def get_referral_tokens(request):
                 'campaign_name': token.campaign_name,
                 'used_by': token.used_by.name if token.used_by else None
             })
-        
+
         return Response({
             'tokens': token_data,
             'count': len(token_data)
         }, status=status.HTTP_200_OK)
-        
+
     except Exception as e:
         return Response({
             'error': 'Failed to get referral tokens'
@@ -233,15 +242,15 @@ def validate_referral_token(request):
     """
     try:
         token = request.data.get('token')
-        
+
         if not token:
             return Response({
                 'error': 'Token is required'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         from .services.referral_service import ReferralService
         result = ReferralService.validate_referral_token(token)
-        
+
         if result['valid']:
             return Response({
                 'valid': True,
@@ -256,7 +265,7 @@ def validate_referral_token(request):
                 'valid': False,
                 'message': result['message']
             }, status=status.HTTP_400_BAD_REQUEST)
-            
+
     except Exception as e:
         return Response({
             'error': 'Failed to validate referral token'
@@ -270,29 +279,31 @@ def user_login(request):
     """
     User login with JWT tokens
     """
+    print(f"Login attempt for email: {request.data.get('email')}")
     serializer = UserLoginSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data['user']
-        
+        print(f"Login successful for user: {user.email}")
+
         # Reset failed login attempts on successful login
         user.reset_failed_login_attempts()
-        
+
         # Generate JWT tokens using the service
         from .services.jwt_service import JWTTokenService
         token_data = JWTTokenService.create_tokens(user, request)
-        
+
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-        
+
         return Response({
             'message': 'Login successful',
             'access': token_data['access_token'],
             'refresh': token_data['refresh_token'],
             'user': UserProfileSerializer(user).data
         }, status=status.HTTP_200_OK)
-    
+
     # Handle different types of validation errors
     errors = serializer.errors
-    
+
     # Check if it's an approval status error
     if 'non_field_errors' in errors:
         error_data = errors['non_field_errors'][0]
@@ -304,14 +315,14 @@ def user_login(request):
                 'message': error_data['message'],
                 'email': error_data.get('email')
             }, status=status.HTTP_403_FORBIDDEN)
-    
+
     # Increment failed login attempts for invalid credentials
     try:
         user = User.objects.get(email=request.data.get('email'))
         user.increment_failed_login()
     except User.DoesNotExist:
         pass
-    
+
     return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -324,14 +335,14 @@ def user_logout(request):
     try:
         # Revoke tokens using the service
         from .services.jwt_service import JWTTokenService
-        
+
         refresh_token = request.data.get('refresh')
         if refresh_token:
             JWTTokenService.revoke_token(refresh_token, 'refresh')
-        
+
         # Revoke all user tokens for security
         JWTTokenService.revoke_all_user_tokens(request.user)
-        
+
         logout(request)
         return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
     except Exception as e:
@@ -349,13 +360,20 @@ def token_refresh(request):
         if not refresh_token:
             print("Token refresh failed: No refresh token provided")
             return Response({'error': 'Refresh token required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         print(f"Token refresh attempt for token: {refresh_token[:20]}...")
-        
-        # Use JWT service to refresh token
+
+        # Use JWT service to validate token and get user
         from .services.jwt_service import JWTTokenService
+        
+        # Validate refresh token and get user
+        is_valid, user, error = JWTTokenService.validate_token(refresh_token, 'refresh')
+        if not is_valid:
+            print(f"Token validation failed: {error}")
+            return Response({'error': 'Invalid refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
+        
         # Rotate the refresh token
-        token_data = JWTTokenService.rotate_refresh_token(refresh_token, request.user, request)
+        token_data = JWTTokenService.rotate_refresh_token(refresh_token, user, request)
 
         print("Token refresh successful with rotation")
         return Response({
@@ -377,7 +395,7 @@ def verify_email(request):
     serializer = EmailVerificationSerializer(data=request.data)
     if serializer.is_valid():
         token = serializer.validated_data['token']
-        
+
         try:
             user = User.objects.get(email_verification_token=token)
             if user.verify_email(token):
@@ -392,7 +410,7 @@ def verify_email(request):
             return Response({
                 'error': 'Invalid verification token'
             }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -408,11 +426,11 @@ def request_password_reset(request):
         email = serializer.validated_data['email']
         try:
             user = User.objects.get(email=email)
-            
+
             # Send OTP for password reset
             from .services.email_service import EmailService
             result = EmailService.send_otp(email, purpose='password_reset', user_name=user.name)
-            
+
             if result['success']:
                 return Response({
                     'message': 'Password reset code sent to your email'
@@ -421,12 +439,12 @@ def request_password_reset(request):
                 return Response({
                     'error': result['message']
                 }, status=status.HTTP_400_BAD_REQUEST)
-                
+
         except User.DoesNotExist:
             return Response({
                 'error': 'No account found with this email address'
             }, status=status.HTTP_404_NOT_FOUND)
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -441,17 +459,17 @@ def confirm_password_reset(request):
     otp = data.get('otp')
     new_password = data.get('new_password')
     confirm_password = data.get('confirm_password')
-    
+
     if not all([email, otp, new_password, confirm_password]):
         return Response({
             'error': 'Email, OTP, new password, and confirm password are required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     if new_password != confirm_password:
         return Response({
             'error': "Passwords don't match"
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     # Validate password strength
     try:
         from django.contrib.auth.password_validation import validate_password
@@ -460,26 +478,26 @@ def confirm_password_reset(request):
         return Response({
             'error': f'Password validation failed: {str(e)}'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         # Verify OTP
         from .services.email_service import EmailService
         result = EmailService.verify_otp(email, otp, purpose='password_reset')
-        
+
         if not result['success']:
             return Response({
                 'error': result['message']
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Get user and update password
         user = User.objects.get(email=email)
         user.set_password(new_password)
         user.save()
-        
+
         return Response({
             'message': 'Password reset successful'
         }, status=status.HTTP_200_OK)
-        
+
     except User.DoesNotExist:
         return Response({
             'error': 'User not found'
@@ -502,20 +520,20 @@ def google_oauth_login(request):
     print('Request data:', request.data)
     print('Client ID from settings:', settings.GOOGLE_OAUTH_CLIENT_ID)
     print('Client Secret configured:', bool(settings.GOOGLE_OAUTH_CLIENT_SECRET))
-    
+
     serializer = GoogleOAuthSerializer(data=request.data)
     print('Serializer data:', serializer.initial_data)
-    
+
     # Only allow customer role for Google OAuth
     forced_role = 'customer'
-    
+
     if not serializer.is_valid():
         print('Serializer validation failed:', serializer.errors)
         print('=== GOOGLE OAUTH LOGIN DEBUG END ===\n')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     print('Serializer valid, validated data:', serializer.validated_data)
-    
+
     try:
         print('Attempting to verify Google token...')
         # Verify Google ID token
@@ -524,13 +542,13 @@ def google_oauth_login(request):
             google_requests.Request(),
             settings.GOOGLE_OAUTH_CLIENT_ID
         )
-        
+
         print('Google token verified successfully!')
         print('Token info:', idinfo)
-        
+
         email = idinfo['email']
         name = idinfo.get('name', '')
-        
+
         # Get or create user
         user, created = User.objects.get_or_create(
             email=email,
@@ -541,9 +559,10 @@ def google_oauth_login(request):
                 'username': email,  # Ensure username uniqueness aligns with email for social logins
             }
         )
-        
+
         print(f'User {"created" if created else "found"}: {user.email}')
-        
+
+
         # Ensure legacy users created without username/email_verified fields are updated
         user_updates = []
         if not user.username:
@@ -570,23 +589,23 @@ def google_oauth_login(request):
             except Exception as e:
                 print(f"Profile creation failed: {e}")
                 # Continue without profile creation
-        
+
         # Generate JWT tokens using the service
         from .services.jwt_service import JWTTokenService
         token_data = JWTTokenService.create_tokens(user, request)
-        
+
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-        
+
         print('Google OAuth login successful!')
         print('=== GOOGLE OAUTH LOGIN DEBUG END ===\n')
-        
+
         return Response({
             'message': 'Google OAuth login successful',
             'access': token_data['access_token'],
             'refresh': token_data['refresh_token'],
             'user': UserProfileSerializer(user).data
         }, status=status.HTTP_200_OK)
-        
+
     except GoogleAuthError as e:
         # GoogleAuthError contains useful messages; include them in logs and response for debugging
         print(f"Google Auth Error: {repr(e)}")
@@ -647,19 +666,19 @@ def change_password(request):
     serializer = PasswordChangeSerializer(data=request.data)
     if serializer.is_valid():
         user = request.user
-        
+
         if not user.check_password(serializer.validated_data['old_password']):
             return Response({
                 'error': 'Current password is incorrect'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         user.set_password(serializer.validated_data['new_password'])
         user.save()
-        
+
         return Response({
             'message': 'Password changed successfully'
         }, status=status.HTTP_200_OK)
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -706,7 +725,7 @@ def cook_profile_detail(request):
         return Response({
             'error': 'This endpoint is only available for cooks'
         }, status=status.HTTP_403_FORBIDDEN)
-    
+
     serializer = CookProfileManagementSerializer(request.user)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -721,20 +740,20 @@ def cook_profile_update(request):
         return Response({
             'error': 'This endpoint is only available for cooks'
         }, status=status.HTTP_403_FORBIDDEN)
-    
+
     serializer = CookProfileManagementSerializer(
-        request.user, 
-        data=request.data, 
+        request.user,
+        data=request.data,
         partial=True
     )
-    
+
     if serializer.is_valid():
         serializer.save()
         return Response({
             'message': 'Profile updated successfully',
             'profile': serializer.data
         }, status=status.HTTP_200_OK)
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -748,11 +767,11 @@ def cook_profile_delete(request):
         return Response({
             'error': 'This endpoint is only available for cooks'
         }, status=status.HTTP_403_FORBIDDEN)
-    
+
     # Soft delete - deactivate the account instead of permanent deletion
     request.user.is_active = False
     request.user.save()
-    
+
     return Response({
         'message': 'Account has been deactivated successfully'
     }, status=status.HTTP_200_OK)
@@ -849,19 +868,19 @@ def complete_registration(request):
     Complete user registration after OTP verification
     """
     print(f"🔍 Complete Registration Request: {request.data}")  # Debug log
-    
+
     try:
         serializer = CompleteRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             print(f"✅ Serializer validation passed")  # Debug log
-            
+
             user = serializer.save()
             print(f"✅ User created successfully: {user.email}")  # Debug log
-            
+
             # Refresh user from database to ensure all relationships are loaded
             user.refresh_from_db()
             print(f"✅ User refreshed from database")  # Debug log
-            
+
             # Create user profile data
             try:
                 user_profile_data = UserProfileSerializer(user).data
@@ -869,14 +888,14 @@ def complete_registration(request):
             except Exception as e:
                 print(f"💥 Error serializing user profile: {str(e)}")  # Debug log
                 raise
-            
+
             # Only generate tokens for customers (who can login immediately)
             # Cooks and delivery agents need admin approval before they can login
             response_data = {
                 'message': 'Registration completed successfully',
                 'user': user_profile_data
             }
-            
+
             if user.role == 'customer':
                 # Generate JWT tokens for customers who can login immediately
                 try:
@@ -894,18 +913,18 @@ def complete_registration(request):
                 # For cooks and delivery agents, don't provide tokens
                 print(f"✅ No tokens provided for {user.role} - requires admin approval")  # Debug log
             print(f"✅ Response data prepared successfully")  # Debug log
-            
+
             return Response(response_data, status=status.HTTP_201_CREATED)
         else:
             print(f"❌ Serializer validation failed: {serializer.errors}")  # Debug log
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
+
     except Exception as e:
         print(f"💥 Exception in complete_registration: {str(e)}")  # Debug log
         print(f"💥 Exception type: {type(e).__name__}")  # Debug log
         import traceback
         print(f"💥 Traceback: {traceback.format_exc()}")  # Debug log
-        
+
         return Response({
             'error': 'Internal server error during registration',
             'message': str(e)
@@ -921,7 +940,7 @@ def user_tokens(request):
     try:
         from .services.jwt_service import JWTTokenService
         tokens = JWTTokenService.get_user_active_tokens(request.user)
-        
+
         token_data = []
         for token in tokens:
             token_data.append({
@@ -935,7 +954,7 @@ def user_tokens(request):
                 'device_info': token.device_info,
                 'is_valid': token.is_valid(),
             })
-        
+
         return Response({
             'tokens': token_data,
             'count': len(token_data)
@@ -952,15 +971,15 @@ def revoke_token(request):
     """
     try:
         from .services.jwt_service import JWTTokenService
-        
+
         token = request.data.get('token')
         token_type = request.data.get('token_type', 'refresh')
-        
+
         if not token:
             return Response({'error': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         success = JWTTokenService.revoke_token(token, token_type)
-        
+
         if success:
             return Response({'message': 'Token revoked successfully'}, status=status.HTTP_200_OK)
         else:
@@ -977,10 +996,10 @@ def revoke_all_tokens(request):
     """
     try:
         from .services.jwt_service import JWTTokenService
-        
+
         token_type = request.data.get('token_type', 'refresh')  # Only refresh tokens supported
         revoked_count = JWTTokenService.revoke_all_user_tokens(request.user, token_type)
-        
+
         return Response({
             'message': f'Successfully revoked {revoked_count} tokens',
             'revoked_count': revoked_count
@@ -997,13 +1016,13 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
-    
+
     def get_queryset(self):
         queryset = User.objects.all()
         user_type = self.request.query_params.get('user_type', None)
         is_active = self.request.query_params.get('is_active', None)
         search = self.request.query_params.get('search', None)
-        
+
         if user_type:
             queryset = queryset.filter(role=user_type)
         if is_active is not None:
@@ -1018,7 +1037,7 @@ class UserViewSet(viewsets.ModelViewSet):
             ) | queryset.filter(
                 last_name__icontains=search
             )
-        
+
         return queryset
 
 
@@ -1217,10 +1236,10 @@ def get_document_types(request):
     role = request.query_params.get('role')
     if not role:
         return Response({'error': 'Role parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     if role not in ['cook', 'delivery_agent']:
         return Response({'error': 'Invalid role'}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     document_types = DocumentType.objects.filter(category=role)
     serializer = DocumentTypeSerializer(document_types, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1251,13 +1270,13 @@ def upload_document_during_registration(request):
     try:
         print(f"Upload registration request data: {request.data}")
         print(f"Upload registration request files: {request.FILES}")
-        
+
         # Get user email from request data
         user_email = request.data.get('user_email')
         if not user_email:
             print("Upload error: No user email provided")
             return Response({'error': 'User email is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Find the user by email
         try:
             user = User.objects.get(email=user_email)
@@ -1265,7 +1284,7 @@ def upload_document_during_registration(request):
         except User.DoesNotExist:
             print(f"Upload error: User not found for email: {user_email}")
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-        
+
         # Validate required fields
         if 'file_upload' not in request.FILES:
             print("Upload error: No file_upload in request.FILES")
@@ -1273,13 +1292,13 @@ def upload_document_during_registration(request):
                 'error': 'No file provided',
                 'message': 'Please select a file to upload'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         if 'document_type_id' not in request.data:
             return Response({
                 'error': 'Document type is required',
                 'message': 'Please select a document type'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Create a modified request data with user context
         serializer = UserDocumentSerializer(data=request.data, context={'user': user})
         if serializer.is_valid():
@@ -1313,7 +1332,7 @@ def upload_document_during_registration(request):
                     'message': 'Please check your input and try again',
                     'details': errors
                 }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     except Exception as e:
         # Ensure we always return JSON, even for unexpected errors
         import traceback
@@ -1361,19 +1380,19 @@ def proxy_document_download(request):
         document_id = request.data.get('document_id')
         file_url = request.data.get('file_url')
         preview_mode = request.data.get('preview', False)
-        
+
         print(f"Proxy request - Document ID: {document_id}, File URL: {file_url}, Preview: {preview_mode}")
         print(f"User: {request.user}, Is Staff: {request.user.is_staff}")
-        
+
         if not document_id and not file_url:
             return Response({'error': 'Document ID or file URL is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # If document_id is provided, get the document and verify access
         if document_id:
             try:
                 document = UserDocument.objects.get(id=document_id)
                 print(f"Found document: {document.file_name}, User: {document.user}")
-                
+
                 # Check if user has access to this document
                 if not (request.user.is_staff or document.user == request.user):
                     print(f"Access denied for user {request.user} to document {document_id}")
@@ -1382,12 +1401,12 @@ def proxy_document_download(request):
             except UserDocument.DoesNotExist:
                 print(f"Document not found: {document_id}")
                 return Response({'error': 'Document not found'}, status=status.HTTP_404_NOT_FOUND)
-        
+
         if not file_url:
             return Response({'error': 'File URL not available'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         print(f"Attempting to fetch file from: {file_url}")
-        
+
         # Check if it's a local file
         if file_url.startswith('/local_media/'):
             return handle_local_file_download(file_url, document_id, preview_mode)
@@ -1400,7 +1419,7 @@ def proxy_document_download(request):
                 except UserDocument.DoesNotExist:
                     pass
             return handle_cloudinary_download(file_url, document_id, preview_mode, document_obj)
-            
+
     except Exception as e:
         print(f"General error: {str(e)}")
         return Response({'error': f'Download failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1416,10 +1435,10 @@ def get_pending_approvals(request):
     try:
         print(f"🔍 Getting pending approvals")
         print(f"👤 Request user: {request.user}, Is staff: {request.user.is_staff}")
-        
+
         role_filter = request.GET.get('role')
         print(f"🏷️ Role filter: {role_filter}")
-        
+
         if role_filter:
             # Filter by specific role if provided
             pending_users = User.objects.filter(
@@ -1432,14 +1451,14 @@ def get_pending_approvals(request):
                 role__in=['cook', 'delivery_agent'],
                 approval_status='pending'
             ).order_by('created_at')
-        
+
         print(f"📊 Found {pending_users.count()} pending users")
         for user in pending_users:
             print(f"  👤 {user.name} ({user.email}, {user.role}) - Documents: {user.documents.count()}")
-        
+
         serializer = UserApprovalSerializer(pending_users, many=True)
         data = serializer.data
-        
+
         print(f"🔄 Serialized {len(data)} users")
         return Response({'users': data}, status=status.HTTP_200_OK)
     except Exception as e:
@@ -1458,26 +1477,26 @@ def get_user_for_approval(request, user_id):
     try:
         print(f"🔍 Getting user details for user_id: {user_id}")
         print(f"👤 Request user: {request.user}, Is staff: {request.user.is_staff}")
-        
+
         user = User.objects.select_related('approved_by').prefetch_related('documents__document_type').get(
-            user_id=user_id, 
+            user_id=user_id,
             role__in=['cook', 'delivery_agent']
         )
-        
+
         print(f"✅ Found user: {user.name} ({user.email})")
         print(f"📋 User approval status: {user.approval_status}")
         print(f"📄 User documents count: {user.documents.count()}")
-        
+
         # Log document details
         for doc in user.documents.all():
             print(f"  📎 Document: {doc.file_name}, URL: {doc.file}, Visible: {doc.is_visible_to_admin}, Type: {doc.document_type.name}")
-        
+
         serializer = UserApprovalSerializer(user)
         data = serializer.data
-        
+
         print(f"🔄 Serialized data documents count: {len(data.get('documents', []))}")
         print(f"📊 Response data keys: {list(data.keys())}")
-        
+
         return Response(data, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         print(f"❌ User not found: {user_id}")
@@ -1500,7 +1519,7 @@ def approve_user(request, user_id):
         print(f"👤 Admin user: {request.user} (ID: {request.user.user_id})")
         print(f"📋 Request data: {request.data}")
         print(f"🔑 Request headers: {dict(request.headers)}")
-        
+
         user = User.objects.get(user_id=user_id, role__in=['cook', 'delivery_agent'])
         print(f"✅ Found user: {user.name} ({user.email}, {user.role})")
         print(f"📊 Current status: {user.approval_status}")
@@ -1510,14 +1529,14 @@ def approve_user(request, user_id):
     except Exception as e:
         print(f"💥 Error fetching user: {str(e)}")
         return Response({'error': f'Failed to fetch user: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     serializer = UserApprovalActionSerializer(data=request.data)
     if serializer.is_valid():
         action = serializer.validated_data['action']
         notes = serializer.validated_data.get('notes', '')
-        
+
         print(f"🔄 Processing {action} action with notes: '{notes}'")
-        
+
         if action == 'approve':
             user.approval_status = 'approved'
             user.approval_notes = notes
@@ -1525,11 +1544,11 @@ def approve_user(request, user_id):
             user.approved_at = timezone.now()
             user.save()
             print(f"✅ User approved and saved")
-            
+
             # Make all user documents visible to admin after approval
             docs_updated = user.documents.update(is_visible_to_admin=True)
             print(f"📄 Updated {docs_updated} documents to be visible")
-            
+
             # Send approval email using the new email service
             try:
                 from .services.email_service import EmailService
@@ -1538,12 +1557,12 @@ def approve_user(request, user_id):
             except Exception as email_error:
                 print(f"⚠️ Email sending failed: {str(email_error)}")
                 # Don't fail the approval if email fails
-            
+
             return Response({
                 'message': 'User approved successfully',
                 'user': UserApprovalSerializer(user).data
             }, status=status.HTTP_200_OK)
-        
+
         elif action == 'reject':
             user.approval_status = 'rejected'
             user.approval_notes = notes
@@ -1551,7 +1570,7 @@ def approve_user(request, user_id):
             user.approved_at = timezone.now()
             user.save()
             print(f"❌ User rejected and saved")
-            
+
             # Send rejection email using the new email service
             try:
                 from .services.email_service import EmailService
@@ -1560,14 +1579,14 @@ def approve_user(request, user_id):
             except Exception as email_error:
                 print(f"⚠️ Email sending failed: {str(email_error)}")
                 # Don't fail the rejection if email fails
-            
+
             return Response({
                 'message': 'User rejected successfully',
                 'user': UserApprovalSerializer(user).data
             }, status=status.HTTP_200_OK)
     else:
         print(f"❌ Invalid serializer data: {serializer.errors}")
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -1578,7 +1597,7 @@ def check_approval_status(request):
     Check the approval status of the current user or by email/user_id
     """
     user = None
-    
+
     # Try to get user from authentication first
     if request.user.is_authenticated:
         user = request.user
@@ -1586,7 +1605,7 @@ def check_approval_status(request):
         # If not authenticated, try to get user by email or user_id from query params
         email = request.query_params.get('email')
         user_id = request.query_params.get('user_id')
-        
+
         if email:
             try:
                 user = User.objects.get(email=email)
@@ -1614,7 +1633,7 @@ def check_approval_status(request):
                 'can_login': False,
                 'message': 'Please log in or provide email/user_id to check approval status.'
             }, status=status.HTTP_401_UNAUTHORIZED)
-    
+
     # Check approval status based on user role
     if user.role in ['cook', 'Cook', 'delivery_agent', 'DeliveryAgent']:
         return Response({
@@ -1654,11 +1673,11 @@ def clear_all_tokens(request):
         email = request.data.get('email')
         if not email:
             return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         user = User.objects.get(email=email)
         from .services.jwt_service import JWTTokenService
         revoked_count = JWTTokenService.revoke_all_user_tokens(user, 'refresh')
-        
+
         return Response({
             'message': f'Revoked {revoked_count} tokens for user {email}'
         }, status=status.HTTP_200_OK)
@@ -1668,19 +1687,24 @@ def clear_all_tokens(request):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def check_user_status(request):
     """
     Check the approval status of a user by email (for login page)
     """
-    email = request.data.get('email')
+    # Support both GET (query params) and POST (request body) methods
+    if request.method == 'GET':
+        email = request.query_params.get('email')
+    else:  # POST
+        email = request.data.get('email')
+    
     if not email:
         return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         user = User.objects.get(email=email)
-        
+
         # Only return approval status for cooks and delivery agents
         if user.role in ['cook', 'delivery_agent']:
             return Response({
@@ -1699,7 +1723,7 @@ def check_user_status(request):
                 'message': 'Your account is ready to use.',
                 'role': user.role
             }, status=status.HTTP_200_OK)
-            
+
     except User.DoesNotExist:
         # User doesn't exist, don't reveal this information
         return Response({
@@ -1720,7 +1744,7 @@ def check_email_availability(request):
     email = request.data.get('email')
     if not email:
         return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         user = User.objects.get(email=email)
         if user.is_active:
@@ -1787,16 +1811,16 @@ def handle_local_file_download(file_url, document_id, preview_mode):
         from django.conf import settings
         from pathlib import Path
         import os
-        
+
         # Remove the /local_media/ prefix to get the relative path
         relative_path = file_url.replace('/local_media/', '')
         local_media_root = getattr(settings, 'LOCAL_MEDIA_ROOT', Path(__file__).resolve().parent.parent.parent / 'local_media')
         file_path = local_media_root / relative_path
-        
+
         if not file_path.exists():
             print(f"Local file not found: {file_path}")
             return Response({'error': 'File not found'}, status=status.HTTP_404_NOT_FOUND)
-        
+
         # Get filename from document if available
         filename = 'document'
         if document_id:
@@ -1805,7 +1829,7 @@ def handle_local_file_download(file_url, document_id, preview_mode):
                 filename = document.file_name
             except UserDocument.DoesNotExist:
                 filename = file_path.name
-        
+
         # Determine content type
         content_type = 'application/octet-stream'
         if filename.endswith('.pdf'):
@@ -1814,15 +1838,15 @@ def handle_local_file_download(file_url, document_id, preview_mode):
             content_type = 'image/jpeg'
         elif filename.endswith('.png'):
             content_type = 'image/png'
-        
+
         print(f"Serving local file: {file_path}, content_type: {content_type}")
-        
+
         # Create response
         response = FileResponse(
             open(file_path, 'rb'),
             content_type=content_type
         )
-        
+
         # Set appropriate headers
         if preview_mode:
             response['Content-Disposition'] = 'inline'
@@ -1830,14 +1854,14 @@ def handle_local_file_download(file_url, document_id, preview_mode):
             import urllib.parse
             filename = urllib.parse.quote(filename)
             response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
+
         # Add CORS headers
         response['Access-Control-Allow-Origin'] = '*'
         response['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
         response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        
+
         return response
-        
+
     except Exception as e:
         print(f"Local file error: {str(e)}")
         return Response({'error': f'Failed to access local file: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1853,11 +1877,11 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
         except ImportError:
             print("Cloudinary package not installed. Please install it with: pip install cloudinary")
             return Response({'error': 'Cloudinary service not available'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        
+
         from django.http import HttpResponse
         from django.conf import settings
         import requests
-        
+
         # Configure Cloudinary
         cloudinary.config(
             cloud_name=settings.CLOUDINARY_STORAGE['CLOUD_NAME'],
@@ -1865,7 +1889,7 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
             api_secret=settings.CLOUDINARY_STORAGE['API_SECRET'],
             secure=True
         )
-        
+
         # Extract public_id from the URL
         url_parts = file_url.split('/')
         if 'upload' in url_parts:
@@ -1873,7 +1897,7 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
             if upload_index + 2 < len(url_parts):
                 # Get the version and public_id parts
                 version_and_path = '/'.join(url_parts[upload_index + 2:])
-                
+
                 # For both raw files and images, remove the version but keep the full path
                 # URL format: /upload/v1234567890/chefsync/assets/images/2/file.jpg
                 # We want: chefsync/assets/images/2/file (without extension for images)
@@ -1881,7 +1905,7 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
                 if len(path_parts) > 1:
                     # Remove version (first part) and keep the rest
                     public_id = '/'.join(path_parts[1:])
-                    
+
                     # For images, remove the file extension
                     if '/image/upload/' in file_url and '.' in public_id:
                         public_id = public_id.rsplit('.', 1)[0]
@@ -1891,9 +1915,9 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
                 raise ValueError("Invalid Cloudinary URL format")
         else:
             raise ValueError("Invalid Cloudinary URL format")
-        
+
         print(f"Extracted public_id: {public_id}")
-        
+
         # Determine resource type from URL
         if '/image/upload/' in file_url:
             resource_type = 'image'
@@ -1901,33 +1925,33 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
             resource_type = 'raw'
         else:
             resource_type = 'raw'
-        
+
         print(f"Resource type: {resource_type}")
-        
+
         # Generate a signed URL for the file
         # For raw files (PDFs) on free Cloudinary accounts, we need to handle them differently
         if resource_type == 'raw':
             print("Handling raw file (PDF) - checking for local file first")
-            
+
             # First, try to serve from local file if available
             if document and document.local_file_path and os.path.exists(document.local_file_path):
                 print(f"Serving PDF from local file: {document.local_file_path}")
                 try:
                     with open(document.local_file_path, 'rb') as local_file:
                         file_content = local_file.read()
-                    
+
                     from django.http import HttpResponse
                     django_response = HttpResponse(file_content, content_type='application/pdf')
                     django_response['Content-Disposition'] = f'inline; filename="{document.file_name}"'
                     django_response['Content-Length'] = str(len(file_content))
-                    
+
                     print(f"Successfully served PDF from local file, size: {len(file_content)} bytes")
                     return django_response
-                    
+
                 except Exception as local_error:
                     print(f"Failed to serve local file: {str(local_error)}")
                     # Continue to try Cloudinary as fallback
-            
+
             # If no local file or local file failed, try Cloudinary
             print("No local file available, trying Cloudinary...")
             try:
@@ -1935,24 +1959,24 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
                 response = requests.get(file_url, stream=True, timeout=30)
                 print(f"Direct download response status: {response.status_code}")
                 response.raise_for_status()
-                
+
                 # If successful, serve the file content directly
                 content_type = response.headers.get('content-type', 'application/pdf')
                 if file_url.endswith('.pdf') or 'application/pdf' in content_type:
                     content_type = 'application/pdf'
-                
+
                 # Create Django response with the file content
                 from django.http import HttpResponse
                 file_content = response.content
-                
+
                 django_response = HttpResponse(file_content, content_type=content_type)
                 filename = document.file_name if document else 'document.pdf'
                 django_response['Content-Disposition'] = f'inline; filename="{filename}"'
                 django_response['Content-Length'] = str(len(file_content))
-                
+
                 print(f"Successfully served PDF file directly, size: {len(file_content)} bytes")
                 return django_response
-                
+
             except requests.exceptions.RequestException as e:
                 print(f"Failed to download PDF directly: {str(e)}")
                 raise ValueError(f"Failed to access PDF file: {str(e)}")
@@ -1982,7 +2006,7 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
                     # Use original URL as final fallback
                     print("Using original URL as final fallback")
                     signed_url = file_url
-        
+
         # Download the file using the signed URL (for images only, PDFs are handled above)
         try:
             response = requests.get(signed_url, stream=True, timeout=30)
@@ -1998,7 +2022,7 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
                 response.raise_for_status()
             else:
                 raise
-        
+
         # Determine proper content type
         content_type = response.headers.get('content-type', 'application/octet-stream')
         if file_url.endswith('.pdf') or 'application/pdf' in content_type:
@@ -2007,13 +2031,13 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
             content_type = 'image/jpeg'
         elif file_url.endswith('.png') or 'image/png' in content_type:
             content_type = 'image/png'
-        
+
         # Create Django response
         django_response = HttpResponse(
             response.content,
             content_type=content_type
         )
-        
+
         # Set headers
         if preview_mode:
             django_response['Content-Disposition'] = 'inline'
@@ -2026,19 +2050,19 @@ def handle_cloudinary_download(file_url, document_id, preview_mode, document=Non
                     filename = file_url.split('/')[-1] if '/' in file_url else 'document'
             else:
                 filename = file_url.split('/')[-1] if '/' in file_url else 'document'
-            
+
             import urllib.parse
             filename = urllib.parse.quote(filename)
             django_response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
+
         django_response['Content-Length'] = str(len(response.content))
         django_response['Access-Control-Allow-Origin'] = '*'
         django_response['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
         django_response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        
+
         print(f"Successfully proxied Cloudinary file, size: {len(response.content)} bytes")
         return django_response
-        
+
     except Exception as e:
         print(f"Cloudinary access error: {str(e)}")
         return Response({'error': f'Failed to access Cloudinary file: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2055,11 +2079,11 @@ def get_jwt_token_location(request):
         if auth_header.startswith('Bearer '):
             token = auth_header.split(' ')[1]
             return 'headers', token
-    
+
     # Check for cookies
     cookies = request.COOKIES
     for key, value in cookies.items():
         if key == 'refresh' or key == 'access':
             return 'cookies', value
-    
+
     return None, None

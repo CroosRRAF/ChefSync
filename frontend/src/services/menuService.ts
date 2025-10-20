@@ -1,7 +1,7 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-const API = `${API_BASE}/api`;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+const API = API_BASE;
 
 // Create axios instance with authentication
 const apiClient = axios.create({
@@ -11,7 +11,7 @@ const apiClient = axios.create({
 // Add request interceptor to include auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem("access_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -28,9 +28,9 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Clear tokens and redirect to login
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      window.location.href = '/auth/login';
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/auth/login";
     }
     return Promise.reject(error);
   }
@@ -149,7 +149,7 @@ export interface CartItem {
   created_at: string;
   updated_at: string;
   discount?: number; // Optional discount percentage
-  isVeg?: boolean;   // Optional vegetarian indicator
+  isVeg?: boolean; // Optional vegetarian indicator
 }
 
 export interface CartSummary {
@@ -161,29 +161,33 @@ export interface CartSummary {
 // API Functions
 export const menuService = {
   // Get all foods with filters
-  getFoods: async (params: {
-    q?: string;
-    category?: string;
-    cuisine?: string;
-    min_price?: number;
-    max_price?: number;
-    veg?: boolean;
-    lat?: number;
-    lng?: number;
-    delivery?: boolean;
-    sort_by?: string;
-    page?: number;
-    page_size?: number;
-  } = {}) => {
+  getFoods: async (
+    params: {
+      q?: string;
+      category?: string;
+      cuisine?: string;
+      min_price?: number;
+      max_price?: number;
+      veg?: boolean;
+      lat?: number;
+      lng?: number;
+      delivery?: boolean;
+      sort_by?: string;
+      page?: number;
+      page_size?: number;
+    } = {}
+  ) => {
     const searchParams = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value !== undefined && value !== null && value !== "") {
         searchParams.append(key, value.toString());
       }
     });
 
-    const response = await apiClient.get(`/api/food/customer/foods/?${searchParams}`);
+    const response = await apiClient.get(
+      `/food/customer/foods/?${searchParams}`
+    );
     return response.data;
   },
 
@@ -200,55 +204,57 @@ export const menuService = {
   // Get food prices for a specific food
   getFoodPrices: async (foodId: number, lat?: number, lng?: number) => {
     const params = new URLSearchParams();
-    if (lat !== undefined) params.append('lat', lat.toString());
-    if (lng !== undefined) params.append('lng', lng.toString());
+    if (lat !== undefined) params.append("lat", lat.toString());
+    if (lng !== undefined) params.append("lng", lng.toString());
 
-    const response = await apiClient.get(`/api/food/customer/foods/${foodId}/prices/?${params}`);
+    const response = await apiClient.get(
+      `/food/customer/foods/${foodId}/prices/?${params}`
+    );
     return response.data;
   },
 
   // Get cuisines
   getCuisines: async () => {
-    const response = await apiClient.get(`/api/food/cuisines/`);
+    const response = await apiClient.get(`/food/cuisines/`);
     return response.data;
   },
 
   // Get food categories
   getCategories: async () => {
-    const response = await apiClient.get(`/api/food/categories/`);
+    const response = await apiClient.get(`/food/categories/`);
     return response.data;
   },
 
   // Cart operations
   addToCart: async (priceId: number, quantity: number = 1) => {
-    const response = await apiClient.post(`/api/orders/cart/add_to_cart/`, {
+    const response = await apiClient.post(`/orders/cart/add_to_cart/`, {
       price_id: priceId,
-      quantity: quantity
+      quantity: quantity,
     });
     return response.data;
   },
 
   getCartSummary: async () => {
-    const response = await apiClient.get(`/api/orders/cart/cart_summary/`);
+    const response = await apiClient.get(`/orders/cart/cart_summary/`);
     return response.data;
   },
 
   clearCart: async () => {
-    const response = await apiClient.delete(`/api/orders/cart/clear_cart/`);
+    const response = await apiClient.delete(`/orders/cart/clear_cart/`);
     return response.data;
   },
 
   updateCartItem: async (itemId: number, quantity: number) => {
-    const response = await apiClient.patch(`/api/orders/cart/${itemId}/`, {
-      quantity: quantity
+    const response = await apiClient.patch(`/orders/cart/${itemId}/`, {
+      quantity: quantity,
     });
     return response.data;
   },
 
   removeFromCart: async (itemId: number) => {
-    const response = await apiClient.delete(`/api/orders/cart/${itemId}/`);
+    const response = await apiClient.delete(`/orders/cart/${itemId}/`);
     return response.data;
-  }
+  },
 };
 
 export default menuService;

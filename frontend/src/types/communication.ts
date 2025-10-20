@@ -117,3 +117,43 @@ export interface PaginatedCommunicationResponse {
   limit: number;
   total_pages: number;
 }
+
+export interface CampaignStats {
+  total_campaigns: number;
+  active_campaigns: number;
+  total_sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  conversion_rate: number;
+}
+
+export interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  type: "info" | "warning" | "error" | "success";
+  read: boolean;
+  created_at: string;
+}
+
+export interface SystemAlert {
+  id: number;
+  title: string;
+  message: string;
+  severity: "low" | "medium" | "high" | "critical";
+  is_active: boolean;
+  created_at: string;
+  expires_at: string | null;
+}
+
+export interface EmailTemplate {
+  id: number;
+  name: string;
+  subject: string;
+  content: string;
+  variables: Record<string, string>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}

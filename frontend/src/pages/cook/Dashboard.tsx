@@ -119,7 +119,7 @@ export default function Dashboard() {
     },
     {
       title: "Total Revenue",
-      value: `$${stats.total_revenue.toFixed(2)}`,
+      value: `LKR ${stats.total_revenue.toFixed(2)}`,
       change: `${stats.average_rating}/5 rating`,
       icon: TrendingUp,
       color: "text-primary",
