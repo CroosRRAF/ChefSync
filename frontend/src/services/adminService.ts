@@ -36,7 +36,7 @@ apiClient.interceptors.response.use(
       // Handle unauthorized access
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
-      window.location.href = '/login';
+      window.location.href = '/auth/login';
     } else if (error.response?.status === 500) {
       // Handle server errors with detailed logging
       console.error('🚨 Server Error (500) in Admin API:', {

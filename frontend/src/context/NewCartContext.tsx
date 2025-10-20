@@ -91,19 +91,15 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
 
   // Load cart from localStorage on mount
   useEffect(() => {
-    console.log('CartProvider: Loading cart from localStorage');
     const savedCart = localStorage.getItem('chefsync_cart');
     if (savedCart) {
       try {
         const items = JSON.parse(savedCart);
-        console.log('CartProvider: Loaded cart items:', items);
         dispatch({ type: 'LOAD_CART', payload: items });
       } catch (error) {
         console.error('Error loading cart from localStorage:', error);
         localStorage.removeItem('chefsync_cart');
       }
-    } else {
-      console.log('CartProvider: No saved cart found');
     }
   }, []);
 
@@ -113,7 +109,6 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
   }, [state.items]);
 
   const addItem = (item: Omit<CartItem, 'id' | 'subtotal'>) => {
-    console.log('CartProvider: Adding item to cart:', item);
     dispatch({ type: 'ADD_ITEM', payload: item });
   };
 

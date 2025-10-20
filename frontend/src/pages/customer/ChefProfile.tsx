@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
-import { useCart } from '@/context/NewCartContext';
+import { useDatabaseCart } from '@/context/DatabaseCartContext';
 import { toast } from 'sonner';
 import { enhancedMenuService, MenuFood } from '@/services/enhancedMenuService';
 
@@ -19,7 +19,7 @@ const ChefProfile: React.FC<ChefProfileProps> = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const { isAuthenticated } = useAuth();
-  const { addItem } = useCart();
+  const { addItem } = useDatabaseCart();
   
   const [chefFoods, setChefFoods] = useState<MenuFood[]>([]);
   const [loading, setLoading] = useState(true);

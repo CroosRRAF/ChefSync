@@ -708,7 +708,26 @@ class CartItemViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter cart items to only show the current user's items"""
-        return CartItem.objects.filter(customer=self.request.user)
+        try:
+            return CartItem.objects.filter(customer=self.request.user).select_related('price__food', 'price__cook')
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting cart items for user {self.request.user.user_id}: {str(e)}")
+            return CartItem.objects.none()
+    
+    def list(self, request, *args, **kwargs):
+        """Get cart items"""
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error listing cart items for user {request.user.user_id}: {str(e)}")
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=False, methods=['post'])
     def add_to_cart(self, request):
@@ -724,25 +743,40 @@ class CartItemViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Check if item already exists in cart
-            cart_item, created = CartItem.objects.get_or_create(
-                customer=request.user,
-                price_id=price_id,  # Django will automatically map this to the FoodPrice primary key
-                defaults={
-                    'quantity': quantity,
-                    'special_instructions': special_instructions
-                }
-            )
+            # Get the FoodPrice object
+            try:
+                from apps.food.models import FoodPrice
+                food_price = FoodPrice.objects.get(price_id=price_id)
+            except FoodPrice.DoesNotExist:
+                return Response(
+                    {'error': 'Food price not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
             
-            if not created:
+            # Check if item already exists in cart
+            try:
+                cart_item = CartItem.objects.get(customer=request.user, price=food_price)
                 # Item exists, update quantity
                 cart_item.quantity += quantity
                 cart_item.save()
+            except CartItem.DoesNotExist:
+                # Item doesn't exist, create new one
+                cart_item = CartItem.objects.create(
+                    customer=request.user,
+                    price=food_price,
+                    quantity=quantity,
+                    special_instructions=special_instructions
+                )
             
             serializer = self.get_serializer(cart_item)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
             
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error adding item to cart for user {request.user.user_id}: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return Response(
                 {'error': str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -764,6 +798,9 @@ class CartItemViewSet(viewsets.ModelViewSet):
                 'cart_items': serializer.data
             })
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting cart summary for user {request.user.user_id}: {str(e)}")
             return Response(
                 {'error': str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1056,7 +1093,7 @@ def calculate_checkout(request):
         for item in cart_items:
             # Get the price record
             try:
-                food_price = FoodPrice.objects.select_related('food', 'cook').get(id=item['price_id'])
+                food_price = FoodPrice.objects.select_related('food', 'cook').get(price_id=item['price_id'])
             except FoodPrice.DoesNotExist:
                 return Response({
                     'error': f'Price with ID {item["price_id"]} not found'

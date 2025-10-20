@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { useCart } from '@/context/NewCartContext';
+import { useDatabaseCart } from '@/context/DatabaseCartContext';
 import logoImage from '@/assets/2.png';
 import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import { 
@@ -34,7 +34,7 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { getItemCount } = useCart();
+  const { getItemCount } = useDatabaseCart();
   const location = useLocation();
   const navigate = useNavigate();
 

@@ -297,6 +297,11 @@ class User(AbstractUser):
 
     objects = UserManager()
 
+    @property
+    def id(self):
+        """Alias for user_id to maintain compatibility with Django's AbstractUser"""
+        return self.user_id
+
     class Meta:
         db_table = 'User'
 

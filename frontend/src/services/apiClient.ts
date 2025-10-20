@@ -25,8 +25,8 @@ apiClient.interceptors.response.use(
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       // Only redirect to login if not already on login page
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+      if (!window.location.pathname.includes('/auth/login')) {
+        window.location.href = '/auth/login';
       }
     }
     return Promise.reject(error);

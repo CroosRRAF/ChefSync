@@ -13,9 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
-import { addressService, DeliveryAddress } from '@/services/addressService';
-import CartService from '@/services/cartService';
+import { useDatabaseCart } from '@/context/DatabaseCartContext';
 import { orderService } from '@/services/orderService';
 import GoogleMapLocationPicker from '@/components/maps/GoogleMapLocationPicker';
 import { getFoodPlaceholder } from '@/utils/placeholderUtils';
@@ -23,8 +21,9 @@ import { getFoodPlaceholder } from '@/utils/placeholderUtils';
 interface ChefSyncCheckoutProps {
   isOpen: boolean;
   onClose: () => void;
-  cartItems?: any[];
   onOrderSuccess: () => void;
+  chefId?: number;
+  chefName?: string;
 }
 
 interface DeliveryFeeInfo {
@@ -48,9 +47,11 @@ interface CartItem {
 const ChefSyncCheckout: React.FC<ChefSyncCheckoutProps> = ({
   isOpen,
   onClose,
-  cartItems: propCartItems = [],
-  onOrderSuccess
+  onOrderSuccess,
+  chefId,
+  chefName
 }) => {
+  const { items: cartItems, getGrandTotal, getItemCount, clearCart } = useDatabaseCart();
   // States
   const [currentStep, setCurrentStep] = useState<'delivery' | 'review' | 'processing'>('delivery');
   const [addresses, setAddresses] = useState<any[]>([]);
@@ -59,7 +60,6 @@ const ChefSyncCheckout: React.FC<ChefSyncCheckoutProps> = ({
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [processingOrder, setProcessingOrder] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
   // New Address Form
   const [newAddress, setNewAddress] = useState({
@@ -81,7 +81,7 @@ const ChefSyncCheckout: React.FC<ChefSyncCheckoutProps> = ({
   const [calculatingFee, setCalculatingFee] = useState(false);
 
   // Calculations
-  const subtotal = cartItems.reduce((sum, item) => sum + (parseFloat(String(item.unit_price || '0')) * item.quantity), 0);
+  const subtotal = getGrandTotal();
   const taxAmount = subtotal * 0.10;
   const deliveryFee = deliveryFeeInfo?.totalFee || 50;
   const total = subtotal + taxAmount + deliveryFee;
@@ -89,31 +89,9 @@ const ChefSyncCheckout: React.FC<ChefSyncCheckoutProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadAddresses();
-      loadCartItems();
       resetForm();
     }
   }, [isOpen]);
-
-  const loadCartItems = async () => {
-    // If cart items are provided as props, use them
-    if (propCartItems && propCartItems.length > 0) {
-      setCartItems(propCartItems);
-      return;
-    }
-
-    // Otherwise fetch from API
-    try {
-      setLoading(true);
-      const data = await CartService.getCartItems();
-      setCartItems(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Error loading cart:', error);
-      toast.error('Failed to load cart items');
-      setCartItems([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (selectedAddress?.latitude && selectedAddress?.longitude) {

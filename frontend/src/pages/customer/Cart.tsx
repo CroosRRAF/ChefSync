@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useCart } from '@/context/NewCartContext';
+import { useDatabaseCart } from '@/context/DatabaseCartContext';
 import { useAuth } from '@/context/AuthContext';
 import { 
   Plus, 
@@ -29,7 +29,7 @@ import { toast } from 'sonner';
 
 const CustomerCart: React.FC = () => {
   const navigate = useNavigate();
-  const { items, updateQuantity, removeItem, clearCart, getGrandTotal, getItemCount } = useCart();
+  const { items, updateQuantity, removeItem, clearCart, getGrandTotal, getItemCount } = useDatabaseCart();
   const { isAuthenticated, user } = useAuth();
   const [selectedAddress, setSelectedAddress] = useState<DeliveryAddress | null>(null);
   const [isAddressPickerOpen, setIsAddressPickerOpen] = useState(false);

@@ -49,7 +49,7 @@ class JWTTokenService:
         access = refresh.access_token
         
         # Add custom claims to access token
-        access['user_id'] = user.user_id
+        access['user_id'] = user.id  # Use the id property which maps to user_id
         access['email'] = user.email
         access['name'] = user.name
         access['role'] = user.role

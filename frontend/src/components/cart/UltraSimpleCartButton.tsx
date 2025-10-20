@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useCart } from '@/context/NewCartContext';
+import { useDatabaseCart } from '@/context/DatabaseCartContext';
 import { ShoppingCart } from 'lucide-react';
+import CartModal from './CartModal';
 
 const UltraSimpleCartButton: React.FC = () => {
-  const { getItemCount } = useCart();
-  const [showPopup, setShowPopup] = useState(false);
+  const { getItemCount, getGrandTotal } = useDatabaseCart();
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
 
   const itemCount = getItemCount();
+  const grandTotal = getGrandTotal();
 
   const handleClick = () => {
-    console.log('Cart clicked!');
-    setShowPopup(!showPopup);
+    setIsCartModalOpen(true);
   };
 
   return (
@@ -66,87 +67,11 @@ const UltraSimpleCartButton: React.FC = () => {
         </Button>
       </div>
 
-      {/* Ultra Simple Popup */}
-      {showPopup && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            zIndex: 10000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px'
-          }}
-          onClick={() => setShowPopup(false)}
-        >
-          <div
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '20px',
-              maxWidth: '400px',
-              width: '100%',
-              maxHeight: '80vh',
-              overflow: 'auto',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold' }}>Your Cart</h2>
-              <button
-                onClick={() => setShowPopup(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '20px',
-                  cursor: 'pointer'
-                }}
-              >
-                ×
-              </button>
-            </div>
-            
-            {itemCount === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <ShoppingCart style={{ width: '48px', height: '48px', color: '#9ca3af', margin: '0 auto 16px' }} />
-                <p style={{ color: '#6b7280', margin: 0 }}>Your cart is empty</p>
-              </div>
-            ) : (
-              <div>
-                <p style={{ margin: '0 0 16px', color: '#6b7280' }}>
-                  {itemCount} item{itemCount !== 1 ? 's' : ''} in cart
-                </p>
-                <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                  <p style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: 'bold' }}>
-                    Total: LKR 0.00
-                  </p>
-                  <button
-                    style={{
-                      backgroundColor: '#f97316',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '12px 24px',
-                      fontSize: '16px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      width: '100%'
-                    }}
-                  >
-                    Proceed to Checkout
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Use the proper CartModal */}
+      <CartModal 
+        isOpen={isCartModalOpen} 
+        onClose={() => setIsCartModalOpen(false)} 
+      />
     </>
   );
 };

@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { AuthProvider } from "@/context/AuthContext";
-import { CartProvider } from "@/context/NewCartContext";
+import { DatabaseCartProvider } from "@/context/DatabaseCartContext";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 
@@ -12,13 +12,15 @@ import CustomerNavbar from "@/components/layout/CustomerNavbar";
 import CustomerHomeNavbar from "@/components/layout/CustomerHomeNavbar";
 import CustomerDashboardLayout from "@/components/layout/CustomerDashboardLayout";
 import AdminLayout from "@/components/layout/AdminLayout";
-import DraggableCartIcon from "@/components/cart/UltraSimpleCartButton";
+import DatabaseCartButton from "@/components/cart/DatabaseCartButton";
 
 // Public pages
 import Home from "@/pages/Home";
 import MenuPage from "@/pages/MenuPage";
 import EnhancedMenuPage from "@/components/menu/EnhancedMenuPage";
 import ChefProfile from "@/pages/customer/ChefProfile";
+import ProductDetail from "@/pages/ProductDetail";
+import ProductDetailDemo from "@/pages/ProductDetailDemo";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
 import NotFound from "@/pages/NotFound";
@@ -270,6 +272,32 @@ const InnerRoutes: React.FC = () => {
                 <Navbar />
               )}
               <ChefProfile />
+            </>
+          }
+        />
+        <Route
+          path="/chef-profile/:chefId"
+          element={
+            <>
+              {isAuthenticated && user && user.role === "customer" ? (
+                <CustomerHomeNavbar />
+              ) : (
+                <Navbar />
+              )}
+              <ChefProfile />
+            </>
+          }
+        />
+        <Route
+          path="/product-demo"
+          element={
+            <>
+              {isAuthenticated && user && user.role === "customer" ? (
+                <CustomerHomeNavbar />
+              ) : (
+                <Navbar />
+              )}
+              <ProductDetailDemo />
             </>
           }
         />
@@ -672,7 +700,7 @@ const InnerRoutes: React.FC = () => {
       </Routes>
       
       {/* Global Cart Button */}
-      <DraggableCartIcon />
+      <DatabaseCartButton />
     </>
   );
 };
@@ -690,7 +718,7 @@ const AppRoutes: React.FC = () => {
       }}
     >
       <AuthProvider>
-        <CartProvider>
+        <DatabaseCartProvider>
           {isValidClientId ? (
             <GoogleOAuthProvider clientId={googleClientId}>
               <InnerRoutes />
@@ -698,7 +726,7 @@ const AppRoutes: React.FC = () => {
           ) : (
             <InnerRoutes />
           )}
-        </CartProvider>
+        </DatabaseCartProvider>
       </AuthProvider>
     </BrowserRouter>
   );

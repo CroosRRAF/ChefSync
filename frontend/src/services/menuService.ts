@@ -187,6 +187,16 @@ export const menuService = {
     return response.data;
   },
 
+  // Get food details by ID
+  getFoodById: async (foodId: number, lat?: number, lng?: number) => {
+    const params = new URLSearchParams();
+    if (lat !== undefined) params.append('lat', lat.toString());
+    if (lng !== undefined) params.append('lng', lng.toString());
+
+    const response = await apiClient.get(`/api/food/customer/foods/${foodId}/?${params}`);
+    return response.data;
+  },
+
   // Get food prices for a specific food
   getFoodPrices: async (foodId: number, lat?: number, lng?: number) => {
     const params = new URLSearchParams();

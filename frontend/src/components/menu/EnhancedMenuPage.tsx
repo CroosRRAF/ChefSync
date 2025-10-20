@@ -7,14 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { enhancedMenuService, MenuFood, MenuFilters, FilterOptions, UserLocation } from '@/services/enhancedMenuService';
 import { menuLocationService, LocationDetails } from '@/services/menuLocationService';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
-import { useCart } from '@/context/NewCartContext';
+import { useDatabaseCart } from '@/context/DatabaseCartContext';
 import FilterSidebar from './FilterSidebar';
 import { toast } from 'sonner';
 import LocationSelector from '@/components/location/LocationSelector';
@@ -32,7 +32,7 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
   
   // Auth and Cart hooks
   const { isAuthenticated } = useAuth();
-  const { addItem } = useCart();
+  const { addItem } = useDatabaseCart();
 
   // Handle chef profile navigation
   const handleChefProfileClick = (cookId: number) => {
@@ -205,22 +205,7 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
     const kitchenLocation = cookData && typeof cookData === 'object' ? (cookData as any).kitchen_location : null;
 
     // Add to cart using the cart context
-    addItem({
-      food_id: selectedFood.food_id,
-      food_name: selectedFood.name,
-      food_image: selectedFood.image_url || selectedFood.primary_image || '',
-      price_id: selectedPrice.price_id,
-      size: selectedPrice.size as 'Small' | 'Medium' | 'Large',
-      unit_price: Number(selectedPrice.price),
-      quantity: quantity,
-      chef_id: cookId,
-      chef_name: cookName,
-      kitchen_address: kitchenLocation?.address || 'Kitchen Location',
-      kitchen_location: {
-        lat: kitchenLocation?.latitude || 0,
-        lng: kitchenLocation?.longitude || 0
-      }
-    });
+    addItem(selectedPrice.price_id, 1, '');
 
     toast.success(`Added ${quantity} × ${selectedFood.name} (${selectedPrice.size}) to cart!`);
     setShowFoodDetail(false);
@@ -669,9 +654,9 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                 <DialogTitle className={`text-2xl font-bold mb-1 text-white`}>
                   {selectedFood.name}
                 </DialogTitle>
-                <p className="text-gray-200 text-sm">
+                <DialogDescription className="text-gray-200 text-sm">
                   {selectedFood.category_name} • {selectedFood.cuisine_name}
-                </p>
+                </DialogDescription>
               </div>
             </div>
 

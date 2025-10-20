@@ -5,15 +5,20 @@ export interface CartItem {
   id: number;
   quantity: number;
   special_instructions: string;
+  created_at: string;
+  updated_at: string;
   food_name: string;
-  cook_name: string;
-  chef_id: number;
-  size: string;
+  food_description: string;
   unit_price: number;
   total_price: number;
   food_image: string;
-  created_at: string;
-  updated_at: string;
+  size: string;
+  chef_id: number;
+  chef_name: string;
+  kitchen_address: string;
+  kitchen_location: { lat: number; lng: number };
+  price_id: number;
+  food_id: number;
 }
 
 export interface CartSummary {
@@ -66,7 +71,7 @@ export class CartService {
    */
   static async getCartItems(): Promise<CartItem[]> {
     try {
-      const response = await apiClient.get('/orders/cart/');
+      const response = await apiClient.get('/api/orders/cart/');
       // Ensure we always return an array
       const data = response.data;
       if (Array.isArray(data)) {
@@ -88,7 +93,7 @@ export class CartService {
    */
   static async getCartSummary(): Promise<CartSummary> {
     try {
-      const response = await apiClient.get('/orders/cart/cart_summary/');
+      const response = await apiClient.get('/api/orders/cart/cart_summary/');
       const data = response.data;
       // Ensure cart_items is always an array
       if (data && !Array.isArray(data.cart_items)) {
@@ -111,7 +116,7 @@ export class CartService {
    */
   static async addToCart(priceId: number, quantity: number = 1, specialInstructions: string = ''): Promise<CartItem> {
     try {
-      const response = await apiClient.post('/orders/cart/add_to_cart/', {
+      const response = await apiClient.post('/api/orders/cart/add_to_cart/', {
         price_id: priceId,
         quantity: quantity,
         special_instructions: specialInstructions
@@ -128,7 +133,7 @@ export class CartService {
    */
   static async updateCartItem(cartItemId: number, quantity: number, specialInstructions?: string): Promise<CartItem> {
     try {
-      const response = await apiClient.patch(`/orders/cart/${cartItemId}/`, {
+      const response = await apiClient.patch(`/api/orders/cart/${cartItemId}/`, {
         quantity: quantity,
         special_instructions: specialInstructions || ''
       });
@@ -144,7 +149,7 @@ export class CartService {
    */
   static async removeFromCart(cartItemId: number): Promise<void> {
     try {
-      await apiClient.delete(`/orders/cart/${cartItemId}/`);
+      await apiClient.delete(`/api/orders/cart/${cartItemId}/`);
     } catch (error) {
       console.error('Error removing item from cart:', error);
       throw error;
@@ -156,7 +161,7 @@ export class CartService {
    */
   static async clearCart(): Promise<void> {
     try {
-      await apiClient.delete('/orders/cart/clear_cart/');
+      await apiClient.delete('/api/orders/cart/clear_cart/');
     } catch (error) {
       console.error('Error clearing cart:', error);
       throw error;
