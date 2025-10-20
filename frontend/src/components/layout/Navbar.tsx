@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/context/AuthContext";
-import { useCart } from "@/context/CartContext";
+import { useDatabaseCart } from "@/context/DatabaseCartContext";
 import { useTheme } from "@/context/ThemeContext";
 import { cn } from "@/lib/utils";
 import {
@@ -30,7 +30,7 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { cartSummary } = useCart();
+  const { summary } = useDatabaseCart();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -213,12 +213,12 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
                       : "text-gray-300"
                   }`}
                 />
-                {cartSummary && cartSummary.total_items > 0 && (
+                {summary && summary.total_items > 0 && (
                   <Badge
                     variant="destructive"
                     className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
                   >
-                    {cartSummary.total_items}
+                    {summary.total_items}
                   </Badge>
                 )}
               </Button>

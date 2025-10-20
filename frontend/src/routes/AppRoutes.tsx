@@ -1,5 +1,5 @@
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { CartProvider } from "@/context/CartContext";
+import { DatabaseCartProvider } from "@/context/DatabaseCartContext";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import React, { Suspense } from "react";
@@ -18,7 +18,7 @@ import Checkout from "@/pages/Checkout";
 import Contact from "@/pages/Contact";
 import DeliveryAddressTest from "@/pages/DeliveryAddressTest";
 import Home from "@/pages/Home";
-import Menu from "@/pages/Menu";
+import MenuPage from "@/pages/MenuPage";
 import NotFound from "@/pages/NotFound";
 
 // Authentication pages
@@ -248,7 +248,7 @@ const InnerRoutes: React.FC = () => {
               ) : (
                 <Navbar />
               )}
-              <Menu />
+              <MenuPage />
             </>
           }
         />
@@ -734,7 +734,7 @@ const AppRoutes: React.FC = () => {
       }}
     >
       <AuthProvider>
-        <CartProvider>
+        <DatabaseCartProvider>
           {isValidClientId ? (
             <GoogleOAuthProvider clientId={googleClientId}>
               <InnerRoutes />
@@ -742,7 +742,7 @@ const AppRoutes: React.FC = () => {
           ) : (
             <InnerRoutes />
           )}
-        </CartProvider>
+        </DatabaseCartProvider>
       </AuthProvider>
     </BrowserRouter>
   );

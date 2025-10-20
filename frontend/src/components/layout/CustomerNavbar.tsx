@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import LocationModal from '@/components/customer/LocationModal';
-import { useLocation as useLocationContext } from '@/context/LocationContext';
+import { useDatabaseCart } from '@/context/DatabaseCartContext';
 import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import { 
   ShoppingCart, 
@@ -23,7 +23,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 const CustomerNavbar: React.FC = () => {
   const { user, logout } = useAuth();
-  const { location: locationContext, setLocation: setLocationContext } = useLocationContext();
+  const { getItemCount } = useDatabaseCart();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
@@ -48,7 +48,7 @@ const CustomerNavbar: React.FC = () => {
   };
 
   const handleLocationSelect = (newLocation: { address: string; latitude: number; longitude: number; }) => {
-    setLocationContext(newLocation);
+    // Location handling can be implemented later
     setIsLocationModalOpen(false);
   };
 
@@ -107,7 +107,7 @@ const CustomerNavbar: React.FC = () => {
                 onClick={() => setIsLocationModalOpen(true)}
               >
                 <MapPin className="h-5 w-5 text-primary" />
-                <span className="text-sm font-medium text-foreground/80 truncate max-w-[150px]">{locationContext.address || 'Select Location'}</span>
+                <span className="text-sm font-medium text-foreground/80 truncate max-w-[150px]">Select Location</span>
               </Button>
 
               {/* Search */}
@@ -140,9 +140,11 @@ const CustomerNavbar: React.FC = () => {
                 className="relative hover:bg-primary/10"
               >
                 <ShoppingCart className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                  2
-                </span>
+                {getItemCount() > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                    {getItemCount()}
+                  </span>
+                )}
               </Button>
 
               <div className="w-px h-6 bg-border mx-2"></div>

@@ -18,6 +18,7 @@ import { useDatabaseCart } from '@/context/DatabaseCartContext';
 import FilterSidebar from './FilterSidebar';
 import { toast } from 'sonner';
 import LocationSelector from '@/components/location/LocationSelector';
+import DatabaseCartButton from '@/components/cart/DatabaseCartButton';
 
 interface EnhancedMenuPageProps {
   className?: string;
@@ -327,11 +328,13 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                 onLocationSelect={(loc) => handleLocationSelect(loc)}
                 className="hidden md:flex"
               />
-              {/* Cart Button */}
-              <Button className="bg-orange-500 hover:bg-orange-600 flex items-center gap-2">
-                <ShoppingCart className="h-4 w-4" />
-                Cart
-              </Button>
+              {/* Cart Button - Hidden as we have floating cart button */}
+              <div className="hidden">
+                <Button className="bg-orange-500 hover:bg-orange-600 flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Cart
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -1080,6 +1083,9 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Floating Cart Button */}
+      <DatabaseCartButton />
     </div>
   );
 };
