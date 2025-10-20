@@ -300,87 +300,138 @@ class CommunicationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def stats(self, request):
         """Get communication statistics"""
-        from django.db.models import Avg
+        try:
+            from django.db.models import Avg
 
-        queryset = self.get_queryset()
+            queryset = self.get_queryset()
 
-        total = queryset.count()
-        unread = queryset.filter(is_read=False).count()
-        unassigned = queryset.filter(assigned_to__isnull=True).count()
-        resolved = queryset.filter(status="resolved").count()
-        pending = queryset.filter(status="pending").count()
-        in_progress = queryset.filter(status="in_progress").count()
-        closed = queryset.filter(status="closed").count()
+            total = queryset.count()
+            unread = queryset.filter(is_read=False).count()
+            unassigned = queryset.filter(assigned_to__isnull=True).count()
+            resolved = queryset.filter(status="resolved").count()
+            pending = queryset.filter(status="pending").count()
+            in_progress = queryset.filter(status="in_progress").count()
+            closed = queryset.filter(status="closed").count()
 
-        by_type = queryset.values("communication_type").annotate(count=Count("id"))
-        by_priority = queryset.values("priority").annotate(count=Count("id"))
-        by_status = queryset.values("status").annotate(count=Count("id"))
+            by_type = queryset.values("communication_type").annotate(count=Count("id"))
+            by_priority = queryset.values("priority").annotate(count=Count("id"))
+            by_status = queryset.values("status").annotate(count=Count("id"))
 
-        # Calculate average rating
-        average_rating = (
-            queryset.filter(rating__isnull=False).aggregate(Avg("rating"))[
-                "rating__avg"
-            ]
-            or 0
-        )
+            # Calculate average rating
+            average_rating = (
+                queryset.filter(rating__isnull=False).aggregate(Avg("rating"))[
+                    "rating__avg"
+                ]
+                or 0
+            )
 
-        return Response(
-            {
-                "total": total,
-                "unread": unread,
-                "unassigned": unassigned,
-                "pending": pending,
-                "in_progress": in_progress,
-                "resolved": resolved,
-                "closed": closed,
-                "average_rating": round(average_rating, 2),
-                "by_type": list(by_type),
-                "by_priority": list(by_priority),
-                "by_status": list(by_status),
-            }
-        )
+            return Response(
+                {
+                    "total": total,
+                    "unread": unread,
+                    "unassigned": unassigned,
+                    "pending": pending,
+                    "in_progress": in_progress,
+                    "resolved": resolved,
+                    "closed": closed,
+                    "average_rating": round(average_rating, 2),
+                    "by_type": list(by_type),
+                    "by_priority": list(by_priority),
+                    "by_status": list(by_status),
+                }
+            )
+        except Exception as e:
+            # Return basic stats if there's an error
+            return Response({
+                "total": 0,
+                "unread": 0,
+                "unassigned": 0,
+                "pending": 0,
+                "in_progress": 0,
+                "resolved": 0,
+                "closed": 0,
+                "average_rating": 0,
+                "by_type": [],
+                "by_priority": [],
+                "by_status": [],
+                "error": str(e)
+            })
 
     @action(detail=False, methods=["get"])
     def sentiment_analysis(self, request):
         """Get AI-powered sentiment analysis of communications"""
-        from datetime import timedelta
-        from .services.ai_sentiment_service import AISentimentService
+        try:
+            from datetime import timedelta
+            from .services.ai_sentiment_service import AISentimentService
 
-        period = request.GET.get("period", "30d")
-        days = int(period.replace("d", ""))
+            period = request.GET.get("period", "30d")
+            days = int(period.replace("d", ""))
 
-        start_date = timezone.now() - timedelta(days=days)
-        queryset = self.get_queryset().filter(created_at__gte=start_date)
+            start_date = timezone.now() - timedelta(days=days)
+            queryset = self.get_queryset().filter(created_at__gte=start_date)
 
-        # Get AI-powered sentiment analysis
-        ai_service = AISentimentService()
-        sentiment_data = ai_service.analyze_communications_sentiment(queryset)
+            # Get AI-powered sentiment analysis
+            ai_service = AISentimentService()
+            sentiment_data = ai_service.analyze_communications_sentiment(queryset)
 
-        # Get communication type breakdown
-        type_breakdown = {}
-        for comm_type, _ in Communication.COMMUNICATION_TYPE:
-            type_queryset = queryset.filter(communication_type=comm_type)
-            type_sentiment = ai_service.analyze_communications_sentiment(type_queryset)
-            type_breakdown[comm_type] = {
-                'count': type_queryset.count(),
-                'sentiment': type_sentiment
-            }
+            # Get communication type breakdown
+            type_breakdown = {}
+            for comm_type, _ in Communication.COMMUNICATION_TYPE:
+                type_queryset = queryset.filter(communication_type=comm_type)
+                type_sentiment = ai_service.analyze_communications_sentiment(type_queryset)
+                type_breakdown[comm_type] = {
+                    'count': type_queryset.count(),
+                    'sentiment': type_sentiment
+                }
 
-        # Get trending topics with AI analysis
-        trending_topics = ai_service.extract_trending_topics(queryset)
+            # Get trending topics with AI analysis
+            trending_topics = ai_service.extract_trending_topics(queryset)
 
-        # Get sentiment trends over time
-        sentiment_trends = ai_service.get_sentiment_trends(queryset, days)
+            # Get sentiment trends over time
+            sentiment_trends = ai_service.get_sentiment_trends(queryset, days)
 
-        return Response({
-            "overall_sentiment": sentiment_data,
-            "type_breakdown": type_breakdown,
-            "trending_topics": trending_topics,
-            "sentiment_trends": sentiment_trends,
-            "period_days": days,
-            "ai_analysis": True,
-            "last_updated": timezone.now().isoformat()
-        })
+            return Response({
+                "overall_sentiment": sentiment_data,
+                "type_breakdown": type_breakdown,
+                "trending_topics": trending_topics,
+                "sentiment_trends": sentiment_trends,
+                "period_days": days,
+                "ai_analysis": True,
+                "last_updated": timezone.now().isoformat()
+            })
+        except Exception as e:
+            # Return fallback data if AI analysis fails
+            from datetime import timedelta
+            
+            period = request.GET.get("period", "30d")
+            days = int(period.replace("d", ""))
+            start_date = timezone.now() - timedelta(days=days)
+            queryset = self.get_queryset().filter(created_at__gte=start_date)
+            
+            # Basic sentiment analysis without AI
+            total_communications = queryset.count()
+            positive_count = queryset.filter(rating__gte=4).count()
+            negative_count = queryset.filter(rating__lte=2).count()
+            neutral_count = total_communications - positive_count - negative_count
+            
+            return Response({
+                "overall_sentiment": {
+                    "sentiment": "neutral",
+                    "confidence": 0.5,
+                    "positive_count": positive_count,
+                    "negative_count": negative_count,
+                    "neutral_count": neutral_count,
+                    "total_count": total_communications,
+                    "analysis_method": "fallback"
+                },
+                "type_breakdown": {},
+                "trending_topics": [],
+                "sentiment_trends": [],
+                "period_days": days,
+                "ai_analysis": False,
+                "error": str(e),
+                "last_updated": timezone.now().isoformat()
+            })
 
     @action(detail=False, methods=["get"])
     def campaign_stats(self, request):

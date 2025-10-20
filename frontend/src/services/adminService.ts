@@ -258,7 +258,7 @@ export interface OrderListResponse {
 }
 
 class AdminService {
-  private baseUrl = "/admin-management";
+  private baseUrl = "/api/admin-management";
 
   // Map backend approval_status + is_active -> single synthetic status string for legacy UI filters
   private deriveUserStatus(user: {
@@ -1165,7 +1165,7 @@ class AdminService {
   }> {
     try {
       const response = await apiClient.get(
-        `/admin-management/dashboard/orders_distribution/?days=7`
+        `/api/admin-management/dashboard/orders_distribution/?days=7`
       );
       return {
         data: response.data.data,
@@ -1187,7 +1187,7 @@ class AdminService {
     try {
       // Try the new endpoint first
       const response = await apiClient.get(
-        `/admin-management/dashboard/orders_distribution/?days=${days}`
+        `/api/admin-management/dashboard/orders_distribution/?days=${days}`
       );
       return response.data;
     } catch (error) {
@@ -1205,7 +1205,7 @@ class AdminService {
   }> {
     try {
       const response = await apiClient.get(
-        `/admin-management/dashboard/new_users/?days=${days}`
+        `/api/admin-management/dashboard/new_users/?days=${days}`
       );
       return response.data;
     } catch (error) {
@@ -1217,7 +1217,7 @@ class AdminService {
   // Get food statistics
   async getFoodStats() {
     try {
-      const response = await apiClient.get("/food/stats/");
+      const response = await apiClient.get("/api/food/stats/");
       return response.data;
     } catch (error) {
       console.error("Error fetching food stats:", error);
@@ -1233,7 +1233,7 @@ class AdminService {
       );
       // Try the new endpoint first
       const response = await apiClient.get(
-        `/admin-management/dashboard/recent_deliveries/?limit=${limit}`
+        `/api/admin-management/dashboard/recent_deliveries/?limit=${limit}`
       );
       console.log(
         `[AdminService] getRecentDeliveries response:`,

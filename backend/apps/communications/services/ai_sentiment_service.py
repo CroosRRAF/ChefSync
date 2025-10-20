@@ -25,16 +25,24 @@ class AISentimentService:
     """Service for AI-powered sentiment analysis of communications"""
     
     def __init__(self):
+        self.ai_enabled = False
+        self.model = None
+        
         if GEMINI_AVAILABLE:
             try:
-                genai.configure(api_key=settings.GOOGLE_AI_API_KEY)
-                self.model = genai.GenerativeModel('gemini-2.0-flash')
-                self.ai_enabled = True
+                api_key = getattr(settings, 'GOOGLE_AI_API_KEY', None)
+                if api_key:
+                    genai.configure(api_key=api_key)
+                    self.model = genai.GenerativeModel('gemini-2.0-flash')
+                    self.ai_enabled = True
+                    logger.info("AI Sentiment Service initialized successfully")
+                else:
+                    logger.warning("GOOGLE_AI_API_KEY not configured - AI features disabled")
             except Exception as e:
                 logger.warning(f"Failed to initialize Gemini AI: {e}")
                 self.ai_enabled = False
         else:
-            self.ai_enabled = False
+            logger.warning("Google Gemini AI not available - using fallback analysis")
     
     def analyze_communications_sentiment(self, queryset) -> Dict[str, Any]:
         """Analyze sentiment of communications using AI"""

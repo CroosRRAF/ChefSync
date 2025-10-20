@@ -526,7 +526,7 @@ class CommunicationService {
   async getCommunicationStats(): Promise<CommunicationStats> {
     try {
       const response = await apiClient.get(
-        "/communications/communications/stats/"
+        "/api/communications/communications/stats/"
       );
       return response.data;
     } catch (error) {
@@ -570,7 +570,7 @@ class CommunicationService {
   }> {
     try {
       const response = await apiClient.get(
-        "/communications/communications/sentiment_analysis/",
+        "/api/communications/communications/sentiment_analysis/",
         {
           params: { period },
         }

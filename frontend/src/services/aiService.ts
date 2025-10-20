@@ -181,7 +181,7 @@ class AIService {
    */
   async getSalesForecast(daysAhead: number = 30): Promise<SalesForecastResponse> {
     try {
-      const response = await apiClient.get(`/admin-management/ai/sales-forecast/`, {
+      const response = await apiClient.get(`/api/admin-management/ai/sales-forecast/`, {
         params: { days_ahead: daysAhead }
       });
       return response.data.data;
@@ -196,7 +196,7 @@ class AIService {
    */
   async detectAnomalies(daysBack: number = 30): Promise<AnomalyDetectionResponse> {
     try {
-      const response = await apiClient.get(`/admin-management/ai/anomaly-detection/`, {
+      const response = await apiClient.get(`/api/admin-management/ai/anomaly-detection/`, {
         params: { days_back: daysBack }
       });
       return response.data.data;
@@ -211,7 +211,7 @@ class AIService {
    */
   async getProductRecommendations(limit: number = 10): Promise<ProductRecommendationsResponse> {
     try {
-      const response = await apiClient.get(`/admin-management/ai/product-recommendations/`, {
+      const response = await apiClient.get(`/api/admin-management/ai/product-recommendations/`, {
         params: { limit: limit }
       });
       return response.data.data;
@@ -226,7 +226,7 @@ class AIService {
    */
   async getCustomerInsights(): Promise<CustomerInsightsResponse> {
     try {
-      const response = await apiClient.get(`/admin-management/ai/customer-insights/`);
+      const response = await apiClient.get(`/api/admin-management/ai/customer-insights/`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching customer insights:", error);
@@ -239,7 +239,7 @@ class AIService {
    */
   async getAIStatus(): Promise<AIStatusResponse> {
     try {
-      const response = await apiClient.get(`/admin-management/ai/status/`);
+      const response = await apiClient.get(`/api/admin-management/ai/status/`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching AI status:", error);
@@ -252,7 +252,7 @@ class AIService {
    */
   async getDashboardSummary(): Promise<AIDashboardSummary> {
     try {
-      const response = await apiClient.get(`/admin-management/ai/dashboard-summary/`);
+      const response = await apiClient.get(`/api/admin-management/ai/dashboard-summary/`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching AI dashboard summary:", error);
