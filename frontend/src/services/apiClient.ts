@@ -1,127 +1,98 @@
-import axios from "axios";
+import axios from 'axios';
 
-// Extend axios config to include metadata
-declare module "axios" {
-  interface AxiosRequestConfig {
-    metadata?: {
-      startTime: number;
-    };
-  }
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+// Simple in-memory cache for API responses
+const apiCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
 
-// ✅ Create axios instance with performance optimizations
+// ✅ Create axios instance
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000, // 10 second timeout
-  headers: {
-    "Content-Type": "application/json",
-  },
-  // Enable request/response compression
-  decompress: true,
 });
-// Request cache for GET requests
-const requestCache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// ✅ Attach token automatically and add performance monitoring
+// ✅ Attach token automatically
 apiClient.interceptors.request.use((config) => {
-  const access_token = localStorage.getItem("access_token");
+  const access_token = localStorage.getItem('access_token');
   if (access_token) {
     config.headers.Authorization = `Bearer ${access_token}`;
   }
-
-  // Add performance monitoring
-  config.metadata = { startTime: Date.now() };
-
-  // Skip caching for dashboard endpoints (they need real-time data)
-  if (config.url?.includes("/dashboard/")) {
-    return config;
-  }
-
-  // Check cache for GET requests
-  if (config.method === "get") {
-    const cacheKey = `${config.url}?${JSON.stringify(config.params || {})}`;
-    const cached = requestCache.get(cacheKey);
-
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      // Return cached response
-      return Promise.reject({
-        isCached: true,
-        data: cached.data,
-        config,
-      });
-    }
-  }
-
   return config;
 });
 
-// Response interceptor to handle common errors and caching
+// Response interceptor to handle common errors
 apiClient.interceptors.response.use(
   (response) => {
-    // Skip caching for dashboard endpoints
-    if (
-      response.config.method === "get" &&
-      !response.config.url?.includes("/dashboard/")
-    ) {
-      const cacheKey = `${response.config.url}?${JSON.stringify(
-        response.config.params || {}
-      )}`;
-      requestCache.set(cacheKey, {
-        data: response.data,
-        timestamp: Date.now(),
-      });
-    }
-
-    // Performance monitoring
-    if (response.config.metadata?.startTime) {
-      const duration = Date.now() - response.config.metadata.startTime;
-      if (duration > 2000) {
-        console.warn(
-          `Slow API response: ${response.config.url} took ${duration}ms`
-        );
-      }
-    }
-
     return response;
   },
   (error) => {
-    // Handle cached responses
-    if (error.isCached) {
-      return Promise.resolve({ data: error.data, config: error.config });
-    }
-
-    // Performance monitoring for errors
-    if (error.config?.metadata?.startTime) {
-      const duration = Date.now() - error.config.metadata.startTime;
-      console.error(`API error after ${duration}ms:`, error.message);
-    }
-
     if (error.response?.status === 401) {
       // Handle unauthorized access
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       // Only redirect to login if not already on login page
-      if (!window.location.pathname.includes("/login")) {
-        window.location.href = "/login";
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);
   }
 );
 
-// Cache management utilities
-export const clearApiCache = () => {
-  requestCache.clear();
+// Cache management functions
+export const getCacheStats = () => {
+  // Clean expired entries
+  const now = Date.now();
+  for (const [key, value] of apiCache.entries()) {
+    if (now - value.timestamp > value.ttl) {
+      apiCache.delete(key);
+    }
+  }
+  
+  return {
+    size: apiCache.size,
+    keys: Array.from(apiCache.keys()),
+  };
 };
 
-export const getCacheStats = () => {
-  return {
-    size: requestCache.size,
-    entries: Array.from(requestCache.keys()),
-  };
+export const clearApiCache = () => {
+  apiCache.clear();
+};
+
+// Enhanced API client with caching
+const createCachedRequest = (method: 'get' | 'post' | 'put' | 'delete', url: string, data?: any, options?: any) => {
+  const cacheKey = `${method}:${url}:${JSON.stringify(data || {})}`;
+  const now = Date.now();
+  
+  // Check cache for GET requests
+  if (method === 'get' && apiCache.has(cacheKey)) {
+    const cached = apiCache.get(cacheKey)!;
+    if (now - cached.timestamp < cached.ttl) {
+      return Promise.resolve({ data: cached.data });
+    } else {
+      apiCache.delete(cacheKey);
+    }
+  }
+  
+  // Make the actual request
+  return apiClient[method](url, data, options).then(response => {
+    // Cache successful GET responses
+    if (method === 'get' && response.status === 200) {
+      apiCache.set(cacheKey, {
+        data: response.data,
+        timestamp: now,
+        ttl: 5 * 60 * 1000, // 5 minutes TTL
+      });
+    }
+    return response;
+  });
+};
+
+// Export cached methods
+export const cachedApiClient = {
+  get: (url: string, options?: any) => createCachedRequest('get', url, undefined, options),
+  post: (url: string, data?: any, options?: any) => createCachedRequest('post', url, data, options),
+  put: (url: string, data?: any, options?: any) => createCachedRequest('put', url, data, options),
+  delete: (url: string, options?: any) => createCachedRequest('delete', url, undefined, options),
 };
 
 export default apiClient;
