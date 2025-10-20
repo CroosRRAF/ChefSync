@@ -1,6 +1,8 @@
 import logging
 
-from django.db.models import Q
+from django.db.models import Q, Min, Max, Avg
+from django.core.paginator import Paginator
+from decimal import Decimal
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -19,6 +21,8 @@ from .serializers import (
     FoodSerializer,
     OfferSerializer,
 )
+from .utils import calculate_delivery_fee, validate_delivery_radius
+from apps.users.models import KitchenLocation
 
 
 @api_view(["GET"])
@@ -555,129 +559,234 @@ def chef_food_status(request):
     )
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def food_stats(request):
-    """Get food statistics for admin dashboard"""
+@api_view(['POST'])
+@permission_classes([])  # Allow anonymous access
+def calculate_delivery_fee_api(request):
+    """
+    Calculate delivery fee based on user location and kitchen location
+    POST /api/food/delivery/calculate-fee/
+    Body: {
+        "user_latitude": 40.7128,
+        "user_longitude": -74.0060,
+        "chef_id": 1
+    }
+    """
     try:
-        from django.db.models import Avg, Count, Max, Min
-
-        # Food statistics
-        total_foods = Food.objects.count()
-        approved_foods = Food.objects.filter(status="Approved").count()
-        pending_foods = Food.objects.filter(status="Pending").count()
-        rejected_foods = Food.objects.filter(status="Rejected").count()
-
-        # Category and cuisine counts
-        total_categories = FoodCategory.objects.count()
-        total_cuisines = Cuisine.objects.count()
-
-        # Rating statistics
-        avg_rating = (
-            FoodReview.objects.aggregate(avg_rating=Avg("rating"))["avg_rating"] or 0
-        )
-
-        # Price statistics
-        price_stats = FoodPrice.objects.aggregate(
-            avg_price=Avg("price"), min_price=Min("price"), max_price=Max("price")
-        )
-
-        # Recent submissions (last 7 days)
-        from datetime import timedelta
-
-        from django.utils import timezone
-
-        week_ago = timezone.now() - timedelta(days=7)
-        recent_submissions = Food.objects.filter(created_at__gte=week_ago).count()
-
-        # Top categories by food count
-        top_categories = FoodCategory.objects.annotate(
-            food_count=Count("foods")
-        ).order_by("-food_count")[:5]
-
-        # Top cuisines by food count (through categories)
-        top_cuisines = Cuisine.objects.annotate(
-            food_count=Count("categories__foods")
-        ).order_by("-food_count")[:5]
-
-        return Response(
-            {
-                "total_foods": total_foods,
-                "approved_foods": approved_foods,
-                "pending_foods": pending_foods,
-                "rejected_foods": rejected_foods,
-                "total_categories": total_categories,
-                "total_cuisines": total_cuisines,
-                "average_rating": round(avg_rating, 2),
-                "price_stats": {
-                    "average_price": round(price_stats["avg_price"] or 0, 2),
-                    "min_price": price_stats["min_price"] or 0,
-                    "max_price": price_stats["max_price"] or 0,
-                },
-                "recent_submissions": recent_submissions,
-                "top_categories": [
-                    {"id": cat.id, "name": cat.name, "food_count": cat.food_count}
-                    for cat in top_categories
-                ],
-                "top_cuisines": [
-                    {
-                        "id": cuisine.id,
-                        "name": cuisine.name,
-                        "food_count": cuisine.food_count,
-                    }
-                    for cuisine in top_cuisines
-                ],
-            },
-            status=status.HTTP_200_OK,
-        )
-
+        data = request.data
+        user_lat = float(data.get('user_latitude'))
+        user_lng = float(data.get('user_longitude'))
+        chef_id = int(data.get('chef_id'))
+        
+        # Get chef's kitchen location
+        try:
+            from apps.users.models import Address
+            kitchen_address = Address.objects.filter(
+                user_id=chef_id,
+                address_type='kitchen',
+                is_active=True
+            ).first()
+            
+            if not kitchen_address:
+                return Response({
+                    'error': 'Kitchen location not found for this chef'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            kitchen_lat = float(kitchen_address.latitude) if kitchen_address.latitude else None
+            kitchen_lng = float(kitchen_address.longitude) if kitchen_address.longitude else None
+            
+            if not kitchen_lat or not kitchen_lng:
+                return Response({
+                    'error': 'Kitchen coordinates not available'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except (ValueError, TypeError):
+            return Response({
+                'error': 'Invalid kitchen location data'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calculate delivery fee
+        fee_data = calculate_delivery_fee(user_lat, user_lng, kitchen_lat, kitchen_lng)
+        
+        # Validate delivery radius (default 25km)
+        radius_validation = validate_delivery_radius(kitchen_lat, kitchen_lng, user_lat, user_lng)
+        
+        return Response({
+            **fee_data,
+            'delivery_validation': radius_validation,
+            'kitchen_location': {
+                'latitude': kitchen_lat,
+                'longitude': kitchen_lng,
+                'address': kitchen_address.full_address
+            }
+        })
+        
+    except (ValueError, TypeError, KeyError) as e:
+        return Response({
+            'error': f'Invalid request data: {str(e)}'
+        }, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        logger.error(f"Food stats error: {str(e)}", exc_info=True)
-        return Response(
-            {"error": "Failed to fetch food statistics", "message": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        return Response({
+            'error': f'Server error: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([])  # Allow anonymous access  
+def menu_with_filters(request):
+    """
+    Enhanced menu endpoint with advanced filtering
+    GET /api/food/menu/?search=&min_price=&max_price=&categories=&cuisines=&dietary=&rating_min=&chef_ids=&user_lat=&user_lng=&page=
+    """
+    # Get query parameters
+    search = request.GET.get('search', '').strip()
+    min_price = request.GET.get('min_price')
+    max_price = request.GET.get('max_price')
+    categories = request.GET.getlist('categories')  # Can pass multiple: ?categories=1&categories=2
+    cuisines = request.GET.getlist('cuisines')
+    dietary = request.GET.getlist('dietary')  # vegetarian, vegan, gluten_free
+    rating_min = request.GET.get('rating_min')
+    chef_ids = request.GET.getlist('chef_ids')
+    user_lat = request.GET.get('user_lat')
+    user_lng = request.GET.get('user_lng')
+    sort_by = request.GET.get('sort_by', 'name')  # name, price, rating, distance
+    page = int(request.GET.get('page', 1))
+    page_size = int(request.GET.get('page_size', 20))
+    
+    # Start with approved foods that are available
+    foods = Food.objects.filter(
+        status='Approved',
+        is_available=True
+    ).select_related('food_category', 'chef').prefetch_related('prices')
+    
+    # Apply search filter
+    if search:
+        foods = foods.filter(
+            Q(name__icontains=search) | 
+            Q(description__icontains=search) |
+            Q(chef__username__icontains=search) |
+            Q(food_category__name__icontains=search)
         )
+    
+    # Apply price filter (look at food prices)
+    if min_price or max_price:
+        price_filter = Q()
+        if min_price:
+            price_filter &= Q(prices__price__gte=Decimal(min_price))
+        if max_price:
+            price_filter &= Q(prices__price__lte=Decimal(max_price))
+        foods = foods.filter(price_filter).distinct()
+    
+    # Apply category filter
+    if categories:
+        foods = foods.filter(food_category__id__in=categories)
+    
+    # Apply cuisine filter
+    if cuisines:
+        foods = foods.filter(food_category__cuisine__id__in=cuisines)
+    
+    # Apply dietary filters
+    if 'vegetarian' in dietary:
+        foods = foods.filter(is_vegetarian=True)
+    if 'vegan' in dietary:
+        foods = foods.filter(is_vegan=True)
+    if 'gluten_free' in dietary:
+        foods = foods.filter(is_gluten_free=True)
+    
+    # Apply rating filter
+    if rating_min:
+        foods = foods.filter(rating_average__gte=Decimal(rating_min))
+    
+    # Apply chef filter
+    if chef_ids:
+        foods = foods.filter(chef__user_id__in=chef_ids)
+    
+    # Sorting
+    if sort_by == 'price':
+        foods = foods.annotate(min_price=Min('prices__price')).order_by('min_price')
+    elif sort_by == 'rating':
+        foods = foods.order_by('-rating_average')
+    elif sort_by == 'distance' and user_lat and user_lng:
+        # For distance sorting, we'll handle this in serializer
+        pass
+    else:
+        foods = foods.order_by('name')
+    
+    # Pagination
+    paginator = Paginator(foods, page_size)
+    page_obj = paginator.get_page(page)
+    
+    # Serialize foods with location context for delivery fee calculation
+    context = {'request': request}
+    if user_lat and user_lng:
+        context['user_location'] = {
+            'latitude': float(user_lat),
+            'longitude': float(user_lng)
+        }
+    
+    serializer = FoodSerializer(page_obj.object_list, many=True, context=context)
+    
+    return Response({
+        'results': serializer.data,
+        'count': paginator.count,
+        'num_pages': paginator.num_pages,
+        'current_page': page,
+        'has_next': page_obj.has_next(),
+        'has_previous': page_obj.has_previous(),
+    })
 
 
-class OfferViewSet(viewsets.ModelViewSet):
-    """Manage food offers and discounts"""
-
-    queryset = Offer.objects.all()
-    serializer_class = OfferSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        """Filter offers based on user permissions"""
-        user = self.request.user
-        if user.is_staff or user.is_superuser:
-            # Admin can see all offers
-            return Offer.objects.all()
-        else:
-            # Regular users can only see their own offers (if they were chefs)
-            return Offer.objects.filter(price__cook=user)
-
-    def perform_create(self, serializer):
-        """Set the creator when creating an offer"""
-        serializer.save()
-
-    @action(detail=False, methods=["get"])
-    def active_offers(self, request):
-        """Get all active (non-expired) offers"""
-        from django.utils import timezone
-
-        active_offers = self.get_queryset().filter(
-            valid_until__gte=timezone.now().date()
-        )
-        serializer = self.get_serializer(active_offers, many=True)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=["get"])
-    def expired_offers(self, request):
-        """Get all expired offers"""
-        from django.utils import timezone
-
-        expired_offers = self.get_queryset().filter(
-            valid_until__lt=timezone.now().date()
-        )
-        serializer = self.get_serializer(expired_offers, many=True)
-        return Response(serializer.data)
+@api_view(['GET'])
+@permission_classes([])  # Allow anonymous access  
+def get_menu_filters_data(request):
+    """
+    Get available filter options for menu filtering
+    GET /api/food/menu/filters/
+    """
+    # Get available cuisines
+    cuisines = Cuisine.objects.filter(is_active=True).order_by('sort_order', 'name')
+    cuisine_data = CuisineSerializer(cuisines, many=True).data
+    
+    # Get available categories grouped by cuisine
+    categories = FoodCategory.objects.filter(is_active=True).select_related('cuisine').order_by('cuisine__name', 'sort_order', 'name')
+    category_data = FoodCategorySerializer(categories, many=True).data
+    
+    # Get price range from available food prices
+    price_range = FoodPrice.objects.aggregate(
+        min_price=Min('price'),
+        max_price=Max('price')
+    )
+    
+    # Get available chefs who have approved foods
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    active_chefs = User.objects.filter(
+        foods__status='Approved',
+        is_active=True
+    ).distinct().values('user_id', 'username')
+    
+    return Response({
+        'cuisines': cuisine_data,
+        'categories': category_data,
+        'price_range': {
+            'min': float(price_range['min_price'] or 0),
+            'max': float(price_range['max_price'] or 1000)
+        },
+        'dietary_options': [
+            {'value': 'vegetarian', 'label': 'Vegetarian'},
+            {'value': 'vegan', 'label': 'Vegan'},
+            {'value': 'gluten_free', 'label': 'Gluten Free'}
+        ],
+        'spice_levels': [
+            {'value': 'mild', 'label': 'Mild'},
+            {'value': 'medium', 'label': 'Medium'},
+            {'value': 'hot', 'label': 'Hot'},
+            {'value': 'very_hot', 'label': 'Very Hot'}
+        ],
+        'sort_options': [
+            {'value': 'name', 'label': 'Name (A-Z)'},
+            {'value': 'price', 'label': 'Price (Low to High)'},
+            {'value': 'rating', 'label': 'Rating (High to Low)'},
+            {'value': 'distance', 'label': 'Distance (Near to Far)'}
+        ],
+        'active_chefs': list(active_chefs)
+    })

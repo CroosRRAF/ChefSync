@@ -33,5 +33,5 @@ urlpatterns = [
     path('upload-image/', views.upload_image, name='upload-image'),
     
     # Food statistics endpoint
-    path('stats/', views.food_stats, name='food-stats'),
+    path('stats/', views.AdminFoodApprovalViewSet.as_view({'get': 'stats'}), name='food-stats'),
 ]

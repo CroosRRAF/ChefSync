@@ -4,18 +4,6 @@ from .models import Order, OrderItem, OrderStatusHistory, CartItem, BulkOrder, B
 from apps.food.models import Food, FoodPrice
 from apps.users.models import ChefProfile
 from django.contrib.auth import get_user_model
-from django.db.models import Count, Sum
-from rest_framework import serializers
-
-from .models import (
-    BulkOrder,
-    BulkOrderAssignment,
-    CartItem,
-    Order,
-    OrderItem,
-    OrderStatusHistory,
-    UserAddress,
-)
 
 User = get_user_model()
 
@@ -400,17 +388,25 @@ class CartItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = CartItem
         fields = [
-            'id', 'quantity', 'special_instructions', 'food_name', 'cook_name',
-            'size', 'unit_price', 'total_price', 'food_image', 'created_at', 'updated_at'
+            'id', 'quantity', 'special_instructions', 'food_name', 'unit_price', 'total_price', 'food_image', 'created_at', 'updated_at'
         ]
 
-
-    def get_chef_id(self, obj):
-        """Get chef ID from the price's cook"""
+    def get_food_name(self, obj):
         try:
-            # Custom User model uses user_id as primary key
-            return obj.price.cook.user_id
-        except:
+            return obj.price.food.name
+        except Exception:
+            return ''
+
+    def get_unit_price(self, obj):
+        try:
+            return float(obj.price.price)
+        except Exception:
+            return 0.0
+
+    def get_food_image(self, obj):
+        try:
+            return obj.price.image_url or (obj.price.food.image_url if obj.price and obj.price.food else None)
+        except Exception:
             return None
 
     def get_total_price(self, obj):
@@ -632,6 +628,36 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
         if obj.order:
             return str(obj.order.total_amount)
         return "0.00"
-        if obj.order:
-            return str(obj.order.total_amount)
-        return "0.00"
+
+
+# --- Placeholder serializers for bulk management and order representations ---
+from .models import Order, BulkOrder
+
+
+class OrderListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ['id', 'order_number', 'status', 'total_amount', 'created_at']
+
+
+class OrderDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ['id', 'order_number', 'status', 'total_amount', 'delivery_fee', 'created_at', 'items']
+
+
+class BulkOrderListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BulkOrder
+        fields = ['bulk_order_id', 'status', 'total_quantity', 'deadline', 'created_at']
+
+
+class BulkOrderDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BulkOrder
+        fields = ['bulk_order_id', 'status', 'total_quantity', 'description', 'deadline', 'created_at']
+
+
+class BulkOrderActionSerializer(serializers.Serializer):
+    action = serializers.CharField()
+    notes = serializers.CharField(required=False, allow_blank=True)
