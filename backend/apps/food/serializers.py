@@ -112,7 +112,6 @@ class FoodPriceSerializer(serializers.ModelSerializer):
                 profile_image_url = f"data:image/jpeg;base64,{encoded_image}"
             except Exception:
                 profile_image_url = None
-<<<<<<< HEAD
         
         # Get cook's kitchen location
         kitchen_location = None
