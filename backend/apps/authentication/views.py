@@ -279,9 +279,11 @@ def user_login(request):
     """
     User login with JWT tokens
     """
+    print(f"Login attempt for email: {request.data.get('email')}")
     serializer = UserLoginSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data['user']
+        print(f"Login successful for user: {user.email}")
 
         # Reset failed login attempts on successful login
         user.reset_failed_login_attempts()
@@ -361,10 +363,17 @@ def token_refresh(request):
 
         print(f"Token refresh attempt for token: {refresh_token[:20]}...")
 
-        # Use JWT service to refresh token
+        # Use JWT service to validate token and get user
         from .services.jwt_service import JWTTokenService
+        
+        # Validate refresh token and get user
+        is_valid, user, error = JWTTokenService.validate_token(refresh_token, 'refresh')
+        if not is_valid:
+            print(f"Token validation failed: {error}")
+            return Response({'error': 'Invalid refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
+        
         # Rotate the refresh token
-        token_data = JWTTokenService.rotate_refresh_token(refresh_token, request.user, request)
+        token_data = JWTTokenService.rotate_refresh_token(refresh_token, user, request)
 
         print("Token refresh successful with rotation")
         return Response({
@@ -1678,13 +1687,18 @@ def clear_all_tokens(request):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def check_user_status(request):
     """
     Check the approval status of a user by email (for login page)
     """
-    email = request.data.get('email')
+    # Support both GET (query params) and POST (request body) methods
+    if request.method == 'GET':
+        email = request.query_params.get('email')
+    else:  # POST
+        email = request.data.get('email')
+    
     if not email:
         return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
