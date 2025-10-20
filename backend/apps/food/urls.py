@@ -28,6 +28,14 @@ urlpatterns = [
     # Chef food status endpoint
     path('chef/status/', views.chef_food_status, name='chef-food-status'),
     
+    # New delivery and menu endpoints
+    path('delivery/calculate-fee/', views.calculate_delivery_fee_api, name='calculate-delivery-fee'),
+    path('menu/', views.menu_with_filters, name='menu-with-filters'),
+    path('menu/filters/', views.get_menu_filters_data, name='menu-filters-data'),
+    
+    # Image upload endpoint
+    path('upload-image/', views.upload_image, name='upload-image'),
+    
     # Image upload endpoint
     path('upload-image/', views.upload_image, name='upload-image'),
 ]

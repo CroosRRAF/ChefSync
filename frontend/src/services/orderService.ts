@@ -8,17 +8,24 @@ export interface OrderItem {
 }
 
 export interface CreateOrderData {
-  chef_id: number;
-  delivery_address_id?: number;
-  delivery_latitude: number;
-  delivery_longitude: number;
+  chef_id?: number;
+  delivery_address_id: number;
+  delivery_latitude?: number;
+  delivery_longitude?: number;
   customer_notes?: string;
+  delivery_instructions?: string;
   promo_code?: string;
   chef_latitude?: number;
   chef_longitude?: number;
   chef_address?: string;
   chef_city?: string;
   delivery_address?: string;
+  payment_method?: string;
+  phone?: string;
+  subtotal?: string;
+  tax_amount?: string;
+  delivery_fee?: string;
+  total_amount?: string;
 }
 
 export interface OrderResponse {
@@ -53,6 +60,38 @@ class OrderService {
       console.error('Error status:', error.response?.status);
       console.error('Error URL:', error.config?.url);
       throw new Error(`Failed to create order: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Place an order with delivery address and calculated fees
+   */
+  async placeOrder(orderData: {
+    delivery_address_id: number;
+    delivery_instructions?: string;
+    payment_method: string;
+    phone: string;
+    delivery_fee: number;
+    subtotal: number;
+    tax_amount: number;
+    total_amount: number;
+  }): Promise<{
+    success: string;
+    order_id: number;
+    order_number: string;
+    status: string;
+    total_amount: number;
+    distance_km?: number;
+  }> {
+    try {
+      console.log('Placing order with data:', orderData);
+      const response = await apiClient.post(`${this.baseUrl}/place/`, orderData);
+      console.log('Order placed successfully:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error placing order:', error);
+      console.error('Error response:', error.response?.data);
+      throw new Error(error.response?.data?.error || 'Failed to place order');
     }
   }
 

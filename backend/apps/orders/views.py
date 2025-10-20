@@ -1087,75 +1087,117 @@ def calculate_checkout(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def place_order(request):
-    """Place a comprehensive order with full validation and processing"""
+    """Place a comprehensive order with delivery address reference and distance-based fee"""
     try:
-        cart_items = request.data.get('cart_items', [])
-        customer_location = request.data.get('customer_location', {})
+        # Debug: log request wrapper type to diagnose HttpRequest vs DRF Request issues
+        try:
+            print("[DEBUG] place_order called. request type:", type(request))
+            print("[DEBUG] has _request:", hasattr(request, '_request'))
+            if hasattr(request, '_request'):
+                print("[DEBUG] underlying _request type:", type(request._request))
+        except Exception:
+            pass
+        # Get order data from request
+        delivery_address_id = request.data.get('delivery_address_id')
+        delivery_instructions = request.data.get('delivery_instructions', '')
         payment_method = request.data.get('payment_method', 'cash')
-        special_instructions = request.data.get('special_instructions', '')
+        phone = request.data.get('phone', '')
+        delivery_fee = request.data.get('delivery_fee', 0)
+        subtotal = request.data.get('subtotal', 0)
+        tax_amount = request.data.get('tax_amount', 0)
+        total_amount = request.data.get('total_amount', 0)
+
+        # Validate required fields
+        if not delivery_address_id:
+            return Response({'error': 'Delivery address is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get cart items for the user (CartItem uses 'customer' FK)
+        cart_items = (
+            CartItem.objects
+            .filter(customer=request.user)
+            .select_related('price__food', 'price__cook')
+        )
+
+        if not cart_items.exists():
+            return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
         
-        if not cart_items:
+        # Get delivery address from users app
+        try:
+            from apps.users.models import Address
+            delivery_address = Address.objects.get(id=delivery_address_id, user=request.user)
+        except Address.DoesNotExist:
             return Response({
-                'error': 'Cart is empty'
+                'error': 'Delivery address not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get chef from first cart item
+        first_item = cart_items.first()
+        chef = first_item.price.cook if first_item and first_item.price else None
+        
+        if not chef:
+            return Response({
+                'error': 'Chef information not found'
             }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get chef's kitchen location
+        chef_lat, chef_lng = _resolve_chef_location(chef, request.data)
+        
+        # Calculate distance if both coordinates available
+        distance_km = None
+        if chef_lat and chef_lng and delivery_address.latitude and delivery_address.longitude:
+            from math import radians, sin, cos, sqrt, atan2
+            
+            def haversine_distance(lat1, lon1, lat2, lon2):
+                R = 6371  # Earth's radius in km
+                lat1, lon1, lat2, lon2 = map(radians, [float(lat1), float(lon1), float(lat2), float(lon2)])
+                dlat = lat2 - lat1
+                dlon = lon2 - lon1
+                a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+                c = 2 * atan2(sqrt(a), sqrt(1-a))
+                return R * c
+            
+            distance_km = haversine_distance(chef_lat, chef_lng, 
+                                            delivery_address.latitude, 
+                                            delivery_address.longitude)
         
         # Create order
         import uuid
-        
         order = Order.objects.create(
             customer=request.user,
-            chef=None,  # Will be set based on first item
+            chef=chef,
             order_number=f'ORD-{uuid.uuid4().hex[:8].upper()}',
-            status='pending',
+            status='confirmed',
             payment_method=payment_method,
-            special_instructions=special_instructions,
-            delivery_address=customer_location.get('formatted_address', ''),
-            delivery_latitude=customer_location.get('latitude'),
-            delivery_longitude=customer_location.get('longitude'),
+            payment_status='pending',
+            subtotal=Decimal(str(subtotal)),
+            tax_amount=Decimal(str(tax_amount)),
+            delivery_fee=Decimal(str(delivery_fee)),
+            total_amount=Decimal(str(total_amount)),
+            delivery_address_new=delivery_address,
+            delivery_instructions=delivery_instructions,
+            customer_notes=delivery_instructions,
+            distance_km=Decimal(str(distance_km)) if distance_km else None
         )
         
-        # Process cart items
-        for item_data in cart_items:
-            try:
-                food_price = FoodPrice.objects.select_related('food', 'cook').get(id=item_data['price_id'])
-                
-                # Set chef for order (from first item)
-                if not order.chef:
-                    order.chef = food_price.cook
-                    order.save()
-                
-                # Create order item
-                OrderItem.objects.create(
-                    order=order,
-                    price=food_price,
-                    quantity=item_data['quantity'],
-                    total_amount=food_price.price * item_data['quantity']
-                )
-                
-            except FoodPrice.DoesNotExist:
-                # Clean up if error
-                order.delete()
-                return Response({
-                    'error': f'Price with ID {item_data["price_id"]} not found'
-                }, status=status.HTTP_404_NOT_FOUND)
+        # Create order items from cart
+        for cart_item in cart_items:
+            OrderItem.objects.create(
+                order=order,
+                price=cart_item.price,
+                quantity=cart_item.quantity,
+                unit_price=cart_item.price.price,
+                total_price=cart_item.price.price * cart_item.quantity,
+                food_name=cart_item.price.food.name,
+                food_description=cart_item.price.food.description
+            )
         
-        # Calculate totals
-        subtotal = sum(item.total_amount for item in order.items.all())
-        delivery_fee = Decimal('15.00')
-        tax_amount = subtotal * Decimal('0.08')
-        total_amount = subtotal + delivery_fee + tax_amount
-        
-        # Update order totals
-        order.subtotal = subtotal
-        order.delivery_fee = delivery_fee
-        order.tax_amount = tax_amount
-        order.total_amount = total_amount
-        order.save()
+        # Clear cart after order placement
+        cart_items.delete()
         
         # Create initial status history
         OrderStatusHistory.objects.create(
             order=order,
-            status='pending',
+            status='confirmed',
             changed_by=request.user,
             notes='Order placed successfully'
         )
@@ -1165,8 +1207,12 @@ def place_order(request):
             'order_id': order.id,
             'order_number': order.order_number,
             'status': order.status,
-            'total_amount': float(total_amount)
-        })
+            'total_amount': float(total_amount),
+            'distance_km': float(distance_km) if distance_km else None
+        }, status=status.HTTP_201_CREATED)
         
     except Exception as e:
+        import traceback
+        print(f"Error placing order: {str(e)}")
+        print(traceback.format_exc())
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

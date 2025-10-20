@@ -322,6 +322,12 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
 
           // Parse address components
           parseAddressComponents(result.address_components || []);
+          
+          // Auto-open the form when location is selected from map
+          if (!showAddForm) {
+            setShowAddForm(true);
+            toast.success('Location selected! Fill in the remaining details.');
+          }
         }
       }
     );
@@ -524,20 +530,19 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
 
   const useCurrentLocation = () => {
     if (currentLocation) {
-      const tempAddress: DeliveryAddress = {
-        id: 0,
-        label: 'Current Location',
+      // Auto-fill the form with current location
+      setFormData(prev => ({
+        ...prev,
         address_line1: currentLocation.formatted_address,
-        city: formData.city,
-        pincode: formData.pincode,
         latitude: currentLocation.lat,
-        longitude: currentLocation.lng,
-        is_default: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      onAddressSelect(tempAddress);
-      onClose();
+        longitude: currentLocation.lng
+      }));
+      
+      // Open the form to let user complete the details
+      if (!showAddForm) {
+        setShowAddForm(true);
+        toast.success('Current location set! Please complete the address details.');
+      }
     }
   };
 
@@ -705,26 +710,54 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
 
             {activeTab === 'map' && (
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Search on Map</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Search on Map</h3>
+                  {showAddForm && (
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      Click map to auto-fill form
+                    </Badge>
+                  )}
+                </div>
+                
+                {/* Instructions */}
+                <Card className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                    📍 How to select your location:
+                  </p>
+                  <ul className="text-xs text-blue-700 dark:text-blue-200 space-y-1 list-disc list-inside">
+                    <li>Search for an address in the box below</li>
+                    <li>Click anywhere on the map to select a location</li>
+                    {showAddForm && <li className="font-semibold">Selected location will auto-fill your form →</li>}
+                  </ul>
+                </Card>
                 
                 {/* Search Input */}
                 <div className="space-y-3">
-                  <Input
-                    ref={searchInputRef}
-                    placeholder="Search for location..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full"
-                  />
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      ref={searchInputRef}
+                      placeholder="Search for location..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10"
+                    />
+                  </div>
                   
                   {currentLocation && (
-                    <Card className="p-3 bg-blue-50 border-blue-200">
-                      <p className="text-sm font-medium text-blue-900">
-                        Selected Location
-                      </p>
-                      <p className="text-xs text-blue-700">
-                        {currentLocation.formatted_address}
-                      </p>
+                    <Card className="p-3 bg-green-50 border-green-200">
+                      <div className="flex items-start gap-2">
+                        <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-green-900">
+                            Location Selected
+                          </p>
+                          <p className="text-xs text-green-700 mt-1">
+                            {currentLocation.formatted_address}
+                          </p>
+                        </div>
+                      </div>
                     </Card>
                   )}
                 </div>
@@ -825,6 +858,46 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Quick Action Buttons */}
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setActiveTab('map');
+                        setShowAddForm(true);
+                      }}
+                      className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 hover:text-blue-800"
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Choose on Map
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        getCurrentLocation();
+                        setActiveTab('current');
+                      }}
+                      disabled={gettingLocation}
+                      className="bg-white hover:bg-green-50 border-green-300 text-green-700 hover:text-green-800"
+                    >
+                      {gettingLocation ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-2 border-green-600 border-t-transparent mr-2" />
+                          Getting...
+                        </>
+                      ) : (
+                        <>
+                          <Navigation className="h-4 w-4 mr-2" />
+                          Current Location
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
                   <div>
                     <Label htmlFor="label">Address Label *</Label>
                     <Input
@@ -835,8 +908,20 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="address_line1">Address Line 1 *</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="address_line1">Address Line 1 *</Label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setActiveTab('map')}
+                        className="text-xs h-7 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        <MapPin className="h-3 w-3 mr-1" />
+                        Choose on Map
+                      </Button>
+                    </div>
                     <Textarea
                       id="address_line1"
                       placeholder="Street address, building name, etc."
@@ -844,6 +929,9 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
                       onChange={(e) => setFormData(prev => ({ ...prev, address_line1: e.target.value }))}
                       rows={2}
                     />
+                    <p className="text-xs text-gray-500">
+                      Tip: Click "Choose on Map" to select your location visually
+                    </p>
                   </div>
 
                   <div>
@@ -878,9 +966,22 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
                   </div>
 
                   {formData.latitude !== 0 && formData.longitude !== 0 && (
-                    <div className="text-sm text-gray-600">
-                      <strong>Coordinates:</strong> {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
-                    </div>
+                    <Card className="p-3 bg-green-50 border-green-200">
+                      <div className="flex items-start gap-2">
+                        <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-green-900">
+                            Location Set Successfully
+                          </p>
+                          <p className="text-xs text-green-700 mt-1">
+                            <strong>Coordinates:</strong> {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
+                          </p>
+                          <p className="text-xs text-green-600 mt-1">
+                            Your delivery address is pinpointed for accurate delivery
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
                   )}
 
                   <div className="flex justify-end gap-3">

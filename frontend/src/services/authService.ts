@@ -100,43 +100,91 @@ const formatErrorMessage = (error: any): string => {
   return error.message || 'An unexpected error occurred';
 };
 
+// Flag to prevent multiple simultaneous refresh attempts
+let isRefreshing = false;
+let failedQueue: any[] = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+
+  failedQueue = [];
+};
+
 // Add response interceptor to handle token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+    // Skip refresh for the refresh endpoint itself to prevent infinite loop
+    if (originalRequest.url?.includes('/auth/token/refresh/')) {
+      isRefreshing = false;
+      processQueue(error, null);
+      removeSecureTokens();
+      window.location.href = '/auth/login';
+      return Promise.reject(error);
+    }
 
-      try {
-        const refreshToken = localStorage.getItem('refresh_token'); // Get refresh token from localStorage
-        if (refreshToken) {
-          const response = await api.post('/auth/token/refresh/', {
-            refresh: refreshToken,
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // If already refreshing, queue this request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
           });
-          
-          const { access, refresh } = response.data;
-          setSecureToken(access);
-          if (refresh) {
-            setRefreshToken(refresh);
-          }
-          
-          console.log('Token refresh successful');
-          
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${access}`;
-          return api(originalRequest);
-        } else {
-          console.log('No refresh token available');
-          removeSecureTokens();
-          window.location.href = '/auth/login';
-        }
-      } catch (refreshError) {
-        console.log('Token refresh failed:', refreshError);
-        // Refresh failed, redirect to login
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = getRefreshToken();
+      
+      if (!refreshToken) {
+        console.log('No refresh token available');
+        isRefreshing = false;
         removeSecureTokens();
         window.location.href = '/auth/login';
+        return Promise.reject(error);
+      }
+
+      try {
+        // Use axios.post directly to avoid interceptor on refresh call
+        const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
+          refresh: refreshToken,
+        });
+        
+        const { access, refresh } = response.data;
+        setSecureToken(access);
+        if (refresh) {
+          setRefreshToken(refresh);
+        }
+        
+        console.log('Token refresh successful');
+        isRefreshing = false;
+        processQueue(null, access);
+        
+        // Retry original request with new token
+        originalRequest.headers.Authorization = `Bearer ${access}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        console.log('Token refresh failed, logging out');
+        isRefreshing = false;
+        processQueue(refreshError, null);
+        removeSecureTokens();
+        window.location.href = '/auth/login';
+        return Promise.reject(refreshError);
       }
     }
 

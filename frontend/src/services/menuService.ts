@@ -62,6 +62,7 @@ export interface FoodItem {
   images: FoodImage[];
   primary_image: string;
   image_url?: string; // Additional image URL field
+  optimized_image_url?: string; // Optimized image URL from backend
   thumbnail_url?: string; // Thumbnail URL field
   available_cooks_count: number;
   prices?: FoodPriceSimple[]; // Add prices array
@@ -139,6 +140,8 @@ export interface CartItem {
   food_name: string;
   cook_name: string;
   chef_id: number;
+  chef_latitude?: number;  // Chef's latitude for delivery fee calculation
+  chef_longitude?: number; // Chef's longitude for delivery fee calculation
   size: string;
   unit_price: number;
   total_price: number;

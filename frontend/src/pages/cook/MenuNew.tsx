@@ -43,7 +43,7 @@ interface Food {
   is_available: boolean;
   prices: FoodPrice[];
   chef_name: string;
-  rating_average: number;
+  rating_average: number | string;
   total_reviews: number;
   total_orders: number;
 }
@@ -1228,7 +1228,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
 
                   {/* Stats */}
                   <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border">
-                    <span>★ {food.rating_average} ({food.total_reviews} reviews)</span>
+                    <span>★ {Number(food.rating_average).toFixed(1)} ({food.total_reviews} reviews)</span>
                     <span>{food.total_orders} orders</span>
                   </div>
 

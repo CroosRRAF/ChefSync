@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import logoImage from '@/assets/2.png';
+import LocationModal from '@/components/customer/LocationModal';
+import { useLocation as useLocationContext } from '@/context/LocationContext';
 import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import { 
   ShoppingCart, 
@@ -16,20 +16,23 @@ import {
   Package,
   Bell,
   Search,
-  LayoutDashboard
+  LayoutDashboard,
+  MapPin
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const CustomerNavbar: React.FC = () => {
   const { user, logout } = useAuth();
+  const { location: locationContext, setLocation: setLocationContext } = useLocationContext();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+      setIsScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
@@ -44,139 +47,155 @@ const CustomerNavbar: React.FC = () => {
     }
   };
 
+  const handleLocationSelect = (newLocation: { address: string; latitude: number; longitude: number; }) => {
+    setLocationContext(newLocation);
+    setIsLocationModalOpen(false);
+  };
+
   const menuItems = [
     { name: 'Home', path: '/', icon: Home },
-    { name: 'Dashboard', path: '/customer/dashboard', icon: LayoutDashboard },
-    { name: 'Orders', path: '/customer/orders', icon: Package },
-    { name: 'Profile', path: '/customer/profile', icon: User },
-    { name: 'Settings', path: '/customer/settings', icon: Settings },
+    { name: 'My Dashboard', path: '/customer/dashboard', icon: LayoutDashboard },
+    { name: 'My Orders', path: '/customer/orders', icon: Package },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      isScrolled ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-lg' : 'bg-transparent'
-    }`}>
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div 
-            className="flex items-center cursor-pointer group"
-            onClick={() => navigate('/customer/dashboard')}
-          >
-            <img 
-              src={navbarLogo} 
-              alt="ChefSync" 
-              className="h-16 w-auto object-contain transform group-hover:scale-105 transition-all duration-300"
-            />
-            <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs">
-              Customer
-            </Badge>
-          </div>
-
-          {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-8">
-            {menuItems.map((item) => (
-              <button
-                key={item.name}
-                onClick={() => navigate(item.path)}
-                className={`flex items-center space-x-2 text-sm font-medium transition-all duration-200 hover:text-orange-500 relative cursor-pointer ${
-                  isActive(item.path)
-                    ? 'text-orange-500'
-                    : 'text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                <item.icon className="h-4 w-4" />
-                <span>{item.name}</span>
-                {isActive(item.path) && (
-                  <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-orange-500 rounded-full"></div>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Right Section */}
-          <div className="flex items-center space-x-4">
-            {/* Search */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/menu')}
-              className="hidden sm:flex hover:bg-orange-50 dark:hover:bg-orange-900/20"
+    <>
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled ? 'bg-background/90 backdrop-blur-lg border-b border-border' : 'bg-transparent'
+      }`}>
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-20">
+            {/* Logo */}
+            <div 
+              className="flex items-center cursor-pointer group"
+              onClick={() => navigate('/')}
             >
-              <Search className="h-5 w-5" />
-            </Button>
-
-            {/* Notifications */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="relative hover:bg-orange-50 dark:hover:bg-orange-900/20"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                3
-              </span>
-            </Button>
-
-            {/* Cart */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/customer/cart')}
-              className="relative hover:bg-orange-50 dark:hover:bg-orange-900/20"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                2
-              </span>
-            </Button>
-
-            {/* User Menu */}
-            <div className="flex items-center space-x-3">
-              <div className="hidden sm:block text-right">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {user?.name}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Customer
-                </p>
-              </div>
-              <Avatar className="h-8 w-8 cursor-pointer" onClick={() => navigate('/customer/profile')}>
-                <AvatarImage src={user?.avatar} alt={user?.name} />
-                <AvatarFallback className="bg-orange-500 text-white text-sm">
-                  {user?.name?.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <img 
+                src={navbarLogo} 
+                alt="ChefSync" 
+                className="h-20 w-auto object-contain transform group-hover:scale-105 transition-transform duration-300"
+              />
             </div>
 
-            {/* Logout Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="hidden sm:flex hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            {/* Desktop Menu */}
+            <div className="hidden md:flex items-center space-x-6">
+              {menuItems.map((item) => (
+                <button
+                  key={item.name}
+                  onClick={() => navigate(item.path)}
+                  className={`flex items-center space-x-2 text-sm font-medium transition-colors duration-300 hover:text-primary relative group ${
+                    isActive(item.path)
+                      ? 'text-primary'
+                      : 'text-foreground/70'
+                  }`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.name}</span>
+                  <span className={`absolute -bottom-2 left-1/2 -translate-x-1/2 h-0.5 w-0 bg-primary transition-all duration-300 group-hover:w-full ${isActive(item.path) ? 'w-full' : ''}`}></span>
+                </button>
+              ))}
+            </div>
+
+            {/* Right Section */}
+            <div className="flex items-center space-x-2">
+              {/* Location Selector */}
+              <Button
+                variant="ghost"
+                className="hidden sm:flex items-center space-x-2"
+                onClick={() => setIsLocationModalOpen(true)}
+              >
+                <MapPin className="h-5 w-5 text-primary" />
+                <span className="text-sm font-medium text-foreground/80 truncate max-w-[150px]">{locationContext.address || 'Select Location'}</span>
+              </Button>
+
+              {/* Search */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/menu')}
+                className="hover:bg-primary/10"
+              >
+                <Search className="h-5 w-5" />
+              </Button>
+
+              {/* Notifications */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative hover:bg-primary/10"
+              >
+                <Bell className="h-5 w-5" />
+                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  3
+                </span>
+              </Button>
+
+              {/* Cart */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/customer/cart')}
+                className="relative hover:bg-primary/10"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  2
+                </span>
+              </Button>
+
+              <div className="w-px h-6 bg-border mx-2"></div>
+
+              {/* User Menu */}
+              {user ? (
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-9 w-9 cursor-pointer" onClick={() => navigate('/customer/profile')}>
+                    <AvatarImage src={user?.avatar} alt={user?.name} />
+                    <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                      {user?.name?.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="hidden lg:block text-right">
+                    <p className="text-sm font-semibold text-foreground">
+                      {user?.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Customer
+                    </p>
+                  </div>
+                   <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleLogout}
+                      className="hidden sm:flex hover:bg-destructive/10 text-destructive"
+                    >
+                      <LogOut className="h-5 w-5" />
+                    </Button>
+                </div>
+              ) : (
+                <Button onClick={() => navigate('/auth/login')}>Login</Button>
+              )}
+            </div>
 
             {/* Mobile Menu Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="md:hidden"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </Button>
+            <div className="flex items-center md:hidden">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="hover:bg-primary/10"
+              >
+                {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="md:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-700 absolute left-0 right-0 top-16 shadow-lg">
-            <div className="px-4 py-6 space-y-4">
+          <div className="md:hidden bg-background border-t border-border shadow-lg">
+            <div className="px-4 pt-2 pb-4 space-y-2">
               {menuItems.map((item) => (
                 <button
                   key={item.name}
@@ -184,56 +203,40 @@ const CustomerNavbar: React.FC = () => {
                     navigate(item.path);
                     setIsMenuOpen(false);
                   }}
-                  className={`flex items-center space-x-3 w-full text-left text-base font-medium transition-colors duration-200 py-2 cursor-pointer ${
+                  className={`w-full flex items-center space-x-3 p-3 text-base font-medium rounded-lg transition-colors duration-300 ${
                     isActive(item.path)
-                      ? 'text-orange-500'
-                      : 'text-gray-700 dark:text-gray-300 hover:text-orange-500'
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-foreground/70 hover:bg-muted'
                   }`}
                 >
                   <item.icon className="h-5 w-5" />
                   <span>{item.name}</span>
                 </button>
               ))}
-              
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <button
+              <div className="pt-2">
+                <Button
+                  variant="outline"
+                  className="w-full flex items-center justify-center space-x-2"
                   onClick={() => {
-                    navigate('/menu');
+                    setIsLocationModalOpen(true);
                     setIsMenuOpen(false);
                   }}
-                  className="flex items-center space-x-3 w-full text-left text-base font-medium text-gray-700 dark:text-gray-300 hover:text-orange-500 py-2"
                 >
-                  <Search className="h-5 w-5" />
-                  <span>Browse Menu</span>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    navigate('/customer/cart');
-                    setIsMenuOpen(false);
-                  }}
-                  className="flex items-center space-x-3 w-full text-left text-base font-medium text-gray-700 dark:text-gray-300 hover:text-orange-500 py-2"
-                >
-                  <ShoppingCart className="h-5 w-5" />
-                  <span>Cart</span>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    handleLogout();
-                    setIsMenuOpen(false);
-                  }}
-                  className="flex items-center space-x-3 w-full text-left text-base font-medium text-red-600 dark:text-red-400 hover:text-red-700 py-2"
-                >
-                  <LogOut className="h-5 w-5" />
-                  <span>Logout</span>
-                </button>
+                  <MapPin className="h-5 w-5 text-primary" />
+                  <span className="text-sm font-medium text-foreground/80 truncate">{locationContext.address || 'Select Location'}</span>
+                </Button>
               </div>
             </div>
           </div>
         )}
-      </div>
-    </nav>
+      </nav>
+
+      <LocationModal 
+        isOpen={isLocationModalOpen} 
+        onClose={() => setIsLocationModalOpen(false)} 
+        onLocationSelect={handleLocationSelect} 
+      />
+    </>
   );
 };
 

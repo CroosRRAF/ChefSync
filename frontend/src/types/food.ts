@@ -17,7 +17,7 @@ export interface Food {
   is_vegan: boolean;
   is_gluten_free: boolean;
   spice_level?: 'mild' | 'medium' | 'hot' | 'very_hot';
-  rating_average: number;
+  rating_average: number | string;
   total_reviews: number;
   total_orders: number;
   created_at: string;

@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { AuthProvider } from "@/context/AuthContext";
-import { CartProvider } from "@/context/CartContext";
+import { CartProvider } from "@/context/NewCartContext";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 
@@ -12,10 +12,13 @@ import CustomerNavbar from "@/components/layout/CustomerNavbar";
 import CustomerHomeNavbar from "@/components/layout/CustomerHomeNavbar";
 import CustomerDashboardLayout from "@/components/layout/CustomerDashboardLayout";
 import AdminLayout from "@/components/layout/AdminLayout";
+import DraggableCartIcon from "@/components/cart/UltraSimpleCartButton";
 
 // Public pages
 import Home from "@/pages/Home";
-import Menu from "@/pages/Menu";
+import MenuPage from "@/pages/MenuPage";
+import EnhancedMenuPage from "@/components/menu/EnhancedMenuPage";
+import ChefProfile from "@/pages/customer/ChefProfile";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
 import NotFound from "@/pages/NotFound";
@@ -240,7 +243,33 @@ const InnerRoutes: React.FC = () => {
               ) : (
                 <Navbar />
               )}
-              <Menu />
+              <EnhancedMenuPage />
+            </>
+          }
+        />
+        <Route
+          path="/old-menu"
+          element={
+            <>
+              {isAuthenticated && user && user.role === "customer" ? (
+                <CustomerHomeNavbar />
+              ) : (
+                <Navbar />
+              )}
+              <MenuPage />
+            </>
+          }
+        />
+        <Route
+          path="/chef-profile/:cookId"
+          element={
+            <>
+              {isAuthenticated && user && user.role === "customer" ? (
+                <CustomerHomeNavbar />
+              ) : (
+                <Navbar />
+              )}
+              <ChefProfile />
             </>
           }
         />
@@ -271,7 +300,7 @@ const InnerRoutes: React.FC = () => {
           }
         />
         <Route
-          path="/checkout"
+          path="/checkout/:chefId"
           element={
             <>
               {isAuthenticated && user && user.role === "customer" ? (
@@ -641,6 +670,9 @@ const InnerRoutes: React.FC = () => {
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      
+      {/* Global Cart Button */}
+      <DraggableCartIcon />
     </>
   );
 };

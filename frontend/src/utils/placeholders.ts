@@ -3,13 +3,14 @@
  */
 
 export const generatePlaceholderImage = (width: number, height: number, text: string = 'No Image') => {
-  const svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="${width}" height="${height}" fill="#F3F4F6"/>
-  <circle cx="${width/2}" cy="${height/2}" r="${Math.min(width, height)/6}" fill="#9CA9B0"/>
-  <text x="${width/2}" y="${height/2 + Math.min(width, height)/4}" text-anchor="middle" fill="#677480" font-size="${Math.min(width, height)/8}" font-family="Arial, sans-serif">${text}</text>
-</svg>`;
+  // Use URL encoding instead of base64 to avoid btoa issues
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}' viewBox='0 0 ${width} ${height}'>
+    <rect width='${width}' height='${height}' fill='%23f3f4f6'/>
+    <circle cx='${width/2}' cy='${height/2}' r='${Math.min(width, height)/6}' fill='%239ca3af'/>
+    <text x='${width/2}' y='${height/2 + 6}' text-anchor='middle' fill='%23374151' font-size='14' font-family='Arial, sans-serif'>${text}</text>
+  </svg>`;
   
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
 
 export const PLACEHOLDER_IMAGES = {

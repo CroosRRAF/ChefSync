@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { useCart } from '@/context/CartContext';
+import { useCart } from '@/context/NewCartContext';
 import logoImage from '@/assets/2.png';
 import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import { 
@@ -34,9 +34,18 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { cartSummary } = useCart();
+  const { getItemCount } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -108,15 +117,15 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 to={link.href}
-                className={`flex items-center space-x-2 text-sm font-medium transition-all duration-300 hover:text-orange-500 relative group ${
+                className={`flex items-center space-x-2 text-sm font-medium transition-all duration-300 hover:text-orange-500 relative group px-3 py-2 rounded-md ${
                   location.pathname === link.href
                     ? 'text-orange-500 font-semibold'
-                    : isHomePage
+                    : isHomePage && !isScrolled
                       ? theme === 'light'
                         ? 'text-gray-900 hover:text-orange-600'
                         : 'text-white/90 hover:text-orange-300'
@@ -128,64 +137,45 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
                 {location.pathname === link.href && (
                   <div className="absolute -bottom-2 left-0 right-0 h-0.5 bg-gradient-to-r from-orange-500 to-red-500 rounded-full"></div>
                 )}
-                <div className="absolute -bottom-2 left-0 right-0 h-0.5 bg-gradient-to-r from-orange-500 to-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
               </Link>
             ))}
           </div>
 
           {/* Right Side Actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
             {/* Search Button */}
             <Button
               variant="ghost"
-              size="sm"
-              className={`hidden sm:flex transition-all duration-300 ${
-                isHomePage 
+              size="icon"
+              className={`hidden sm:flex transition-all duration-300 rounded-full ${
+                isHomePage && !isScrolled
                   ? theme === 'light'
                     ? 'hover:bg-white/20 text-gray-900'
                     : 'hover:bg-white/20 text-white'
-                  : theme === 'light'
-                    ? 'hover:bg-orange-50 text-gray-900'
-                    : 'hover:bg-orange-900/20 text-gray-300'
+                  : 'hover:bg-gray-200/80 dark:hover:bg-gray-700/80 text-gray-900 dark:text-gray-300'
               }`}
               onClick={() => navigate('/menu')}
             >
-              <Search className={`h-4 w-4 transition-colors duration-300 ${
-                isHomePage 
-                  ? theme === 'light'
-                    ? 'text-gray-900'
-                    : 'text-white' 
-                  : theme === 'light'
-                    ? 'text-gray-900'
-                    : 'text-gray-300'
-              }`} />
+              <Search className="h-4 w-4" />
             </Button>
 
             {/* Theme Toggle */}
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={toggleTheme}
-              className={`hidden sm:flex transition-all duration-300 ${
-                isHomePage 
+              className={`hidden sm:flex transition-all duration-300 rounded-full ${
+                isHomePage && !isScrolled
                   ? theme === 'light'
                     ? 'hover:bg-white/20 text-gray-900'
                     : 'hover:bg-white/20 text-white'
-                  : theme === 'light'
-                    ? 'hover:bg-orange-50 text-gray-900'
-                    : 'hover:bg-orange-900/20 text-gray-300'
+                  : 'hover:bg-gray-200/80 dark:hover:bg-gray-700/80 text-gray-900 dark:text-gray-300'
               }`}
             >
               {theme === 'light' ? (
-                <Moon className={`h-4 w-4 transition-colors duration-300 ${
-                  isHomePage 
-                    ? 'text-gray-900'
-                    : 'text-gray-900'
-                }`} />
+                <Moon className="h-4 w-4" />
               ) : (
-                <Sun className={`h-4 w-4 transition-colors duration-300 ${
-                  isHomePage ? 'text-yellow-300' : 'text-yellow-500'
-                }`} />
+                <Sun className="h-4 w-4 text-yellow-400" />
               )}
             </Button>
 
@@ -193,29 +183,21 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
             {isAuthenticated && user?.role === 'customer' && (
               <Button
                 variant="ghost"
-                size="sm"
-                className={`relative transition-all duration-300 ${
-                  isHomePage 
-                    ? 'hover:bg-white/20 text-white' 
-                    : theme === 'light'
-                      ? 'hover:bg-orange-50 text-gray-900'
-                      : 'hover:bg-orange-900/20 text-gray-300'
+                size="icon"
+                className={`relative transition-all duration-300 rounded-full ${
+                  isHomePage && !isScrolled
+                    ? 'hover:bg-white/20 text-white'
+                    : 'hover:bg-gray-200/80 dark:hover:bg-gray-700/80 text-gray-900 dark:text-gray-300'
                 }`}
                 onClick={() => navigate('/customer/cart')}
               >
-                <ShoppingCart className={`h-4 w-4 transition-colors duration-300 ${
-                  isHomePage 
-                    ? 'text-white' 
-                    : theme === 'light'
-                      ? 'text-gray-900'
-                      : 'text-gray-300'
-                }`} />
-                {cartSummary && cartSummary.total_items > 0 && (
-                  <Badge 
-                    variant="destructive" 
+                <ShoppingCart className="h-4 w-4" />
+                {getItemCount() > 0 && (
+                  <Badge
+                    variant="destructive"
                     className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
                   >
-                    {cartSummary.total_items}
+                    {getItemCount()}
                   </Badge>
                 )}
               </Button>
@@ -224,72 +206,52 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
             {/* Desktop Auth Actions */}
             <div className="hidden md:flex items-center space-x-2">
               {isAuthenticated ? (
-                <>
+                <div className="flex items-center space-x-1">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={`flex items-center space-x-1 transition-all duration-300 ${
-                      isHomePage 
-                        ? 'hover:bg-white/20 text-white' 
-                        : theme === 'light'
-                          ? 'hover:bg-orange-50 text-gray-900'
-                          : 'hover:bg-orange-900/20 text-gray-300'
+                    className={`flex items-center space-x-2 transition-all duration-300 rounded-full ${
+                      isHomePage && !isScrolled
+                        ? 'hover:bg-white/20 text-white'
+                        : 'hover:bg-gray-200/80 dark:hover:bg-gray-700/80 text-gray-900 dark:text-gray-300'
                     }`}
                     onClick={() => {
                       if (user?.role === 'customer') {
                         navigate('/customer/dashboard');
+                      } else if (user?.role === 'cook') {
+                        navigate('/cook/dashboard');
+                      } else if (user?.role === 'admin') {
+                        navigate('/admin/dashboard');
                       }
                     }}
                   >
-                    <User className={`h-4 w-4 transition-colors duration-300 ${
-                      isHomePage 
-                        ? 'text-white' 
-                        : theme === 'light'
-                          ? 'text-gray-900'
-                          : 'text-gray-300'
-                    }`} />
-                    <span className={`text-sm transition-colors duration-300 ${
-                      isHomePage 
-                        ? 'text-white' 
-                        : theme === 'light'
-                          ? 'text-gray-900'
-                          : 'text-gray-300'
-                    }`}>{user?.name}</span>
+                    <User className="h-4 w-4" />
+                    <span className="text-sm font-medium">{user?.name}</span>
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className={`transition-all duration-300 ${
-                      isHomePage 
-                        ? 'hover:bg-white/20 text-white' 
-                        : theme === 'light'
-                          ? 'hover:bg-orange-50 text-gray-900'
-                          : 'hover:bg-orange-900/20 text-gray-300'
+                    size="icon"
+                    className={`transition-all duration-300 rounded-full ${
+                      isHomePage && !isScrolled
+                        ? 'hover:bg-white/20 text-white'
+                        : 'hover:bg-gray-200/80 dark:hover:bg-gray-700/80 text-gray-900 dark:text-gray-300'
                     }`}
                     onClick={logout}
                   >
-                    <LogOut className={`h-4 w-4 transition-colors duration-300 ${
-                      isHomePage 
-                        ? 'text-white' 
-                        : theme === 'light'
-                          ? 'text-gray-900'
-                          : 'text-gray-300'
-                    }`} />
+                    <LogOut className="h-4 w-4" />
                   </Button>
-                </>
+                </div>
               ) : (
                 <>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={`transition-all duration-300 ${
-                      isHomePage 
+                    className={`transition-all duration-300 rounded-md ${
+                      isHomePage && !isScrolled
                         ? theme === 'light'
                           ? 'hover:bg-white/20 text-gray-900 hover:text-gray-700'
                           : 'hover:bg-white/20 text-white dark:text-gray-200 dark:hover:bg-white/15'
-                        : theme === 'light'
-                          ? 'hover:bg-orange-50 text-gray-900'
-                          : 'hover:bg-orange-900/20 text-gray-300'
+                        : 'hover:bg-gray-200/80 dark:hover:bg-gray-700/80 text-gray-900 dark:text-gray-300'
                     }`}
                     onClick={() => navigate('/auth/login')}
                   >
@@ -298,13 +260,7 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
                   <Button
                     size="sm"
                     onClick={() => navigate('/auth/register')}
-                    className={`transition-colors duration-300 ${
-                      isHomePage 
-                        ? theme === 'light'
-                          ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-lg'
-                          : 'bg-white/20 text-white border-white/30 hover:bg-white/30 hover:text-white backdrop-blur-sm dark:bg-white/10 dark:hover:bg-white/20 dark:text-gray-100'
-                        : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
-                    }`}
+                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-md"
                   >
                     Get Started
                   </Button>
@@ -315,33 +271,24 @@ const Navbar: React.FC<NavbarProps> = ({ className }) => {
             {/* Mobile Menu */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className={`md:hidden transition-all duration-300 ${
-                    isHomePage 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`md:hidden transition-all duration-300 rounded-full ${
+                    isHomePage && !isScrolled
                       ? theme === 'light'
                         ? 'hover:bg-white/20 text-gray-900'
                         : 'hover:bg-white/20 text-white'
-                      : theme === 'light'
-                        ? 'hover:bg-orange-50 text-gray-900'
-                        : 'hover:bg-orange-900/20 text-gray-300'
+                      : 'hover:bg-gray-200/80 dark:hover:bg-gray-700/80 text-gray-900 dark:text-gray-300'
                   }`}
                 >
-                  <Menu className={`h-5 w-5 transition-colors duration-300 ${
-                    isHomePage 
-                      ? theme === 'light'
-                        ? 'text-gray-900'
-                        : 'text-white' 
-                      : theme === 'light'
-                        ? 'text-gray-900'
-                        : 'text-gray-300'
-                  }`} />
+                  <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-80">
-                <h2 className="sr-only">Mobile menu</h2>
-                <p className="sr-only">Navigation drawer with links and actions</p>
+                <SheetHeader>
+                  <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                </SheetHeader>
                 <div className="flex flex-col h-full">
                   {/* Mobile Logo */}
                   <div className="flex items-center pb-6 border-b">

@@ -49,7 +49,7 @@ interface UserProfile {
   available_hours?: string;
   service_location?: string;
   bio?: string;
-  rating_average?: number;
+  rating_average?: number | string;
   total_reviews?: number;
 }
 
@@ -306,7 +306,7 @@ export default function Profile() {
               <Star className="h-4 w-4 text-yellow-500" />
               <span>
                 {profileData?.rating_average ? 
-                  `${profileData.rating_average.toFixed(1)} rating • ${profileData.total_reviews || 0} reviews` :
+                  `${Number(profileData.rating_average).toFixed(1)} rating • ${profileData.total_reviews || 0} reviews` :
                   "No reviews yet"
                 }
               </span>

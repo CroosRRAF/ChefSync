@@ -67,10 +67,19 @@ export class CartService {
   static async getCartItems(): Promise<CartItem[]> {
     try {
       const response = await apiClient.get('/orders/cart/');
-      return response.data;
+      // Ensure we always return an array
+      const data = response.data;
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data && Array.isArray(data.results)) {
+        return data.results;
+      } else if (data && Array.isArray(data.cart_items)) {
+        return data.cart_items;
+      }
+      return [];
     } catch (error) {
       console.error('Error loading cart items:', error);
-      throw error;
+      return []; // Return empty array instead of throwing
     }
   }
   
@@ -80,10 +89,20 @@ export class CartService {
   static async getCartSummary(): Promise<CartSummary> {
     try {
       const response = await apiClient.get('/orders/cart/cart_summary/');
-      return response.data;
+      const data = response.data;
+      // Ensure cart_items is always an array
+      if (data && !Array.isArray(data.cart_items)) {
+        data.cart_items = [];
+      }
+      return data;
     } catch (error) {
       console.error('Error loading cart summary:', error);
-      throw error;
+      // Return empty cart summary instead of throwing
+      return {
+        total_value: 0,
+        total_items: 0,
+        cart_items: []
+      };
     }
   }
   
@@ -150,7 +169,13 @@ export class CartService {
   static async getUserAddresses(): Promise<UserAddress[]> {
     try {
       const response = await apiClient.get('/orders/addresses/');
-      return response.data;
+      const data = response.data;
+
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.results)) return data.results;
+      if (data && Array.isArray(data.addresses)) return data.addresses;
+      if (data && Array.isArray(data.data)) return data.data;
+      return [];
     } catch (error) {
       console.error('Error loading addresses:', error);
       throw error;

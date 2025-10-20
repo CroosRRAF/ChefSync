@@ -94,55 +94,76 @@ def upload_image_to_cloudinary(
 
 
 def get_optimized_url(
-    cloudinary_url: str,
+    image_url: str,
     width: Optional[int] = None,
     height: Optional[int] = None,
     quality: str = 'auto',
     format: str = 'auto'
 ) -> str:
     """
-    Get optimized version of Cloudinary URL
+    Get optimized version of image URL
     
     Args:
-        cloudinary_url: Original Cloudinary URL
+        image_url: Original image URL (Cloudinary or external)
         width: Desired width
         height: Desired height
         quality: Image quality (auto, 100, 80, etc.)
         format: Image format (auto, jpg, png, webp, etc.)
         
     Returns:
-        Optimized Cloudinary URL
+        Optimized URL (Cloudinary optimized URL or original external URL)
     """
     try:
-        if not cloudinary_url or 'cloudinary.com' not in cloudinary_url:
-            return cloudinary_url or ''
-        
-        public_id = extract_public_id_from_url(cloudinary_url)
-        if not public_id:
-            return cloudinary_url
-        
-        configure_cloudinary()
-        
-        transformation = {
-            'quality': quality,
-            'fetch_format': format
-        }
-        
-        if width:
-            transformation['width'] = width
-        if height:
-            transformation['height'] = height
+        if not image_url:
+            return ''
             
-        if width or height:
-            transformation['crop'] = 'fill'
-        
-        # Generate optimized URL
-        optimized_url = cloudinary.CloudinaryImage(public_id).build_url(**transformation)
-        return optimized_url
+        # If it's a Cloudinary URL, optimize it
+        if 'cloudinary.com' in image_url:
+            public_id = extract_public_id_from_url(image_url)
+            if not public_id:
+                return image_url
+            
+            configure_cloudinary()
+            
+            transformation = {
+                'quality': quality,
+                'fetch_format': format
+            }
+            
+            if width:
+                transformation['width'] = width
+            if height:
+                transformation['height'] = height
+                
+            if width or height:
+                transformation['crop'] = 'fill'
+            
+            # Generate optimized URL
+            optimized_url = cloudinary.CloudinaryImage(public_id).build_url(**transformation)
+            return optimized_url
+        else:
+            # For external URLs (Unsplash, etc.), return as-is
+            # You could potentially add query parameters for optimization if the service supports it
+            if 'unsplash.com' in image_url and (width or height):
+                # Unsplash supports URL parameters for resizing
+                if '?' in image_url:
+                    separator = '&'
+                else:
+                    separator = '?'
+                
+                params = []
+                if width:
+                    params.append(f'w={width}')
+                if height:
+                    params.append(f'h={height}')
+                
+                return f"{image_url}{separator}{'&'.join(params)}"
+            
+            return image_url
         
     except Exception as e:
         print(f"Error generating optimized URL: {e}")
-        return cloudinary_url or ''
+        return image_url or ''
 
 
 def extract_public_id_from_url(cloudinary_url: str) -> Optional[str]:
@@ -244,3 +265,99 @@ def migrate_blob_to_cloudinary(
     except Exception as e:
         print(f"Error migrating blob to Cloudinary: {e}")
         return None
+
+
+def get_reliable_image_url(
+    image_url: str,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    fallback_enabled: bool = True
+) -> str:
+    """
+    Get a reliable image URL that handles both Cloudinary and external URLs
+    with proper fallback mechanisms for the frontend.
+    
+    Args:
+        image_url: Original image URL (Cloudinary, Unsplash, or other external)
+        width: Desired width for optimization
+        height: Desired height for optimization
+        fallback_enabled: Whether to provide fallback URL if original fails
+        
+    Returns:
+        Optimized URL with fallback logic
+    """
+    if not image_url:
+        if fallback_enabled:
+            return f"https://picsum.photos/{width or 400}/{height or 300}?random=food"
+        return ''
+    
+    try:
+        # Handle Cloudinary URLs - optimize them
+        if 'cloudinary.com' in image_url:
+            return get_optimized_url(image_url, width, height)
+        
+        # Handle Unsplash URLs - add optimization parameters
+        elif 'unsplash.com' in image_url:
+            return _optimize_unsplash_url(image_url, width, height)
+        
+        # Handle other external URLs - return as-is but add CORS-friendly parameters where possible
+        elif image_url.startswith('http'):
+            return image_url
+        
+        # Handle relative paths - assume they should be Cloudinary URLs
+        else:
+            return _construct_cloudinary_url(image_url, width, height)
+            
+    except Exception as e:
+        print(f"Error processing image URL {image_url}: {e}")
+        if fallback_enabled:
+            return f"https://picsum.photos/{width or 400}/{height or 300}?random=food"
+        return image_url
+
+
+def _optimize_unsplash_url(image_url: str, width: Optional[int] = None, height: Optional[int] = None) -> str:
+    """Optimize Unsplash URLs with proper parameters"""
+    try:
+        base_url = image_url.split('?')[0]  # Remove existing parameters
+        params = []
+        
+        # Add optimization parameters
+        if width:
+            params.append(f'w={width}')
+        if height:
+            params.append(f'h={height}')
+        
+        # Add quality and format optimization
+        params.extend(['auto=format', 'fit=crop', 'q=80'])
+        
+        if params:
+            return f"{base_url}?{'&'.join(params)}"
+        
+        return image_url
+    except Exception:
+        return image_url
+
+
+def _construct_cloudinary_url(relative_path: str, width: Optional[int] = None, height: Optional[int] = None) -> str:
+    """Construct Cloudinary URL from relative path"""
+    try:
+        configure_cloudinary()
+        cloud_name = settings.CLOUDINARY_STORAGE.get('CLOUD_NAME', 'dqbl2r4ct')
+        
+        # Clean the path
+        clean_path = relative_path.lstrip('/')
+        
+        # Build transformation string
+        transformations = ['f_auto', 'q_auto']
+        if width:
+            transformations.append(f'w_{width}')
+        if height:
+            transformations.append(f'h_{height}')
+        if width and height:
+            transformations.append('c_fill')
+        
+        transformation_str = ','.join(transformations)
+        
+        return f"https://res.cloudinary.com/{cloud_name}/image/upload/{transformation_str}/{clean_path}"
+    except Exception:
+        return relative_path

@@ -114,18 +114,18 @@ class Food(models.Model):
     
     @property
     def optimized_image_url(self):
-        """Get optimized Cloudinary URL for the primary image"""
+        """Get optimized image URL with fallback handling for both Cloudinary and external URLs"""
         if self.image:
-            from utils.cloudinary_utils import get_optimized_url
-            return get_optimized_url(str(self.image))
+            from utils.cloudinary_utils import get_reliable_image_url
+            return get_reliable_image_url(str(self.image), width=400, height=300)
         return None
     
     @property
     def thumbnail_url(self):
-        """Get thumbnail URL - generate from primary image"""
+        """Get thumbnail URL with fallback handling"""
         if self.image:
-            from utils.cloudinary_utils import get_optimized_url
-            return get_optimized_url(str(self.image), width=200, height=200)
+            from utils.cloudinary_utils import get_reliable_image_url
+            return get_reliable_image_url(str(self.image), width=200, height=200)
         return None
     
     class Meta:

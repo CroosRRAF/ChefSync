@@ -79,12 +79,49 @@ class FoodPriceSerializer(serializers.ModelSerializer):
             except Exception:
                 profile_image_url = None
         
+        # Get cook's kitchen location
+        kitchen_location = None
+        try:
+            from apps.users.models import Address
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            kitchen_address = Address.objects.filter(
+                user=obj.cook,
+                address_type='kitchen',
+                is_active=True
+            ).first()
+            
+            if not kitchen_address:
+                logger.warning(f"No kitchen address found for cook {obj.cook.user_id}")
+            elif not kitchen_address.latitude or not kitchen_address.longitude:
+                logger.warning(f"Kitchen address found but missing coordinates for cook {obj.cook.user_id}")
+            else:
+                # Get kitchen name from KitchenLocation object
+                kitchen_name = 'Kitchen'
+                if hasattr(kitchen_address, 'kitchen_details') and kitchen_address.kitchen_details:
+                    kitchen_name = kitchen_address.kitchen_details.kitchen_name
+                
+                kitchen_location = {
+                    'latitude': float(kitchen_address.latitude),
+                    'longitude': float(kitchen_address.longitude),
+                    'address': kitchen_address.full_address,
+                    'kitchen_name': kitchen_name
+                }
+                logger.info(f"Kitchen location found for cook {obj.cook.user_id}: {kitchen_location}")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting kitchen location for cook {obj.cook.user_id}: {str(e)}")
+            kitchen_location = None
+        
         return {
             'id': obj.cook.pk,  # Use pk instead of id
             'name': obj.cook.name,
             'rating': getattr(obj.cook, 'rating', 4.5),
             'is_active': getattr(obj.cook, 'is_active', True),
-            'profile_image': profile_image_url
+            'profile_image': profile_image_url,
+            'kitchen_location': kitchen_location
         }
     
     def get_image_data_url(self, obj):
@@ -106,6 +143,14 @@ class FoodSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     optimized_image_url = serializers.SerializerMethodField()
     
+    # New fields for delivery features
+    min_price = serializers.SerializerMethodField()
+    max_price = serializers.SerializerMethodField()
+    delivery_fee = serializers.SerializerMethodField()
+    distance_km = serializers.SerializerMethodField()
+    estimated_delivery_time = serializers.SerializerMethodField()
+    kitchen_location = serializers.SerializerMethodField()
+    
     class Meta:
         model = Food
         fields = [
@@ -114,7 +159,9 @@ class FoodSerializer(serializers.ModelSerializer):
             'allergens', 'nutritional_info', 'is_vegetarian', 'is_vegan', 'is_gluten_free', 'spice_level',
             'rating_average', 'total_reviews', 'total_orders', 'primary_image', 'available_cooks_count',
             'image_url', 'thumbnail_url', 'optimized_image_url', 'image',
-            'status', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at'
+            'status', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at',
+            # New delivery fields
+            'min_price', 'max_price', 'delivery_fee', 'distance_km', 'estimated_delivery_time', 'kitchen_location'
         ]
         read_only_fields = ['food_id', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at']
     
@@ -137,6 +184,119 @@ class FoodSerializer(serializers.ModelSerializer):
     def get_available_cooks_count(self, obj):
         """Get count of cooks who have prices for this food"""
         return obj.prices.values('cook').distinct().count()
+    
+    def get_min_price(self, obj):
+        """Get minimum price across all sizes"""
+        prices = obj.prices.all()
+        if prices:
+            return float(min(price.price for price in prices))
+        return None
+    
+    def get_max_price(self, obj):
+        """Get maximum price across all sizes"""
+        prices = obj.prices.all()
+        if prices:
+            return float(max(price.price for price in prices))
+        return None
+    
+    def get_delivery_fee(self, obj):
+        """Calculate delivery fee if user location is provided"""
+        user_location = self.context.get('user_location')
+        if not user_location:
+            return None
+            
+        try:
+            from apps.users.models import Address
+            from .utils import calculate_delivery_fee
+            
+            # Get chef's kitchen location
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_active=True
+            ).first()
+            
+            if not kitchen_address or not kitchen_address.latitude or not kitchen_address.longitude:
+                return None
+            
+            fee_data = calculate_delivery_fee(
+                user_location['latitude'],
+                user_location['longitude'],
+                float(kitchen_address.latitude),
+                float(kitchen_address.longitude)
+            )
+            
+            return fee_data['total_delivery_fee']
+            
+        except Exception:
+            return None
+    
+    def get_distance_km(self, obj):
+        """Calculate distance from user to kitchen"""
+        user_location = self.context.get('user_location')
+        if not user_location:
+            return None
+            
+        try:
+            from apps.users.models import Address
+            from .utils import calculate_distance
+            
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_active=True
+            ).first()
+            
+            if not kitchen_address or not kitchen_address.latitude or not kitchen_address.longitude:
+                return None
+            
+            distance = calculate_distance(
+                user_location['latitude'],
+                user_location['longitude'],
+                float(kitchen_address.latitude),
+                float(kitchen_address.longitude)
+            )
+            
+            return round(distance, 2)
+            
+        except Exception:
+            return None
+    
+    def get_estimated_delivery_time(self, obj):
+        """Calculate estimated delivery time"""
+        distance = self.get_distance_km(obj)
+        if distance is None:
+            return None
+            
+        try:
+            from .utils import estimate_delivery_time
+            return estimate_delivery_time(distance, obj.preparation_time or 30)
+        except Exception:
+            return None
+    
+    def get_kitchen_location(self, obj):
+        """Get chef's kitchen location details"""
+        try:
+            from apps.users.models import Address
+            
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_active=True
+            ).first()
+            
+            if not kitchen_address:
+                return None
+            
+            return {
+                'latitude': float(kitchen_address.latitude) if kitchen_address.latitude else None,
+                'longitude': float(kitchen_address.longitude) if kitchen_address.longitude else None,
+                'address': kitchen_address.full_address,
+                'kitchen_name': getattr(kitchen_address, 'kitchen_details', {}).get('kitchen_name', 'Kitchen') if hasattr(kitchen_address, 'kitchen_details') else 'Kitchen'
+            }
+            
+        except Exception:
+            return None
 
     def create(self, validated_data):
         # Handle image upload if provided

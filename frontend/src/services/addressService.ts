@@ -30,7 +30,8 @@ export interface UpdateAddressData extends Partial<CreateAddressData> {
 }
 
 class AddressService {
-  private baseUrl = '/orders/addresses';
+  // Ensure trailing slash to match DRF router endpoints and avoid redirects
+  private baseUrl = '/orders/addresses/';
 
   /**
    * Get all addresses for the current user
@@ -38,7 +39,29 @@ class AddressService {
   async getAddresses(): Promise<DeliveryAddress[]> {
     try {
       const response = await apiClient.get(this.baseUrl);
-      return response.data;
+      const data = response.data;
+
+      // Normalize response to always return an array of addresses.
+      if (Array.isArray(data)) {
+        return data;
+      }
+
+      // DRF pagination returns { count, next, previous, results: [...] }
+      if (data && Array.isArray(data.results)) {
+        return data.results;
+      }
+
+      // Some endpoints may wrap results under 'addresses' or 'data'
+      if (data && Array.isArray(data.addresses)) {
+        return data.addresses;
+      }
+
+      if (data && Array.isArray(data.data)) {
+        return data.data;
+      }
+
+      // Fallback: return empty array if shape is unexpected
+      return [];
     } catch (error) {
       console.error('Error fetching addresses:', error);
       throw new Error('Failed to fetch addresses');
@@ -67,6 +90,16 @@ class AddressService {
       return response.data;
     } catch (error) {
       console.error('Error creating address:', error);
+      // If the server returned validation errors, include them in the thrown error
+      const anyErr: any = error;
+      if (anyErr.response) {
+        const status = anyErr.response.status;
+        const respData = anyErr.response.data;
+        console.error('Address creation response data:', status, respData);
+        const respString = typeof respData === 'string' ? respData : JSON.stringify(respData);
+        // Include status for easier debugging in the UI
+        throw new Error(`HTTP ${status} - ${respString}`);
+      }
       throw new Error('Failed to create address');
     }
   }
