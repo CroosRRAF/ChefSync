@@ -10,6 +10,7 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
 import os
+import logging
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, UserProfileSerializer,
     CustomerSerializer, CookSerializer, DeliveryAgentSerializer,
@@ -28,6 +29,9 @@ from django.apps import apps
 DocumentType = apps.get_model('authentication', 'DocumentType')
 UserDocument = apps.get_model('authentication', 'UserDocument')
 import json
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 # Health Check Endpoint
 @api_view(['GET'])
@@ -86,7 +90,7 @@ def user_registration(request):
             referral_result = ReferralService.use_referral_token(referral_token, user)
             if not referral_result['success']:
                 # Log error but don't fail registration
-                print(f"Referral token usage failed: {referral_result['message']}")
+                logger.error(f"Referral token usage failed: {referral_result['message']}")
 
         # Send email verification
         try:
@@ -100,7 +104,7 @@ def user_registration(request):
             )
         except Exception as e:
             # Log error but don't fail registration
-            print(f"Email sending failed: {e}")
+            logger.error(f"Email sending failed: {e}")
 
         response_data = {
             'message': 'User registered successfully. Please check your email for verification.',
@@ -279,11 +283,11 @@ def user_login(request):
     """
     User login with JWT tokens
     """
-    print(f"Login attempt for email: {request.data.get('email')}")
+    logger.info(f"Login attempt for email: {request.data.get('email')}")
     serializer = UserLoginSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data['user']
-        print(f"Login successful for user: {user.email}")
+        logger.info(f"Login successful for user: {user.email}")
 
         # Reset failed login attempts on successful login
         user.reset_failed_login_attempts()
@@ -358,10 +362,10 @@ def token_refresh(request):
     try:
         refresh_token = request.data.get('refresh')
         if not refresh_token:
-            print("Token refresh failed: No refresh token provided")
+            logger.warning("Token refresh failed: No refresh token provided")
             return Response({'error': 'Refresh token required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        print(f"Token refresh attempt for token: {refresh_token[:20]}...")
+        logger.info(f"Token refresh attempt for token: {refresh_token[:20]}...")
 
         # Use JWT service to validate token and get user
         from .services.jwt_service import JWTTokenService
@@ -369,20 +373,20 @@ def token_refresh(request):
         # Validate refresh token and get user
         is_valid, user, error = JWTTokenService.validate_token(refresh_token, 'refresh')
         if not is_valid:
-            print(f"Token validation failed: {error}")
+            logger.error(f"Token validation failed: {error}")
             return Response({'error': 'Invalid refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
         
         # Rotate the refresh token
         token_data = JWTTokenService.rotate_refresh_token(refresh_token, user, request)
 
-        print("Token refresh successful with rotation")
+        logger.info("Token refresh successful with rotation")
         return Response({
             'access': token_data['access_token'],
             'refresh': token_data['refresh_token']
         }, status=status.HTTP_200_OK)
     except Exception as e:
-        print(f"Token refresh error: {str(e)}")
-        print(f"Error type: {type(e).__name__}")
+        logger.error(f"Token refresh error: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
         return Response({'error': 'Invalid refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -514,28 +518,28 @@ def google_oauth_login(request):
     """
     Google OAuth login
     """
-    print('\n=== GOOGLE OAUTH LOGIN DEBUG START ===')
-    print('Request method:', request.method)
-    print('Request headers:', dict(request.headers))
-    print('Request data:', request.data)
-    print('Client ID from settings:', settings.GOOGLE_OAUTH_CLIENT_ID)
-    print('Client Secret configured:', bool(settings.GOOGLE_OAUTH_CLIENT_SECRET))
+    logger.info('=== GOOGLE OAUTH LOGIN DEBUG START ===')
+    logger.info(f'Request method: {request.method}')
+    logger.info(f'Request headers: {dict(request.headers)}')
+    logger.info(f'Request data: {request.data}')
+    logger.info(f'Client ID from settings: {settings.GOOGLE_OAUTH_CLIENT_ID}')
+    logger.info(f'Client Secret configured: {bool(settings.GOOGLE_OAUTH_CLIENT_SECRET)}')
 
     serializer = GoogleOAuthSerializer(data=request.data)
-    print('Serializer data:', serializer.initial_data)
+    logger.info(f'Serializer data: {serializer.initial_data}')
 
     # Only allow customer role for Google OAuth
     forced_role = 'customer'
 
     if not serializer.is_valid():
-        print('Serializer validation failed:', serializer.errors)
-        print('=== GOOGLE OAUTH LOGIN DEBUG END ===\n')
+        logger.error(f'Serializer validation failed: {serializer.errors}')
+        logger.info('=== GOOGLE OAUTH LOGIN DEBUG END ===')
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    print('Serializer valid, validated data:', serializer.validated_data)
+    logger.info(f'Serializer valid, validated data: {serializer.validated_data}')
 
     try:
-        print('Attempting to verify Google token...')
+        logger.info('Attempting to verify Google token...')
         # Verify Google ID token
         idinfo = id_token.verify_oauth2_token(
             serializer.validated_data['id_token'],
@@ -543,8 +547,8 @@ def google_oauth_login(request):
             settings.GOOGLE_OAUTH_CLIENT_ID
         )
 
-        print('Google token verified successfully!')
-        print('Token info:', idinfo)
+        logger.info('Google token verified successfully!')
+        logger.info(f'Token info: {idinfo}')
 
         email = idinfo['email']
         name = idinfo.get('name', '')
@@ -560,7 +564,7 @@ def google_oauth_login(request):
             }
         )
 
-        print(f'User {"created" if created else "found"}: {user.email}')
+        logger.info(f'User {"created" if created else "found"}: {user.email}')
 
 
         # Ensure legacy users created without username/email_verified fields are updated
@@ -581,13 +585,13 @@ def google_oauth_login(request):
         if created:
             user.set_unusable_password()
             user.save()
-            print('Set unusable password for new Google user')
+            logger.info('Set unusable password for new Google user')
             # Create customer profile for new Google OAuth users
             try:
                 user.create_profile()
-                print('Created customer profile')
+                logger.info('Created customer profile')
             except Exception as e:
-                print(f"Profile creation failed: {e}")
+                logger.error(f"Profile creation failed: {e}")
                 # Continue without profile creation
 
         # Generate JWT tokens using the service
@@ -596,8 +600,9 @@ def google_oauth_login(request):
 
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
 
-        print('Google OAuth login successful!')
-        print('=== GOOGLE OAUTH LOGIN DEBUG END ===\n')
+        logger.info('Google OAuth login successful!')
+        logger.info('=== GOOGLE OAUTH LOGIN DEBUG END ===')
+
 
         return Response({
             'message': 'Google OAuth login successful',
@@ -608,16 +613,16 @@ def google_oauth_login(request):
 
     except GoogleAuthError as e:
         # GoogleAuthError contains useful messages; include them in logs and response for debugging
-        print(f"Google Auth Error: {repr(e)}")
-        print('=== GOOGLE OAUTH LOGIN DEBUG END ===\n')
+        logger.error(f"Google Auth Error: {repr(e)}")
+        logger.info('=== GOOGLE OAUTH LOGIN DEBUG END ===')
         return Response({
             'error': 'Invalid Google token',
             'details': str(e)
         }, status=status.HTTP_400_BAD_REQUEST)
     except ValueError as e:
         # id_token.verify_oauth2_token may raise ValueError for invalid tokens
-        print(f"Google token verification failed: {repr(e)}")
-        print('=== GOOGLE OAUTH LOGIN DEBUG END ===\n')
+        logger.error(f"Google token verification failed: {repr(e)}")
+        logger.info('=== GOOGLE OAUTH LOGIN DEBUG END ===')
         return Response({'error': 'Invalid Google token', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         # Catch-all: log full exception for debugging

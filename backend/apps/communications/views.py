@@ -1,4 +1,6 @@
 import uuid
+import logging
+from datetime import timedelta
 
 from apps.admin_management.models import AdminActivityLog
 from django.db.models import Count, Q
@@ -6,6 +8,8 @@ from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     Communication,
@@ -32,6 +36,16 @@ class CommunicationViewSet(viewsets.ModelViewSet):
     queryset = Communication.objects.all()
     serializer_class = CommunicationSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def _safe_get_average_rating(self, queryset):
+        """Safely get average rating, handling cases where rating field doesn't exist"""
+        try:
+            from django.db.models import Avg
+            return queryset.filter(
+                rating__isnull=False
+            ).aggregate(Avg('rating'))['rating__avg'] or 0
+        except Exception:
+            return 0
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -317,13 +331,17 @@ class CommunicationViewSet(viewsets.ModelViewSet):
             by_priority = queryset.values("priority").annotate(count=Count("id"))
             by_status = queryset.values("status").annotate(count=Count("id"))
 
-            # Calculate average rating
-            average_rating = (
-                queryset.filter(rating__isnull=False).aggregate(Avg("rating"))[
-                    "rating__avg"
-                ]
-                or 0
-            )
+            # Calculate average rating (handle missing rating field gracefully)
+            try:
+                average_rating = (
+                    queryset.filter(rating__isnull=False).aggregate(Avg("rating"))[
+                        "rating__avg"
+                    ]
+                    or 0
+                )
+            except Exception:
+                # Rating field might not exist in database yet
+                average_rating = 0
 
             return Response(
                 {
@@ -342,6 +360,7 @@ class CommunicationViewSet(viewsets.ModelViewSet):
             )
         except Exception as e:
             # Return basic stats if there's an error
+            logger.error(f"Communication stats failed: {str(e)}")
             return Response({
                 "total": 0,
                 "unread": 0,
@@ -401,18 +420,24 @@ class CommunicationViewSet(viewsets.ModelViewSet):
             })
         except Exception as e:
             # Return fallback data if AI analysis fails
-            from datetime import timedelta
+            logger.error(f"AI sentiment analysis failed: {str(e)}")
             
             period = request.GET.get("period", "30d")
             days = int(period.replace("d", ""))
             start_date = timezone.now() - timedelta(days=days)
             queryset = self.get_queryset().filter(created_at__gte=start_date)
             
-            # Basic sentiment analysis without AI
+            # Basic sentiment analysis without AI (handle missing rating field)
             total_communications = queryset.count()
-            positive_count = queryset.filter(rating__gte=4).count()
-            negative_count = queryset.filter(rating__lte=2).count()
-            neutral_count = total_communications - positive_count - negative_count
+            try:
+                positive_count = queryset.filter(rating__gte=4).count()
+                negative_count = queryset.filter(rating__lte=2).count()
+                neutral_count = total_communications - positive_count - negative_count
+            except Exception:
+                # Rating field might not exist, use basic fallback
+                positive_count = 0
+                negative_count = 0
+                neutral_count = total_communications
             
             return Response({
                 "overall_sentiment": {
@@ -996,9 +1021,7 @@ class CommunicationViewSet(viewsets.ModelViewSet):
             'in_progress': queryset.filter(status='in_progress').count(),
             'resolved': queryset.filter(status='resolved').count(),
             'closed': queryset.filter(status='closed').count(),
-            'average_rating': queryset.filter(
-                rating__isnull=False
-            ).aggregate(Avg('rating'))['rating__avg'] or 0,
+            'average_rating': self._safe_get_average_rating(queryset),
             'by_type': {
                 'feedback': queryset.filter(communication_type='feedback').count(),
                 'complaint': queryset.filter(communication_type='complaint').count(),
@@ -1027,14 +1050,24 @@ class CommunicationViewSet(viewsets.ModelViewSet):
         start_date = timezone.now() - timedelta(days=days)
         queryset = self.get_queryset().filter(created_at__gte=start_date)
         
-        # Basic sentiment calculation based on ratings and keywords
-        positive_count = queryset.filter(
-            Q(rating__gte=4) | Q(message__icontains='thank') | Q(message__icontains='great')
-        ).count()
-        
-        negative_count = queryset.filter(
-            Q(rating__lte=2) | Q(communication_type='complaint')
-        ).count()
+        # Basic sentiment calculation based on ratings and keywords (handle missing rating field)
+        try:
+            positive_count = queryset.filter(
+                Q(rating__gte=4) | Q(message__icontains='thank') | Q(message__icontains='great')
+            ).count()
+            
+            negative_count = queryset.filter(
+                Q(rating__lte=2) | Q(communication_type='complaint')
+            ).count()
+        except Exception:
+            # Fallback when rating field doesn't exist
+            positive_count = queryset.filter(
+                Q(message__icontains='thank') | Q(message__icontains='great')
+            ).count()
+            
+            negative_count = queryset.filter(
+                Q(communication_type='complaint')
+            ).count()
         
         total = queryset.count()
         neutral_count = total - positive_count - negative_count

@@ -16,7 +16,7 @@ try:
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
-    print("Warning: Google Gemini AI not available. Using fallback sentiment analysis.")
+    logging.warning("Google Gemini AI not available. Using fallback sentiment analysis.")
 
 logger = logging.getLogger(__name__)
 
