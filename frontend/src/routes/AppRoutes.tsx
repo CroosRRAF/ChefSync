@@ -37,6 +37,8 @@ import CustomerDashboard from "@/pages/customer/Dashboard";
 import CustomerOrders from "@/pages/customer/Orders";
 import CustomerProfile from "@/pages/customer/Profile";
 import CustomerSettings from "@/pages/customer/Settings";
+import CustomerBulkOrderDashboard from "@/components/customer/CustomerBulkOrderDashboard";
+import ChefProfilePage from "@/pages/ChefProfilePage";
 
 import AllOrders from "@/pages/delivery/AllOrders";
 import DeliveryDashboard from "@/pages/delivery/Dashboard";
@@ -254,6 +256,10 @@ const InnerRoutes: React.FC = () => {
           }
         />
         <Route
+          path="/chef-profile/:cookId"
+          element={<ChefProfilePage />}
+        />
+        <Route
           path="/about"
           element={
             <>
@@ -414,6 +420,16 @@ const InnerRoutes: React.FC = () => {
             <ProtectedRoute allowedRoles={["customer"]}>
               <CustomerDashboardLayout>
                 <CustomerDashboard />
+              </CustomerDashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customer/bulk-orders"
+          element={
+            <ProtectedRoute allowedRoles={["customer"]}>
+              <CustomerDashboardLayout>
+                <CustomerBulkOrderDashboard />
               </CustomerDashboardLayout>
             </ProtectedRoute>
           }

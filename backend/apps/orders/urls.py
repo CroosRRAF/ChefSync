@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 from .bulk_views import BulkOrderManagementViewSet
+from .customer_bulk_views import CustomerBulkOrderViewSet
 
 router = DefaultRouter()
 router.register(r"orders", views.OrderViewSet, basename="orders")
@@ -11,8 +12,11 @@ router.register(r"orders", views.OrderViewSet, basename="orders")
 router.register(r"cart", views.CartItemViewSet, basename="cart")
 router.register(r"addresses", views.UserAddressViewSet, basename="addresses")
 
-# Bulk order management
+# Bulk order management (for cooks/admins)
 router.register(r"bulk", BulkOrderManagementViewSet, basename="bulk-orders")
+
+# Customer bulk orders (for customers to place bulk orders)
+router.register(r"customer-bulk-orders", CustomerBulkOrderViewSet, basename="customer-bulk-orders")
 
 # Delivery tracking
 router.register(

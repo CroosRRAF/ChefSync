@@ -76,6 +76,7 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
   const sidebarItems = [
     { name: 'Dashboard', path: '/customer/dashboard', icon: LayoutDashboard },
     { name: 'Orders', path: '/customer/orders', icon: Package },
+    { name: 'Bulk Orders', path: '/customer/bulk-orders', icon: Package },
     { name: 'Profile', path: '/customer/profile', icon: User },
     { name: 'Settings', path: '/customer/settings', icon: Settings },
   ];

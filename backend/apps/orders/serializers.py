@@ -753,3 +753,77 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
 
 
 # Duplicate definitions removed - using earlier complete implementations above
+
+
+# ===== CUSTOMER BULK ORDER SERIALIZERS =====
+
+class CustomerBulkOrderSerializer(serializers.Serializer):
+    """Serializer for customers to place bulk orders from bulk menus"""
+    
+    bulk_menu_id = serializers.IntegerField(required=True)
+    num_persons = serializers.IntegerField(required=True, min_value=1)
+    event_date = serializers.DateField(required=True)
+    event_time = serializers.TimeField(required=True)
+    delivery_address = serializers.CharField(required=True, max_length=500)
+    special_instructions = serializers.CharField(required=False, allow_blank=True)
+    selected_optional_items = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        default=list
+    )
+    total_amount = serializers.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        required=True,
+        min_value=0
+    )
+
+    def validate_bulk_menu_id(self, value):
+        """Validate that the bulk menu exists and is available"""
+        from apps.food.models import BulkMenu
+        
+        try:
+            menu = BulkMenu.objects.get(id=value)
+            if menu.approval_status != 'approved':
+                raise serializers.ValidationError("This bulk menu is not approved")
+            if not menu.availability_status:
+                raise serializers.ValidationError("This bulk menu is not currently available")
+            return value
+        except BulkMenu.DoesNotExist:
+            raise serializers.ValidationError("Bulk menu not found")
+
+    def validate(self, data):
+        """Validate that num_persons is within menu limits and event is in future"""
+        from apps.food.models import BulkMenu
+        from django.utils import timezone
+        from datetime import datetime, timedelta
+        
+        menu = BulkMenu.objects.get(id=data['bulk_menu_id'])
+        
+        # Validate number of persons
+        if data['num_persons'] < menu.min_persons:
+            raise serializers.ValidationError({
+                'num_persons': f"Minimum {menu.min_persons} persons required for this menu"
+            })
+        if data['num_persons'] > menu.max_persons:
+            raise serializers.ValidationError({
+                'num_persons': f"Maximum {menu.max_persons} persons allowed for this menu"
+            })
+        
+        # Validate event date/time is in future with advance notice
+        event_datetime = datetime.combine(data['event_date'], data['event_time'])
+        event_datetime = timezone.make_aware(event_datetime)
+        
+        if event_datetime <= timezone.now():
+            raise serializers.ValidationError({
+                'event_date': "Event must be in the future"
+            })
+        
+        # Check advance notice requirement
+        hours_until_event = (event_datetime - timezone.now()).total_seconds() / 3600
+        if hours_until_event < menu.advance_notice_hours:
+            raise serializers.ValidationError({
+                'event_date': f"This menu requires {menu.advance_notice_hours} hours advance notice"
+            })
+        
+        return data

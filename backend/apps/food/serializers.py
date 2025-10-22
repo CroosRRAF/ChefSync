@@ -691,6 +691,7 @@ class BulkMenuSerializer(serializers.ModelSerializer):
     """Serializer for BulkMenu model"""
     chef_name = serializers.CharField(source="chef.username", read_only=True)
     approved_by_name = serializers.CharField(source="approved_by.username", read_only=True)
+    meal_type_display = serializers.CharField(source="get_meal_type_display", read_only=True)
     delivery_fee = serializers.SerializerMethodField()
 
     class Meta:
@@ -700,6 +701,7 @@ class BulkMenuSerializer(serializers.ModelSerializer):
             "chef",
             "chef_name",
             "meal_type",
+            "meal_type_display",
             "menu_name",
             "description",
             "base_price_per_person",
@@ -711,7 +713,7 @@ class BulkMenuSerializer(serializers.ModelSerializer):
             "rejection_reason",
             "min_persons",
             "max_persons",
-            "advance_notice_days",
+            "advance_notice_hours",
             "delivery_fee",
             "created_at",
             "updated_at",
@@ -755,6 +757,11 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
     items = BulkMenuItemSerializer(many=True, read_only=True)
     chef_name = serializers.CharField(source="chef.username", read_only=True)
     approved_by_name = serializers.CharField(source="approved_by.username", read_only=True, allow_null=True)
+    meal_type_display = serializers.CharField(source="get_meal_type_display", read_only=True)
+    image_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    items_count = serializers.SerializerMethodField()
+    menu_items_summary = serializers.SerializerMethodField()
     
     class Meta:
         model = BulkMenu
@@ -763,6 +770,7 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
             "chef",
             "chef_name",
             "meal_type",
+            "meal_type_display",
             "menu_name",
             "description",
             "base_price_per_person",
@@ -775,8 +783,201 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
             "min_persons",
             "max_persons",
             "advance_notice_hours",
+            "image",
+            "image_url",
+            "thumbnail_url",
             "items",
+            "items_count",
+            "menu_items_summary",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["chef", "approved_by", "approved_at", "created_at", "updated_at"]
+    
+    def get_image_url(self, obj):
+        """Get optimized image URL"""
+        try:
+            if obj.image:
+                return get_optimized_url(str(obj.image))
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting image URL: {e}")
+            if obj.image:
+                return str(obj.image)
+        return None
+    
+    def get_thumbnail_url(self, obj):
+        """Get thumbnail URL"""
+        try:
+            if obj.image:
+                return get_optimized_url(str(obj.image), width=300, height=200)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting thumbnail URL: {e}")
+            if obj.image:
+                return str(obj.image)
+        return None
+    
+    def get_items_count(self, obj):
+        """Get count of all items in this menu"""
+        return obj.items.count()
+    
+    def get_menu_items_summary(self, obj):
+        """Get summary of menu items"""
+        try:
+            return obj.get_menu_items_summary()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting menu items summary: {e}")
+            return {
+                'mandatory_items': [],
+                'optional_items': [],
+                'total_items': 0
+            }
+    
+    def create(self, validated_data):
+        """Create bulk menu with items from request data"""
+        import logging
+        import json
+        logger = logging.getLogger(__name__)
+        
+        # Get items data from request context (passed separately)
+        request = self.context.get('request')
+        items_data = []
+        
+        # Handle different data formats (FormData vs JSON)
+        if request:
+            # Try to get items from request data
+            if hasattr(request, 'data'):
+                items_raw = request.data.get('items', '[]')
+                
+                # Handle if items is a string (from FormData)
+                if isinstance(items_raw, str):
+                    try:
+                        items_data = json.loads(items_raw)
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse items JSON: {items_raw}")
+                        items_data = []
+                # Handle if items is already a list
+                elif isinstance(items_raw, list):
+                    items_data = items_raw
+                
+                logger.info(f"Creating bulk menu with {len(items_data)} items")
+        
+        # Handle image upload
+        image_data = validated_data.get('image')
+        if image_data:
+            try:
+                # Upload to Cloudinary
+                folder = "chefsync/bulk_menus"
+                result = upload_image_to_cloudinary(
+                    image_data=image_data,
+                    folder=folder,
+                    public_id=f"bulk_menu_{uuid.uuid4().hex[:8]}",
+                    tags=["bulk_menu", "chefsync"],
+                )
+                if result and result.get("secure_url"):
+                    validated_data["image"] = result["secure_url"]
+            except Exception as e:
+                logger.error(f"Error uploading bulk menu image: {e}")
+        
+        # Create the bulk menu
+        bulk_menu = super().create(validated_data)
+        logger.info(f"Created bulk menu: {bulk_menu.id} - {bulk_menu.menu_name}")
+        
+        # Create menu items
+        if items_data:
+            for item_data in items_data:
+                try:
+                    # Remove any id field (shouldn't be there for new items)
+                    item_data.pop('id', None)
+                    item_data.pop('bulk_menu', None)
+                    
+                    # Create the item
+                    BulkMenuItem.objects.create(
+                        bulk_menu=bulk_menu,
+                        **item_data
+                    )
+                    logger.info(f"Created item: {item_data.get('item_name')}")
+                except Exception as e:
+                    logger.error(f"Error creating menu item: {e} - Data: {item_data}")
+        
+        return bulk_menu
+    
+    def update(self, instance, validated_data):
+        """Update bulk menu with items from request data"""
+        import logging
+        import json
+        logger = logging.getLogger(__name__)
+        
+        # Get items data from request context
+        request = self.context.get('request')
+        items_data = []
+        
+        if request and hasattr(request, 'data'):
+            items_raw = request.data.get('items', '[]')
+            
+            # Handle if items is a string (from FormData)
+            if isinstance(items_raw, str):
+                try:
+                    items_data = json.loads(items_raw)
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse items JSON: {items_raw}")
+                    items_data = []
+            # Handle if items is already a list
+            elif isinstance(items_raw, list):
+                items_data = items_raw
+        
+        # Handle image upload
+        image_data = validated_data.get('image')
+        if image_data and not isinstance(image_data, str):
+            try:
+                # Upload to Cloudinary
+                folder = "chefsync/bulk_menus"
+                result = upload_image_to_cloudinary(
+                    image_data=image_data,
+                    folder=folder,
+                    public_id=f"bulk_menu_{uuid.uuid4().hex[:8]}",
+                    tags=["bulk_menu", "chefsync"],
+                )
+                if result and result.get("secure_url"):
+                    validated_data["image"] = result["secure_url"]
+            except Exception as e:
+                logger.error(f"Error uploading bulk menu image: {e}")
+        
+        # Update the bulk menu
+        bulk_menu = super().update(instance, validated_data)
+        
+        # Update menu items if provided
+        if items_data:
+            # Get existing item IDs
+            existing_item_ids = [item.get('id') for item in items_data if item.get('id')]
+            
+            # Delete items not in the update
+            bulk_menu.items.exclude(id__in=existing_item_ids).delete()
+            
+            # Update or create items
+            for item_data in items_data:
+                item_id = item_data.get('id')
+                if item_id:
+                    # Update existing item
+                    try:
+                        item = BulkMenuItem.objects.get(id=item_id, bulk_menu=bulk_menu)
+                        for field, value in item_data.items():
+                            if field not in ['id', 'bulk_menu']:
+                                setattr(item, field, value)
+                        item.save()
+                        logger.info(f"Updated item: {item.item_name}")
+                    except BulkMenuItem.DoesNotExist:
+                        logger.warning(f"Item {item_id} not found for menu {bulk_menu.id}")
+                else:
+                    # Create new item
+                    item_data.pop('id', None)
+                    item_data.pop('bulk_menu', None)
+                    BulkMenuItem.objects.create(bulk_menu=bulk_menu, **item_data)
+                    logger.info(f"Created new item: {item_data.get('item_name')}")
+        
+        return bulk_menu

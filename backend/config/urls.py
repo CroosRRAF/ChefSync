@@ -24,11 +24,17 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from django.urls import include, path
 
 
-def root_health_check(_request):
-    """Simple health check endpoint for base URL."""
+def root_redirect(_request):
+    """Redirect root URL to admin dashboard."""
+    return redirect('/admin/')
+
+
+def api_health_check(_request):
+    """Simple health check endpoint for API."""
     return JsonResponse(
         {
             "service": "ChefSync Backend",
@@ -39,7 +45,8 @@ def root_health_check(_request):
 
 
 urlpatterns = [
-    path("", root_health_check, name="health-check"),
+    path("", root_redirect, name="root-redirect"),
+    path("api/health/", api_health_check, name="health-check"),
     path("admin/", admin.site.urls),
     # API paths
     path("api/auth/", include("apps.authentication.urls", namespace="api-auth")),

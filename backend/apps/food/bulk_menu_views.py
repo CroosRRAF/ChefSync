@@ -4,7 +4,7 @@ Bulk Menu ViewSets for large orders/catering
 import logging
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, AllowAny
 from rest_framework.response import Response
 from rest_framework import serializers as drf_serializers
 
@@ -17,27 +17,43 @@ logger = logging.getLogger(__name__)
 class BulkMenuViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing bulk menus (for large orders/catering)
+    - Anyone can view approved bulk menus (list, retrieve)
+    - Only authenticated cooks can create/update/delete their own menus
     """
     serializer_class = BulkMenuWithItemsSerializer
-    permission_classes = [IsAuthenticated]
+    
+    def get_permissions(self):
+        """
+        Allow anyone to view (list/retrieve) approved menus
+        Require authentication for create/update/delete
+        """
+        if self.action in ['list', 'retrieve', 'meal_types']:
+            # Anyone can view approved bulk menus
+            permission_classes = [AllowAny]
+        else:
+            # Create, update, delete require authentication
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
     
     def get_queryset(self):
         """Return bulk menus based on user role"""
         user = self.request.user
         
-        # Chefs can only see their own bulk menus
-        if hasattr(user, 'role') and user.role == 'cook':
-            return BulkMenu.objects.filter(chef=user).prefetch_related('items')
+        # Authenticated users - role-based filtering
+        if user.is_authenticated:
+            # Chefs can see their own bulk menus (including pending)
+            if hasattr(user, 'role') and user.role == 'cook':
+                return BulkMenu.objects.filter(chef=user).prefetch_related('items')
+            
+            # Admins can see all
+            if hasattr(user, 'is_staff') and user.is_staff:
+                return BulkMenu.objects.all().prefetch_related('items')
         
-        # Admins can see all
-        if hasattr(user, 'is_staff') and user.is_staff:
-            return BulkMenu.objects.all().prefetch_related('items')
-        
-        # Customers can only see approved and available bulk menus
+        # Unauthenticated users and customers: only approved and available menus
         return BulkMenu.objects.filter(
             approval_status='approved',
             availability_status=True
-        ).prefetch_related('items')
+        ).prefetch_related('items').select_related('chef')
     
     def perform_create(self, serializer):
         """Set the chef to the current user"""
@@ -66,10 +82,10 @@ class BulkMenuViewSet(viewsets.ModelViewSet):
         menus = BulkMenu.objects.filter(chef=request.user)
         stats = {
             'total_menus': menus.count(),
-            'pending_approval': menus.filter(approval_status='pending').count(),
-            'approved': menus.filter(approval_status='approved').count(),
-            'rejected': menus.filter(approval_status='rejected').count(),
-            'available': menus.filter(availability_status=True, approval_status='approved').count(),
+            'pending_menus': menus.filter(approval_status='pending').count(),
+            'approved_menus': menus.filter(approval_status='approved').count(),
+            'rejected_menus': menus.filter(approval_status='rejected').count(),
+            'available_menus': menus.filter(availability_status=True, approval_status='approved').count(),
         }
         return Response(stats)
     
