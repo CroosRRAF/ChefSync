@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import LocationModal from '@/components/customer/LocationModal';
 import { useDatabaseCart } from '@/context/DatabaseCartContext';
 import navbarLogo from '@/assets/images/hero/navbarlogo.png';
+import { NotificationBell } from '@/components/notifications';
 import { 
   ShoppingCart, 
   User, 
@@ -14,7 +15,6 @@ import {
   X,
   Home,
   Package,
-  Bell,
   Search,
   LayoutDashboard,
   MapPin
@@ -121,16 +121,7 @@ const CustomerNavbar: React.FC = () => {
               </Button>
 
               {/* Notifications */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative hover:bg-primary/10"
-              >
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                  3
-                </span>
-              </Button>
+              <NotificationBell />
 
               {/* Cart */}
               <Button
@@ -225,7 +216,7 @@ const CustomerNavbar: React.FC = () => {
                   }}
                 >
                   <MapPin className="h-5 w-5 text-primary" />
-                  <span className="text-sm font-medium text-foreground/80 truncate">{locationContext.address || 'Select Location'}</span>
+                  <span className="text-sm font-medium text-foreground/80 truncate">Select Location</span>
                 </Button>
               </div>
             </div>

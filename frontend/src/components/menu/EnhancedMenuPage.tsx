@@ -43,6 +43,7 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
   // State management
   const [foods, setFoods] = useState<MenuFood[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<MenuFilters>({});
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
@@ -101,7 +102,7 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
   // Load foods when filters or location change
   useEffect(() => {
     if (filterOptions) {
-      loadFoods();
+      loadFoods(true); // Pass true to indicate this is a filter change
     }
   }, [filters, userLocation, searchQuery, currentPage]);
 
@@ -127,9 +128,13 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
     }
   };
 
-  const loadFoods = async () => {
+  const loadFoods = async (isFilterChange = false) => {
     try {
-      setLoading(true);
+      if (isFilterChange) {
+        setIsFiltering(true);
+      } else {
+        setLoading(true);
+      }
       
       const menuFilters: MenuFilters = {
         ...filters,
@@ -151,7 +156,11 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
       console.error('Error loading foods:', error);
       toast.error('Failed to load menu items');
     } finally {
-      setLoading(false);
+      if (isFilterChange) {
+        setIsFiltering(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -175,17 +184,28 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
     setCurrentPage(1);
   }, []);
 
-  const handleFilterChange = (newFilters: Partial<MenuFilters>) => {
+  const handleFilterChange = useCallback((newFilters: Partial<MenuFilters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
     setCurrentPage(1);
-  };
+    // Keep the filter sidebar open during filter changes
+    // The sidebar should only close when user explicitly closes it
+  }, []);
 
   const handleFoodClick = (food: MenuFood) => {
+    // Close filter sidebar when user clicks on food items
+    setShowFilters(false);
     setSelectedFood(food);
     setShowFoodDetail(true);
   };
 
   const handleAddToCart = () => {
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      toast.error('Please login to add items to cart');
+      navigate('/auth/login');
+      return;
+    }
+
     if (!selectedFood || !selectedPriceId) {
       toast.error('Please select a cook and size');
       return;
@@ -341,46 +361,76 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
       </div>
 
       {/* Search and Filters Bar */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-32 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col md:flex-row gap-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-32 z-30 shadow-sm">
+        <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+            <div className="flex-1 relative min-w-0">
+              <Search className="h-4 w-4 sm:h-5 sm:w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
               <Input
                 placeholder="Search for food, restaurant, or cuisine..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                className="pl-9 sm:pl-10 pr-3 h-10 sm:h-11 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm sm:text-base"
               />
             </div>
             
             {/* Filters Toggle */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-shrink-0">
               <Sheet open={showFilters} onOpenChange={setShowFilters}>
                 <SheetTrigger asChild>
-                  <Button variant="outline" className="flex items-center gap-2">
+                  <Button 
+                    variant={(() => {
+                      const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
+                        if (Array.isArray(value)) return value.length > 0;
+                        return value !== undefined && value !== null && value !== '';
+                      });
+                      return hasActiveFilters ? "default" : "outline";
+                    })()} 
+                    className="flex items-center gap-1 sm:gap-2 relative h-10 sm:h-11 px-3 sm:px-4 text-sm sm:text-base"
+                  >
                     <SlidersHorizontal className="h-4 w-4" />
-                    Filters
+                    <span className="hidden xs:inline">Filters</span>
+                    {(() => {
+                      const activeFilters = Object.entries(filters).filter(([key, value]) => {
+                        if (Array.isArray(value)) return value.length > 0;
+                        return value !== undefined && value !== null && value !== '';
+                      }).length;
+                      return activeFilters > 0 ? (
+                        <Badge 
+                          variant="secondary" 
+                          className="ml-1 h-4 w-4 sm:h-5 sm:w-5 p-0 flex items-center justify-center text-xs bg-orange-500 text-white"
+                        >
+                          {activeFilters}
+                        </Badge>
+                      ) : null;
+                    })()}
+                    {isFiltering && <span className="h-2 w-2 bg-orange-500 rounded-full animate-pulse ml-1" />}
                   </Button>
                 </SheetTrigger>
-                <SheetContent className="w-80">
-                  <SheetHeader>
-                    <SheetTitle>Filter Menu</SheetTitle>
+                <SheetContent 
+                  side="right"
+                  className="w-full sm:w-96 h-full overflow-hidden flex flex-col p-0 border-l shadow-xl"
+                >
+                  <SheetHeader className="flex-shrink-0 sticky top-0 bg-background z-10 p-6 pb-4 border-b">
+                    <SheetTitle className="text-left text-lg font-semibold">Filter Menu</SheetTitle>
                   </SheetHeader>
-                  {filterOptions && (
-                    <FilterSidebar
-                      filterOptions={filterOptions}
-                      currentFilters={filters}
-                      onFilterChange={handleFilterChange}
-                      userLocation={userLocation}
-                    />
-                  )}
+                  <div className="flex-1 overflow-y-auto">
+                    {filterOptions && (
+                      <FilterSidebar
+                        filterOptions={filterOptions}
+                        currentFilters={filters}
+                        onFilterChange={handleFilterChange}
+                        userLocation={userLocation}
+                        onClose={() => setShowFilters(false)}
+                      />
+                    )}
+                  </div>
                 </SheetContent>
               </Sheet>
 
               {/* Mobile Location Selector */}
-              <div className="md:hidden">
+              <div className="sm:hidden">
                 <LocationSelector
                   currentLocation={mappedLocation}
                   onLocationSelect={(loc) => handleLocationSelect(loc)}
@@ -391,15 +441,18 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
 
           {/* Active Filters Display */}
           {Object.keys(filters).length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap gap-1 sm:gap-2 mt-2 sm:mt-3 px-1">
               {filters.cuisines?.map(id => {
                 const cuisine = filterOptions?.cuisines.find(c => c.id === id);
                 return cuisine ? (
-                  <Badge key={id} variant="secondary" className="flex items-center gap-1">
-                    {cuisine.name}
-                    <button onClick={() => handleFilterChange({ 
-                      cuisines: filters.cuisines?.filter(c => c !== id) 
-                    })}>
+                  <Badge key={id} variant="secondary" className="flex items-center gap-1 text-xs sm:text-sm px-2 py-1">
+                    <span className="truncate max-w-20 sm:max-w-none">{cuisine.name}</span>
+                    <button 
+                      onClick={() => handleFilterChange({ 
+                        cuisines: filters.cuisines?.filter(c => c !== id) 
+                      })}
+                      className="hover:bg-gray-300 rounded-full p-0.5"
+                    >
                       <X className="h-3 w-3" />
                     </button>
                   </Badge>
@@ -407,11 +460,14 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
               })}
               
               {filters.dietary?.map(diet => (
-                <Badge key={diet} variant="secondary" className="flex items-center gap-1">
-                  {diet.charAt(0).toUpperCase() + diet.slice(1)}
-                  <button onClick={() => handleFilterChange({ 
-                    dietary: filters.dietary?.filter(d => d !== diet) 
-                  })}>
+                <Badge key={diet} variant="secondary" className="flex items-center gap-1 text-xs sm:text-sm px-2 py-1">
+                  <span className="truncate">{diet.charAt(0).toUpperCase() + diet.slice(1)}</span>
+                  <button 
+                    onClick={() => handleFilterChange({ 
+                      dietary: filters.dietary?.filter(d => d !== diet) 
+                    })}
+                    className="hover:bg-gray-300 rounded-full p-0.5"
+                  >
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
@@ -424,10 +480,20 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
       {/* Location Info is now handled within LocationSelector */}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6 relative">
+        {/* Filtering Overlay */}
+        {isFiltering && (
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+            <div className="bg-card p-4 rounded-lg shadow-lg flex items-center gap-3">
+              <div className="h-4 w-4 bg-orange-500 rounded-full animate-pulse"></div>
+              <span className="text-sm font-medium">Applying filters...</span>
+            </div>
+          </div>
+        )}
+        
         {loading ? (
-          // Loading Skeleton
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          // Loading Skeleton - Enhanced responsive design
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6 transition-all duration-300">
             {Array.from({ length: 8 }).map((_, index) => (
               <Card key={index} className="overflow-hidden">
                 <Skeleton className="h-48 w-full" />
@@ -463,8 +529,8 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
             </Button>
           </div>
         ) : (
-          // Food Grid
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          // Food Grid - Enhanced responsive design
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6 transition-all duration-300">
             {foods.map((food) => {
               const deliveryInfo = getDeliveryInfo(food);
               const isFavorite = favoriteIds.has(food.food_id);
@@ -485,11 +551,14 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
               return (
                 <Card 
                   key={food.food_id} 
-                  className="group cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  onClick={() => handleFoodClick(food)}
+                  className="group cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 w-full min-w-0"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleFoodClick(food);
+                  }}
                 >
                   {/* Food Image */}
-                  <div className="relative aspect-video overflow-hidden">
+                  <div className="relative aspect-[4/3] sm:aspect-video overflow-hidden">
                     <img
                       src={food.optimized_image_url || food.primary_image || '/food-placeholder.jpg'}
                       alt={food.name}
@@ -526,13 +595,13 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                     </div>
                   </div>
 
-                  <CardContent className="p-4">
+                  <CardContent className="p-3 sm:p-4">
                     {/* Food Name and Rating */}
                     <div className="mb-2">
-                      <h3 className="font-semibold text-lg text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors line-clamp-1">
+                      <h3 className="font-semibold text-base sm:text-lg text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors line-clamp-1">
                         {food.name}
                       </h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                         <span>by {food.chef_name}</span>
                         {Number(food.rating_average) > 0 && (
                           <div className="flex items-center gap-1">
@@ -544,18 +613,18 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                     </div>
 
                     {/* Description */}
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3 line-clamp-2">
                       {food.description}
                     </p>
 
                     {/* Timing and Delivery Info */}
-                    <div className="space-y-2 mb-4">
+                    <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
                       {food.preparation_time && (
                         <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                          <Clock className="h-3 w-3" />
-                          <span>{food.preparation_time} mins prep</span>
+                          <Clock className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{food.preparation_time} mins prep</span>
                           {deliveryInfo?.time && (
-                            <span>• {deliveryInfo.time} mins total</span>
+                            <span className="hidden sm:inline">• {deliveryInfo.time} mins total</span>
                           )}
                         </div>
                       )}
@@ -573,16 +642,32 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                         <div className="text-xs text-gray-500 dark:text-gray-400">{food.category_name}</div>
                       </div>
                       
-                      <Button
-                        size="sm"
-                        className="bg-orange-500 hover:bg-orange-600"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleFoodClick(food);
-                        }}
-                      >
-                        Add
-                      </Button>
+                      {isAuthenticated ? (
+                        <Button
+                          size="sm"
+                          className="bg-orange-500 hover:bg-orange-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowFilters(false);
+                            handleFoodClick(food);
+                          }}
+                        >
+                          Add
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-orange-500 text-orange-600 hover:bg-orange-50 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toast.error('Please login to add items to cart');
+                            navigate('/auth/login');
+                          }}
+                        >
+                          Login to Order
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

@@ -103,13 +103,13 @@ export const customerService = {
       }
     });
 
-    const response = await apiClient.get(`/orders/orders/?${searchParams}`);
+    const response = await apiClient.get(`/api/orders/orders/?${searchParams}`);
     return response.data;
   },
 
   // Get specific order details
   getOrder: async (orderId: number): Promise<Order> => {
-    const response = await apiClient.get(`/orders/orders/${orderId}/`);
+    const response = await apiClient.get(`/api/orders/orders/${orderId}/`);
     return response.data;
   },
 
@@ -117,7 +117,7 @@ export const customerService = {
   getCustomerStats: async (): Promise<CustomerStats> => {
     try {
       // Get orders for statistics
-      const ordersResponse = await apiClient.get('/orders/orders/');
+      const ordersResponse = await apiClient.get('/api/orders/orders/');
       const orders = ordersResponse.data.results || ordersResponse.data;
 
       const totalOrders = orders.length;
@@ -162,7 +162,7 @@ export const customerService = {
 
   // Cancel order
   cancelOrder: async (orderId: number, reason?: string): Promise<void> => {
-    await apiClient.patch(`/orders/orders/${orderId}/`, {
+    await apiClient.patch(`/api/orders/orders/${orderId}/`, {
       status: 'cancelled',
       customer_notes: reason || 'Order cancelled by customer'
     });
@@ -170,7 +170,7 @@ export const customerService = {
 
   // Get order status history
   getOrderHistory: async (orderId: number): Promise<any[]> => {
-    const response = await apiClient.get(`/orders/order-history/?order=${orderId}`);
+    const response = await apiClient.get(`/api/orders/order-history/?order=${orderId}`);
     return response.data.results || response.data;
   }
 };

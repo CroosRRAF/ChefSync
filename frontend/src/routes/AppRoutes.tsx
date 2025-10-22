@@ -14,7 +14,7 @@ import AdminLayout from "@/components/admin/layout/AdminLayout";
 
 // Public pages
 import About from "@/pages/About";
-import Checkout from "@/pages/Checkout";
+import CheckoutPage from "@/pages/CheckoutPage";
 import Contact from "@/pages/Contact";
 import DeliveryAddressTest from "@/pages/DeliveryAddressTest";
 import Home from "@/pages/Home";
@@ -281,14 +281,9 @@ const InnerRoutes: React.FC = () => {
         <Route
           path="/checkout"
           element={
-            <>
-              {isAuthenticated && user && user.role === "customer" ? (
-                <CustomerHomeNavbar />
-              ) : (
-                <Navbar />
-              )}
-              <Checkout />
-            </>
+            <ProtectedRoute allowedRoles={["customer"]}>
+              <CheckoutPage />
+            </ProtectedRoute>
           }
         />
         <Route
@@ -378,6 +373,17 @@ const InnerRoutes: React.FC = () => {
           element={
             <ProtectedRoute>
               <Navigate to={getDefaultRoute()} replace />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/cart"
+          element={
+            <ProtectedRoute allowedRoles={["customer"]}>
+              <CustomerDashboardLayout>
+                <CustomerCart />
+              </CustomerDashboardLayout>
             </ProtectedRoute>
           }
         />

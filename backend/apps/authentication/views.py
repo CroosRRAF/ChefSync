@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 import os
 import logging
@@ -514,6 +515,7 @@ def confirm_password_reset(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@csrf_exempt
 def google_oauth_login(request):
     """
     Google OAuth login
@@ -522,6 +524,8 @@ def google_oauth_login(request):
     logger.info(f'Request method: {request.method}')
     logger.info(f'Request headers: {dict(request.headers)}')
     logger.info(f'Request data: {request.data}')
+    logger.info(f'Request path: {request.path}')
+    logger.info(f'CSRF exempt check: {getattr(request, "_dont_enforce_csrf_checks", False)}')
     logger.info(f'Client ID from settings: {settings.GOOGLE_OAUTH_CLIENT_ID}')
     logger.info(f'Client Secret configured: {bool(settings.GOOGLE_OAUTH_CLIENT_SECRET)}')
 

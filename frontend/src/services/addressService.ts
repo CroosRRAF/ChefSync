@@ -31,7 +31,7 @@ export interface UpdateAddressData extends Partial<CreateAddressData> {
 
 class AddressService {
   // Ensure trailing slash to match DRF router endpoints and avoid redirects
-  private baseUrl = '/orders/addresses/';
+  private baseUrl = '/api/orders/addresses/';
 
   /**
    * Get all addresses for the current user
@@ -73,7 +73,7 @@ class AddressService {
    */
   async getAddress(id: number): Promise<DeliveryAddress> {
     try {
-      const response = await apiClient.get(`${this.baseUrl}/${id}`);
+      const response = await apiClient.get(`${this.baseUrl}${id}/`);
       return response.data;
     } catch (error) {
       console.error('Error fetching address:', error);
@@ -98,10 +98,30 @@ class AddressService {
         console.error('Address creation response data:', status, respData);
         const respString = typeof respData === 'string' ? respData : JSON.stringify(respData);
         // Include status for easier debugging in the UI
-        throw new Error(`HTTP ${status} - ${respString}`);
+        throw new Error(`Failed to create address (status ${status}): ${respString}`);
       }
       throw new Error('Failed to create address');
     }
+  }
+
+  /**
+   * Calculate distance between two points (Haversine formula)
+   */
+  calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Radius of the Earth in kilometers
+    const dLat = this.deg2rad(lat2 - lat1);
+    const dLon = this.deg2rad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; // Distance in km
+    return distance;
+  }
+
+  private deg2rad(deg: number): number {
+    return deg * (Math.PI / 180);
   }
 
   /**
@@ -110,7 +130,7 @@ class AddressService {
   async updateAddress(addressData: UpdateAddressData): Promise<DeliveryAddress> {
     try {
       const { id, ...updateData } = addressData;
-      const response = await apiClient.put(`${this.baseUrl}/${id}`, updateData);
+      const response = await apiClient.put(`${this.baseUrl}${id}/`, updateData);
       return response.data;
     } catch (error) {
       console.error('Error updating address:', error);
@@ -123,7 +143,7 @@ class AddressService {
    */
   async deleteAddress(id: number): Promise<void> {
     try {
-      await apiClient.delete(`${this.baseUrl}/${id}`);
+      await apiClient.delete(`${this.baseUrl}${id}/`);
     } catch (error) {
       console.error('Error deleting address:', error);
       throw new Error('Failed to delete address');
@@ -135,7 +155,7 @@ class AddressService {
    */
   async setDefaultAddress(addressId: number): Promise<void> {
     try {
-      await apiClient.post(`${this.baseUrl}/set_default/`, {
+      await apiClient.post(`${this.baseUrl}set_default/`, {
         address_id: addressId
       });
     } catch (error) {
@@ -155,32 +175,6 @@ class AddressService {
       console.error('Error fetching default address:', error);
       return null;
     }
-  }
-
-  /**
-   * Calculate distance between two coordinates using Haversine formula
-   */
-  calculateDistance(
-    lat1: number, 
-    lng1: number, 
-    lat2: number, 
-    lng2: number
-  ): number {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = this.toRadians(lat2 - lat1);
-    const dLng = this.toRadians(lng2 - lng1);
-    
-    const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  private toRadians(degrees: number): number {
-    return degrees * (Math.PI / 180);
   }
 
   /**

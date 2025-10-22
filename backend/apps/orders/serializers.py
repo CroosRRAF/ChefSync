@@ -376,41 +376,163 @@ class OrderDetailSerializer(serializers.ModelSerializer):
 class CartItemSerializer(serializers.ModelSerializer):
     """Enhanced cart item serializer with all required fields for frontend"""
 
+    # Food and price information
     food_name = serializers.CharField(source="price.food.name", read_only=True)
-    cook_name = serializers.CharField(source="price.cook.get_full_name", read_only=True)
+    food_description = serializers.CharField(source="price.food.description", read_only=True)
+    food_id = serializers.IntegerField(source="price.food.food_id", read_only=True)
+    price_id = serializers.IntegerField(source="price.price_id", read_only=True)
     size = serializers.CharField(source="price.size", read_only=True)
     unit_price = serializers.DecimalField(
         source="price.price", max_digits=10, decimal_places=2, read_only=True
     )
     total_price = serializers.SerializerMethodField()
-    food_image = serializers.CharField(source="price.food.image", read_only=True)
+    food_image = serializers.SerializerMethodField()
+    
+    # Chef/Cook information
+    chef_id = serializers.IntegerField(source="price.cook.user_id", read_only=True)
+    chef_name = serializers.SerializerMethodField()
+    cook_name = serializers.SerializerMethodField()
+    kitchen_address = serializers.SerializerMethodField()
+    kitchen_location = serializers.SerializerMethodField()
 
     class Meta:
         model = CartItem
         fields = [
-            'id', 'quantity', 'special_instructions', 'food_name', 'unit_price', 'total_price', 'food_image', 'created_at', 'updated_at'
+            'id', 'quantity', 'special_instructions', 'created_at', 'updated_at',
+            'food_name', 'food_description', 'food_id', 'price_id', 'size', 
+            'unit_price', 'total_price', 'food_image',
+            'chef_id', 'chef_name', 'cook_name', 'kitchen_address', 'kitchen_location'
         ]
 
-    def get_food_name(self, obj):
+    def get_chef_name(self, obj):
+        """Get chef's display name"""
         try:
-            return obj.price.food.name
+            cook = obj.price.cook
+            if cook and cook.name:
+                return cook.name
+            elif cook:
+                return f"{cook.first_name} {cook.last_name}".strip() or cook.username
+            return "Unknown Chef"
         except Exception:
-            return ''
-
-    def get_unit_price(self, obj):
-        try:
-            return float(obj.price.price)
-        except Exception:
-            return 0.0
+            return "Unknown Chef"
+    
+    def get_cook_name(self, obj):
+        """Alias for chef_name for backward compatibility"""
+        return self.get_chef_name(obj)
 
     def get_food_image(self, obj):
+        """Get optimized food image URL"""
         try:
-            return obj.price.image_url or (obj.price.food.image_url if obj.price and obj.price.food else None)
+            if obj.price and obj.price.food and obj.price.food.image:
+                # Try to get optimized URL if available
+                if hasattr(obj.price.food, 'get_optimized_image_url'):
+                    return obj.price.food.get_optimized_image_url()
+                return str(obj.price.food.image)
+            return None
         except Exception:
             return None
 
+    def get_kitchen_address(self, obj):
+        """Get chef's kitchen address"""
+        try:
+            from apps.users.models import Address
+            
+            cook = obj.price.cook
+            if not cook:
+                return "Address not available"
+            
+            # Get kitchen address from Address model (users app)
+            kitchen_address = Address.objects.filter(
+                user=cook,
+                address_type='kitchen',
+                is_default=True,
+                is_active=True
+            ).first()
+            
+            # If no default kitchen, get any active kitchen address
+            if not kitchen_address:
+                kitchen_address = Address.objects.filter(
+                    user=cook,
+                    address_type='kitchen',
+                    is_active=True
+                ).first()
+            
+            # If still no kitchen address, get default address
+            if not kitchen_address:
+                kitchen_address = Address.objects.filter(
+                    user=cook,
+                    is_default=True,
+                    is_active=True
+                ).first()
+            
+            if kitchen_address:
+                # Format the address nicely
+                address_parts = []
+                if kitchen_address.label:
+                    address_parts.append(kitchen_address.label)
+                if hasattr(kitchen_address, 'street_address') and kitchen_address.street_address:
+                    address_parts.append(kitchen_address.street_address)
+                if hasattr(kitchen_address, 'city') and kitchen_address.city:
+                    address_parts.append(kitchen_address.city)
+                
+                return ", ".join(address_parts) if address_parts else "Kitchen Location"
+            
+            return "Address not available"
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting kitchen address for cook {obj.price.cook.user_id}: {str(e)}")
+            return "Address not available"
+
+    def get_kitchen_location(self, obj):
+        """Get chef's kitchen location coordinates"""
+        try:
+            from apps.users.models import Address
+            
+            cook = obj.price.cook
+            if not cook:
+                return None
+            
+            # Get kitchen address from Address model (users app)
+            kitchen_address = Address.objects.filter(
+                user=cook,
+                address_type='kitchen',
+                is_default=True,
+                is_active=True
+            ).first()
+            
+            # If no default kitchen, get any active kitchen address
+            if not kitchen_address:
+                kitchen_address = Address.objects.filter(
+                    user=cook,
+                    address_type='kitchen',
+                    is_active=True
+                ).first()
+            
+            # If still no kitchen address, get default address
+            if not kitchen_address:
+                kitchen_address = Address.objects.filter(
+                    user=cook,
+                    is_default=True,
+                    is_active=True
+                ).first()
+            
+            if kitchen_address and kitchen_address.latitude and kitchen_address.longitude:
+                return {
+                    'lat': float(kitchen_address.latitude),
+                    'lng': float(kitchen_address.longitude)
+                }
+            
+            return None
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting kitchen location for cook {obj.price.cook.user_id}: {str(e)}")
+            return None
+
     def get_total_price(self, obj):
-        return obj.total_price
+        """Calculate total price for this cart item"""
+        return float(obj.total_price)
 
 
 class OrderStatsSerializer(serializers.Serializer):
@@ -630,34 +752,4 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
         return "0.00"
 
 
-# --- Placeholder serializers for bulk management and order representations ---
-from .models import Order, BulkOrder
-
-
-class OrderListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Order
-        fields = ['id', 'order_number', 'status', 'total_amount', 'created_at']
-
-
-class OrderDetailSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Order
-        fields = ['id', 'order_number', 'status', 'total_amount', 'delivery_fee', 'created_at', 'items']
-
-
-class BulkOrderListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BulkOrder
-        fields = ['bulk_order_id', 'status', 'total_quantity', 'deadline', 'created_at']
-
-
-class BulkOrderDetailSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BulkOrder
-        fields = ['bulk_order_id', 'status', 'total_quantity', 'description', 'deadline', 'created_at']
-
-
-class BulkOrderActionSerializer(serializers.Serializer):
-    action = serializers.CharField()
-    notes = serializers.CharField(required=False, allow_blank=True)
+# Duplicate definitions removed - using earlier complete implementations above

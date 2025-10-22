@@ -45,7 +45,17 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
       }
 
       // Ensure CSRF cookie is present (Django expects it for POST when SessionAuth is enabled)
-      await apiClient.get("/auth/csrf-token/").catch(() => {});
+      try {
+        const csrfResponse = await apiClient.get("/auth/csrf-token/");
+        console.log("CSRF token retrieved successfully", csrfResponse);
+        
+        // Ensure the CSRF cookie is properly set before making the OAuth request
+        // Wait a bit to ensure the cookie is set
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (csrfError) {
+        console.error("CSRF token error:", csrfError);
+        // Continue anyway as CSRF might be disabled in development
+      }
 
       const data = await apiClient.post<any>("/auth/google/login/", {
         id_token: credentialResponse.credential,
@@ -83,16 +93,33 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
       }
     } catch (err: any) {
       console.error("Google OAuth error:", err);
+      console.error("Error response data:", err.response?.data);
+      console.error("Error status:", err.response?.status);
+      console.error("Error headers:", err.response?.headers);
+      
       let errorMessage = "Please check your connection and try again";
+      let errorTitle = "Authentication error";
 
-      if (err.message?.includes("fetch")) {
-        errorMessage =
-          "Cannot connect to server. Please ensure the backend is running.";
+      // Handle specific error cases
+      if (err.response?.status === 403) {
+        errorTitle = "Authentication rejected";
+        const backendError = err.response?.data?.error || err.response?.data?.detail || "Unknown error";
+        errorMessage = `Backend rejected the request: ${backendError}`;
+        console.error("403 error details:", err.response?.data);
+      } else if (err.response?.status === 400) {
+        errorTitle = "Invalid request";
+        errorMessage = err.response?.data?.error || "Invalid authentication data";
+      } else if (err.message?.includes("fetch")) {
+        errorTitle = "Connection error";
+        errorMessage = "Cannot connect to server. Please ensure the backend is running.";
+      } else if (err.code === 'ERR_NETWORK') {
+        errorTitle = "Network error";
+        errorMessage = "Check that both frontend (8080) and backend (8000) servers are running.";
       }
 
       toast({
         variant: "destructive",
-        title: "Network error",
+        title: errorTitle,
         description: errorMessage,
       });
     }
@@ -108,7 +135,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
       variant: "destructive",
       title: "Google authentication failed",
       description: isOriginError 
-        ? "OAuth origin not configured. Please add http://localhost:8081 to Google Console authorized origins."
+        ? "OAuth origin not configured. Please add http://localhost:8080 to Google Console authorized origins."
         : "Please try again or use email/password",
     });
   };

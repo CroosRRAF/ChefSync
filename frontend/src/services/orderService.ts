@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
 import { DeliveryAddress } from './addressService';
+import { chefService, Chef } from '@/services/chefService';
 
 export interface OrderItem {
   price_id: number;
@@ -28,19 +29,33 @@ export interface CreateOrderData {
   total_amount?: string;
 }
 
+export interface CreateOrderFromCartData {
+  order_type: 'delivery' | 'pickup';
+  delivery_address_id?: number; // Required for delivery, not for pickup
+  delivery_instructions?: string;
+  payment_method: string;
+  phone: string;
+  delivery_fee: number;
+  subtotal: number;
+  tax_amount: number;
+  total_amount: number;
+  customer_notes?: string;
+}
+
 export interface OrderResponse {
-  id: number;
+  success?: string;
+  order_id: number;
   order_number: string;
   status: string;
   total_amount: number;
-  delivery_fee: number;
-  tax_amount: number;
-  delivery_address: string;
-  created_at: string;
+  delivery_fee?: number;
+  tax_amount?: number;
+  delivery_address?: string;
+  created_at?: string;
 }
 
 class OrderService {
-  private baseUrl = '/orders';
+  private baseUrl = '/api/orders';
 
   /**
    * Create a new order from cart items
@@ -60,6 +75,19 @@ class OrderService {
       console.error('Error status:', error.response?.status);
       console.error('Error URL:', error.config?.url);
       throw new Error(`Failed to create order: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  async createOrderFromCart(orderData: CreateOrderFromCartData): Promise<OrderResponse> {
+    try {
+      console.log('Creating order from cart with data:', orderData);
+      const response = await apiClient.post(`${this.baseUrl}/place/`, orderData);
+      console.log('Order from cart created successfully:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error creating order from cart:', error);
+      console.error('Error response:', error.response?.data);
+      throw new Error(`Failed to create order from cart: ${error.response?.data?.error || error.message}`);
     }
   }
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 
 import GoogleMapsAddressPicker from '@/components/checkout/GoogleMapsAddressPicker';
-import CheckoutPopup from '@/components/checkout/CheckoutPopup';
 import { DeliveryAddress, addressService } from '@/services/addressService';
 import { toast } from 'sonner';
 
@@ -33,7 +32,6 @@ const CustomerCart: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
   const [selectedAddress, setSelectedAddress] = useState<DeliveryAddress | null>(null);
   const [isAddressPickerOpen, setIsAddressPickerOpen] = useState(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
   
@@ -67,13 +65,13 @@ const CustomerCart: React.FC = () => {
   const cart = items || [];
   
   const subtotal = cart.reduce((sum, item) => {
-    return sum + item.subtotal;
+    return sum + Number(item.subtotal);
   }, 0);
 
   const taxAmount = subtotal * 0.10; // 10% tax
   const total = subtotal + taxAmount; // Delivery fee will be calculated in checkout
 
-  const handleQuantityChange = async (itemId: string, newQuantity: number) => {
+  const handleQuantityChange = async (itemId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
       removeItem(itemId);
     } else {
@@ -81,7 +79,7 @@ const CustomerCart: React.FC = () => {
     }
   };
 
-  const handleRemoveItem = async (itemId: string) => {
+  const handleRemoveItem = async (itemId: number) => {
     removeItem(itemId);
   };
 
@@ -96,14 +94,15 @@ const CustomerCart: React.FC = () => {
       navigate('/auth/login');
       return;
     }
-    // Open checkout popup - address selection will happen there
-    setIsCheckoutOpen(true);
-  };
-
-  const handleOrderSuccess = () => {
-    toast.success('Order placed successfully!');
-    // Cart will be cleared by the checkout component
-    navigate('/customer/dashboard');
+    
+    // Get chef ID from cart items
+    if (cart.length > 0) {
+      const chefId = cart[0].chef_id;
+      // Navigate to checkout page with chef ID
+      navigate('/checkout', { state: { chefId } });
+    } else {
+      toast.error('Your cart is empty');
+    }
   };
 
   const handleAddressSelect = (address: DeliveryAddress) => {
@@ -205,7 +204,7 @@ const CustomerCart: React.FC = () => {
               }, {} as Record<number, { chef_name: string; items: typeof cart }>);
 
               return Object.entries(itemsByChef).map(([chefId, chefData], chefIndex) => {
-                const chefTotal = chefData.items.reduce((sum, item) => sum + item.subtotal, 0);
+                const chefTotal = chefData.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
                 
                 return (
                   <Card key={chefId} className="border-2 border-orange-100 dark:border-orange-900/20 animate-slideUp" style={{ animationDelay: `${chefIndex * 100}ms` }}>
@@ -225,7 +224,7 @@ const CustomerCart: React.FC = () => {
                           </div>
                         </div>
                         <Badge variant="secondary" className="bg-orange-200 text-orange-800 dark:bg-orange-800 dark:text-orange-200 text-lg px-3 py-1">
-                          LKR {chefTotal.toFixed(2)}
+                          LKR {Number(chefTotal).toFixed(2)}
                         </Badge>
                       </div>
                     </CardHeader>
@@ -237,8 +236,8 @@ const CustomerCart: React.FC = () => {
                             {/* Item Image */}
                             <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
                               <img
-                                src={item.food_image || '/placeholder-food.jpg'}
-                                alt={item.food_name}
+                                src={item.image || '/placeholder-food.jpg'}
+                                alt={item.name}
                                 className="w-full h-full object-cover"
                               />
                             </div>
@@ -246,10 +245,10 @@ const CustomerCart: React.FC = () => {
                             {/* Item Details */}
                             <div className="flex-1 min-w-0">
                               <h4 className="font-semibold text-gray-900 dark:text-white mb-1">
-                                {item.food_name}
+                                {item.name}
                               </h4>
                               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                {item.size} • LKR {item.unit_price.toFixed(2)}
+                                {item.size} • LKR {Number(item.unit_price).toFixed(2)}
                               </p>
                               
                               {/* Quantity Controls */}
@@ -290,7 +289,7 @@ const CustomerCart: React.FC = () => {
                             {/* Item Total */}
                             <div className="text-right">
                               <div className="font-bold text-gray-900 dark:text-white">
-                                LKR {item.subtotal.toFixed(2)}
+                                LKR {Number(item.subtotal).toFixed(2)}
                               </div>
                             </div>
                           </div>
@@ -432,13 +431,6 @@ const CustomerCart: React.FC = () => {
         onClose={() => setIsAddressPickerOpen(false)}
         onAddressSelect={handleAddressSelect}
         selectedAddress={selectedAddress}
-      />
-
-      <CheckoutPopup
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        cartItems={cart}
-        onOrderSuccess={handleOrderSuccess}
       />
     </div>
   );

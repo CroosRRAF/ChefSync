@@ -7,11 +7,11 @@ export interface CartItem {
   special_instructions: string;
   created_at: string;
   updated_at: string;
-  food_name: string;
+  menu_item_name: string;
   food_description: string;
   unit_price: number;
   total_price: number;
-  food_image: string;
+  image_url: string;
   size: string;
   chef_id: number;
   chef_name: string;

@@ -21,7 +21,6 @@ const DeliveryAddressTest: React.FC = () => {
       setCurrentLocation(coords);
       
       const geocoded = await reverseGeocode(coords.latitude, coords.longitude);
-      toast.success(`Location detected: ${geocoded.city}`);
       
       console.log('Current Location:', coords);
       console.log('Reverse Geocoded:', geocoded);

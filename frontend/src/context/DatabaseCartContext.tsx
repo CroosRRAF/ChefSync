@@ -22,8 +22,6 @@ export interface DatabaseCartContextType {
   getTotalByChef: (chefId: number) => number;
   getGrandTotal: () => number;
   getItemCount: () => number;
-  canCheckout: () => boolean;
-  getCheckoutChefId: () => number | null;
   getChefInfo: (chefId: number) => any;
   getAllChefs: () => any[];
 }
@@ -119,7 +117,9 @@ export function DatabaseCartProvider({ children }: { children: ReactNode }): JSX
       // Transform backend cart items to frontend format
       const transformedItems: DatabaseCartItem[] = items.map(item => ({
         ...item,
-        subtotal: item.quantity * item.unit_price,
+        unit_price: Number(item.unit_price),
+        quantity: Number(item.quantity),
+        subtotal: Number(item.quantity) * Number(item.unit_price),
       }));
       
       dispatch({ type: 'SET_ITEMS', payload: transformedItems });
@@ -159,7 +159,9 @@ export function DatabaseCartProvider({ children }: { children: ReactNode }): JSX
       // Transform the response
       const transformedItem: DatabaseCartItem = {
         ...newItem,
-        subtotal: newItem.quantity * newItem.unit_price,
+        unit_price: Number(newItem.unit_price),
+        quantity: Number(newItem.quantity),
+        subtotal: Number(newItem.quantity) * Number(newItem.unit_price),
       };
       
       // Check if adding this item creates multiple chefs
@@ -167,16 +169,9 @@ export function DatabaseCartProvider({ children }: { children: ReactNode }): JSX
       const newChefId = transformedItem.chef_id;
       
       if (currentChefIds.size > 0 && !currentChefIds.has(newChefId)) {
-        // Multiple chefs detected - show warning but still add the item
-        const newChefName = transformedItem.chef_name;
-        const currentChefNames = Array.from(currentChefIds).map(id => 
-          state.items.find(item => item.chef_id === id)?.chef_name || 'Unknown Chef'
-        );
-        
-        toast.warning(
-          `Added item from ${newChefName}!\n\nYou now have items from ${currentChefIds.size + 1} different chefs:\n• ${currentChefNames.join('\n• ')}\n• ${newChefName}\n\nYou can checkout each chef separately.`,
-          { duration: 8000 }
-        );
+        // Multiple chefs detected, but we won't show a toast.
+        // The cart modal will handle the UI for multiple chefs.
+        console.log(`Added item from a new chef. Total chefs in cart: ${currentChefIds.size + 1}`);
       } else {
         // Silent success - no toast needed for normal operations
       }
@@ -230,7 +225,9 @@ export function DatabaseCartProvider({ children }: { children: ReactNode }): JSX
       // Transform the response
       const transformedItem: DatabaseCartItem = {
         ...updatedItem,
-        subtotal: updatedItem.quantity * updatedItem.unit_price,
+        unit_price: Number(updatedItem.unit_price),
+        quantity: Number(updatedItem.quantity),
+        subtotal: Number(updatedItem.quantity) * Number(updatedItem.unit_price),
       };
       
       dispatch({ type: 'UPDATE_ITEM', payload: transformedItem });
@@ -321,25 +318,15 @@ export function DatabaseCartProvider({ children }: { children: ReactNode }): JSX
   const getTotalByChef = (chefId: number): number => {
     return state.items
       .filter(item => item.chef_id === chefId)
-      .reduce((total, item) => total + item.subtotal, 0);
+      .reduce((total, item) => total + Number(item.subtotal), 0);
   };
 
   const getGrandTotal = (): number => {
-    return state.items.reduce((total, item) => total + item.subtotal, 0);
+    return state.items.reduce((total, item) => total + Number(item.subtotal), 0);
   };
 
   const getItemCount = (): number => {
     return state.items.reduce((total, item) => total + item.quantity, 0);
-  };
-
-  const canCheckout = (): boolean => {
-    const chefIds = new Set(state.items.map(item => item.chef_id));
-    return chefIds.size === 1 && state.items.length > 0;
-  };
-
-  const getCheckoutChefId = (): number | null => {
-    if (!canCheckout()) return null;
-    return state.items[0]?.chef_id || null;
   };
 
   const getChefInfo = (chefId: number) => {
@@ -374,8 +361,6 @@ export function DatabaseCartProvider({ children }: { children: ReactNode }): JSX
     getTotalByChef,
     getGrandTotal,
     getItemCount,
-    canCheckout,
-    getCheckoutChefId,
     getChefInfo,
     getAllChefs,
   };

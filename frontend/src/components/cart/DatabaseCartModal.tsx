@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -22,6 +22,8 @@ interface ChefSectionProps {
   subtotal: number;
   onQuantityChange: (itemId: number, quantity: number) => void;
   onRemoveItem: (itemId: number) => void;
+  isMultiChef?: boolean;
+  onCheckout: () => void;
 }
 
 const ChefSection: React.FC<ChefSectionProps> = ({
@@ -31,11 +33,50 @@ const ChefSection: React.FC<ChefSectionProps> = ({
   subtotal,
   onQuantityChange,
   onRemoveItem,
+  isMultiChef = false,
+  onCheckout,
 }) => {
   const navigate = useNavigate();
 
+  if (isMultiChef) {
+    return (
+      <Card className="border-2 border-orange-200 shadow-lg bg-white transition-all duration-300 hover:shadow-xl">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center shadow-md">
+              <ChefHat className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-lg">{chefName}</h3>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>{items.length} item{items.length !== 1 ? 's' : ''}</span>
+                <span>•</span>
+                <span className="font-semibold">LKR {subtotal.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2 mb-4">
+            {items.map(item => (
+              <div key={item.id} className="flex items-center gap-2 text-sm p-2 bg-gray-50 rounded-md">
+                <img src={item.image_url} alt={item.menu_item_name} className="w-8 h-8 rounded-md object-cover" />
+                <div className="flex-1">
+                              <p className="font-semibold text-gray-800">{item.menu_item_name}</p>
+                  <p className="text-xs text-gray-500">x{item.quantity}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <Button onClick={onCheckout} className="w-full bg-orange-500 hover:bg-orange-600">
+            <CreditCard className="h-4 w-4 mr-2" />
+            Checkout with {chefName}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="mb-6 border-2 border-orange-200 shadow-xl hover:shadow-2xl transition-all duration-300 bg-white">
+    <Card className="mb-6 border-2 border-orange-200 shadow-xl bg-white">
       <CardContent className="p-0 overflow-hidden">
         {/* Enhanced Chef Header */}
         <div className="bg-gradient-to-r from-orange-50 via-orange-100 to-red-50 p-6 border-b border-orange-200 relative">
@@ -67,17 +108,7 @@ const ChefSection: React.FC<ChefSectionProps> = ({
                 <Badge className="bg-orange-500 text-white font-semibold px-3 py-1">
                   {items.length} item{items.length !== 1 ? 's' : ''}
                 </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    navigate(`/chef-profile/${chefId}`);
-                  }}
-                  className="text-orange-600 border-orange-300 hover:bg-orange-50 hover:border-orange-400 transition-all duration-200 px-4 py-2"
-                >
-                  <ChefHat className="h-4 w-4 mr-2" />
-                  Visit Kitchen
-                </Button>
+                
               </div>
             </div>
           </div>
@@ -161,8 +192,8 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
       {/* Enhanced Item Image */}
       <div className="w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 flex-shrink-0 shadow-md relative">
         <img
-          src={item.food_image}
-          alt={item.food_name}
+          src={item.image_url}
+          alt={item.menu_item_name}
           className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
@@ -182,7 +213,7 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
             <h4 className="font-bold text-gray-900 text-lg leading-tight mb-2">
-              {item.food_name}
+              {item.menu_item_name}
             </h4>
             
             {/* Chef Info with Icon */}
@@ -198,11 +229,11 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
             {/* Price Info */}
             <div className="flex items-center gap-3 mb-2">
               <span className="text-sm font-semibold text-orange-600">
-                LKR {item.unit_price.toFixed(2)} each
+                LKR {Number(item.unit_price).toFixed(2)} each
               </span>
               <span className="text-xs text-gray-400">•</span>
               <span className="text-xs text-gray-500">
-                {item.quantity} × LKR {item.unit_price.toFixed(2)}
+                {item.quantity} × LKR {Number(item.unit_price).toFixed(2)}
               </span>
             </div>
             
@@ -219,7 +250,7 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
           {/* Subtotal */}
           <div className="text-right ml-4">
             <p className="text-xl font-bold text-gray-900">
-              LKR {item.subtotal.toFixed(2)}
+              LKR {Number(item.subtotal).toFixed(2)}
             </p>
             <p className="text-xs text-gray-500 mt-1">
               Subtotal
@@ -288,8 +319,6 @@ const DatabaseCartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     getTotalByChef,
     getGrandTotal,
     getItemCount,
-    canCheckout,
-    getCheckoutChefId,
   } = useDatabaseCart();
   
   const navigate = useNavigate();
@@ -305,12 +334,9 @@ const DatabaseCartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     await removeItem(itemId);
   };
 
-  const handleCheckout = () => {
-    const chefId = getCheckoutChefId();
-    if (chefId) {
-      onClose();
-      navigate('/checkout', { state: { chefId } });
-    }
+  const handleCheckout = (chefId: number) => {
+    onClose();
+    navigate('/checkout');
   };
 
   const handleContinueShopping = () => {
@@ -323,6 +349,8 @@ const DatabaseCartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
       await clearCart();
     }
   };
+
+  const canCheckout = itemCount > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -337,7 +365,7 @@ const DatabaseCartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-2">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
@@ -354,241 +382,94 @@ const DatabaseCartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Single Chef - Normal Display */}
-              {chefItems.size === 1 && (
+              {chefItems.size > 1 ? (
                 <>
-                  {Array.from(chefItems.entries()).map(([chefId, chefItems]) => (
-                    <ChefSection
-                      key={chefId}
-                      chefId={chefId}
-                      chefName={chefItems[0]?.chef_name || 'Unknown Chef'}
-                      items={chefItems}
-                      subtotal={getTotalByChef(chefId)}
-                      onQuantityChange={handleQuantityChange}
-                      onRemoveItem={handleRemoveItem}
-                    />
-                  ))}
-                  
-                  {/* Single Chef Success Message */}
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center gap-2 text-green-800">
-                      <ChefHat className="h-5 w-5" />
-                      <span className="font-semibold">Ready for Checkout!</span>
-                    </div>
-                    <p className="text-sm text-green-700 mt-1">
-                      All items are from the same chef - you can proceed to checkout.
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {/* Multiple Chefs - Enhanced UI */}
-              {chefItems.size > 1 && (
-                <div className="space-y-6">
-                  {/* Enhanced Multi-Chef Header */}
-                  <div className="p-8 bg-gradient-to-r from-orange-50 via-orange-100 to-red-50 border-2 border-orange-200 rounded-2xl shadow-lg">
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center shadow-lg">
-                        <ChefHat className="h-8 w-8 text-white" />
+                  <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="h-6 w-6 text-orange-500" />
+                      <div>
+                        <h4 className="font-semibold text-orange-800">Multiple Chefs</h4>
+                        <p className="text-sm text-orange-700">
+                          You have items from {chefItems.size} different chefs. Please checkout with each chef separately.
+                        </p>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-bold text-orange-800 mb-2">Multiple Chefs Detected</h3>
-                        <p className="text-orange-700 text-lg">You have items from {chefItems.size} different chefs</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                          <span className="text-sm text-orange-600">Each chef offers unique flavors!</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-white p-6 rounded-xl border border-orange-200 shadow-sm">
-                      <div className="flex items-center gap-3 text-orange-800 mb-3">
-                        <AlertTriangle className="h-6 w-6" />
-                        <span className="font-bold text-lg">Important Notice</span>
-                      </div>
-                      <p className="text-orange-700 leading-relaxed">
-                        You can only checkout with items from one chef at a time. Choose which chef you'd like to checkout with, 
-                        or continue shopping to add more items from the same chef. Each chef will prepare and deliver your order separately.
-                      </p>
                     </div>
                   </div>
-                  
-                  {/* Enhanced Individual Chef Checkout Cards */}
-                  <div className="grid gap-6 md:grid-cols-2">
-                    {Array.from(chefItems.entries()).map(([chefId, chefItems]) => (
-                      <Card key={chefId} className="border-2 border-orange-200 hover:border-orange-400 transition-all duration-300 shadow-lg hover:shadow-xl bg-white">
-                        <CardContent className="p-6">
-                          {/* Enhanced Chef Header */}
-                          <div className="flex items-center gap-4 mb-6">
-                            <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center shadow-md">
-                              <ChefHat className="h-7 w-7 text-white" />
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-bold text-gray-900 text-xl mb-1">{chefItems[0]?.chef_name}</h4>
-                              <div className="flex items-center gap-2 mb-2">
-                                <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                                <span className="text-sm font-medium text-gray-600">4.8</span>
-                                <span className="text-gray-400">•</span>
-                                <span className="text-sm text-gray-600">{chefItems.length} item{chefItems.length !== 1 ? 's' : ''}</span>
-                              </div>
-                              <p className="text-xs text-gray-500">{chefItems[0]?.kitchen_address}</p>
-                            </div>
-                            <Badge className="bg-orange-500 text-white font-semibold px-3 py-1">
-                              {chefItems.length} items
-                            </Badge>
-                          </div>
-                          
-                          {/* Items Preview */}
-                          <div className="space-y-2 mb-4">
-                            {chefItems.slice(0, 3).map((item) => (
-                              <div key={item.id} className="flex items-center gap-2 text-sm">
-                                <div className="w-6 h-6 rounded overflow-hidden bg-gray-100">
-                                  <img
-                                    src={item.food_image}
-                                    alt={item.food_name}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      target.src = '/placeholder-food.jpg';
-                                    }}
-                                  />
-                                </div>
-                                <span className="flex-1 truncate">{item.food_name}</span>
-                                <span className="text-orange-600 font-medium">x{item.quantity}</span>
-                              </div>
-                            ))}
-                            {chefItems.length > 3 && (
-                              <p className="text-xs text-gray-500 text-center">
-                                +{chefItems.length - 3} more item{chefItems.length - 3 !== 1 ? 's' : ''}
-                              </p>
-                            )}
-                          </div>
-                          
-                          {/* Total and Actions */}
-                          <div className="border-t border-gray-200 pt-4">
-                            <div className="flex justify-between items-center mb-4">
-                              <span className="font-semibold text-gray-900">Subtotal</span>
-                              <span className="text-xl font-bold text-orange-600">
-                                LKR {getTotalByChef(chefId).toFixed(2)}
-                              </span>
-                            </div>
-                            
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  onClose();
-                                  navigate(`/chef-profile/${chefId}`);
-                                }}
-                                className="flex-1 text-orange-600 border-orange-300 hover:bg-orange-50"
-                              >
-                                <ChefHat className="h-4 w-4 mr-2" />
-                                Visit Kitchen
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  // Show confirmation dialog for chef-specific checkout
-                                  const confirmCheckout = window.confirm(
-                                    `Checkout with ${chefItems[0]?.chef_name}?\n\nThis will:\n• Remove items from other chefs\n• Proceed to checkout with only ${chefItems[0]?.chef_name}'s items\n• Total: LKR ${getTotalByChef(chefId).toFixed(2)}\n\nContinue?`
-                                  );
-                                  
-                                  if (confirmCheckout) {
-                                    // Filter cart to only this chef's items
-                                    const otherChefItems = items.filter(item => item.chef_id !== chefId);
-                                    otherChefItems.forEach(item => removeItem(item.id));
-                                    onClose();
-                                    navigate('/checkout', { state: { chefId, chefName: chefItems[0]?.chef_name } });
-                                  }
-                                }}
-                                className="flex-1 bg-orange-500 hover:bg-orange-600"
-                              >
-                                <CreditCard className="h-4 w-4 mr-2" />
-                                Checkout This Chef
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {Array.from(chefItems.entries()).map(([chefId, chefItemsList]) => (
+                      <ChefSection
+                        key={chefId}
+                        chefId={chefId}
+                        chefName={chefItemsList[0]?.chef_name || 'Unknown Chef'}
+                        items={chefItemsList}
+                        subtotal={getTotalByChef(chefId)}
+                        onQuantityChange={handleQuantityChange}
+                        onRemoveItem={handleRemoveItem}
+                        isMultiChef={true}
+                        onCheckout={() => handleCheckout(chefId)}
+                      />
                     ))}
                   </div>
-                  
-                  {/* Continue Shopping Option */}
-                  <div className="text-center">
-                    <Button
-                      variant="outline"
-                      onClick={handleContinueShopping}
-                      className="text-orange-600 border-orange-300 hover:bg-orange-50"
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Continue Shopping
-                    </Button>
-                  </div>
-                </div>
+                </>
+              ) : (
+                Array.from(chefItems.entries()).map(([chefId, chefItemsList]) => (
+                  <ChefSection
+                    key={chefId}
+                    chefId={chefId}
+                    chefName={chefItemsList[0]?.chef_name || 'Unknown Chef'}
+                    items={chefItemsList}
+                    subtotal={getTotalByChef(chefId)}
+                    onQuantityChange={handleQuantityChange}
+                    onRemoveItem={handleRemoveItem}
+                    onCheckout={() => handleCheckout(chefId)}
+                  />
+                ))
               )}
             </div>
           )}
         </div>
 
-        {/* Cart Summary & Actions */}
         {itemCount > 0 && (
-          <>
-            <Separator />
-            <div className="space-y-4">
-              {/* Grand Total */}
-              <div className="flex justify-between items-center text-xl font-bold">
-                <span>Total</span>
-                <span className="text-orange-600">LKR {grandTotal.toFixed(2)}</span>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3">
+          <div className="p-6 border-t border-gray-200 bg-gray-50">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-4">
                 <Button
                   variant="outline"
                   onClick={handleContinueShopping}
-                  className="flex-1"
+                  className="w-full sm:w-auto"
                 >
                   Continue Shopping
                 </Button>
-                
-                {canCheckout() ? (
-                  <Button
-                    onClick={() => {
-                      const chefName = items[0]?.chef_name || 'Unknown Chef';
-                      const confirmCheckout = window.confirm(
-                        `Proceed to checkout with ${chefName}?\n\nTotal: LKR ${grandTotal.toFixed(2)}\n\nContinue?`
-                      );
-                      
-                      if (confirmCheckout) {
-                        handleCheckout();
-                      }
-                    }}
-                    className="flex-1 bg-orange-500 hover:bg-orange-600"
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Proceed to Checkout
-                  </Button>
-                ) : (
-                  <Button
-                    disabled
-                    className="flex-1 bg-gray-300 text-gray-500 cursor-not-allowed"
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Multiple Chefs - Use Options Above
-                  </Button>
-                )}
-                
                 <Button
                   variant="destructive"
                   onClick={handleClearCart}
-                  className="px-4"
+                  className="w-full sm:w-auto"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear Cart
                 </Button>
               </div>
+
+              <div className="w-full sm:w-auto flex flex-col items-end gap-2">
+                <div className="text-right">
+                  <span className="text-sm text-gray-600">Total</span>
+                  <p className="text-2xl font-bold text-gray-900">
+                    LKR {grandTotal.toFixed(2)}
+                  </p>
+                </div>
+                {chefItems.size === 1 && (
+                  <Button
+                    onClick={() => handleCheckout(Array.from(chefItems.keys())[0])}
+                    disabled={loading}
+                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <CreditCard className="h-5 w-5 mr-2" />
+                    Checkout
+                  </Button>
+                )}
+              </div>
             </div>
-          </>
+          </div>
         )}
       </DialogContent>
     </Dialog>

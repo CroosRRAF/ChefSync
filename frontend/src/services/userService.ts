@@ -88,7 +88,8 @@ class UserService {
   // Profile Management Methods
   async getUserProfile(): Promise<CookProfileResponse> {
     try {
-      const response = await fetch(`${this.apiUrl}/auth/cook-profile/`, {
+      // Use general profile endpoint that works for all user roles
+      const response = await fetch(`${this.apiUrl}/auth/profile/`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
@@ -107,6 +108,47 @@ class UserService {
 
   async updateUserProfile(profileData: ProfileUpdateData): Promise<User> {
     try {
+      // Use general profile update endpoint that works for all user roles
+      const response = await fetch(`${this.apiUrl}/auth/profile/update/`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(profileData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.user || data;
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    }
+  }
+
+  // Cook-specific profile methods
+  async getCookProfile(): Promise<CookProfileResponse> {
+    try {
+      const response = await fetch(`${this.apiUrl}/auth/cook-profile/`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching cook profile:', error);
+      throw error;
+    }
+  }
+
+  async updateCookProfile(profileData: ProfileUpdateData): Promise<User> {
+    try {
       const response = await fetch(`${this.apiUrl}/auth/cook-profile/update/`, {
         method: 'PATCH',
         headers: this.getAuthHeaders(),
@@ -120,13 +162,15 @@ class UserService {
       const data = await response.json();
       return data.profile || data;
     } catch (error) {
-      console.error('Error updating user profile:', error);
+      console.error('Error updating cook profile:', error);
       throw error;
     }
   }
 
   async deleteUserAccount(): Promise<void> {
     try {
+      // For now, keep using cook-profile endpoint for deletion
+      // This should be changed to a general user deletion endpoint
       const response = await fetch(`${this.apiUrl}/auth/cook-profile/delete/`, {
         method: 'DELETE',
         headers: this.getAuthHeaders(),

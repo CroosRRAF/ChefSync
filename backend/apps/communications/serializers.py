@@ -7,6 +7,7 @@ from .models import (
     CommunicationResponse,
     CommunicationTag,
     CommunicationTemplate,
+    Notification,
 )
 
 
@@ -170,3 +171,53 @@ class CommunicationListSerializer(serializers.ModelSerializer):
 
     def get_response_count(self, obj):
         return obj.responses.count()
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    """Serializer for user notifications"""
+    
+    user_name = serializers.SerializerMethodField()
+    time_ago = serializers.SerializerMethodField()
+    is_unread = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Notification
+        fields = [
+            'notification_id',
+            'subject',
+            'message',
+            'time',
+            'status',
+            'user',
+            'user_name',
+            'time_ago',
+            'is_unread'
+        ]
+        read_only_fields = ['notification_id', 'time', 'user']
+    
+    def get_user_name(self, obj):
+        return obj.user.name if obj.user and obj.user.name else (obj.user.username if obj.user else 'Unknown')
+    
+    def get_time_ago(self, obj):
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        diff = now - obj.time
+        
+        if diff < timedelta(minutes=1):
+            return 'Just now'
+        elif diff < timedelta(hours=1):
+            minutes = int(diff.total_seconds() / 60)
+            return f'{minutes}m ago'
+        elif diff < timedelta(days=1):
+            hours = int(diff.total_seconds() / 3600)
+            return f'{hours}h ago'
+        elif diff < timedelta(days=7):
+            days = diff.days
+            return f'{days}d ago'
+        else:
+            return obj.time.strftime('%b %d, %Y')
+    
+    def get_is_unread(self, obj):
+        return obj.status == 'Unread'

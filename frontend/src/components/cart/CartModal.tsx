@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, ChefHat, MapPin, Clock, CreditCard } from 'lucide-react';
-import { useDatabaseCart } from '@/context/DatabaseCartContext';
-import { CartItem } from '@/types/customer';
+import { useDatabaseCart, DatabaseCartItem } from '@/context/DatabaseCartContext';
 import ItemComponent from './ItemComponent';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,10 +16,10 @@ interface CartModalProps {
 interface CookSectionProps {
   chefId: number;
   chefName: string;
-  items: CartItem[];
+  items: DatabaseCartItem[];
   subtotal: number;
-  onQuantityChange: (itemId: string, quantity: number) => void;
-  onRemoveItem: (itemId: string) => void;
+  onQuantityChange: (itemId: number, quantity: number) => void;
+  onRemoveItem: (itemId: number) => void;
 }
 
 const CookSection: React.FC<CookSectionProps> = ({
@@ -103,8 +102,6 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     getTotalByChef, 
     getGrandTotal, 
     getItemCount,
-    canCheckout,
-    getCheckoutChefId,
   } = useDatabaseCart();
   const navigate = useNavigate();
 
@@ -112,11 +109,11 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
   const itemCount = getItemCount();
   const grandTotal = getGrandTotal();
 
-  const handleQuantityChange = (itemId: string, quantity: number) => {
+  const handleQuantityChange = (itemId: number, quantity: number) => {
     updateQuantity(itemId, quantity);
   };
 
-  const handleRemoveItem = (itemId: string) => {
+  const handleRemoveItem = (itemId: number) => {
     removeItem(itemId);
   };
 

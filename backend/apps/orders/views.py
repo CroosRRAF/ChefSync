@@ -170,6 +170,7 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
     time_since_order = serializers.SerializerMethodField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     total_items = serializers.SerializerMethodField()
+    items = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -183,14 +184,13 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "customer_name",
-            "chef",
-            "delivery_partner",
-            "items",
+            "chef_name",
             "time_since_order",
             "total_items",
             "delivery_address",
             "customer_notes",
             "chef_notes",
+            "items",
         ]
 
     def get_customer_name(self, obj):
@@ -202,7 +202,7 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
             )
         return "Unknown Customer"
 
-    def get_chef(self, obj):
+    def get_chef_name(self, obj):
         if obj.chef:
             return obj.chef.get_full_name() or obj.chef.name or obj.chef.username
         return "Unknown Chef"
@@ -226,47 +226,78 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
 
     def get_items(self, obj):
         items = []
-        for order_item in obj.items.select_related("price__food", "price__cook").all():
-            # Get food name with proper fallbacks
-            food_name = order_item.food_name
-            if not food_name and order_item.price and order_item.price.food:
-                food_name = order_item.price.food.name
-            if not food_name:
-                food_name = "Unknown Food"
+        try:
+            for order_item in obj.items.select_related("price__food", "price__cook").all():
+                try:
+                    # Get food name with proper fallbacks
+                    food_name = order_item.food_name
+                    if not food_name and order_item.price and order_item.price.food:
+                        food_name = order_item.price.food.name
+                    if not food_name:
+                        food_name = "Unknown Food"
 
-            # Get food description with proper fallbacks
-            food_description = order_item.food_description
-            if not food_description and order_item.price and order_item.price.food:
-                food_description = order_item.price.food.description or ""
+                    # Get food description with proper fallbacks
+                    food_description = order_item.food_description or ""
+                    if not food_description and order_item.price and order_item.price.food:
+                        food_description = getattr(order_item.price.food, 'description', "") or ""
 
-            # Get food image with proper fallbacks
-            food_image = None
-            if order_item.price:
-                if order_item.price.image_url:
-                    food_image = order_item.price.image_url
-                elif order_item.price.food and order_item.price.food.image_url:
-                    food_image = order_item.price.food.image_url
+                    # Get food image with proper fallbacks
+                    food_image = None
+                    try:
+                        if order_item.price:
+                            if hasattr(order_item.price, 'image_url') and order_item.price.image_url:
+                                food_image = str(order_item.price.image_url)
+                            elif order_item.price.food:
+                                if hasattr(order_item.price.food, 'image_url') and order_item.price.food.image_url:
+                                    food_image = str(order_item.price.food.image_url)
+                                elif hasattr(order_item.price.food, 'image') and order_item.price.food.image:
+                                    food_image = str(order_item.price.food.image.url) if order_item.price.food.image else None
+                    except Exception:
+                        food_image = None
 
-            # Get cook name with proper fallbacks
-            cook_name = "Unknown Cook"
-            if order_item.price and order_item.price.cook:
-                cook = order_item.price.cook
-                cook_name = cook.get_full_name() or cook.name or cook.username
+                    # Get cook name with proper fallbacks
+                    cook_name = "Unknown Cook"
+                    try:
+                        if order_item.price and order_item.price.cook:
+                            cook = order_item.price.cook
+                            cook_name = getattr(cook, 'name', None) or cook.get_full_name() or cook.username
+                    except Exception:
+                        cook_name = "Unknown Cook"
 
-            items.append(
-                {
-                    "id": order_item.order_item_id,
-                    "quantity": order_item.quantity or 0,
-                    "unit_price": float(order_item.unit_price or 0),
-                    "total_price": float(order_item.total_price or 0),
-                    "special_instructions": order_item.special_instructions or "",
-                    "food_name": food_name,
-                    "food_description": food_description,
-                    "food_image": food_image,
-                    "size": order_item.price.size if order_item.price else "Medium",
-                    "cook_name": cook_name,
-                }
-            )
+                    # Get size with fallback
+                    size = "Medium"
+                    try:
+                        if order_item.price and hasattr(order_item.price, 'size'):
+                            size = order_item.price.size
+                    except Exception:
+                        pass
+
+                    items.append(
+                        {
+                            "id": order_item.order_item_id,
+                            "quantity": int(order_item.quantity or 0),
+                            "unit_price": float(order_item.unit_price or 0),
+                            "total_price": float(order_item.total_price or 0),
+                            "special_instructions": str(order_item.special_instructions or ""),
+                            "food_name": food_name,
+                            "food_description": food_description,
+                            "food_image": food_image,
+                            "size": size,
+                            "cook_name": cook_name,
+                        }
+                    )
+                except Exception as item_error:
+                    # Log the error but continue processing other items
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error processing order item {order_item.order_item_id}: {str(item_error)}")
+                    continue
+        except Exception as e:
+            # Log the error and return empty list
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting items for order {obj.id}: {str(e)}")
+        
         return items
 
 
@@ -454,6 +485,15 @@ class OrderViewSet(viewsets.ModelViewSet):
             notes=order.chef_notes,
         )
 
+        # Send notification to customer
+        try:
+            from apps.communications.services.order_notification_service import OrderNotificationService
+            OrderNotificationService.notify_order_confirmed(order)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send order confirmation notification: {str(e)}")
+
         return Response(
             {"success": "Order accepted successfully", "status": "confirmed"}
         )
@@ -495,6 +535,15 @@ class OrderViewSet(viewsets.ModelViewSet):
             changed_by=request.user,
             notes=order.chef_notes,
         )
+
+        # Send notification to customer
+        try:
+            from apps.communications.services.order_notification_service import OrderNotificationService
+            OrderNotificationService.notify_order_rejected(order, reason=rejection_reason)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send order rejection notification: {str(e)}")
 
         return Response(
             {"success": "Order rejected successfully", "status": "cancelled"}
@@ -1291,87 +1340,10 @@ def calculate_checkout(request):
 def place_order(request):
     """Place a comprehensive order with delivery address reference and distance-based fee"""
     try:
-        cart_items = request.data.get("cart_items", [])
-        customer_location = request.data.get("customer_location", {})
-        payment_method = request.data.get("payment_method", "cash")
-        special_instructions = request.data.get("special_instructions", "")
-
-        if not cart_items:
-            return Response(
-                {"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Create order
-        import uuid
-
-        order = Order.objects.create(
-            customer=request.user,
-            chef=None,  # Will be set based on first item
-            order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
-            status="pending",
-            payment_method=payment_method,
-            special_instructions=special_instructions,
-            delivery_address=customer_location.get("formatted_address", ""),
-            delivery_latitude=customer_location.get("latitude"),
-            delivery_longitude=customer_location.get("longitude"),
-        )
-
-        # Process cart items
-        for item_data in cart_items:
-            try:
-                food_price = FoodPrice.objects.select_related("food", "cook").get(
-                    id=item_data["price_id"]
-                )
-
-                # Set chef for order (from first item)
-                if not order.chef:
-                    order.chef = food_price.cook
-                    order.save()
-
-                # Create order item
-                OrderItem.objects.create(
-                    order=order,
-                    price=food_price,
-                    quantity=item_data["quantity"],
-                )
-
-            except FoodPrice.DoesNotExist:
-                # Clean up if error
-                order.delete()
-                return Response(
-                    {"error": f'Price with ID {item_data["price_id"]} not found'},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-        # Calculate totals
-        # Compute totals using OrderItem.total_price (model computes on save)
-        items_qs = OrderItem.objects.filter(order=order)
-        subtotal = sum((item.total_price or Decimal("0.00")) for item in items_qs)
-        # Ensure Decimal type even when empty
-        subtotal = sum(
-            ((item.total_price or Decimal("0.00")) for item in items_qs),
-            start=Decimal("0.00"),
-        )
-        delivery_fee = Decimal("15.00")
-        tax_amount = subtotal * Decimal("0.08")
-        total_amount = subtotal + delivery_fee + tax_amount
-
-        # Update order totals
-        order.subtotal = subtotal
-        order.delivery_fee = delivery_fee
-        order.tax_amount = tax_amount
-        order.total_amount = total_amount
-        order.save()
-
-        # Create initial status history
-        OrderStatusHistory.objects.create(
-            order=order,
-            status="pending",
-            changed_by=request.user,
-            notes="Order placed successfully",
-        )
+        order_type = request.data.get('order_type', 'delivery')  # 'delivery' or 'pickup'
         delivery_address_id = request.data.get('delivery_address_id')
         delivery_instructions = request.data.get('delivery_instructions', '')
+        customer_notes = request.data.get('customer_notes', '')
         payment_method = request.data.get('payment_method', 'cash')
         phone = request.data.get('phone', '')
         delivery_fee = request.data.get('delivery_fee', 0)
@@ -1379,28 +1351,45 @@ def place_order(request):
         tax_amount = request.data.get('tax_amount', 0)
         total_amount = request.data.get('total_amount', 0)
 
-        # Validate required fields
-        if not delivery_address_id:
-            return Response({'error': 'Delivery address is required'}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate required fields - address only required for delivery
+        if order_type == 'delivery' and not delivery_address_id:
+            return Response({'error': 'Delivery address is required for delivery orders'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get cart items for the user (CartItem uses 'customer' FK)
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"🛒 Fetching cart for user: {request.user} (ID: {request.user.id if request.user else 'None'})")
+        
         cart_items = (
             CartItem.objects
             .filter(customer=request.user)
             .select_related('price__food', 'price__cook')
         )
-
+        
+        logger.info(f"🛒 Cart items count: {cart_items.count()}")
+        
         if not cart_items.exists():
+            # Check if cart items exist without customer filter to debug
+            all_cart_count = CartItem.objects.count()
+            logger.error(f"❌ Cart is empty for user {request.user.id}. Total cart items in DB: {all_cart_count}")
             return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Get delivery address from users app
-        try:
-            from apps.users.models import Address
-            delivery_address = Address.objects.get(id=delivery_address_id, user=request.user)
-        except Address.DoesNotExist:
-            return Response({
-                'error': 'Delivery address not found'
-            }, status=status.HTTP_404_NOT_FOUND)
+        # Get delivery address from orders app (only for delivery orders)
+        delivery_address = None
+        if order_type == 'delivery':
+            try:
+                # UserAddress is from the orders app, not users app
+                delivery_address = UserAddress.objects.get(id=delivery_address_id, user=request.user)
+                logger.info(f"✅ Found delivery address: {delivery_address.label} - {delivery_address.city}")
+            except UserAddress.DoesNotExist:
+                logger.error(f"❌ Delivery address ID {delivery_address_id} not found for user {request.user.id}")
+                # List all addresses for this user for debugging
+                user_addresses = UserAddress.objects.filter(user=request.user)
+                logger.error(f"Available addresses for user: {list(user_addresses.values_list('id', 'label'))}")
+                return Response({
+                    'error': 'Delivery address not found'
+                }, status=status.HTTP_404_NOT_FOUND)
         
         # Get chef from first cart item
         first_item = cart_items.first()
@@ -1411,26 +1400,27 @@ def place_order(request):
                 'error': 'Chef information not found'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Get chef's kitchen location
-        chef_lat, chef_lng = _resolve_chef_location(chef, request.data)
-        
-        # Calculate distance if both coordinates available
+        # Get chef's kitchen location and calculate distance (only for delivery)
         distance_km = None
-        if chef_lat and chef_lng and delivery_address.latitude and delivery_address.longitude:
-            from math import radians, sin, cos, sqrt, atan2
+        if order_type == 'delivery' and delivery_address:
+            chef_lat, chef_lng = _resolve_chef_location(chef, request.data)
             
-            def haversine_distance(lat1, lon1, lat2, lon2):
-                R = 6371  # Earth's radius in km
-                lat1, lon1, lat2, lon2 = map(radians, [float(lat1), float(lon1), float(lat2), float(lon2)])
-                dlat = lat2 - lat1
-                dlon = lon2 - lon1
-                a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-                c = 2 * atan2(sqrt(a), sqrt(1-a))
-                return R * c
-            
-            distance_km = haversine_distance(chef_lat, chef_lng, 
-                                            delivery_address.latitude, 
-                                            delivery_address.longitude)
+            # Calculate distance if both coordinates available
+            if chef_lat and chef_lng and delivery_address.latitude and delivery_address.longitude:
+                from math import radians, sin, cos, sqrt, atan2
+                
+                def haversine_distance(lat1, lon1, lat2, lon2):
+                    R = 6371  # Earth's radius in km
+                    lat1, lon1, lat2, lon2 = map(radians, [float(lat1), float(lon1), float(lat2), float(lon2)])
+                    dlat = lat2 - lat1
+                    dlon = lon2 - lon1
+                    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+                    c = 2 * atan2(sqrt(a), sqrt(1-a))
+                    return R * c
+                
+                distance_km = haversine_distance(chef_lat, chef_lng, 
+                                                delivery_address.latitude, 
+                                                delivery_address.longitude)
         
         # Create order
         import uuid
@@ -1438,18 +1428,23 @@ def place_order(request):
             customer=request.user,
             chef=chef,
             order_number=f'ORD-{uuid.uuid4().hex[:8].upper()}',
-            status='confirmed',
+            status='pending',  # Order starts as pending, waiting for chef approval
             payment_method=payment_method,
             payment_status='pending',
             subtotal=Decimal(str(subtotal)),
             tax_amount=Decimal(str(tax_amount)),
             delivery_fee=Decimal(str(delivery_fee)),
             total_amount=Decimal(str(total_amount)),
-            delivery_address_new=delivery_address,
-            delivery_instructions=delivery_instructions,
-            customer_notes=delivery_instructions,
+            delivery_address_ref=delivery_address,  # UserAddress FK reference
+            delivery_address=f"{delivery_address.address_line1}, {delivery_address.city}" if delivery_address else "Pickup",
+            delivery_latitude=delivery_address.latitude if delivery_address else None,
+            delivery_longitude=delivery_address.longitude if delivery_address else None,
+            delivery_instructions=delivery_instructions if order_type == 'delivery' else '',
+            customer_notes=customer_notes or delivery_instructions,
             distance_km=Decimal(str(distance_km)) if distance_km else None
         )
+        
+        logger.info(f"✅ Order {order.order_number} created successfully with status 'pending' for user {request.user.username}")
         
         # Create order items from cart
         for cart_item in cart_items:
@@ -1469,10 +1464,20 @@ def place_order(request):
         # Create initial status history
         OrderStatusHistory.objects.create(
             order=order,
-            status='confirmed',
+            status='pending',  # Initial status is pending
             changed_by=request.user,
-            notes="Order placed successfully",
+            notes="Order placed successfully. Waiting for chef approval.",
         )
+
+        # Create notifications
+        try:
+            from apps.communications.services.order_notification_service import OrderNotificationService
+            # Notify customer
+            OrderNotificationService.notify_customer_order_placed(order)
+            # Notify chef
+            OrderNotificationService.notify_chef_new_order(order)
+        except Exception as e:
+            logger.error(f"Failed to send order notifications: {str(e)}")
 
         return Response(
             {

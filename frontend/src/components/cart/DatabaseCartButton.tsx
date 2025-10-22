@@ -2,14 +2,21 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
 import { useDatabaseCart } from '@/context/DatabaseCartContext';
+import { useAuth } from '@/context/AuthContext';
 import DatabaseCartModal from './DatabaseCartModal';
 
 const DatabaseCartButton: React.FC = () => {
   const { getItemCount, getGrandTotal, loading } = useDatabaseCart();
+  const { isAuthenticated } = useAuth();
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
 
   const itemCount = getItemCount();
   const grandTotal = getGrandTotal();
+
+  // Don't render cart button if user is not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleClick = () => {
     setIsCartModalOpen(true);

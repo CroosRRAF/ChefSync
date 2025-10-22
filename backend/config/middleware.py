@@ -49,9 +49,16 @@ class DisableCSRFMiddleware(MiddlewareMixin):
         if settings.DEBUG:
             # List of URL patterns to exempt from CSRF
             csrf_exempt_patterns = getattr(settings, "CSRF_EXEMPT_URLS", [])
+            
+            # Debug logging
+            print(f"🔍 CSRF Check - Request path: {request.path}")
+            print(f"🔍 CSRF Check - Patterns: {csrf_exempt_patterns}")
 
             for pattern in csrf_exempt_patterns:
                 if re.match(pattern, request.path):
+                    print(f"✅ CSRF Exempted for path: {request.path}")
                     setattr(request, "_dont_enforce_csrf_checks", True)
                     break
+            else:
+                print(f"❌ CSRF NOT exempted for path: {request.path}")
         return None

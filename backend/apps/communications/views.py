@@ -19,6 +19,7 @@ from .models import (
     CommunicationTag,
     CommunicationTagRelation,
     CommunicationTemplate,
+    Notification,
 )
 from .serializers import (
     CommunicationCategorySerializer,
@@ -27,6 +28,7 @@ from .serializers import (
     CommunicationSerializer,
     CommunicationTagSerializer,
     CommunicationTemplateSerializer,
+    NotificationSerializer,
 )
 
 
@@ -1417,3 +1419,52 @@ class CommunicationTagViewSet(viewsets.ModelViewSet):
             ip_address=self.request.META.get("REMOTE_ADDR"),
             user_agent=self.request.META.get("HTTP_USER_AGENT"),
         )
+
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing user notifications"""
+    
+    queryset = Notification.objects.all()
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter notifications to only show the current user's notifications"""
+        return Notification.objects.filter(user=self.request.user).order_by('-time')
+    
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        """Get count of unread notifications"""
+        count = self.get_queryset().filter(status='Unread').count()
+        return Response({'count': count})
+    
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark a notification as read"""
+        notification = self.get_object()
+        notification.status = 'Read'
+        notification.save()
+        return Response({'message': 'Notification marked as read'})
+    
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        """Mark all notifications as read"""
+        updated = self.get_queryset().filter(status='Unread').update(status='Read')
+        return Response({'message': f'Marked {updated} notifications as read', 'count': updated})
+    
+    @action(detail=False, methods=['delete'])
+    def clear_all(self, request):
+        """Clear all notifications for the current user"""
+        deleted = self.get_queryset().delete()[0]
+        return Response({'message': f'Deleted {deleted} notifications', 'count': deleted})
+    
+    @action(detail=False, methods=['get'])
+    def recent(self, request):
+        """Get recent notifications (last 20)"""
+        recent_notifications = self.get_queryset()[:20]
+        serializer = self.get_serializer(recent_notifications, many=True)
+        return Response({
+            'results': serializer.data,
+            'count': recent_notifications.count(),
+            'unread_count': self.get_queryset().filter(status='Unread').count()
+        })

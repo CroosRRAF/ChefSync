@@ -3,12 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Minus, Plus, Trash2, ChefHat, Star } from 'lucide-react';
-import { CartItem } from '@/types/customer';
+import { DatabaseCartItem } from '@/context/DatabaseCartContext';
 
 interface ItemComponentProps {
-  item: CartItem;
-  onQuantityChange: (itemId: string, quantity: number) => void;
-  onRemove: (itemId: string) => void;
+  item: DatabaseCartItem;
+  onQuantityChange: (itemId: number, quantity: number) => void;
+  onRemove: (itemId: number) => void;
 }
 
 const ItemComponent: React.FC<ItemComponentProps> = ({ 
@@ -33,8 +33,8 @@ const ItemComponent: React.FC<ItemComponentProps> = ({
           {/* Enhanced Item Image */}
           <div className="w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 flex-shrink-0 shadow-md relative">
             <img
-              src={item.food_image}
-              alt={item.food_name}
+              src={item.image_url}
+              alt={item.menu_item_name}
               className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -54,7 +54,7 @@ const ItemComponent: React.FC<ItemComponentProps> = ({
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1">
                 <h4 className="font-bold text-gray-900 text-lg leading-tight mb-1">
-                  {item.food_name}
+                  {item.menu_item_name}
                 </h4>
                 
                 {/* Chef Info with Icon */}
