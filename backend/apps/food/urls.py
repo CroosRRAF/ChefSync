@@ -11,9 +11,10 @@ router.register(r'cuisines', views.CuisineViewSet, basename='cuisines')
 router.register(r'categories', views.FoodCategoryViewSet, basename='categories')
 router.register(r'reviews', views.FoodReviewViewSet, basename='reviews')
 
-# Bulk Menu Management URLs
-router.register(r'bulk-menus', views.BulkMenuViewSet, basename='bulk-menus')
-router.register(r'bulk-menu-items', views.BulkMenuItemViewSet, basename='bulk-menu-items')
+# Bulk Menu Management URLs - Temporarily disabled due to implementation issues
+# TODO: Implement BulkMenuViewSet and BulkMenuItemViewSet properly
+# router.register(r'bulk-menus', views.BulkMenuViewSet, basename='bulk-menus')
+# router.register(r'bulk-menu-items', views.BulkMenuItemViewSet, basename='bulk-menu-items')
 router.register(r'offers', views.OfferViewSet, basename='offers')
 
 # Admin approval endpoints

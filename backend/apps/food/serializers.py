@@ -4,7 +4,7 @@ import uuid
 from rest_framework import serializers
 from utils.cloudinary_utils import get_optimized_url, upload_image_to_cloudinary
 
-from .models import Cuisine, Food, FoodCategory, FoodPrice, FoodReview, Offer
+from .models import BulkMenu, Cuisine, Food, FoodCategory, FoodPrice, FoodReview, Offer
 
 
 class CuisineSerializer(serializers.ModelSerializer):
@@ -669,3 +669,42 @@ class OfferSerializer(serializers.ModelSerializer):
         from django.utils import timezone
 
         return obj.valid_until >= timezone.now().date()
+
+
+class BulkMenuSerializer(serializers.ModelSerializer):
+    """Serializer for BulkMenu model"""
+    chef_name = serializers.CharField(source="chef.username", read_only=True)
+    approved_by_name = serializers.CharField(source="approved_by.username", read_only=True)
+    delivery_fee = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BulkMenu
+        fields = [
+            "id",
+            "chef",
+            "chef_name",
+            "meal_type",
+            "menu_name",
+            "description",
+            "base_price_per_person",
+            "availability_status",
+            "approval_status",
+            "approved_by",
+            "approved_by_name",
+            "approved_at",
+            "rejection_reason",
+            "min_persons",
+            "max_persons",
+            "advance_notice_days",
+            "delivery_fee",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["chef", "approved_by", "approved_at", "created_at", "updated_at"]
+
+    def get_delivery_fee(self, obj):
+        """Calculate delivery fee based on service area and group size"""
+        # Basic delivery fee calculation
+        base_fee = 100  # Base delivery fee in rupees
+        # You can customize this logic based on your business requirements
+        return base_fee

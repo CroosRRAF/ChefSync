@@ -104,6 +104,13 @@ export const useOrderService = () => {
     createOrder,
     cancelOrder,
     getOrderStatus,
+    // Bulk order methods
+    loadBulkOrders: orderService.loadBulkOrders,
+    loadBulkOrderStats: orderService.loadBulkOrderStats,
+    acceptBulkOrder: orderService.acceptBulkOrder,
+    declineBulkOrder: orderService.declineBulkOrder,
+    requestCollaboration: orderService.requestCollaboration,
+    loadAvailableChefs: orderService.loadAvailableChefs,
     // Direct service methods
     calculateDeliveryFee: orderService.calculateDeliveryFee,
     calculateTax: orderService.calculateTax,

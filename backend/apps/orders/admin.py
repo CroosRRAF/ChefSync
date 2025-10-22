@@ -37,19 +37,19 @@ class DeliveryAdmin(admin.ModelAdmin):
 # Register BulkOrder models
 @admin.register(BulkOrder)
 class BulkOrderAdmin(admin.ModelAdmin):
-    list_display = ['bulk_order_id', 'status', 'total_quantity', 'created_by', 'created_at', 'deadline']
-    list_filter = ['status', 'created_at', 'deadline']
-    search_fields = ['bulk_order_id', 'description', 'created_by__username']
+    list_display = ['bulk_order_id', 'status', 'total_amount', 'created_by', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['bulk_order_id', 'notes', 'created_by__username']
     readonly_fields = ['bulk_order_id', 'created_at', 'updated_at']
     date_hierarchy = 'created_at'
     autocomplete_fields = ['created_by']
     
     fieldsets = (
         ('Order Information', {
-            'fields': ('bulk_order_id', 'status', 'total_quantity')
+            'fields': ('bulk_order_id', 'status', 'total_amount')
         }),
         ('Details', {
-            'fields': ('description', 'deadline', 'created_by', 'order')
+            'fields': ('notes', 'created_by', 'order')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -63,7 +63,7 @@ class BulkOrderAdmin(admin.ModelAdmin):
 
 @admin.register(BulkOrderAssignment)
 class BulkOrderAssignmentAdmin(admin.ModelAdmin):
-    list_display = ['id', 'bulk_order', 'chef', 'get_bulk_order_status']
+    list_display = ['assignment_id', 'bulk_order', 'chef', 'get_bulk_order_status']
     list_filter = ['bulk_order__status']
     search_fields = ['bulk_order__bulk_order_id', 'chef__username', 'chef__email']
     autocomplete_fields = ['chef']

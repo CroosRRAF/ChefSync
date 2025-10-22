@@ -54,6 +54,78 @@ export interface OrderResponse {
   created_at?: string;
 }
 
+// Bulk Order types - updated to match backend model
+export interface BulkOrder {
+  id: number;
+  order_number: string;
+  customer_name: string;
+  event_type: string;
+  event_date?: string;
+  status: 'pending' | 'confirmed' | 'preparing' | 'completed' | 'cancelled' | 'accepted' | 'declined' | 'collaborating';
+  total_amount: string | number;
+  total_quantity?: number;
+  description?: string;
+  items?: BulkOrderItem[];
+  collaborators?: BulkOrderCollaborator[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface BulkOrderItem {
+  id: number;
+  food_name: string;
+  quantity: number;
+  special_instructions?: string;
+}
+
+export interface BulkOrderCollaborator {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+}
+
+export interface BulkOrderAssignment {
+  id: number;
+  chef: {
+    id: number;
+    name: string;
+    username: string;
+  };
+  status: string;
+  assigned_at: string;
+}
+
+export interface BulkOrderFilters {
+  status?: string;
+  search?: string;
+  event_date_from?: string;
+  event_date_to?: string;
+}
+
+export interface BulkOrderStats {
+  pending: number;
+  confirmed: number;
+  preparing: number;
+  completed: number;
+  total_revenue: string;
+  total_orders: number;
+}
+
+export interface CollaborationRequest {
+  chef_ids: number[];
+  message?: string;
+}
+
+export interface ChefCollaborator {
+  id: number;
+  name: string;
+  username: string;
+  profile_image?: string;
+  rating: number;
+  specialties: string[];
+}
+
 class OrderService {
   private baseUrl = '/api/orders';
 
@@ -328,6 +400,101 @@ class OrderService {
     console.log(`Approximate distance: ${distance.toFixed(2)} km`);
     
     return orderData;
+  }
+
+  // Bulk Order Methods
+  
+  /**
+   * Load bulk orders with filters
+   */
+  async loadBulkOrders(filters: BulkOrderFilters = {}): Promise<BulkOrder[]> {
+    try {
+      const params = new URLSearchParams();
+      
+      if (filters.status && filters.status !== 'all') {
+        params.append('status', filters.status);
+      }
+      if (filters.search) {
+        params.append('search', filters.search);
+      }
+      if (filters.event_date_from) {
+        params.append('event_date_from', filters.event_date_from);
+      }
+      if (filters.event_date_to) {
+        params.append('event_date_to', filters.event_date_to);
+      }
+      
+      const queryString = params.toString();
+      const url = `${this.baseUrl}/bulk/${queryString ? '?' + queryString : ''}`;
+      
+      const response = await apiClient.get(url);
+      return response.data.results || response.data || [];
+    } catch (error: any) {
+      console.error('Error loading bulk orders:', error);
+      throw new Error(`Failed to load bulk orders: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Load bulk order statistics
+   */
+  async loadBulkOrderStats(): Promise<BulkOrderStats> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/bulk/stats/`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error loading bulk order stats:', error);
+      throw new Error(`Failed to load bulk order stats: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Accept a bulk order
+   */
+  async acceptBulkOrder(orderId: number): Promise<void> {
+    try {
+      await apiClient.post(`${this.baseUrl}/bulk/${orderId}/accept/`);
+    } catch (error: any) {
+      console.error('Error accepting bulk order:', error);
+      throw new Error(`Failed to accept bulk order: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Decline a bulk order
+   */
+  async declineBulkOrder(orderId: number): Promise<void> {
+    try {
+      await apiClient.post(`${this.baseUrl}/bulk/${orderId}/decline/`);
+    } catch (error: any) {
+      console.error('Error declining bulk order:', error);
+      throw new Error(`Failed to decline bulk order: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Request collaboration for a bulk order
+   */
+  async requestCollaboration(orderId: number, collaborationData: CollaborationRequest): Promise<void> {
+    try {
+      await apiClient.post(`${this.baseUrl}/bulk/${orderId}/collaborate/`, collaborationData);
+    } catch (error: any) {
+      console.error('Error requesting collaboration:', error);
+      throw new Error(`Failed to request collaboration: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Load available chefs for collaboration
+   */
+  async loadAvailableChefs(): Promise<ChefCollaborator[]> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/bulk/available_chefs/`);
+      return response.data || [];
+    } catch (error: any) {
+      console.error('Error loading available chefs:', error);
+      throw new Error(`Failed to load available chefs: ${error.response?.data?.error || error.message}`);
+    }
   }
 
 }
