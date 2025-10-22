@@ -1,83 +1,92 @@
-import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
-import { AuthProvider } from "@/context/AuthContext";
-import { CartProvider } from "@/context/CartContext";
-import { GoogleOAuthProvider } from "@react-oauth/google";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { DatabaseCartProvider } from "@/context/DatabaseCartContext";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
+import { GoogleOAuthProvider } from "@react-oauth/google";
+import React, { Suspense } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 // Layout components
-import Navbar from "@/components/layout/Navbar";
-import CustomerNavbar from "@/components/layout/CustomerNavbar";
-import CustomerHomeNavbar from "@/components/layout/CustomerHomeNavbar";
 import CustomerDashboardLayout from "@/components/layout/CustomerDashboardLayout";
-import AdminLayout from "@/components/layout/AdminLayout";
+import CustomerHomeNavbar from "@/components/layout/CustomerHomeNavbar";
+import Navbar from "@/components/layout/Navbar";
+// New unified admin layout
+import AdminLayout from "@/components/admin/layout/AdminLayout";
 
 // Public pages
-import Home from "@/pages/Home";
-import Menu from "@/pages/Menu";
 import About from "@/pages/About";
+import CheckoutPage from "@/pages/CheckoutPage";
 import Contact from "@/pages/Contact";
+import DeliveryAddressTest from "@/pages/DeliveryAddressTest";
+import Home from "@/pages/Home";
+import MenuPage from "@/pages/MenuPage";
 import NotFound from "@/pages/NotFound";
 
 // Authentication pages
+import ApprovalStatusPage from "@/pages/auth/ApprovalStatus";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
 import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
-import ForgotPassword from "@/pages/auth/ForgotPassword";
-import VerifyEmail from "@/pages/auth/VerifyEmail";
 import ResetPassword from "@/pages/auth/ResetPassword";
-import ApprovalStatusPage from "@/pages/auth/ApprovalStatus";
+import VerifyEmail from "@/pages/auth/VerifyEmail";
 
 // Profile page - removed old generic profile, now using role-specific profiles
 
 // Role-based pages
+import CustomerCart from "@/pages/customer/Cart";
 import CustomerDashboard from "@/pages/customer/Dashboard";
 import CustomerOrders from "@/pages/customer/Orders";
 import CustomerProfile from "@/pages/customer/Profile";
 import CustomerSettings from "@/pages/customer/Settings";
-import CustomerCart from "@/pages/customer/Cart";
 
+import AllOrders from "@/pages/delivery/AllOrders";
 import DeliveryDashboard from "@/pages/delivery/Dashboard";
 import DeliveryMap from "@/pages/delivery/Map";
+import DeliveryProfile from "@/pages/delivery/Profile";
 import DeliverySchedule from "@/pages/delivery/Schedule";
 import DeliverySettings from "@/pages/delivery/Settings";
-import DeliveryProfile from "@/pages/delivery/Profile";
-import AllOrders from "@/pages/delivery/AllOrders";
 import PickupNavigationDemo from "@/pages/demo/PickupNavigationDemo";
 
-import CookDashboard from "@/pages/cook/Dashboard";
+import CookLayout from "@/components/layout/CookLayout";
 import CookBulkOrders from "@/pages/cook/BulkOrders";
+import CookDashboard from "@/pages/cook/Dashboard";
 import CookHome from "@/pages/cook/Home";
 import CookMenu from "@/pages/cook/MenuNew";
-import CookOrders from "@/pages/cook/Order";
 import CookNotifications from "@/pages/cook/Notifications";
+import CookOrders from "@/pages/cook/Order";
 import CookProfile from "@/pages/cook/Profile";
 import CookSettings from "@/pages/cook/Settings";
-import CookLayout from "@/components/layout/CookLayout";
-import BulkMenuManagement from "@/components/cook/BulkMenuManagement";
 
-// Admin pages
-import ModernDashboard from "@/pages/admin/ModernDashboard";
-import AdminManageUsers from "@/pages/admin/ManageUsers";
-import AdminOrders from "@/pages/admin/Orders";
-import AdminAnalytics from "@/pages/admin/Analytics";
-import AdminSettings from "@/pages/admin/Settings";
-import AdminProfile from "@/pages/admin/Profile";
-import AdminReports from "@/pages/admin/Reports";
-import Approvals from "@/pages/admin/Approvals";
-import FoodManagement from "@/pages/admin/FoodManagement";
-import AdminNotifications from "@/pages/admin/Notifications";
-import Communications from "@/pages/admin/Communications";
+// Lazy-loaded admin pages for better performance
+const AnalyticsHub = React.lazy(() => import("@/pages/admin/AnalyticsHub"));
+const UserManagementHub = React.lazy(() => import("@/pages/admin/UserManagementHub"));
+const OrderManagementHub = React.lazy(() => import("@/pages/admin/OrderManagementHub"));
+const ContentManagementHub = React.lazy(() => import("@/pages/admin/ContentManagementHub"));
+const CommunicationCenter = React.lazy(() => import("@/pages/admin/CommunicationCenter"));
+const PaymentManagementHub = React.lazy(() => import("@/pages/admin/PaymentManagementHub"));
+const SystemHub = React.lazy(() => import("@/pages/admin/SystemHub"));
+const AdminDashboard = React.lazy(() => import("@/pages/admin/Dashboard"));
+const TestingDashboard = React.lazy(() => import("@/pages/admin/TestingDashboard"));
+
+// Loading component for lazy-loaded routes
+const LazyLoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="text-center">
+      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+      <p className="text-gray-600 dark:text-gray-400 font-medium">Loading...</p>
+    </div>
+  </div>
+);
 
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
   return (
     clientId &&
+    clientId.trim() !== "" &&
     clientId !== "your-google-client-id" &&
     clientId !== "YOUR_NEW_GOOGLE_CLIENT_ID_HERE" &&
     clientId !==
-      "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com" &&
+    "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com" &&
     clientId.includes(".apps.googleusercontent.com")
   );
 };
@@ -213,14 +222,14 @@ const InnerRoutes: React.FC = () => {
           path="/"
           element={
             isAuthenticated &&
-            user &&
-            user.role.toLowerCase() !== "customer" ? (
+              user &&
+              user.role.toLowerCase() !== "customer" ? (
               <Navigate to={getDefaultRoute()} replace />
             ) : (
               <>
                 {isAuthenticated &&
-                user &&
-                user.role.toLowerCase() === "customer" ? (
+                  user &&
+                  user.role.toLowerCase() === "customer" ? (
                   <CustomerHomeNavbar />
                 ) : (
                   <Navbar />
@@ -239,7 +248,7 @@ const InnerRoutes: React.FC = () => {
               ) : (
                 <Navbar />
               )}
-              <Menu />
+              <MenuPage />
             </>
           }
         />
@@ -266,6 +275,23 @@ const InnerRoutes: React.FC = () => {
                 <Navbar />
               )}
               <Contact />
+            </>
+          }
+        />
+        <Route
+          path="/checkout"
+          element={
+            <ProtectedRoute allowedRoles={["customer"]}>
+              <CheckoutPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/delivery-address-test"
+          element={
+            <>
+              <Navbar />
+              <DeliveryAddressTest />
             </>
           }
         />
@@ -347,6 +373,17 @@ const InnerRoutes: React.FC = () => {
           element={
             <ProtectedRoute>
               <Navigate to={getDefaultRoute()} replace />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/cart"
+          element={
+            <ProtectedRoute allowedRoles={["customer"]}>
+              <CustomerDashboardLayout>
+                <CustomerCart />
+              </CustomerDashboardLayout>
             </ProtectedRoute>
           }
         />
@@ -433,7 +470,6 @@ const InnerRoutes: React.FC = () => {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<CookDashboard />} />
           <Route path="bulk-orders" element={<CookBulkOrders />} />
-          <Route path="bulk-menu" element={<BulkMenuManagement />} />
           <Route path="home" element={<CookHome />} />
           <Route path="menu" element={<CookMenu />} />
           <Route path="orders" element={<CookOrders />} />
@@ -506,7 +542,7 @@ const InnerRoutes: React.FC = () => {
           element={<PickupNavigationDemo />}
         />
 
-        {/* Admin Routes */}
+        {/* Clean Admin Routes - One per Hub */}
         <Route
           path="/admin"
           element={
@@ -520,27 +556,9 @@ const InnerRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <ModernDashboard />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminManageUsers />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/orders"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <AdminLayout>
-                <AdminOrders />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <AdminDashboard />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
@@ -550,47 +568,57 @@ const InnerRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminAnalytics />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <AnalyticsHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/admin/settings"
+          path="/admin/users"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminSettings />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <UserManagementHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/admin/profile"
+          path="/admin/manage-user"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminProfile />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <UserManagementHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/admin/reports"
+          path="/admin/orders"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <AdminReports />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <OrderManagementHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/admin/food"
+          path="/admin/contents"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <FoodManagement />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <ContentManagementHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
@@ -600,17 +628,93 @@ const InnerRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <Communications />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <CommunicationCenter />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/admin/approvals"
+          path="/admin/communication"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout>
-                <Approvals />
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <CommunicationCenter />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/feedback-management"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <CommunicationCenter />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/food-menu-management"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <ContentManagementHub />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/payment-management"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <PaymentManagementHub />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <AnalyticsHub />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/profile"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <UserManagementHub />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <SystemHub />
+                </Suspense>
               </AdminLayout>
             </ProtectedRoute>
           }
@@ -636,7 +740,7 @@ const AppRoutes: React.FC = () => {
       }}
     >
       <AuthProvider>
-        <CartProvider>
+        <DatabaseCartProvider>
           {isValidClientId ? (
             <GoogleOAuthProvider clientId={googleClientId}>
               <InnerRoutes />
@@ -644,7 +748,7 @@ const AppRoutes: React.FC = () => {
           ) : (
             <InnerRoutes />
           )}
-        </CartProvider>
+        </DatabaseCartProvider>
       </AuthProvider>
     </BrowserRouter>
   );

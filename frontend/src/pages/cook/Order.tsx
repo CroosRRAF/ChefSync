@@ -13,7 +13,8 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { type Order, type ChefDashboardStats, useOrderService } from '../../services/orderService';
+import { useOrderService } from '@/hooks/useOrderService';
+import { ChefDashboardStats } from '@/hooks/useOrderService';
 import { 
   Search, Filter, RefreshCw, MoreVertical, Eye, Edit, Trash2, 
   Users, Clock, CheckCircle, AlertCircle, Package, TrendingUp,
@@ -397,8 +398,8 @@ const DashboardStats: React.FC<{ stats: ChefDashboardStats | null }> = ({ stats 
     },
     {
       title: 'Today Revenue',
-      value: `Rs.${stats.today_revenue.toFixed(2)}`,
-      icon: () => <span className="font-bold text-lg">LRK</span>,
+      value: `LKR ${stats.today_revenue.toFixed(2)}`,
+      icon: DollarSign,
       color: 'text-green-600'
     }
   ];
@@ -695,11 +696,8 @@ const Order: React.FC = () => {
       }
       
       const fetchedOrders = await loadOrders(filters);
-      
-      // Ensure fetchedOrders is always an array
-      const ordersArray = Array.isArray(fetchedOrders) ? fetchedOrders : [];
-      setOrders(ordersArray);
-      showNotification(`Loaded ${ordersArray.length} orders`, 'success');
+      setOrders(fetchedOrders);
+      showNotification(`Loaded ${fetchedOrders.length} orders`, 'success');
       
     } catch (error) {
       console.error('Error fetching orders:', error);

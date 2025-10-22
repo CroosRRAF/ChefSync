@@ -5,14 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Upload, 
-  FileText, 
-  Image, 
-  File, 
-  X, 
-  CheckCircle, 
-  AlertCircle, 
+import {
+  Upload,
+  FileText,
+  Image,
+  File,
+  X,
+  CheckCircle,
+  AlertCircle,
   Loader2,
   Download,
   Eye,
@@ -48,10 +48,10 @@ interface DocumentUploadProps {
   onBack: () => void;
 }
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ 
-  role, 
-  onDocumentsComplete, 
-  onBack 
+const DocumentUpload: React.FC<DocumentUploadProps> = ({
+  role,
+  onDocumentsComplete,
+  onBack
 }) => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [selectedDocumentType, setSelectedDocumentType] = useState<DocumentType | null>(null);
@@ -68,8 +68,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     console.log('DocumentUpload component mounted with role:', role);
     const fetchDocumentTypes = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-        const response = await fetch(`${apiUrl}/api/auth/documents/types/?role=${role}`, {
+        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+        const response = await fetch(`${apiUrl}/auth/documents/types/?role=${role}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -181,7 +181,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         reader.onload = (e) => {
           const arrayBuffer = e.target?.result as ArrayBuffer;
           const uint8Array = new Uint8Array(arrayBuffer);
-          
+
           // Check PDF header (%PDF)
           const header = String.fromCharCode(uint8Array[0], uint8Array[1], uint8Array[2], uint8Array[3]);
           if (header !== '%PDF') {
@@ -206,15 +206,15 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         const arrayBuffer = await file.arrayBuffer();
         const pdfDoc = await PDFDocument.load(arrayBuffer);
         const pageCount = pdfDoc.getPageCount();
-        
+
         if (pageCount > 3) {
           return `PDF has ${pageCount} pages. Maximum allowed is 3 pages. Please use a PDF with fewer pages.`;
         }
-        
+
         if (pageCount === 0) {
           return "PDF appears to be empty or corrupted. Please check your file.";
         }
-        
+
         return null; // PDF is valid
       } catch (pdfError) {
         console.error('PDF parsing error:', pdfError);
@@ -241,16 +241,16 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
     setIsValidating(true);
     const newFiles: UploadedFile[] = [];
-    
+
     try {
       // Validate files (including async PDF validation)
       for (const file of acceptedFiles) {
         const id = Math.random().toString(36).substr(2, 9);
         let error: string | null = null;
-        
+
         // Basic validation
         error = validateFile(file, selectedDocumentType);
-        
+
       // If it's a PDF and basic validation passed, do async PDF validation
       if (!error && file.name.toLowerCase().endsWith('.pdf')) {
         try {
@@ -261,7 +261,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           error = null;
         }
       }
-        
+
         newFiles.push({
           id,
           file,
@@ -298,7 +298,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     accept: selectedDocumentType ? (() => {
       const allowedTypes = getAllowedFileTypes(selectedDocumentType);
       const acceptObject: Record<string, string[]> = {};
-      
+
       allowedTypes.forEach(type => {
         if (type === 'pdf') {
           acceptObject['application/pdf'] = ['.pdf'];
@@ -310,7 +310,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           acceptObject[mimeType].push(`.${type}`);
         }
       });
-      
+
       return acceptObject;
     })() : undefined,
     multiple: true,
@@ -319,11 +319,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
   const uploadFile = async (uploadedFile: UploadedFile) => {
     setIsUploading(true);
-    
+
     // Simulate upload progress
     const progressInterval = setInterval(() => {
-      setUploadedFiles(prev => prev.map(file => 
-        file.id === uploadedFile.id 
+      setUploadedFiles(prev => prev.map(file =>
+        file.id === uploadedFile.id
           ? { ...file, progress: Math.min(file.progress + 10, 90) }
           : file
       ));
@@ -332,9 +332,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     try {
       // Get user email from localStorage or props
       const userEmail = localStorage.getItem('registration_email') || '';
-      
+
       console.log('User email found in localStorage:', userEmail);
-      
+
       if (!userEmail) {
         console.error('No registration email found in localStorage');
         console.log('Available localStorage keys:', Object.keys(localStorage));
@@ -346,10 +346,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       formData.append('file_upload', uploadedFile.file);
       formData.append('document_type_id', uploadedFile.documentType.id.toString());
       formData.append('user_email', userEmail);
-      
+
       // Upload to backend
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
       // Debug logging
       console.log('Uploading file:', {
         fileName: uploadedFile.file.name,
@@ -357,9 +357,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         fileType: uploadedFile.file.type,
         documentTypeId: uploadedFile.documentType.id,
         userEmail: userEmail,
-        apiUrl: `${apiUrl}/api/auth/documents/upload-registration/`
+        apiUrl: `${apiUrl}/auth/documents/upload-registration/`
       });
-      const response = await fetch(`${apiUrl}/api/auth/documents/upload-registration/`, {
+      const response = await fetch(`${apiUrl}/auth/documents/upload-registration/`, {
         method: 'POST',
         body: formData,
       });
@@ -372,7 +372,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           console.error('Failed to parse error response:', parseError);
           throw new Error(`Upload failed with status ${response.status}: ${response.statusText}`);
         }
-        
+
         // Use the detailed error message from backend if available
         const errorMessage = errorData.message || errorData.error || `Upload failed with status ${response.status}`;
         console.error('Upload error details:', errorData);
@@ -380,15 +380,15 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       }
 
       const result = await response.json();
-      
+
       clearInterval(progressInterval);
-      
-      setUploadedFiles(prev => prev.map(file => 
-        file.id === uploadedFile.id 
-          ? { 
-              ...file, 
-              status: 'success', 
-              progress: 100, 
+
+      setUploadedFiles(prev => prev.map(file =>
+        file.id === uploadedFile.id
+          ? {
+              ...file,
+              status: 'success',
+              progress: 100,
               documentId: result.document.id,
               isPdfConverted: result.document.is_pdf_converted || false,
               convertedImages: result.document.converted_images || []
@@ -401,18 +401,18 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
       const isPdfConverted = result.document.is_pdf_converted || false;
       const convertedImagesCount = result.document.converted_images?.length || 0;
-      
+
       toast({
         title: "File Uploaded",
-        description: isPdfConverted 
+        description: isPdfConverted
           ? `${uploadedFile.file.name} has been converted to ${convertedImagesCount} image(s) and uploaded successfully.`
           : `${uploadedFile.file.name} has been uploaded successfully.`,
       });
     } catch (error: any) {
       clearInterval(progressInterval);
-      
-      setUploadedFiles(prev => prev.map(file => 
-        file.id === uploadedFile.id 
+
+      setUploadedFiles(prev => prev.map(file =>
+        file.id === uploadedFile.id
           ? { ...file, status: 'error', error: error.message || 'Upload failed' }
           : file
       ));
@@ -433,12 +433,12 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       if (file?.preview) {
         URL.revokeObjectURL(file.preview);
       }
-      
+
       // Remove document type from uploaded set if no more files of this type
       const remainingFiles = prev.filter(f => f.id !== fileId);
       const documentTypeIds = new Set(remainingFiles.map(f => f.documentType.id));
       setUploadedDocumentTypes(documentTypeIds);
-      
+
       return remainingFiles;
     });
   };
@@ -446,8 +446,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const retryUpload = (fileId: string) => {
     const file = uploadedFiles.find(f => f.id === fileId);
     if (file) {
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === fileId 
+      setUploadedFiles(prev => prev.map(f =>
+        f.id === fileId
           ? { ...f, status: 'pending', progress: 0, error: undefined }
           : f
       ));
@@ -487,10 +487,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
   const requiredDocuments = documentTypes.filter(doc => doc.is_required);
   const optionalDocuments = documentTypes.filter(doc => !doc.is_required);
-  const uploadedRequiredDocs = uploadedFiles.filter(file => 
+  const uploadedRequiredDocs = uploadedFiles.filter(file =>
     file.documentType.is_required && file.status === 'success'
   );
-  const allRequiredUploaded = requiredDocuments.every(doc => 
+  const allRequiredUploaded = requiredDocuments.every(doc =>
     uploadedFiles.some(file => file.documentType.id === doc.id && file.status === 'success')
   );
 
@@ -514,7 +514,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         </h2>
         <div className="max-w-2xl mx-auto">
           <p className="text-muted-foreground text-lg mb-3">
-            {role === 'cook' 
+            {role === 'cook'
               ? 'Please upload your cooking credentials and certifications to verify your culinary expertise'
               : 'Please upload your delivery-related documents and licenses to verify your delivery capabilities'
             }
@@ -563,7 +563,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               {documentTypes.map((docType) => {
               const isUploaded = uploadedDocumentTypes.has(docType.id);
               const uploadedFilesForType = uploadedFiles.filter(f => f.documentType.id === docType.id && f.status === 'success');
-              
+
               return (
                 <Button
                   key={docType.id}
@@ -639,10 +639,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               )}
               <p className="text-lg font-medium mb-2">
-                {isValidating 
-                  ? 'Validating files...' 
-                  : isDragActive 
-                    ? 'Drop files here' 
+                {isValidating
+                  ? 'Validating files...'
+                  : isDragActive
+                    ? 'Drop files here'
                     : 'Drag & drop files here'
                 }
               </p>
@@ -650,7 +650,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 {isValidating ? 'Please wait while we validate your files' : 'or click to select files'}
               </p>
               <p className="text-xs text-muted-foreground">
-                Allowed: {getAllowedFileTypes(selectedDocumentType).map(t => `.${t}`).join(', ')} • 
+                Allowed: {getAllowedFileTypes(selectedDocumentType).map(t => `.${t}`).join(', ')} •
                 Max size: {selectedDocumentType.max_file_size_mb}MB
               </p>
               {getAllowedFileTypes(selectedDocumentType).includes('pdf') && (
@@ -775,7 +775,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               <h4 className="font-medium mb-2">Required Documents</h4>
               <div className="space-y-2">
                 {requiredDocuments.map((doc) => {
-                  const uploaded = uploadedFiles.some(file => 
+                  const uploaded = uploadedFiles.some(file =>
                     file.documentType.id === doc.id && file.status === 'success'
                   );
                   return (
@@ -793,13 +793,13 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 })}
               </div>
             </div>
-            
+
             {optionalDocuments.length > 0 && (
               <div>
                 <h4 className="font-medium mb-2">Optional Documents</h4>
                 <div className="space-y-2">
                   {optionalDocuments.map((doc) => {
-                    const uploaded = uploadedFiles.some(file => 
+                    const uploaded = uploadedFiles.some(file =>
                       file.documentType.id === doc.id && file.status === 'success'
                     );
                     return (
@@ -834,7 +834,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               {requiredDocuments.length - uploadedRequiredDocs.length} required document(s) remaining
             </p>
           )}
-          <Button 
+          <Button
             onClick={handleContinue}
             disabled={!allRequiredUploaded || isUploading}
             className="flex items-center gap-2"

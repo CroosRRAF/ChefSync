@@ -7,9 +7,9 @@
 
 # Virtual environments
 .venv/
-venv/
+venv*/
 ENV/
-env/
+env*/
 env.bak/
 venv.bak/
 
@@ -52,8 +52,7 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .nox/
-.coverage
-.coverage.*
+.coverage*
 .cache
 nosetests.xml
 coverage.xml
@@ -71,17 +70,21 @@ cover/
 local_settings.py
 settings_local.py
 db.sqlite3
+*.sqlite
+*.sql
 db.sqlite3-journal
+
+# Static and media
+# Ignore collected/static build files, not source static
 staticfiles/
-static/
 media/
 local_media/
 
-# Migration files (uncomment if you want to ignore migrations)
+# Migration files (optional – usually commit these)
 # */migrations/*.py
 # !*/migrations/__init__.py
 
-# Flask stuff
+# Flask stuff (if mixed)
 instance/
 .webassets-cache
 
@@ -99,25 +102,17 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Spyder project settings
+# Spyder / Rope
 .spyderproject
 .spyproject
-
-# Rope project settings
 .ropeproject
 
-# mypy
+# mypy / type checking
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# Pyre type checker
 .pyre/
-
-# pytype static type analyzer
 .pytype/
-
-# Cython debug symbols
 cython_debug/
 
 ###############################
@@ -143,10 +138,8 @@ build/
 # Cache directories
 .cache/
 .parcel-cache/
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
+.rpt2_cache*/
+.rts2_cache_*/
 .npm/
 .eslintcache
 .nyc_output/
@@ -166,11 +159,11 @@ pids/
 *.seed
 *.pid.lock
 
-# Coverage directory
+# Coverage
 coverage/
 *.lcov
 
-# Optional files
+# Misc
 .node_repl_history
 *.tgz
 .yarn-integrity
@@ -180,7 +173,6 @@ coverage/
 # Environment Variables
 ###############################
 
-# Environment files
 .env
 .env.*
 !.env.example
@@ -194,13 +186,13 @@ coverage/
 .vscode/
 !.vscode/extensions.json
 
-# JetBrains IDEs
+# JetBrains
 .idea/
+
+# Temp / swap files
 *.swp
 *.swo
 *~
-
-# Sublime Text
 *.sublime*
 
 ###############################
@@ -241,9 +233,8 @@ temp/
 
 # Database files
 *.db
-*.sqlite
 
-# SSL certificates
+# SSL certificates (never commit real ones!)
 *.pem
 *.key
 *.crt
@@ -255,5 +246,3 @@ docs/temp/
 # Design files
 psd/
 sketch/
-
-.env 

@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Use Vite dev proxy by default to avoid protocol mismatches in development.
 // Set VITE_API_BASE_URL in production builds.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -112,8 +112,13 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refresh_token'); // Get refresh token from localStorage
         if (refreshToken) {
-          const response = await api.post('/auth/token/refresh/', {
+          // Make refresh request without Authorization header to avoid interceptor loop
+          const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
             refresh: refreshToken,
+          }, {
+            headers: {
+              'Content-Type': 'application/json'
+            }
           });
           
           const { access, refresh } = response.data;

@@ -1,0 +1,116 @@
+import { useState, useCallback } from 'react';
+import { orderService, CreateOrderData, OrderResponse } from '@/services/orderService';
+import { toast } from 'sonner';
+
+export interface ChefDashboardStats {
+  total_orders: number;
+  total_revenue: number;
+  pending_orders: number;
+  completed_orders: number;
+  average_rating: number;
+  recent_orders: any[];
+}
+
+export const useOrderService = () => {
+  const [loading, setLoading] = useState(false);
+  const [orders, setOrders] = useState<OrderResponse[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<ChefDashboardStats | null>(null);
+
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const userOrders = await orderService.getUserOrders();
+      setOrders(userOrders);
+      return userOrders;
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      toast.error('Failed to load orders');
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadDashboardStats = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Mock dashboard stats for now - replace with actual API call
+      const mockStats: ChefDashboardStats = {
+        total_orders: 45,
+        total_revenue: 12500.00,
+        pending_orders: 3,
+        completed_orders: 42,
+        average_rating: 4.8,
+        recent_orders: []
+      };
+      setDashboardStats(mockStats);
+      return mockStats;
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+      toast.error('Failed to load dashboard stats');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const createOrder = useCallback(async (orderData: CreateOrderData) => {
+    setLoading(true);
+    try {
+      const order = await orderService.createOrder(orderData);
+      toast.success('Order created successfully');
+      return order;
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast.error('Failed to create order');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const cancelOrder = useCallback(async (orderId: number) => {
+    setLoading(true);
+    try {
+      await orderService.cancelOrder(orderId);
+      toast.success('Order cancelled successfully');
+      // Reload orders after cancellation
+      await loadOrders();
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      toast.error('Failed to cancel order');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [loadOrders]);
+
+  const getOrderStatus = useCallback(async (orderId: number) => {
+    try {
+      return await orderService.getOrderStatus(orderId);
+    } catch (error) {
+      console.error('Error getting order status:', error);
+      toast.error('Failed to get order status');
+      throw error;
+    }
+  }, []);
+
+  return {
+    loading,
+    orders,
+    dashboardStats,
+    loadOrders,
+    loadDashboardStats,
+    createOrder,
+    cancelOrder,
+    getOrderStatus,
+    // Direct service methods
+    calculateDeliveryFee: orderService.calculateDeliveryFee,
+    calculateTax: orderService.calculateTax,
+    calculateTotal: orderService.calculateTotal,
+    calculateDistance: orderService.calculateDistance,
+    formatOrderData: orderService.formatOrderData
+  };
+};
+
+export default useOrderService;

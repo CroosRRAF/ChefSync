@@ -11,14 +11,10 @@ import {
   Activity,
   RefreshCw
 } from "lucide-react";
-import { ChefDashboardStats, useOrderService } from '@/services/orderService';
-import { useAuth } from '@/context/AuthContext';
-import Greeting from '@/components/cook/Greeting';
+import { useOrderService } from '@/hooks/useOrderService';
+import { ChefDashboardStats } from '@/hooks/useOrderService';
 
 export default function Dashboard() {
-  // Get user data from auth context
-  const { user } = useAuth();
-  
   // State for API data
   const [stats, setStats] = useState<ChefDashboardStats | null>(null);
   const [reviews, setReviews] = useState<any[]>([]);
@@ -99,16 +95,16 @@ export default function Dashboard() {
   const displayStats = stats ? [
     {
       title: "Completed Orders",
-      value: stats.orders_completed.toString(),
+      value: stats.completed_orders.toString(),
       change: `+${Math.floor(Math.random() * 5)} today`, // Can be calculated from API later
       icon: CheckCircle2,
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-50 dark:bg-green-900/20"
     },
     {
-      title: "Active Orders",
-      value: stats.orders_active.toString(),
-      change: `+${Math.floor(Math.random() * 3)} pending`,
+      title: "Total Orders",
+      value: stats.total_orders.toString(),
+      change: `+${Math.floor(Math.random() * 3)} total`,
       icon: ClipboardList,
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-50 dark:bg-blue-900/20"
@@ -122,8 +118,8 @@ export default function Dashboard() {
       bgColor: "bg-yellow-50 dark:bg-yellow-900/20"
     },
     {
-      title: "Today Revenue",
-      value: `Rs.${stats.today_revenue.toFixed(2)}`,
+      title: "Total Revenue",
+      value: `LKR ${stats.total_revenue.toFixed(2)}`,
       change: `${stats.average_rating}/5 rating`,
       icon: TrendingUp,
       color: "text-primary",
@@ -135,10 +131,12 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background p-6 space-y-6">
       {/* Welcome Section */}
       <div className="flex items-center justify-between">
-        <Greeting 
-          chefName={user?.name || 'Chef'} 
-          error={error} 
-        />
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Good Morning, Chef!</h1>
+          <p className="text-muted-foreground mt-1">
+            {error ? '⚠️ ' + error : "Here's what's happening in your kitchen today"}
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="px-3 py-1">
             <Clock className="h-3 w-3 mr-1" />

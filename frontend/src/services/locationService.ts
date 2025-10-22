@@ -25,19 +25,7 @@ export const updateDeliveryPartnerLocation = async (
 ): Promise<LocationResponse> => {
   try {
     // TODO: Implement actual API call when backend endpoint is ready
-    // const response = await apiClient.post(
-    //   `/delivery/partners/${deliveryPartnerId}/location/`,
-    //   location
-    // );
-    // return response.data;
-    
-    // Mock implementation for now
-    console.warn("Location update endpoint not yet implemented in backend");
-    return {
-      success: true,
-      message: "Location update simulated (backend endpoint pending)",
-      location_id: `mock_${Date.now()}`
-    };
+    throw new Error("Location update endpoint not implemented");
   } catch (error) {
     console.error("Failed to update location:", error);
     return {
@@ -55,13 +43,7 @@ export const getDeliveryPartnerLocation = async (
 ): Promise<LocationUpdate | null> => {
   try {
     // TODO: Implement actual API call when backend endpoint is ready
-    // const response = await apiClient.get(
-    //   `/delivery/partners/${deliveryPartnerId}/location/`
-    // );
-    // return response.data;
-    
-    console.warn("Location retrieval endpoint not yet implemented in backend");
-    return null;
+    throw new Error("Location retrieval endpoint not implemented");
   } catch (error) {
     console.warn("Location retrieval endpoint not yet implemented in backend");
     return null;

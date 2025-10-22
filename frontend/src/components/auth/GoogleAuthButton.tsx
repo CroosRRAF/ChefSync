@@ -1,31 +1,34 @@
-import React from 'react';
-import { GoogleLogin } from '@react-oauth/google';
-import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import { getRoleBasedPath } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
+import { getRoleBasedPath, useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/utils/fetcher";
+import { GoogleLogin } from "@react-oauth/google";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
-  // For development, allow any client ID that looks like a Google OAuth client ID
-  // In production, you should use proper validation
-  return clientId && 
-         clientId !== 'your-google-client-id' && 
-         clientId !== 'YOUR_NEW_GOOGLE_CLIENT_ID_HERE' &&
-         clientId !== '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com' &&
-         (clientId.includes('.apps.googleusercontent.com') || clientId.length > 20);
+  // Check if client ID is properly configured
+  return (
+    clientId &&
+    clientId.trim() !== "" &&
+    clientId !== "your-google-client-id" &&
+    clientId !== "YOUR_NEW_GOOGLE_CLIENT_ID_HERE" &&
+    clientId !==
+      "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com" &&
+    clientId.includes(".apps.googleusercontent.com")
+  );
 };
 
 interface GoogleAuthButtonProps {
-  mode?: 'login' | 'register';
+  mode?: "login" | "register";
   onSuccess?: () => void;
 }
 
-const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ 
-  mode = 'register',
-  onSuccess 
+const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
+  mode = "register",
+  onSuccess,
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -35,88 +38,139 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
   const handleGoogleSuccess = async (credentialResponse: any) => {
     try {
       // Add debug logging
-      console.log('Google OAuth credentialResponse:', credentialResponse);
-      
+      console.log("Google OAuth credentialResponse:", credentialResponse);
+
       if (!credentialResponse?.credential) {
-        throw new Error('No credential received from Google');
+        throw new Error("No credential received from Google");
       }
 
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      console.log('Making request to:', `${apiUrl}/api/auth/google/login/`);
-      
-      const res = await fetch(`${apiUrl}/api/auth/google/login/`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'include', // Include credentials for CORS
-        body: JSON.stringify({ id_token: credentialResponse.credential }),
+      // Ensure CSRF cookie is present (Django expects it for POST when SessionAuth is enabled)
+      try {
+        const csrfResponse = await apiClient.get("/auth/csrf-token/");
+        console.log("CSRF token retrieved successfully", csrfResponse);
+        
+        // Ensure the CSRF cookie is properly set before making the OAuth request
+        // Wait a bit to ensure the cookie is set
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (csrfError) {
+        console.error("CSRF token error:", csrfError);
+        // Continue anyway as CSRF might be disabled in development
+      }
+
+      const data = await apiClient.post<any>("/auth/google/login/", {
+        id_token: credentialResponse.credential,
       });
-      
-      const data = await res.json();
-      console.log('Backend response:', { status: res.status, data });
-      
-      if (res.ok) {
+      console.log("Backend response (Google OAuth):", data);
+
+      if (data && data.access && data.user) {
         // Set auth context state via oauthLogin helper
         oauthLogin(data);
 
-        toast({ 
-          title: `Google ${mode === 'login' ? 'login' : 'registration'} successful!`,
-          description: `Welcome, ${data.user.name || data.user.email}!`
+        toast({
+          title: `Google ${
+            mode === "login" ? "login" : "registration"
+          } successful!`,
+          description: `Welcome, ${data.user.name || data.user.email}!`,
         });
-        
+
         // Call onSuccess callback if provided
         onSuccess?.();
-        
+
         // Role-based redirect
         const rolePath = getRoleBasedPath(data.user.role);
-        navigate(rolePath, { replace: true, state: { from: 'google_oauth' } });
+        navigate(rolePath, { replace: true, state: { from: "google_oauth" } });
       } else {
         // Better error handling for backend errors
-        const errorMessage = data.error || data.detail || 'Authentication failed';
-        const errorDetails = data.details ? ` (${data.details})` : '';
-        
-        console.error('Backend error:', data);
-        toast({ 
-          variant: 'destructive', 
-          title: `Google ${mode} failed`, 
-          description: `${errorMessage}${errorDetails}`
+        const errorMessage =
+          (data && (data.error || data.detail)) || "Authentication failed";
+        const errorDetails = data && data.details ? ` (${data.details})` : "";
+        console.error("Backend error (Google OAuth):", data);
+        toast({
+          variant: "destructive",
+          title: `Google ${mode} failed`,
+          description: `${errorMessage}${errorDetails}`,
         });
       }
     } catch (err: any) {
-      console.error('Google OAuth error:', err);
-      let errorMessage = 'Please check your connection and try again';
+      console.error("Google OAuth error:", err);
+      console.error("Error response data:", err.response?.data);
+      console.error("Error status:", err.response?.status);
+      console.error("Error headers:", err.response?.headers);
       
-      if (err.message?.includes('fetch')) {
-        errorMessage = 'Cannot connect to server. Please ensure the backend is running.';
+      let errorMessage = "Please check your connection and try again";
+      let errorTitle = "Authentication error";
+
+      // Handle specific error cases
+      if (err.response?.status === 403) {
+        errorTitle = "Authentication rejected";
+        const backendError = err.response?.data?.error || err.response?.data?.detail || "Unknown error";
+        errorMessage = `Backend rejected the request: ${backendError}`;
+        console.error("403 error details:", err.response?.data);
+      } else if (err.response?.status === 400) {
+        errorTitle = "Invalid request";
+        errorMessage = err.response?.data?.error || "Invalid authentication data";
+      } else if (err.message?.includes("fetch")) {
+        errorTitle = "Connection error";
+        errorMessage = "Cannot connect to server. Please ensure the backend is running.";
+      } else if (err.code === 'ERR_NETWORK') {
+        errorTitle = "Network error";
+        errorMessage = "Check that both frontend (8080) and backend (8000) servers are running.";
       }
-      
-      toast({ 
-        variant: 'destructive', 
-        title: 'Network error', 
-        description: errorMessage 
+
+      toast({
+        variant: "destructive",
+        title: errorTitle,
+        description: errorMessage,
       });
     }
   };
 
   const handleGoogleError = () => {
-    console.error('Google OAuth failed');
-    toast({ 
-      variant: 'destructive', 
-      title: 'Google authentication failed', 
-      description: 'Please try again or use email/password' 
+    console.error("Google OAuth failed");
+    
+    // Check if it's an origin error
+    const isOriginError = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    toast({
+      variant: "destructive",
+      title: "Google authentication failed",
+      description: isOriginError 
+        ? "OAuth origin not configured. Please add http://localhost:8080 to Google Console authorized origins."
+        : "Please try again or use email/password",
     });
   };
 
   if (!isValidClientId) {
     return (
-      <Button variant="outline" disabled className="w-full">
+      <Button 
+        variant="outline" 
+        disabled 
+        className="w-full"
+        onClick={() => {
+          toast({
+            title: "Google OAuth Not Configured",
+            description: "Please configure VITE_GOOGLE_OAUTH_CLIENT_ID in your .env file",
+            variant: "destructive",
+          });
+        }}
+      >
         <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
-          <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-          <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-          <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-          <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          <path
+            fill="currentColor"
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+          />
+          <path
+            fill="currentColor"
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+          />
+          <path
+            fill="currentColor"
+            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+          />
+          <path
+            fill="currentColor"
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+          />
         </svg>
         Google OAuth not configured
       </Button>
@@ -131,7 +185,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
         useOneTap={false}
         theme="outline"
         size="large"
-        text={mode === 'login' ? 'signin_with' : 'signup_with'}
+        text={mode === "login" ? "signin_with" : "signup_with"}
         width="300"
         // Avoid passing width="100%" which causes GSI width invalid warnings; let it fill container.
       />

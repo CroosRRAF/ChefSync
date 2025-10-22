@@ -6,52 +6,47 @@
 
 @layer base {
   :root {
-    /* Core Colors - Food-inspired warm palette */
-    --background: 0 0% 100%;
-    --foreground: 20 14.3% 4.1%;
+    /* Customer-Facing Theme - Professional & Appetizing */
+    --background: 216 67% 98%;    /* #F7F9FC */
+    --foreground: 0 0% 20%;        /* #333333 */
     
     --card: 0 0% 100%;
-    --card-foreground: 20 14.3% 4.1%;
+    --card-foreground: 0 0% 20%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 20 14.3% 4.1%;
+    --popover-foreground: 0 0% 20%;
     
-    /* Primary - Appetite Orange */
-    --primary: 24 100% 50%;
-    --primary-foreground: 0 0% 98%;
-    --primary-light: 24 100% 60%;
-    --primary-dark: 24 100% 40%;
+    /* Primary - Warm Orange */
+    --primary: 27 100% 63%;       /* #FF8C42 */
+    --primary-foreground: 0 0% 100%;
     
-    /* Secondary - Fresh Green */
-    --secondary: 142 69% 45%;
-    --secondary-foreground: 0 0% 98%;
-    --secondary-light: 142 69% 55%;
-    --secondary-dark: 142 69% 35%;
+    /* Secondary - Deep Blue */
+    --secondary: 210 29% 24%;     /* #2C3E50 */
+    --secondary-foreground: 0 0% 100%;
     
-    /* Accent - Golden Yellow */
-    --accent: 45 100% 65%;
-    --accent-foreground: 20 14.3% 4.1%;
-    --accent-light: 45 100% 75%;
-    --accent-dark: 45 100% 55%;
+    /* Accent - Vibrant Green (for CTAs) */
+    --accent: 145 58% 49%;        /* #2ECC71 */
+    --accent-foreground: 0 0% 100%;
     
-    /* Neutral Palette */
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Success - Green (Matches Accent) */
+    --success: 145 58% 49%;       /* #2ECC71 */
+    --success-foreground: 0 0% 100%;
     
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Warning - Amber */
+    --warning: 38 92% 50%;        /* #F97316 */
+    --warning-foreground: 0 0% 100%;
     
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 24 100% 50%;
+    /* Error/Destructive - Coral Red */
+    --destructive: 0 100% 71%;     /* #FF6B6B */
+    --destructive-foreground: 0 0% 100%;
     
-    /* Success - Fresh Green variation */
-    --success: 142 69% 45%;
-    --success-foreground: 0 0% 98%;
+    /* Neutral Colors */
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
     
-    /* Warning - Warm Orange variation */
-    --warning: 38 100% 55%;
-    --warning-foreground: 20 14.3% 4.1%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 27 100% 63%;           /* Primary orange for focus rings */
     
     /* Info - Cool Blue */
     --info: 217 91% 60%;
@@ -61,10 +56,10 @@
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
     --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-light)));
     --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-light)));
-    --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.9), hsl(var(--secondary) / 0.8));
+    --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.9), hsl(var(--destructive) / 0.8));
     --gradient-card: linear-gradient(145deg, hsl(var(--background)), hsl(var(--muted) / 0.3));
     
-    /* Shadows - Food-themed with warm tones */
+    /* Shadows - Soft & Professional */
     --shadow-sm: 0 1px 2px 0 hsl(var(--primary) / 0.05);
     --shadow-md: 0 4px 6px -1px hsl(var(--primary) / 0.1), 0 2px 4px -1px hsl(var(--primary) / 0.06);
     --shadow-lg: 0 10px 15px -3px hsl(var(--primary) / 0.1), 0 4px 6px -2px hsl(var(--primary) / 0.05);
@@ -486,4 +481,40 @@
   background: rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(25px) saturate(200%) brightness(90%);
   -webkit-backdrop-filter: blur(25px) saturate(200%) brightness(90%);
+}
+
+/* Custom scrollbar for filter sidebar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203, 213, 225) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgb(203, 213, 225);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgb(148, 163, 184);
+}
+
+/* Dark mode scrollbar */
+.dark .custom-scrollbar {
+  scrollbar-color: rgb(75, 85, 99) transparent;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgb(75, 85, 99);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgb(107, 114, 128);
 }

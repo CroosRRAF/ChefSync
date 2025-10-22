@@ -8,6 +8,7 @@ router.register(r'responses', views.CommunicationResponseViewSet)
 router.register(r'templates', views.CommunicationTemplateViewSet)
 router.register(r'categories', views.CommunicationCategoryViewSet)
 router.register(r'tags', views.CommunicationTagViewSet)
+router.register(r'notifications', views.NotificationViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

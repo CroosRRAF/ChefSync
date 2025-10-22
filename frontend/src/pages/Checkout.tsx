@@ -9,8 +9,16 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
+import GoogleMapsAddressPicker from '@/components/checkout/GoogleMapsAddressPicker';
 import { 
   ArrowLeft,
   CreditCard,
@@ -24,29 +32,47 @@ import {
   User,
   Home,
   LayoutDashboard,
-  AlertCircle
+  AlertCircle,
+  Navigation,
+  Edit2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CartItem } from '@/services/menuService';
+import { orderService } from '@/services/orderService';
+import { paymentService } from '@/services/paymentService';
+import { getFoodPlaceholder } from '@/utils/placeholderUtils';
 
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
-  const { cartSummary, clearCart } = useCart();
+  const { cartSummary, clearCart, refreshCart } = useCart();
   const { user, isAuthenticated } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [showAddressPicker, setShowAddressPicker] = useState(false);
 
   // Form states
   const [deliveryInfo, setDeliveryInfo] = useState({
     address: user?.address || '',
     city: 'Colombo',
     postalCode: '',
-    phone: user?.phone_no || '',
+    phone: user?.phone || '',
     instructions: ''
   });
 
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [orderNotes, setOrderNotes] = useState('');
+  
+  // Payment form states
+  const [cardDetails, setCardDetails] = useState({
+    cardNumber: '',
+    cardHolder: '',
+    expiryMonth: '',
+    expiryYear: '',
+    cvv: ''
+  });
+  const [savePaymentMethod, setSavePaymentMethod] = useState(false);
+  const [availablePaymentMethods, setAvailablePaymentMethods] = useState<any[]>([]);
 
   // Redirect if not authenticated or no cart items
   useEffect(() => {
@@ -59,6 +85,28 @@ const Checkout: React.FC = () => {
       return;
     }
   }, [isAuthenticated, user, cartSummary, navigate]);
+
+  // Load available payment methods
+  useEffect(() => {
+    const loadPaymentMethods = async () => {
+      try {
+        const methods = await paymentService.getAvailablePaymentMethods();
+        setAvailablePaymentMethods(methods);
+      } catch (error) {
+        console.error('Error loading payment methods:', error);
+        // Set default methods if API fails
+        setAvailablePaymentMethods([
+          { id: 'cash', name: 'Cash on Delivery', type: 'cash', enabled: true },
+          { id: 'card', name: 'Credit/Debit Card', type: 'card', enabled: true },
+          { id: 'online', name: 'Online Payment', type: 'online', enabled: false }
+        ]);
+      }
+    };
+
+    if (isAuthenticated) {
+      loadPaymentMethods();
+    }
+  }, [isAuthenticated]);
 
   const cart = cartSummary?.cart_items || [];
   
@@ -77,11 +125,31 @@ const Checkout: React.FC = () => {
     }));
   };
 
+  const handleCardInputChange = (field: string, value: string) => {
+    setCardDetails(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const validateCardDetails = () => {
+    if (paymentMethod !== 'card') return { isValid: true, errors: [] };
+    
+    const validation = paymentService.validatePaymentDetails({
+      order_id: 0, // Will be set when order is created
+      payment_method: 'card',
+      amount: total.toString(),
+      payment_details: cardDetails
+    });
+    
+    return validation;
+  };
+
   const handleNextStep = () => {
     if (currentStep === 1) {
       // Validate delivery info
-      if (!deliveryInfo.address || !deliveryInfo.phone) {
-        toast.error('Please fill in all required delivery information');
+      if (!selectedAddress || !deliveryInfo.phone) {
+        toast.error('Please select a delivery address and provide phone number');
         return;
       }
       setCurrentStep(2);
@@ -97,19 +165,89 @@ const Checkout: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
+    if (!selectedAddress) {
+      toast.error('Please select a delivery address');
+      return;
+    }
+
+    if (!deliveryInfo.phone) {
+      toast.error('Please provide a phone number');
+      return;
+    }
+
+    // Validate card details if card payment is selected
+    if (paymentMethod === 'card') {
+      const validation = validateCardDetails();
+      if (!validation.isValid) {
+        toast.error(`Payment validation failed: ${validation.errors.join(', ')}`);
+        return;
+      }
+    }
+
     setIsProcessing(true);
     
     try {
-      // Simulate order placement
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Refresh cart items to get updated chef_id field
+      console.log('Refreshing cart items to get updated chef_id...');
+      await refreshCart();
+      
+      // Get updated cart items
+      const updatedCart = cartSummary?.cart_items || [];
+      console.log('Updated cart items:', updatedCart);
+      
+      // Format order data
+      const orderData = orderService.formatOrderData(
+        selectedAddress,
+        deliveryInfo.instructions,
+        orderNotes,
+        paymentMethod,
+        updatedCart
+      );
+
+      // Create the order first
+      const order = await orderService.createOrder(orderData);
+      console.log('Order created:', order);
+      
+      // Process payment if not cash on delivery
+      if (paymentMethod !== 'cash') {
+        try {
+          const paymentData = {
+            order_id: order.id,
+            payment_method: paymentMethod,
+            amount: total.toString(),
+            save_payment_method: savePaymentMethod,
+            payment_details: paymentMethod === 'card' ? cardDetails : undefined
+          };
+
+          console.log('Processing payment:', paymentData);
+          const payment = await paymentService.processPayment(paymentData);
+          console.log('Payment processed:', payment);
+
+          if (payment.status === 'completed') {
+            toast.success('Payment successful! Order placed successfully! 🎉');
+          } else if (payment.status === 'pending') {
+            toast.success('Order placed! Payment is being processed. You will receive confirmation shortly. 🎉');
+          } else {
+            toast.error('Payment failed. Please try again.');
+            return;
+          }
+        } catch (paymentError) {
+          console.error('Payment processing error:', paymentError);
+          toast.error('Payment failed. Please try again or use cash on delivery.');
+          return;
+        }
+      } else {
+        toast.success('Order placed successfully! Pay cash on delivery. 🎉');
+      }
       
       // Clear cart after successful order
       await clearCart();
       
-      toast.success('Order placed successfully! 🎉');
+      // Navigate to success page
       navigate('/customer/orders', { 
         state: { 
-          message: 'Your order has been placed successfully! You will receive a confirmation email shortly.' 
+          message: 'Your order has been placed successfully! You will receive a confirmation email shortly.',
+          orderNumber: order.order_number
         }
       });
       
@@ -204,51 +342,70 @@ const Checkout: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="address">Delivery Address *</Label>
-                      <Textarea
-                        id="address"
-                        placeholder="Enter your full address"
-                        value={deliveryInfo.address}
-                        onChange={(e) => handleInputChange('address', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        value={deliveryInfo.city}
-                        onChange={(e) => handleInputChange('city', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="phone">Phone Number *</Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        placeholder="+94 XX XXX XXXX"
-                        value={deliveryInfo.phone}
-                        onChange={(e) => handleInputChange('phone', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="postalCode">Postal Code</Label>
-                      <Input
-                        id="postalCode"
-                        value={deliveryInfo.postalCode}
-                        onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
+                  {/* Address Selection */}
+                  <div>
+                    <Label>Delivery Address *</Label>
+                    {selectedAddress ? (
+                      <Card className="mt-2 p-4 bg-green-50 border-green-200">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MapPin className="h-4 w-4 text-green-600" />
+                              <span className="font-medium text-green-900">{selectedAddress.label}</span>
+                              {selectedAddress.is_default && (
+                                <Badge variant="secondary" className="text-xs">Default</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-green-700 mb-1">{selectedAddress.address_line1}</p>
+                            {selectedAddress.address_line2 && (
+                              <p className="text-sm text-green-600 mb-1">{selectedAddress.address_line2}</p>
+                            )}
+                            <p className="text-xs text-green-600">
+                              {selectedAddress.city}, {selectedAddress.pincode}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowAddressPicker(true)}
+                            className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                          >
+                            <Edit2 className="h-3 w-3 mr-1" />
+                            Change
+                          </Button>
+                        </div>
+                      </Card>
+                    ) : (
+                      <div className="mt-2 space-y-3">
+                        <Button
+                          onClick={() => setShowAddressPicker(true)}
+                          className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                        >
+                          <MapPin className="h-4 w-4 mr-2" />
+                          Choose Delivery Address
+                        </Button>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Navigation className="h-4 w-4" />
+                          <span>Use current location, search on map, or select from saved addresses</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Phone Number */}
+                  <div>
+                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+94 XX XXX XXXX"
+                      value={deliveryInfo.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Delivery Instructions */}
                   <div>
                     <Label htmlFor="instructions">Delivery Instructions (Optional)</Label>
                     <Textarea
@@ -275,40 +432,135 @@ const Checkout: React.FC = () => {
                 <CardContent>
                   <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
                     <div className="space-y-4">
-                      <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
-                        <RadioGroupItem value="cash" id="cash" />
-                        <Label htmlFor="cash" className="flex-1 cursor-pointer">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">Cash on Delivery</div>
-                              <div className="text-sm text-gray-500">Pay when your order arrives</div>
+                      {availablePaymentMethods.map((method) => (
+                        <div 
+                          key={method.id}
+                          className={`flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                            !method.enabled ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          <RadioGroupItem 
+                            value={method.id} 
+                            id={method.id} 
+                            disabled={!method.enabled}
+                          />
+                          <Label htmlFor={method.id} className="flex-1 cursor-pointer">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-medium">{method.name}</div>
+                                <div className="text-sm text-gray-500">
+                                  {method.id === 'cash' && 'Pay when your order arrives'}
+                                  {method.id === 'card' && 'Pay securely with your card'}
+                                  {method.id === 'online' && 'PayPal, Stripe, or other online methods'}
+                                </div>
+                              </div>
+                              {method.id === 'cash' && <Badge variant="secondary">Recommended</Badge>}
+                              {!method.enabled && <Badge variant="outline">Coming Soon</Badge>}
                             </div>
-                            <Badge variant="secondary">Recommended</Badge>
-                          </div>
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
-                        <RadioGroupItem value="card" id="card" />
-                        <Label htmlFor="card" className="flex-1 cursor-pointer">
-                          <div>
-                            <div className="font-medium">Credit/Debit Card</div>
-                            <div className="text-sm text-gray-500">Pay securely with your card</div>
-                          </div>
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
-                        <RadioGroupItem value="online" id="online" />
-                        <Label htmlFor="online" className="flex-1 cursor-pointer">
-                          <div>
-                            <div className="font-medium">Online Payment</div>
-                            <div className="text-sm text-gray-500">PayPal, Stripe, or other online methods</div>
-                          </div>
-                        </Label>
-                      </div>
+                          </Label>
+                        </div>
+                      ))}
                     </div>
                   </RadioGroup>
+
+                  {/* Card Details Form */}
+                  {paymentMethod === 'card' && (
+                    <div className="mt-6 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
+                      <h4 className="font-medium mb-4">Card Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <Label htmlFor="cardNumber">Card Number *</Label>
+                          <Input
+                            id="cardNumber"
+                            placeholder="1234 5678 9012 3456"
+                            value={cardDetails.cardNumber}
+                            onChange={(e) => handleCardInputChange('cardNumber', e.target.value)}
+                            className="mt-1"
+                            maxLength={19}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label htmlFor="cardHolder">Cardholder Name *</Label>
+                          <Input
+                            id="cardHolder"
+                            placeholder="John Doe"
+                            value={cardDetails.cardHolder}
+                            onChange={(e) => handleCardInputChange('cardHolder', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="expiryMonth">Expiry Month *</Label>
+                          <Select
+                            value={cardDetails.expiryMonth}
+                            onValueChange={(value) => handleCardInputChange('expiryMonth', value)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="MM" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => (
+                                <SelectItem key={i + 1} value={(i + 1).toString().padStart(2, '0')}>
+                                  {(i + 1).toString().padStart(2, '0')}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="expiryYear">Expiry Year *</Label>
+                          <Select
+                            value={cardDetails.expiryYear}
+                            onValueChange={(value) => handleCardInputChange('expiryYear', value)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="YYYY" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 10 }, (_, i) => {
+                                const year = new Date().getFullYear() + i;
+                                return (
+                                  <SelectItem key={year} value={year.toString()}>
+                                    {year}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="cvv">CVV *</Label>
+                          <Input
+                            id="cvv"
+                            placeholder="123"
+                            value={cardDetails.cvv}
+                            onChange={(e) => handleCardInputChange('cvv', e.target.value)}
+                            className="mt-1"
+                            maxLength={4}
+                            type="password"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="saveCard"
+                            checked={savePaymentMethod}
+                            onChange={(e) => setSavePaymentMethod(e.target.checked)}
+                            className="rounded"
+                          />
+                          <Label htmlFor="saveCard" className="text-sm">
+                            Save this card for future orders
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Security Notice */}
+                  <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
+                    <Shield className="h-4 w-4 text-green-500" />
+                    <span>Your payment information is encrypted and secure</span>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -328,19 +580,30 @@ const Checkout: React.FC = () => {
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                       <h4 className="font-medium mb-2">Delivery Information</h4>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center gap-2 mb-1">
-                          <MapPin className="h-4 w-4" />
-                          {deliveryInfo.address}
-                        </div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Phone className="h-4 w-4" />
-                          {deliveryInfo.phone}
-                        </div>
-                        {deliveryInfo.instructions && (
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            {deliveryInfo.instructions}
-                          </div>
+                        {selectedAddress ? (
+                          <>
+                            <div className="flex items-center gap-2 mb-1">
+                              <MapPin className="h-4 w-4" />
+                              <span className="font-medium">{selectedAddress.label}</span>
+                            </div>
+                            <div className="ml-6 mb-2">
+                              <p>{selectedAddress.address_line1}</p>
+                              {selectedAddress.address_line2 && <p>{selectedAddress.address_line2}</p>}
+                              <p>{selectedAddress.city}, {selectedAddress.pincode}</p>
+                            </div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Phone className="h-4 w-4" />
+                              {deliveryInfo.phone}
+                            </div>
+                            {deliveryInfo.instructions && (
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                {deliveryInfo.instructions}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-red-500">No delivery address selected</div>
                         )}
                       </div>
                     </div>
@@ -349,9 +612,31 @@ const Checkout: React.FC = () => {
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                       <h4 className="font-medium mb-2">Payment Method</h4>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {paymentMethod === 'cash' && 'Cash on Delivery'}
-                        {paymentMethod === 'card' && 'Credit/Debit Card'}
-                        {paymentMethod === 'online' && 'Online Payment'}
+                        {paymentMethod === 'cash' && (
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" />
+                            <span>Cash on Delivery - Pay when your order arrives</span>
+                          </div>
+                        )}
+                        {paymentMethod === 'card' && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <CreditCard className="h-4 w-4" />
+                              <span>Credit/Debit Card</span>
+                            </div>
+                            <div className="ml-6 text-xs">
+                              <p>Card ending in: {cardDetails.cardNumber.slice(-4) || '****'}</p>
+                              <p>Expires: {cardDetails.expiryMonth || 'MM'}/{cardDetails.expiryYear || 'YYYY'}</p>
+                              {savePaymentMethod && <p className="text-green-600">✓ Card will be saved for future orders</p>}
+                            </div>
+                          </div>
+                        )}
+                        {paymentMethod === 'online' && (
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" />
+                            <span>Online Payment (PayPal, Stripe, etc.)</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -417,9 +702,12 @@ const Checkout: React.FC = () => {
                       <div key={item.id} className="flex items-center space-x-3">
                         <div className="w-12 h-12 flex-shrink-0">
                           <img
-                            src={item.food_image || 'https://via.placeholder.com/48x48?text=No+Image'}
+                            src={item.food_image || getFoodPlaceholder(48, 48)}
                             alt={item.food_name}
                             className="w-full h-full object-cover rounded-lg"
+                            onError={(e) => {
+                              e.currentTarget.src = getFoodPlaceholder(48, 48);
+                            }}
                           />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -468,6 +756,18 @@ const Checkout: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Google Maps Address Picker Modal */}
+      <GoogleMapsAddressPicker
+        isOpen={showAddressPicker}
+        onClose={() => setShowAddressPicker(false)}
+        onAddressSelect={(address) => {
+          setSelectedAddress(address);
+          setShowAddressPicker(false);
+          toast.success(`Selected ${address.label} address`);
+        }}
+        selectedAddress={selectedAddress}
+      />
     </div>
   );
 };

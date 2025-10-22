@@ -130,7 +130,7 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
         from django.contrib.auth import get_user_model
         User = get_user_model()
         try:
-            chef = User.objects.get(id=chef_id, is_active=True, role__in=['cook', 'Cook'])
+            chef = User.objects.get(user_id=chef_id, is_active=True, role__in=['cook', 'Cook'])
         except User.DoesNotExist:
             return Response(
                 {'error': 'Chef not found or inactive'}, 
@@ -172,9 +172,9 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
             is_active=True,
             role__in=['cook', 'Cook']
         ).exclude(
-            id=request.user.id
+            user_id=request.user.user_id
         ).values(
-            'id', 'name', 'username', 'email'
+            'user_id', 'name', 'username', 'email'
         )
         
         # Format chef data
@@ -182,12 +182,12 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
         for chef in active_chefs:
             # Get current workload (number of active bulk orders)
             active_assignments = BulkOrderAssignment.objects.filter(
-                chef_id=chef['id'],
+                chef_id=chef['user_id'],
                 bulk_order__status__in=['pending', 'confirmed', 'collaborating', 'preparing']
             ).count()
             
             chef_list.append({
-                'id': chef['id'],
+                'id': chef['user_id'],
                 'name': chef['name'] or chef['username'],
                 'username': chef['username'],
                 'email': chef['email'],

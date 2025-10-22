@@ -233,7 +233,7 @@ export default function Home() {
     },
     {
       title: "Today's Revenue",
-      value: `$${stats.today_revenue.toFixed(0)}`,
+      value: `LKR ${stats.today_revenue.toFixed(0)}`,
       change: "+15% from yesterday",
       icon: DollarSign,
       color: "text-emerald-600 dark:text-emerald-400",

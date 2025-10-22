@@ -93,7 +93,7 @@ const CustomerOrders: React.FC = () => {
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.chef.name.toLowerCase().includes(searchTerm.toLowerCase());
+                         (order.chef?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -237,7 +237,7 @@ const CustomerOrders: React.FC = () => {
                           Order #{order.order_number}
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          by {order.chef.name} • {new Date(order.created_at).toLocaleDateString()}
+                          by {order.chef?.name || 'Unknown Chef'} • {new Date(order.created_at).toLocaleDateString()}
                         </p>
                         <div className="flex items-center space-x-4 mt-1">
                           <div className="flex items-center space-x-1 text-sm text-gray-500">
@@ -333,7 +333,7 @@ const CustomerOrders: React.FC = () => {
                           <ChefHat className="h-5 w-5 text-orange-600" />
                         </div>
                         <div>
-                          <p className="font-medium">{selectedOrder.chef.name}</p>
+                          <p className="font-medium">{selectedOrder.chef?.name || 'Unknown Chef'}</p>
                           <p className="text-sm text-gray-600">Chef</p>
                         </div>
                       </div>
@@ -343,23 +343,27 @@ const CustomerOrders: React.FC = () => {
                     <div>
                       <h4 className="font-semibold mb-2">Order Items</h4>
                       <div className="space-y-2">
-                        {selectedOrder.items.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <div>
-                              <p className="font-medium">{item.food_name}</p>
-                              <p className="text-sm text-gray-600">by {item.cook_name} - {item.size}</p>
-                              {item.special_instructions && (
-                                <p className="text-xs text-gray-500 mt-1">
-                                  Note: {item.special_instructions}
-                                </p>
-                              )}
+                        {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                          selectedOrder.items.map((item) => (
+                            <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                              <div>
+                                <p className="font-medium">{item.food_name}</p>
+                                <p className="text-sm text-gray-600">by {item.cook_name} - {item.size}</p>
+                                {item.special_instructions && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Note: {item.special_instructions}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold">LKR {Math.round(item.total_price)}</p>
+                                <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="font-semibold">LKR {Math.round(item.total_price)}</p>
-                              <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
-                            </div>
-                          </div>
-                        ))}
+                          ))
+                        ) : (
+                          <p className="text-gray-500 text-sm">No items found in this order.</p>
+                        )}
                       </div>
                     </div>
 
