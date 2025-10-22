@@ -71,7 +71,7 @@ export class CartService {
    */
   static async getCartItems(): Promise<CartItem[]> {
     try {
-      const response = await apiClient.get('/api/orders/cart/');
+      const response = await apiClient.get('/orders/cart/');
       // Ensure we always return an array
       const data = response.data;
       if (Array.isArray(data)) {
@@ -93,7 +93,7 @@ export class CartService {
    */
   static async getCartSummary(): Promise<CartSummary> {
     try {
-      const response = await apiClient.get('/api/orders/cart/cart_summary/');
+      const response = await apiClient.get('/orders/cart/cart_summary/');
       const data = response.data;
       // Ensure cart_items is always an array
       if (data && !Array.isArray(data.cart_items)) {
@@ -116,7 +116,7 @@ export class CartService {
    */
   static async addToCart(priceId: number, quantity: number = 1, specialInstructions: string = ''): Promise<CartItem> {
     try {
-      const response = await apiClient.post('/api/orders/cart/add_to_cart/', {
+      const response = await apiClient.post('/orders/cart/add_to_cart/', {
         price_id: priceId,
         quantity: quantity,
         special_instructions: specialInstructions
@@ -133,7 +133,7 @@ export class CartService {
    */
   static async updateCartItem(cartItemId: number, quantity: number, specialInstructions?: string): Promise<CartItem> {
     try {
-      const response = await apiClient.patch(`/api/orders/cart/${cartItemId}/`, {
+      const response = await apiClient.patch(`/orders/cart/${cartItemId}/`, {
         quantity: quantity,
         special_instructions: specialInstructions || ''
       });
@@ -149,7 +149,7 @@ export class CartService {
    */
   static async removeFromCart(cartItemId: number): Promise<void> {
     try {
-      await apiClient.delete(`/api/orders/cart/${cartItemId}/`);
+      await apiClient.delete(`/orders/cart/${cartItemId}/`);
     } catch (error) {
       console.error('Error removing item from cart:', error);
       throw error;
@@ -161,7 +161,7 @@ export class CartService {
    */
   static async clearCart(): Promise<void> {
     try {
-      await apiClient.delete('/api/orders/cart/clear_cart/');
+      await apiClient.delete('/orders/cart/clear_cart/');
     } catch (error) {
       console.error('Error clearing cart:', error);
       throw error;

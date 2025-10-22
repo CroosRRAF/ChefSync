@@ -1,6 +1,14 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+// Log the configured base URL for debugging
+console.log('🔧 API Client Configuration:', {
+  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  API_BASE_URL,
+  mode: import.meta.env.MODE,
+  dev: import.meta.env.DEV
+});
 
 // Simple in-memory cache for API responses
 const apiCache = new Map<string, { data: any; timestamp: number; ttl: number }>();

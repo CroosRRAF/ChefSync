@@ -393,6 +393,7 @@ class BulkOrder(models.Model):
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("confirmed", "Confirmed"),
+        ("collaborating", "Collaborating"),
         ("preparing", "Preparing"),
         ("completed", "Completed"),
         ("cancelled", "Cancelled"),

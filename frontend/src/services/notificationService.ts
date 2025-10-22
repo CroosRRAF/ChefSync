@@ -19,7 +19,7 @@ export interface NotificationResponse {
 }
 
 class NotificationService {
-  private baseUrl = '/api/communications/notifications';
+  private baseUrl = '/communications/notifications';
 
   /**
    * Get all notifications for the current user

@@ -113,8 +113,9 @@ export interface BulkOrderStats {
 }
 
 export interface CollaborationRequest {
-  chef_ids: number[];
-  message?: string;
+  chef_id: number;
+  message: string;
+  work_distribution?: string;
 }
 
 export interface ChefCollaborator {
@@ -127,7 +128,7 @@ export interface ChefCollaborator {
 }
 
 class OrderService {
-  private baseUrl = '/api/orders';
+  private baseUrl = '/orders';
 
   /**
    * Create a new order from cart items
@@ -201,7 +202,15 @@ class OrderService {
   async getUserOrders(): Promise<OrderResponse[]> {
     try {
       const response = await apiClient.get(`${this.baseUrl}/orders/`);
-      return response.data;
+      // Handle both paginated and non-paginated responses
+      if (Array.isArray(response.data)) {
+        return response.data;
+      } else if (response.data?.results && Array.isArray(response.data.results)) {
+        return response.data.results;
+      } else {
+        console.warn('Unexpected response format:', response.data);
+        return [];
+      }
     } catch (error) {
       console.error('Error fetching orders:', error);
       throw new Error('Failed to fetch orders');
@@ -451,9 +460,9 @@ class OrderService {
   /**
    * Accept a bulk order
    */
-  async acceptBulkOrder(orderId: number): Promise<void> {
+  async acceptBulkOrder(orderId: number, notes?: string): Promise<void> {
     try {
-      await apiClient.post(`${this.baseUrl}/bulk/${orderId}/accept/`);
+      await apiClient.post(`${this.baseUrl}/bulk/${orderId}/accept/`, { notes });
     } catch (error: any) {
       console.error('Error accepting bulk order:', error);
       throw new Error(`Failed to accept bulk order: ${error.response?.data?.error || error.message}`);
@@ -463,9 +472,9 @@ class OrderService {
   /**
    * Decline a bulk order
    */
-  async declineBulkOrder(orderId: number): Promise<void> {
+  async declineBulkOrder(orderId: number, reason?: string): Promise<void> {
     try {
-      await apiClient.post(`${this.baseUrl}/bulk/${orderId}/decline/`);
+      await apiClient.post(`${this.baseUrl}/bulk/${orderId}/decline/`, { reason });
     } catch (error: any) {
       console.error('Error declining bulk order:', error);
       throw new Error(`Failed to decline bulk order: ${error.response?.data?.error || error.message}`);
@@ -494,6 +503,52 @@ class OrderService {
     } catch (error: any) {
       console.error('Error loading available chefs:', error);
       throw new Error(`Failed to load available chefs: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Accept an order (Chef accepts a pending order)
+   */
+  async acceptOrder(orderId: number, notes?: string): Promise<{ success: string; status: string }> {
+    try {
+      const response = await apiClient.post(`${this.baseUrl}/orders/${orderId}/chef_accept/`, {
+        notes: notes || 'Order accepted by chef'
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error accepting order:', error);
+      throw new Error(`Failed to accept order: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Reject an order (Chef rejects a pending order)
+   */
+  async rejectOrder(orderId: number, reason: string): Promise<{ success: string; status: string }> {
+    try {
+      const response = await apiClient.post(`${this.baseUrl}/orders/${orderId}/chef_reject/`, {
+        reason: reason
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error rejecting order:', error);
+      throw new Error(`Failed to reject order: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Update order status (Chef updates order through kitchen workflow)
+   */
+  async updateOrderStatus(orderId: number, status: string, notes?: string): Promise<{ success: string; status: string }> {
+    try {
+      const response = await apiClient.patch(`${this.baseUrl}/orders/${orderId}/chef_update_status/`, {
+        status: status,
+        notes: notes || ''
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error updating order status:', error);
+      throw new Error(`Failed to update order status: ${error.response?.data?.error || error.message}`);
     }
   }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '@/services/apiClient';
 import { 
   Card, 
   CardContent, 
@@ -192,12 +192,7 @@ const ChefMenu: React.FC = () => {
       
       console.log('Loading menu items with token:', token.substring(0, 20) + '...');
       
-      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await apiClient.get('/food/chef/foods/');
       
       console.log('Menu API response:', response.data);
       
@@ -246,12 +241,7 @@ const ChefMenu: React.FC = () => {
       
       console.log('Searching for foods with query:', query);
       
-      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/search/?q=${encodeURIComponent(query)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await apiClient.get(`/food/chef/foods/search/?q=${encodeURIComponent(query)}`);
       
       console.log('Search response:', response.data);
       setSearchResults(response.data);
@@ -259,11 +249,20 @@ const ChefMenu: React.FC = () => {
       
     } catch (error: any) {
       console.error('Error searching foods:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        fullURL: error.config?.baseURL + error.config?.url
+      });
       setSearchResults([]);
       setShowSearchResults(false);
       
       if (error.response?.status === 401) {
         showError('Your session has expired. Please log in again.');
+      } else if (error.response?.status === 404) {
+        // No results found - this is OK, show empty results
+        console.log('No foods found matching query');
       } else {
         showError('Error searching foods. Please try again.');
       }
@@ -478,21 +477,84 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
       foodFormData.append("size", primaryVariant.size);
       foodFormData.append("preparation_time", primaryVariant.preparation_time.toString());
 
-      response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/`,
+      response = await apiClient.post(
+        '/food/chef/foods/',
         foodFormData,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
           },
         }
       );
 
       console.log("✅ New food creation response:", response.data);
-      // ... rest of your logic (variants + success handling)
+      
+      // If there are additional price variants (beyond the first one), create them
+      if (priceVariants.length > 1) {
+        for (let i = 1; i < priceVariants.length; i++) {
+          const variant = priceVariants[i];
+          try {
+            await apiClient.post('/food/chef/prices/', {
+              food: response.data.food.food_id,
+              price: variant.price,
+              size: variant.size,
+              preparation_time: variant.preparation_time
+            });
+            console.log(`✅ Additional variant created: ${variant.size} - $${variant.price}`);
+          } catch (variantError) {
+            console.error(`❌ Error creating variant ${variant.size}:`, variantError);
+          }
+        }
+      }
+      
+      showSuccess("New food item created successfully! It's pending admin approval.");
     } else {
-      // ... existing food variant logic (unchanged)
+      // Adding price variants to existing food
+      console.log("📝 Adding price variants to existing food:", selectedFood);
+      
+      if (!selectedFood || !selectedFood.id) {
+        showError("Selected food is invalid. Please select again.");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Create all price variants for the selected existing food
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const variant of priceVariants) {
+        try {
+          const priceData = {
+            food: selectedFood.id,
+            price: variant.price,
+            size: variant.size,
+            preparation_time: variant.preparation_time
+          };
+          
+          console.log(`Creating price variant:`, priceData);
+          
+          await apiClient.post('/food/chef/prices/', priceData);
+          successCount++;
+          console.log(`✅ Variant created: ${variant.size} - $${variant.price}`);
+        } catch (variantError: any) {
+          errorCount++;
+          console.error(`❌ Error creating variant ${variant.size}:`, variantError);
+          
+          // Check for duplicate error
+          if (variantError.response?.data) {
+            const errorMsg = JSON.stringify(variantError.response.data);
+            if (errorMsg.includes('duplicate') || errorMsg.includes('already exists')) {
+              console.log(`⚠️ Variant ${variant.size} already exists, skipping...`);
+            }
+          }
+        }
+      }
+      
+      if (successCount > 0) {
+        showSuccess(`Successfully added ${successCount} price variant(s) to "${selectedFood.name}"!`);
+      } else if (errorCount > 0) {
+        showError(`Failed to add price variants. They may already exist.`);
+      }
     }
 
     resetForm();
@@ -555,12 +617,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
 
       console.log('Updating food with data:', updateData);
 
-      const response = await axios.patch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/${editingItem.food_id}/`, updateData, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await apiClient.patch(`/food/chef/foods/${editingItem.food_id}/`, updateData);
 
       // Update prices if there are changes
       for (const price of editedPrices) {
@@ -570,12 +627,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
           size: price.size
         };
 
-        await axios.patch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/prices/${price.price_id}/`, priceData, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        await apiClient.patch(`/food/chef/prices/${price.price_id}/`, priceData);
       }
 
       showSuccess('Food updated successfully!');
@@ -658,11 +710,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
 
     try {
       const token = localStorage.getItem('access_token');
-      await axios.delete(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/${foodId}/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      await apiClient.delete(`/food/chef/foods/${foodId}/`);
 
       showSuccess('Food deleted successfully!');
       await loadMenuItems();
@@ -1250,12 +1298,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
                             is_available: !food.is_available
                           };
 
-                          await axios.patch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/food/chef/foods/${food.food_id}/`, updateData, {
-                            headers: {
-                              'Authorization': `Bearer ${token}`,
-                              'Content-Type': 'application/json'
-                            }
-                          });
+                          await apiClient.patch(`/food/chef/foods/${food.food_id}/`, updateData);
 
                           await loadMenuItems();
                           

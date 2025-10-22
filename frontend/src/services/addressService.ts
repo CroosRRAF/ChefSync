@@ -31,7 +31,7 @@ export interface UpdateAddressData extends Partial<CreateAddressData> {
 
 class AddressService {
   // Ensure trailing slash to match DRF router endpoints and avoid redirects
-  private baseUrl = '/api/orders/addresses/';
+  private baseUrl = '/orders/addresses/';
 
   /**
    * Get all addresses for the current user

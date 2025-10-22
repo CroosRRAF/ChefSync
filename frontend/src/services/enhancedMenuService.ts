@@ -157,7 +157,7 @@ export interface UserLocation {
 
 // Enhanced Menu Service
 class EnhancedMenuService {
-  private baseUrl = '/api/food';
+  private baseUrl = '/food';
 
   /**
    * Get menu foods with advanced filtering and location-based features

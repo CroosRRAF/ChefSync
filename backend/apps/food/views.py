@@ -10,9 +10,10 @@ from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
 
-from .models import BulkMenu, Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
+from .models import BulkMenu, BulkMenuItem, Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer
 from .serializers import (
-    BulkMenuSerializer, CuisineSerializer, FoodCategorySerializer, FoodSerializer, 
+    BulkMenuSerializer, BulkMenuItemSerializer, BulkMenuWithItemsSerializer,
+    CuisineSerializer, FoodCategorySerializer, FoodSerializer, 
     ChefFoodCreateSerializer, ChefFoodPriceSerializer, FoodPriceSerializer, 
     FoodReviewSerializer, OfferSerializer
 )

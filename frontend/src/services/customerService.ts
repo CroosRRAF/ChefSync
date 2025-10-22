@@ -117,7 +117,7 @@ export const customerService = {
   getCustomerStats: async (): Promise<CustomerStats> => {
     try {
       // Get orders for statistics
-      const ordersResponse = await apiClient.get('/api/orders/orders/');
+      const ordersResponse = await apiClient.get('/orders/orders/');
       const orders = ordersResponse.data.results || ordersResponse.data;
 
       const totalOrders = orders.length;

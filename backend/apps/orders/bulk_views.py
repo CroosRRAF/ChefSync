@@ -162,33 +162,49 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
         """Get bulk order statistics"""
         try:
             # Status counts
+            pending_count = BulkOrder.objects.filter(status='pending').count()
+            confirmed_count = BulkOrder.objects.filter(status='confirmed').count()
+            collaborating_count = BulkOrder.objects.filter(status='collaborating').count()
+            preparing_count = BulkOrder.objects.filter(status='preparing').count()
+            completed_count = BulkOrder.objects.filter(status='completed').count()
+            cancelled_count = BulkOrder.objects.filter(status='cancelled').count()
+            
+            # Revenue calculations from related orders (only completed orders)
+            total_revenue = BulkOrder.objects.filter(
+                status='completed'
+            ).aggregate(
+                total=Sum('order__total_amount')
+            )['total'] or 0
+            
             stats = {
-                'pending': BulkOrder.objects.filter(status='pending').count(),
-                'confirmed': BulkOrder.objects.filter(status='confirmed').count(),
-                'preparing': BulkOrder.objects.filter(status='preparing').count(),
-                'completed': BulkOrder.objects.filter(status='completed').count(),
-                'cancelled': BulkOrder.objects.filter(status='cancelled').count(),
+                'pending': pending_count,
+                'confirmed': confirmed_count,
+                'accepted': confirmed_count,  # Frontend uses 'accepted' for confirmed status
+                'collaborating': collaborating_count,
+                'preparing': preparing_count,
+                'completed': completed_count,
+                'cancelled': cancelled_count,
+                'total_revenue': str(total_revenue),
+                'total_orders': pending_count + confirmed_count + collaborating_count + preparing_count + completed_count,
             }
+            
         except Exception as e:
             # Return mock data if database has issues
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error calculating bulk order stats: {str(e)}")
+            
             stats = {
-                'pending': 3,
-                'confirmed': 2,
-                'preparing': 1,
-                'completed': 5,
+                'pending': 0,
+                'confirmed': 0,
+                'accepted': 0,
+                'collaborating': 0,
+                'preparing': 0,
+                'completed': 0,
                 'cancelled': 0,
+                'total_revenue': '0.00',
+                'total_orders': 0,
             }
-        
-        # Revenue calculations from related orders
-        total_revenue = BulkOrder.objects.filter(
-            status__in=['completed', 'delivered']
-        ).aggregate(
-            total=Sum('order__total_amount')
-        )['total'] or 0
-        
-        stats.update({
-            'total_revenue': str(total_revenue),
-        })
         
         return Response(stats)
     

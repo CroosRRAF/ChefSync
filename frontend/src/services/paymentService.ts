@@ -332,7 +332,7 @@ class PaymentService {
     end_date?: string;
   }): Promise<PaymentStats> {
     try {
-      const response = await apiClient.get("/api/payments/stats/", { params });
+      const response = await apiClient.get("/payments/stats/", { params });
       return response.data;
     } catch (error: any) {
       console.error("Error fetching payment stats:", error);

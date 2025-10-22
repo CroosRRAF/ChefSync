@@ -16,7 +16,11 @@ export default defineConfig(({ mode }: { mode: string }) => ({
     // In non-dev, keep a permissive COOP for OAuth popups.
     headers:
       mode === "development"
-        ? {}
+        ? {
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+          }
         : {
             "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
           },

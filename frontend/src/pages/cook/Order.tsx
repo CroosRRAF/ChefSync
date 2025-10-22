@@ -398,7 +398,7 @@ const DashboardStats: React.FC<{ stats: ChefDashboardStats | null }> = ({ stats 
     },
     {
       title: 'Today Revenue',
-      value: `LKR ${stats.today_revenue.toFixed(2)}`,
+      value: `LKR ${(stats.today_revenue || 0).toFixed(2)}`,
       icon: DollarSign,
       color: 'text-green-600'
     }
@@ -504,9 +504,9 @@ const OrderDetailModal: React.FC<{
               {order.items?.map((item, index) => (
                 <div key={index} className="flex justify-between items-start p-3 bg-gray-50 dark:bg-gray-700 rounded">
                   <div className="flex-1">
-                    <p className="font-medium">{item.price_details.food_name}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{item.price_details.food_description}</p>
-                    <p className="text-xs text-gray-500">Size: {item.price_details.size}</p>
+                    <p className="font-medium">{item.price_details?.food_name || item.food_name || 'Unknown Item'}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{item.price_details?.food_description || item.food_description || ''}</p>
+                    <p className="text-xs text-gray-500">Size: {item.price_details?.size || item.size || 'Standard'}</p>
                     {item.special_instructions && (
                       <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
                         Note: {item.special_instructions}
@@ -515,7 +515,7 @@ const OrderDetailModal: React.FC<{
                   </div>
                   <div className="text-right ml-4">
                     <p className="font-medium">Qty: {item.quantity}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">${item.price_details.price}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">${item.price_details?.price || item.price || '0.00'}</p>
                     <p className="font-bold">${item.item_total}</p>
                   </div>
                 </div>
@@ -817,19 +817,20 @@ const Order: React.FC = () => {
   };
 
   // Pagination
-  const totalPages = Math.ceil(orders.length / ordersPerPage);
+  const ordersArray = Array.isArray(orders) ? orders : [];
+  const totalPages = Math.ceil(ordersArray.length / ordersPerPage);
   const startIndex = (currentPage - 1) * ordersPerPage;
   const endIndex = startIndex + ordersPerPage;
-  const currentOrders = orders.slice(startIndex, endIndex);
+  const currentOrders = ordersArray.slice(startIndex, endIndex);
 
   // Filter for status counts
   const statusCounts = useMemo(() => {
-    return orders.reduce((acc, order) => {
+    return ordersArray.reduce((acc, order) => {
       const key = `${order.status}_orders`;
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-  }, [orders]);
+  }, [ordersArray]);
 
   // Effects
   useEffect(() => {

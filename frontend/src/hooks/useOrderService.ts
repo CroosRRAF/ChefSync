@@ -95,28 +95,91 @@ export const useOrderService = () => {
     }
   }, []);
 
+  const acceptOrder = useCallback(async (orderId: number, notes?: string) => {
+    setLoading(true);
+    try {
+      const response = await orderService.acceptOrder(orderId, notes);
+      toast.success('Order accepted successfully');
+      return response;
+    } catch (error) {
+      console.error('Error accepting order:', error);
+      toast.error('Failed to accept order');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const rejectOrder = useCallback(async (orderId: number, reason: string) => {
+    setLoading(true);
+    try {
+      const response = await orderService.rejectOrder(orderId, reason);
+      toast.success('Order rejected');
+      return response;
+    } catch (error) {
+      console.error('Error rejecting order:', error);
+      toast.error('Failed to reject order');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const updateStatus = useCallback(async (orderId: number, status: string, notes?: string) => {
+    setLoading(true);
+    try {
+      const response = await orderService.updateOrderStatus(orderId, status, notes);
+      toast.success('Order status updated');
+      return response;
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast.error('Failed to update order status');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadOrderDetails = useCallback(async (orderId: number) => {
+    setLoading(true);
+    try {
+      const order = await orderService.getOrder(orderId);
+      return order;
+    } catch (error) {
+      console.error('Error loading order details:', error);
+      toast.error('Failed to load order details');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     loading,
     orders,
     dashboardStats,
     loadOrders,
     loadDashboardStats,
+    loadOrderDetails,
     createOrder,
     cancelOrder,
     getOrderStatus,
-    // Bulk order methods
-    loadBulkOrders: orderService.loadBulkOrders,
-    loadBulkOrderStats: orderService.loadBulkOrderStats,
-    acceptBulkOrder: orderService.acceptBulkOrder,
-    declineBulkOrder: orderService.declineBulkOrder,
-    requestCollaboration: orderService.requestCollaboration,
-    loadAvailableChefs: orderService.loadAvailableChefs,
-    // Direct service methods
-    calculateDeliveryFee: orderService.calculateDeliveryFee,
-    calculateTax: orderService.calculateTax,
-    calculateTotal: orderService.calculateTotal,
-    calculateDistance: orderService.calculateDistance,
-    formatOrderData: orderService.formatOrderData
+    acceptOrder,
+    rejectOrder,
+    updateStatus,
+    // Bulk order methods - bind to preserve 'this' context
+    loadBulkOrders: orderService.loadBulkOrders.bind(orderService),
+    loadBulkOrderStats: orderService.loadBulkOrderStats.bind(orderService),
+    acceptBulkOrder: orderService.acceptBulkOrder.bind(orderService),
+    declineBulkOrder: orderService.declineBulkOrder.bind(orderService),
+    requestCollaboration: orderService.requestCollaboration.bind(orderService),
+    loadAvailableChefs: orderService.loadAvailableChefs.bind(orderService),
+    // Direct service methods - bind to preserve 'this' context
+    calculateDeliveryFee: orderService.calculateDeliveryFee.bind(orderService),
+    calculateTax: orderService.calculateTax.bind(orderService),
+    calculateTotal: orderService.calculateTotal.bind(orderService),
+    calculateDistance: orderService.calculateDistance.bind(orderService),
+    formatOrderData: orderService.formatOrderData.bind(orderService)
   };
 };
 

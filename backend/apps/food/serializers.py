@@ -4,7 +4,7 @@ import uuid
 from rest_framework import serializers
 from utils.cloudinary_utils import get_optimized_url, upload_image_to_cloudinary
 
-from .models import BulkMenu, Cuisine, Food, FoodCategory, FoodPrice, FoodReview, Offer
+from .models import BulkMenu, BulkMenuItem, Cuisine, Food, FoodCategory, FoodPrice, FoodReview, Offer
 
 
 class CuisineSerializer(serializers.ModelSerializer):
@@ -708,3 +708,59 @@ class BulkMenuSerializer(serializers.ModelSerializer):
         base_fee = 100  # Base delivery fee in rupees
         # You can customize this logic based on your business requirements
         return base_fee
+
+
+class BulkMenuItemSerializer(serializers.ModelSerializer):
+    """Serializer for BulkMenuItem model"""
+    
+    class Meta:
+        model = BulkMenuItem
+        fields = [
+            "id",
+            "bulk_menu",
+            "item_name",
+            "description",
+            "is_optional",
+            "extra_cost",
+            "sort_order",
+            "is_vegetarian",
+            "is_vegan",
+            "is_gluten_free",
+            "spice_level",
+            "allergens",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+
+class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
+    """Serializer for BulkMenu with nested items"""
+    items = BulkMenuItemSerializer(many=True, read_only=True)
+    chef_name = serializers.CharField(source="chef.username", read_only=True)
+    approved_by_name = serializers.CharField(source="approved_by.username", read_only=True, allow_null=True)
+    
+    class Meta:
+        model = BulkMenu
+        fields = [
+            "id",
+            "chef",
+            "chef_name",
+            "meal_type",
+            "menu_name",
+            "description",
+            "base_price_per_person",
+            "availability_status",
+            "approval_status",
+            "approved_by",
+            "approved_by_name",
+            "approved_at",
+            "rejection_reason",
+            "min_persons",
+            "max_persons",
+            "advance_notice_hours",
+            "items",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["chef", "approved_by", "approved_at", "created_at", "updated_at"]

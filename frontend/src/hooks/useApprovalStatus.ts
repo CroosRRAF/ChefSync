@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import apiClient from '@/services/apiClient';
 
 interface ApprovalStatus {
   approval_status: string;
@@ -19,31 +20,15 @@ export const useApprovalStatus = () => {
 
     setIsLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('access_token'); // Fixed token key
-      
-      const response = await fetch(`${apiUrl}/api/auth/approval-status/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setApprovalStatus(data);
-      } else if (response.status === 401) {
+      const response = await apiClient.get('/auth/approval-status/');
+      setApprovalStatus(response.data);
+    } catch (error: any) {
+      if (error.response?.status === 401 && user?.email) {
         // If unauthorized, try without token (for users who just registered)
-        const responseWithoutAuth = await fetch(`${apiUrl}/api/auth/approval-status/?email=${encodeURIComponent(user.email)}`, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (responseWithoutAuth.ok) {
-          const data = await responseWithoutAuth.json();
-          setApprovalStatus(data);
-        } else {
+        try {
+          const responseWithoutAuth = await apiClient.get(`/auth/approval-status/?email=${encodeURIComponent(user.email)}`);
+          setApprovalStatus(responseWithoutAuth.data);
+        } catch (fallbackError) {
           setApprovalStatus({
             approval_status: 'unknown',
             can_login: false,
@@ -51,20 +36,12 @@ export const useApprovalStatus = () => {
           });
         }
       } else {
-        // If we can't check status, assume they can't login
         setApprovalStatus({
           approval_status: 'unknown',
           can_login: false,
           message: 'Unable to verify approval status'
         });
       }
-    } catch (error) {
-      console.error('Error checking approval status:', error);
-      setApprovalStatus({
-        approval_status: 'unknown',
-        can_login: false,
-        message: 'Error checking approval status'
-      });
     } finally {
       setIsLoading(false);
     }

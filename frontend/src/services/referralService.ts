@@ -106,7 +106,7 @@ class ReferralService {
    */
   async getReferralStats(): Promise<ReferralStats> {
     try {
-      const response = await apiClient.get("/api/auth/referral/stats/");
+      const response = await apiClient.get("/auth/referral/stats/");
       return response.data;
     } catch (error) {
       console.error("Error fetching referral stats:", error);

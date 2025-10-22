@@ -258,7 +258,7 @@ export interface OrderListResponse {
 }
 
 class AdminService {
-  private baseUrl = "/api/admin-management";
+  private baseUrl = "/admin-management";
 
   // Map backend approval_status + is_active -> single synthetic status string for legacy UI filters
   private deriveUserStatus(user: {
@@ -1217,7 +1217,7 @@ class AdminService {
   // Get food statistics
   async getFoodStats() {
     try {
-      const response = await apiClient.get("/api/food/stats/");
+      const response = await apiClient.get("/food/stats/");
       return response.data;
     } catch (error) {
       console.error("Error fetching food stats:", error);

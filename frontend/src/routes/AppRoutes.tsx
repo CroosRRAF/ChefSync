@@ -48,6 +48,7 @@ import PickupNavigationDemo from "@/pages/demo/PickupNavigationDemo";
 
 import CookLayout from "@/components/layout/CookLayout";
 import CookBulkOrders from "@/pages/cook/BulkOrders";
+import CookBulkMenus from "@/pages/cook/BulkMenus";
 import CookDashboard from "@/pages/cook/Dashboard";
 import CookHome from "@/pages/cook/Home";
 import CookMenu from "@/pages/cook/MenuNew";
@@ -470,6 +471,7 @@ const InnerRoutes: React.FC = () => {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<CookDashboard />} />
           <Route path="bulk-orders" element={<CookBulkOrders />} />
+          <Route path="bulk-menu" element={<CookBulkMenus />} />
           <Route path="home" element={<CookHome />} />
           <Route path="menu" element={<CookMenu />} />
           <Route path="orders" element={<CookOrders />} />
