@@ -10,6 +10,10 @@ router.register(r'customer/foods', views.CustomerFoodViewSet, basename='customer
 router.register(r'cuisines', views.CuisineViewSet, basename='cuisines')
 router.register(r'categories', views.FoodCategoryViewSet, basename='categories')
 router.register(r'reviews', views.FoodReviewViewSet, basename='reviews')
+
+# Bulk Menu Management URLs
+router.register(r'bulk-menus', views.BulkMenuViewSet, basename='bulk-menus')
+router.register(r'bulk-menu-items', views.BulkMenuItemViewSet, basename='bulk-menu-items')
 router.register(r'offers', views.OfferViewSet, basename='offers')
 router.register(r'images', views.FoodImageViewSet, basename='images')
 

@@ -397,8 +397,8 @@ const DashboardStats: React.FC<{ stats: ChefDashboardStats | null }> = ({ stats 
     },
     {
       title: 'Today Revenue',
-      value: `$${stats.today_revenue.toFixed(2)}`,
-      icon: DollarSign,
+      value: `Rs.${stats.today_revenue.toFixed(2)}`,
+      icon: () => <span className="font-bold text-lg">LRK</span>,
       color: 'text-green-600'
     }
   ];
@@ -695,8 +695,11 @@ const Order: React.FC = () => {
       }
       
       const fetchedOrders = await loadOrders(filters);
-      setOrders(fetchedOrders);
-      showNotification(`Loaded ${fetchedOrders.length} orders`, 'success');
+      
+      // Ensure fetchedOrders is always an array
+      const ordersArray = Array.isArray(fetchedOrders) ? fetchedOrders : [];
+      setOrders(ordersArray);
+      showNotification(`Loaded ${ordersArray.length} orders`, 'success');
       
     } catch (error) {
       console.error('Error fetching orders:', error);

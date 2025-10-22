@@ -234,3 +234,202 @@ class FoodReview(models.Model):
         unique_together = ['customer', 'price', 'order']
 
 
+class BulkMealType(models.TextChoices):
+    """Meal type choices for bulk menus"""
+    BREAKFAST = 'breakfast', 'Breakfast'
+    LUNCH = 'lunch', 'Lunch'
+    DINNER = 'dinner', 'Dinner'
+    SNACKS = 'snacks', 'Snacks'
+
+
+class BulkMenu(models.Model):
+    """Bulk menu management for chefs"""
+    
+    APPROVAL_STATUS_CHOICES = [
+        ('pending', 'Pending Approval'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    chef = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='bulk_menus',
+        limit_choices_to={'role': 'cook'}
+    )
+    meal_type = models.CharField(max_length=20, choices=BulkMealType.choices)
+    menu_name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    base_price_per_person = models.DecimalField(
+        max_digits=8, 
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        help_text="Base price per person in rupees"
+    )
+    availability_status = models.BooleanField(default=True)
+    approval_status = models.CharField(
+        max_length=20, 
+        choices=APPROVAL_STATUS_CHOICES, 
+        default='pending'
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_bulk_menus',
+        limit_choices_to={'is_staff': True}
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    
+    # Additional metadata
+    min_persons = models.PositiveIntegerField(
+        default=10,
+        help_text="Minimum number of persons for this bulk menu"
+    )
+    max_persons = models.PositiveIntegerField(
+        default=100,
+        help_text="Maximum number of persons for this bulk menu"
+    )
+    advance_notice_hours = models.PositiveIntegerField(
+        default=24,
+        help_text="Hours of advance notice required for ordering"
+    )
+    
+    # Image fields
+    image = CloudinaryImageField(
+        blank=True, 
+        null=True,
+        help_text="Main image for the bulk menu"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.chef.username} - {self.menu_name} ({self.get_meal_type_display()})"
+    
+    @property
+    def is_approved(self):
+        return self.approval_status == 'approved'
+    
+    @property
+    def is_available(self):
+        return self.availability_status and self.is_approved
+    
+    def calculate_total_cost(self, num_persons):
+        """Calculate total cost for given number of persons including optional items"""
+        from decimal import Decimal
+        
+        if not self.items.exists():
+            return self.base_price_per_person * Decimal(str(num_persons))
+        
+        optional_cost = sum(item.extra_cost for item in self.items.filter(is_optional=True))
+        return (self.base_price_per_person + optional_cost) * Decimal(str(num_persons))
+    
+    def get_menu_items_summary(self):
+        """Get a summary of menu items"""
+        items = self.items.all()
+        mandatory_items = [item.item_name for item in items if not item.is_optional]
+        optional_items = [f"{item.item_name} (+₹{item.extra_cost})" for item in items if item.is_optional]
+        
+        return {
+            'mandatory_items': mandatory_items,
+            'optional_items': optional_items,
+            'total_items': items.count()
+        }
+    
+    def get_image_url(self):
+        """Get optimized Cloudinary URL for the main image"""
+        if self.image:
+            from utils.cloudinary_utils import get_optimized_url
+            return get_optimized_url(str(self.image))
+        return None
+    
+    def get_thumbnail_url(self):
+        """Get thumbnail version of the main image"""
+        if self.image:
+            from utils.cloudinary_utils import get_optimized_url
+            return get_optimized_url(str(self.image), width=300, height=200)
+        return None
+    
+    class Meta:
+        db_table = 'bulk_menus'
+        ordering = ['-created_at']
+        unique_together = ['chef', 'meal_type', 'menu_name']
+        indexes = [
+            models.Index(fields=['meal_type', 'approval_status']),
+            models.Index(fields=['chef', 'availability_status']),
+        ]
+
+
+class BulkMenuItem(models.Model):
+    """Individual items within a bulk menu"""
+    
+    bulk_menu = models.ForeignKey(
+        BulkMenu, 
+        on_delete=models.CASCADE, 
+        related_name='items'
+    )
+    item_name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    is_optional = models.BooleanField(
+        default=False,
+        help_text="Whether this item is optional (customers can choose to add)"
+    )
+    extra_cost = models.DecimalField(
+        max_digits=8, 
+        decimal_places=2, 
+        default=0.00,
+        validators=[MinValueValidator(0)],
+        help_text="Additional cost if this item is selected (for optional items)"
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+    
+    # Nutritional and dietary information
+    is_vegetarian = models.BooleanField(default=False)
+    is_vegan = models.BooleanField(default=False)
+    is_gluten_free = models.BooleanField(default=False)
+    spice_level = models.CharField(
+        max_length=20, 
+        choices=[
+            ('mild', 'Mild'),
+            ('medium', 'Medium'),
+            ('hot', 'Hot'),
+            ('very_hot', 'Very Hot'),
+        ], 
+        blank=True, 
+        null=True
+    )
+    allergens = models.JSONField(default=list, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        optional_text = " (Optional)" if self.is_optional else ""
+        cost_text = f" +₹{self.extra_cost}" if self.extra_cost > 0 else ""
+        return f"{self.item_name}{optional_text}{cost_text}"
+    
+    def clean(self):
+        """Validate bulk menu item"""
+        from django.core.exceptions import ValidationError
+        
+        # If item is not optional, extra_cost should be 0
+        if not self.is_optional and self.extra_cost > 0:
+            raise ValidationError(
+                "Mandatory items should not have extra cost. Set is_optional=True for items with extra cost."
+            )
+    
+    def save(self, *args, **kwargs):
+        """Custom save to run validation"""
+        self.full_clean()
+        super().save(*args, **kwargs)
+    
+    class Meta:
+        db_table = 'bulk_menu_items'
+        ordering = ['sort_order', 'item_name']
+        unique_together = ['bulk_menu', 'item_name']
+
+

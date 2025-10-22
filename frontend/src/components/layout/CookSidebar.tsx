@@ -16,7 +16,8 @@ import {
   ClipboardList, 
   Package, 
   Bell,
-  UtensilsCrossed 
+  UtensilsCrossed,
+  Menu
 } from "lucide-react";
 
 const items = [
@@ -24,6 +25,7 @@ const items = [
   { title: "Menu", url: "/cook/menu", icon: ChefHat },
   { title: "Orders", url: "/cook/orders", icon: ClipboardList },
   { title: "Bulk Orders", url: "/cook/bulk-orders", icon: Package },
+  { title: "Bulk Menu", url: "/cook/bulk-menu", icon: Menu },
   { title: "Notifications", url: "/cook/notifications", icon: Bell },
 ];
 

@@ -1,6 +1,36 @@
 from rest_framework import serializers
-from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer, FoodImage
+from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer, FoodImage, BulkMenu, BulkMenuItem
 from utils.cloudinary_utils import get_optimized_url
+import json
+
+
+class JSONListField(serializers.ListField):
+    """Custom field to handle JSON string input from FormData"""
+    
+    def to_internal_value(self, data):
+        # Handle FormData case where JSON string is wrapped in a list
+        if isinstance(data, list) and len(data) == 1 and isinstance(data[0], str):
+            json_string = data[0]
+            try:
+                # Parse JSON string from FormData
+                parsed_data = json.loads(json_string)
+                # Now parse each item with the child serializer
+                return super().to_internal_value(parsed_data)
+            except (json.JSONDecodeError, ValueError) as e:
+                raise serializers.ValidationError(f"Invalid JSON format: {str(e)}")
+        
+        # If data is a string, try to parse it as JSON first
+        elif isinstance(data, str):
+            try:
+                # Parse JSON string from FormData
+                parsed_data = json.loads(data)
+                # Now parse each item with the child serializer
+                return super().to_internal_value(parsed_data)
+            except (json.JSONDecodeError, ValueError) as e:
+                raise serializers.ValidationError(f"Invalid JSON format: {str(e)}")
+        
+        # If data is already a proper list, process normally
+        return super().to_internal_value(data)
 
 
 class CuisineSerializer(serializers.ModelSerializer):
@@ -338,3 +368,321 @@ class OfferSerializer(serializers.ModelSerializer):
     class Meta:
         model = Offer
         fields = '__all__'
+
+
+class BulkMenuItemSerializer(serializers.ModelSerializer):
+    """Serializer for bulk menu items"""
+    
+    class Meta:
+        model = BulkMenuItem
+        fields = [
+            'id', 'bulk_menu', 'item_name', 'description', 'is_optional', 'extra_cost',
+            'sort_order', 'is_vegetarian', 'is_vegan', 'is_gluten_free', 'spice_level',
+            'allergens', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'bulk_menu': {'required': False}  # Allow bulk_menu to be optional for nested creation
+        }
+    
+    def validate_extra_cost(self, value):
+        """Validate that extra cost is non-negative"""
+        if value < 0:
+            raise serializers.ValidationError("Extra cost cannot be negative")
+        return value
+    
+    def validate(self, data):
+        """Custom validation for bulk menu items"""
+        # If item is not optional, extra_cost should be 0
+        if not data.get('is_optional', False) and data.get('extra_cost', 0) > 0:
+            raise serializers.ValidationError(
+                "Mandatory items should not have extra cost. Set is_optional=True for items with extra cost."
+            )
+        return data
+
+
+class BulkMenuSerializer(serializers.ModelSerializer):
+    """Serializer for bulk menus"""
+    
+    items = BulkMenuItemSerializer(many=True, read_only=True)
+    chef_name = serializers.CharField(source='chef.username', read_only=True)
+    chef_full_name = serializers.CharField(source='chef.name', read_only=True)
+    meal_type_display = serializers.CharField(source='get_meal_type_display', read_only=True)
+    approval_status_display = serializers.CharField(source='get_approval_status_display', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.username', read_only=True)
+    items_count = serializers.SerializerMethodField()
+    menu_items_summary = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BulkMenu
+        fields = [
+            'id', 'chef', 'chef_name', 'chef_full_name', 'meal_type', 'meal_type_display',
+            'menu_name', 'description', 'base_price_per_person', 'availability_status',
+            'approval_status', 'approval_status_display', 'approved_by', 'approved_by_name',
+            'approved_at', 'rejection_reason', 'min_persons', 'max_persons',
+            'advance_notice_hours', 'image', 'image_url', 'thumbnail_url', 'items', 
+            'items_count', 'menu_items_summary', 'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'approved_by', 'approved_at', 'items', 'created_at', 'updated_at'
+        ]
+    
+    def get_items_count(self, obj):
+        """Get total number of items in this menu"""
+        return obj.items.count()
+    
+    def get_menu_items_summary(self, obj):
+        """Get summary of menu items"""
+        return obj.get_menu_items_summary()
+    
+    def get_image_url(self, obj):
+        """Get optimized Cloudinary URL for the main image"""
+        return obj.get_image_url()
+    
+    def get_thumbnail_url(self, obj):
+        """Get thumbnail version of the main image"""
+        return obj.get_thumbnail_url()
+    
+    def validate_base_price_per_person(self, value):
+        """Validate that base price is positive"""
+        if value <= 0:
+            raise serializers.ValidationError("Base price per person must be greater than 0")
+        return value
+    
+    def validate_min_persons(self, value):
+        """Validate minimum persons"""
+        if value < 1:
+            raise serializers.ValidationError("Minimum persons must be at least 1")
+        return value
+    
+    def validate_max_persons(self, value):
+        """Validate maximum persons"""
+        if value < 1:
+            raise serializers.ValidationError("Maximum persons must be at least 1")
+        return value
+    
+    def validate(self, data):
+        """Custom validation for bulk menus"""
+        min_persons = data.get('min_persons')
+        max_persons = data.get('max_persons')
+        
+        if min_persons and max_persons and min_persons > max_persons:
+            raise serializers.ValidationError(
+                "Minimum persons cannot be greater than maximum persons"
+            )
+        
+        # Check for duplicate menu name per chef per meal type
+        if self.instance is None:  # Creating new menu
+            chef = data.get('chef') or self.context['request'].user
+            meal_type = data.get('meal_type')
+            menu_name = data.get('menu_name')
+            
+            if BulkMenu.objects.filter(
+                chef=chef, 
+                meal_type=meal_type, 
+                menu_name=menu_name
+            ).exists():
+                raise serializers.ValidationError(
+                    f"A menu with name '{menu_name}' already exists for {meal_type}"
+                )
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create bulk menu with chef from request user"""
+        validated_data['chef'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class BulkMenuItemCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating bulk menu items (without bulk_menu field)"""
+    
+    class Meta:
+        model = BulkMenuItem
+        fields = [
+            'item_name', 'description', 'is_optional', 'extra_cost',
+            'sort_order', 'is_vegetarian', 'is_vegan', 'is_gluten_free', 'spice_level',
+            'allergens'
+        ]
+    
+    def validate_extra_cost(self, value):
+        """Validate that extra cost is non-negative"""
+        if value < 0:
+            raise serializers.ValidationError("Extra cost cannot be negative")
+        return value
+
+
+class BulkMenuCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating bulk menus with items"""
+    
+    items = JSONListField(
+        child=BulkMenuItemCreateSerializer(), 
+        required=False, 
+        allow_empty=True,
+        write_only=True
+    )
+    image = serializers.FileField(required=False, allow_null=True, write_only=True)
+    
+    class Meta:
+        model = BulkMenu
+        fields = [
+            'meal_type', 'menu_name', 'description', 'base_price_per_person',
+            'availability_status', 'min_persons', 'max_persons', 'advance_notice_hours',
+            'image', 'items'
+        ]
+    
+    def to_internal_value(self, data):
+        """Handle FormData conversion issues"""
+        # Create a mutable copy of the data
+        if hasattr(data, '_mutable'):
+            data._mutable = True
+        
+        # Convert string boolean values to actual booleans
+        if 'availability_status' in data:
+            val = data['availability_status']
+            if isinstance(val, str):
+                data['availability_status'] = val.lower() in ('true', '1', 'yes', 'on')
+        
+        return super().to_internal_value(data)
+    
+    def validate_image(self, value):
+        """Validate and process image upload"""
+        if value:
+            print(f"DEBUG: Bulk menu image file received: {value.name}, size: {value.size}")
+            # Upload to Cloudinary
+            try:
+                from utils.cloudinary_utils import upload_image_to_cloudinary
+                result = upload_image_to_cloudinary(value, folder='bulk_menus')
+                if result and 'secure_url' in result:
+                    print(f"DEBUG: Bulk menu image uploaded to Cloudinary: {result['secure_url']}")
+                    return result['secure_url']
+                else:
+                    print("ERROR: Cloudinary upload failed - no secure_url in result")
+                    return None
+            except Exception as e:
+                print(f"ERROR: Cloudinary upload failed: {e}")
+                return None
+        return None
+    
+    def validate(self, data):
+        """Custom validation"""
+        # Validate using parent class logic with proper context
+        min_persons = data.get('min_persons')
+        max_persons = data.get('max_persons')
+        
+        if min_persons and max_persons and min_persons > max_persons:
+            raise serializers.ValidationError(
+                "Minimum persons cannot be greater than maximum persons"
+            )
+        
+        # Check for duplicate menu name per chef per meal type
+        chef = self.context['request'].user
+        meal_type = data.get('meal_type')
+        menu_name = data.get('menu_name')
+        
+        if BulkMenu.objects.filter(
+            chef=chef, 
+            meal_type=meal_type, 
+            menu_name=menu_name
+        ).exists():
+            raise serializers.ValidationError({
+                "menu_name": [f"A menu with name '{menu_name}' already exists for {meal_type}"]
+            })
+        
+        # Additional validation for items
+        items_data = data.get('items', [])
+        if len(items_data) == 0:
+            raise serializers.ValidationError({"items": ["Menu must have at least one item"]})
+        
+        # Check for duplicate item names
+        item_names = [item['item_name'] for item in items_data]
+        if len(item_names) != len(set(item_names)):
+            raise serializers.ValidationError({"items": ["Menu items must have unique names"]})
+        
+        # Validate individual items
+        for i, item_data in enumerate(items_data):
+            # If item is not optional, extra_cost should be 0
+            if not item_data.get('is_optional', False) and item_data.get('extra_cost', 0) > 0:
+                raise serializers.ValidationError({
+                    "items": [f"Item '{item_data.get('item_name', f'item {i+1}')}': Mandatory items should not have extra cost. Set is_optional=True for items with extra cost."]
+                })
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create bulk menu with items"""
+        items_data = validated_data.pop('items', [])
+        
+        # Handle image upload - it should be a Cloudinary URL now from validate_image
+        image_url = validated_data.pop('image', None)
+        if image_url:
+            validated_data['image'] = image_url
+        
+        validated_data['chef'] = self.context['request'].user
+        
+        # Create bulk menu
+        bulk_menu = BulkMenu.objects.create(**validated_data)
+        
+        # Create menu items
+        for item_data in items_data:
+            BulkMenuItem.objects.create(bulk_menu=bulk_menu, **item_data)
+        
+        return bulk_menu
+
+
+class BulkMenuCostCalculationSerializer(serializers.Serializer):
+    """Serializer for calculating bulk menu costs"""
+    
+    bulk_menu_id = serializers.IntegerField()
+    num_persons = serializers.IntegerField(min_value=1)
+    optional_items = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True,
+        help_text="List of optional item IDs to include"
+    )
+    
+    def validate_num_persons(self, value):
+        """Validate number of persons"""
+        if value < 1:
+            raise serializers.ValidationError("Number of persons must be at least 1")
+        return value
+    
+    def validate(self, data):
+        """Validate bulk menu exists and person count is within limits"""
+        bulk_menu_id = data['bulk_menu_id']
+        num_persons = data['num_persons']
+        
+        try:
+            bulk_menu = BulkMenu.objects.get(id=bulk_menu_id)
+        except BulkMenu.DoesNotExist:
+            raise serializers.ValidationError("Bulk menu not found")
+        
+        if num_persons < bulk_menu.min_persons:
+            raise serializers.ValidationError(
+                f"Minimum {bulk_menu.min_persons} persons required for this menu"
+            )
+        
+        if num_persons > bulk_menu.max_persons:
+            raise serializers.ValidationError(
+                f"Maximum {bulk_menu.max_persons} persons allowed for this menu"
+            )
+        
+        # Validate optional items belong to this menu
+        optional_items = data.get('optional_items', [])
+        if optional_items:
+            valid_optional_items = bulk_menu.items.filter(
+                id__in=optional_items, 
+                is_optional=True
+            ).values_list('id', flat=True)
+            
+            invalid_items = set(optional_items) - set(valid_optional_items)
+            if invalid_items:
+                raise serializers.ValidationError(
+                    f"Invalid optional item IDs: {list(invalid_items)}"
+                )
+        
+        data['bulk_menu'] = bulk_menu
+        return data

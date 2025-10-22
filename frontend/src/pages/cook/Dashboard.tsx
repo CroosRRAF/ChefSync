@@ -12,8 +12,13 @@ import {
   RefreshCw
 } from "lucide-react";
 import { ChefDashboardStats, useOrderService } from '@/services/orderService';
+import { useAuth } from '@/context/AuthContext';
+import Greeting from '@/components/cook/Greeting';
 
 export default function Dashboard() {
+  // Get user data from auth context
+  const { user } = useAuth();
+  
   // State for API data
   const [stats, setStats] = useState<ChefDashboardStats | null>(null);
   const [reviews, setReviews] = useState<any[]>([]);
@@ -118,7 +123,7 @@ export default function Dashboard() {
     },
     {
       title: "Today Revenue",
-      value: `$${stats.today_revenue.toFixed(2)}`,
+      value: `Rs.${stats.today_revenue.toFixed(2)}`,
       change: `${stats.average_rating}/5 rating`,
       icon: TrendingUp,
       color: "text-primary",
@@ -130,12 +135,10 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background p-6 space-y-6">
       {/* Welcome Section */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Good Morning, Chef!</h1>
-          <p className="text-muted-foreground mt-1">
-            {error ? '⚠️ ' + error : "Here's what's happening in your kitchen today"}
-          </p>
-        </div>
+        <Greeting 
+          chefName={user?.name || 'Chef'} 
+          error={error} 
+        />
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="px-3 py-1">
             <Clock className="h-3 w-3 mr-1" />

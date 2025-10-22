@@ -54,6 +54,7 @@ import CookNotifications from "@/pages/cook/Notifications";
 import CookProfile from "@/pages/cook/Profile";
 import CookSettings from "@/pages/cook/Settings";
 import CookLayout from "@/components/layout/CookLayout";
+import BulkMenuManagement from "@/components/cook/BulkMenuManagement";
 
 // Admin pages
 import ModernDashboard from "@/pages/admin/ModernDashboard";
@@ -432,6 +433,7 @@ const InnerRoutes: React.FC = () => {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<CookDashboard />} />
           <Route path="bulk-orders" element={<CookBulkOrders />} />
+          <Route path="bulk-menu" element={<BulkMenuManagement />} />
           <Route path="home" element={<CookHome />} />
           <Route path="menu" element={<CookMenu />} />
           <Route path="orders" element={<CookOrders />} />

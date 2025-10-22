@@ -1,13 +1,16 @@
-from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import viewsets, status, filters, serializers
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer, FoodImage
+from django.utils import timezone
+from .models import Cuisine, FoodCategory, Food, FoodReview, FoodPrice, Offer, FoodImage, BulkMenu, BulkMenuItem
 from .serializers import (
     CuisineSerializer, FoodCategorySerializer, FoodSerializer, 
     ChefFoodCreateSerializer, ChefFoodPriceSerializer, FoodPriceSerializer, 
-    FoodReviewSerializer, OfferSerializer, FoodImageSerializer
+    FoodReviewSerializer, OfferSerializer, FoodImageSerializer,
+    BulkMenuSerializer, BulkMenuItemSerializer, BulkMenuCreateSerializer,
+    BulkMenuCostCalculationSerializer
 )
 
 @api_view(['GET'])
@@ -540,3 +543,333 @@ def chef_food_status(request):
         'recent_submissions': FoodSerializer(recent_foods, many=True, context={'request': request}).data,
         'total_foods': chef_foods.count()
     })
+
+
+class BulkMenuViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing bulk menus
+    Provides CRUD operations for chefs to manage their bulk menus
+    """
+    serializer_class = BulkMenuSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['menu_name', 'description']
+    ordering_fields = ['created_at', 'meal_type', 'base_price_per_person']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        """Filter bulk menus based on user role"""
+        user = self.request.user
+        
+        # Admins can see all menus
+        if user.is_staff:
+            queryset = BulkMenu.objects.all()
+        else:
+            # Chefs can only see their own menus
+            queryset = BulkMenu.objects.filter(chef=user)
+        
+        # Filter by meal type if provided
+        meal_type = self.request.query_params.get('meal_type')
+        if meal_type:
+            queryset = queryset.filter(meal_type=meal_type)
+        
+        # Filter by approval status if provided
+        approval_status = self.request.query_params.get('approval_status')
+        if approval_status:
+            queryset = queryset.filter(approval_status=approval_status)
+        
+        # Filter by availability status if provided
+        availability_status = self.request.query_params.get('availability_status')
+        if availability_status:
+            is_available = availability_status.lower() == 'true'
+            queryset = queryset.filter(availability_status=is_available)
+        
+        return queryset.select_related('chef', 'approved_by').prefetch_related('items')
+    
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action"""
+        if self.action == 'create':
+            return BulkMenuCreateSerializer
+        return BulkMenuSerializer
+    
+    def perform_create(self, serializer):
+        """Set chef to current user when creating"""
+        serializer.save(chef=self.request.user)
+    
+
+    
+    def update(self, request, *args, **kwargs):
+        """Custom update to reset approval status when menu is modified"""
+        instance = self.get_object()
+        
+        # Only allow chef to update their own menus (unless admin)
+        if not request.user.is_staff and instance.chef != request.user:
+            return Response(
+                {'error': 'You can only update your own menus'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Reset approval status if menu content is modified
+        significant_fields = ['menu_name', 'description', 'base_price_per_person', 'min_persons', 'max_persons']
+        if any(field in request.data for field in significant_fields):
+            if instance.approval_status == 'approved':
+                instance.approval_status = 'pending'
+                instance.approved_by = None
+                instance.approved_at = None
+                instance.save()
+        
+        return super().update(request, *args, **kwargs)
+    
+    @action(detail=True, methods=['put', 'patch'])
+    def update_with_items(self, request, pk=None):
+        """Update bulk menu with its items"""
+        instance = self.get_object()
+        
+        # Only allow chef to update their own menus (unless admin)
+        if not request.user.is_staff and instance.chef != request.user:
+            return Response(
+                {'error': 'You can only update your own menus'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Use BulkMenuCreateSerializer for updates that include items
+        serializer = BulkMenuCreateSerializer(
+            instance, 
+            data=request.data, 
+            partial=request.method == 'PATCH',
+            context={'request': request}
+        )
+        
+        if serializer.is_valid():
+            # Reset approval status if content is modified
+            significant_fields = ['menu_name', 'description', 'base_price_per_person', 'min_persons', 'max_persons', 'items']
+            if any(field in request.data for field in significant_fields):
+                if instance.approval_status == 'approved':
+                    instance.approval_status = 'pending'
+                    instance.approved_by = None
+                    instance.approved_at = None
+                    instance.save()
+            
+            # If items are provided, update them
+            if 'items' in request.data:
+                # Delete existing items
+                instance.items.all().delete()
+                
+                # Create new items from the provided data
+                items_data = serializer.validated_data.pop('items', [])
+                updated_instance = serializer.save()
+                
+                for item_data in items_data:
+                    BulkMenuItem.objects.create(bulk_menu=updated_instance, **item_data)
+            else:
+                updated_instance = serializer.save()
+            
+            # Return updated data with the read serializer
+            response_serializer = BulkMenuSerializer(updated_instance, context={'request': request})
+            return Response(response_serializer.data)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def approve(self, request, pk=None):
+        """Approve a bulk menu (admin only)"""
+        bulk_menu = self.get_object()
+        
+        if bulk_menu.approval_status == 'approved':
+            return Response({'message': 'Menu is already approved'})
+        
+        bulk_menu.approval_status = 'approved'
+        bulk_menu.approved_by = request.user
+        bulk_menu.approved_at = timezone.now()
+        bulk_menu.save()
+        
+        serializer = self.get_serializer(bulk_menu)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def reject(self, request, pk=None):
+        """Reject a bulk menu (admin only)"""
+        bulk_menu = self.get_object()
+        rejection_reason = request.data.get('rejection_reason', '')
+        
+        if bulk_menu.approval_status == 'rejected':
+            return Response({'message': 'Menu is already rejected'})
+        
+        bulk_menu.approval_status = 'rejected'
+        bulk_menu.rejection_reason = rejection_reason
+        bulk_menu.approved_by = None
+        bulk_menu.approved_at = None
+        bulk_menu.save()
+        
+        serializer = self.get_serializer(bulk_menu)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def toggle_availability(self, request, pk=None):
+        """Toggle menu availability status"""
+        bulk_menu = self.get_object()
+        
+        # Only allow chef to toggle their own menus (unless admin)
+        if not request.user.is_staff and bulk_menu.chef != request.user:
+            return Response(
+                {'error': 'You can only modify your own menus'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        bulk_menu.availability_status = not bulk_menu.availability_status
+        bulk_menu.save()
+        
+        serializer = self.get_serializer(bulk_menu)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def calculate_cost(self, request, pk=None):
+        """Calculate total cost for bulk menu"""
+        bulk_menu = self.get_object()
+        
+        # Validate request data
+        serializer = BulkMenuCostCalculationSerializer(data={
+            'bulk_menu_id': bulk_menu.id,
+            **request.data
+        })
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        validated_data = serializer.validated_data
+        num_persons = validated_data['num_persons']
+        optional_items = validated_data.get('optional_items', [])
+        
+        # Calculate base cost
+        base_cost = bulk_menu.base_price_per_person * num_persons
+        
+        # Calculate optional items cost
+        optional_cost = 0
+        if optional_items:
+            optional_items_qs = bulk_menu.items.filter(
+                id__in=optional_items, 
+                is_optional=True
+            )
+            optional_cost = sum(item.extra_cost for item in optional_items_qs) * num_persons
+        
+        total_cost = base_cost + optional_cost
+        
+        return Response({
+            'bulk_menu_id': bulk_menu.id,
+            'menu_name': bulk_menu.menu_name,
+            'num_persons': num_persons,
+            'base_price_per_person': bulk_menu.base_price_per_person,
+            'base_cost': base_cost,
+            'optional_cost': optional_cost,
+            'total_cost': total_cost,
+            'cost_breakdown': {
+                'base_cost': base_cost,
+                'optional_items_cost': optional_cost,
+                'total_cost': total_cost
+            }
+        })
+    
+    @action(detail=False, methods=['get'])
+    def meal_types(self, request):
+        """Get available meal types"""
+        from .models import BulkMealType
+        return Response([
+            {'value': choice[0], 'label': choice[1]} 
+            for choice in BulkMealType.choices
+        ])
+    
+    @action(detail=False, methods=['get'])
+    def chef_dashboard_stats(self, request):
+        """Get chef dashboard statistics for bulk menus"""
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        chef_menus = BulkMenu.objects.filter(chef=request.user)
+        
+        from django.db.models import Count
+        stats = {
+            'total_menus': chef_menus.count(),
+            'approved_menus': chef_menus.filter(approval_status='approved').count(),
+            'pending_menus': chef_menus.filter(approval_status='pending').count(),
+            'rejected_menus': chef_menus.filter(approval_status='rejected').count(),
+            'available_menus': chef_menus.filter(availability_status=True, approval_status='approved').count(),
+        }
+        
+        # Meal type breakdown
+        meal_type_stats = chef_menus.values('meal_type').annotate(count=Count('meal_type'))
+        stats['meal_type_breakdown'] = {item['meal_type']: item['count'] for item in meal_type_stats}
+        
+        # Recent menus
+        recent_menus = chef_menus.order_by('-created_at')[:5]
+        stats['recent_menus'] = BulkMenuSerializer(recent_menus, many=True, context={'request': request}).data
+        
+        return Response(stats)
+
+
+class BulkMenuItemViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing bulk menu items
+    """
+    serializer_class = BulkMenuItemSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter items based on bulk menu access"""
+        user = self.request.user
+        
+        if user.is_staff:
+            # Admins can see all items
+            return BulkMenuItem.objects.all()
+        else:
+            # Chefs can only see items from their own menus
+            return BulkMenuItem.objects.filter(bulk_menu__chef=user)
+    
+    def perform_create(self, serializer):
+        """Validate bulk menu ownership before creating item"""
+        bulk_menu = serializer.validated_data['bulk_menu']
+        
+        # Ensure chef can only add items to their own menus
+        if not self.request.user.is_staff and bulk_menu.chef != self.request.user:
+            raise serializers.ValidationError("You can only add items to your own menus")
+        
+        # Reset approval status if adding items to approved menu
+        if bulk_menu.approval_status == 'approved':
+            bulk_menu.approval_status = 'pending'
+            bulk_menu.approved_by = None
+            bulk_menu.approved_at = None
+            bulk_menu.save()
+        
+        serializer.save()
+    
+    def perform_update(self, serializer):
+        """Reset approval status when items are modified"""
+        instance = serializer.instance
+        bulk_menu = instance.bulk_menu
+        
+        # Ensure chef can only modify their own menu items
+        if not self.request.user.is_staff and bulk_menu.chef != self.request.user:
+            raise serializers.ValidationError("You can only modify items in your own menus")
+        
+        # Reset approval status if modifying items in approved menu
+        if bulk_menu.approval_status == 'approved':
+            bulk_menu.approval_status = 'pending'
+            bulk_menu.approved_by = None
+            bulk_menu.approved_at = None
+            bulk_menu.save()
+        
+        serializer.save()
+    
+    def perform_destroy(self, instance):
+        """Reset approval status when items are deleted"""
+        bulk_menu = instance.bulk_menu
+        
+        # Ensure chef can only delete their own menu items
+        if not self.request.user.is_staff and bulk_menu.chef != self.request.user:
+            raise serializers.ValidationError("You can only delete items from your own menus")
+        
+        # Reset approval status if deleting items from approved menu
+        if bulk_menu.approval_status == 'approved':
+            bulk_menu.approval_status = 'pending'
+            bulk_menu.approved_by = None
+            bulk_menu.approved_at = None
+            bulk_menu.save()

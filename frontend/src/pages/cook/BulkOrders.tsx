@@ -45,7 +45,7 @@ import {
   BulkOrderFilters, 
   CollaborationRequest, 
   ChefCollaborator,
-  useOrderService 
+  useOrderService
 } from '@/services/orderService';
 
 interface NotificationState {
