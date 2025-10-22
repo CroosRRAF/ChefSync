@@ -53,6 +53,8 @@ interface FoodPrice {
   size: string;
   price: number;
   preparation_time: number;
+  food?: number; // Optional food ID reference
+  cook?: number; // Optional cook ID reference
 }
 
 interface SearchResult {
@@ -106,6 +108,7 @@ const ChefMenu: React.FC = () => {
   useEffect(() => {
     loadMenuItems();
   }, []);
+
 
   // Helper function to get suggested preparation time based on size
   const getSuggestedPrepTime = (size: string): number => {
@@ -187,42 +190,31 @@ const ChefMenu: React.FC = () => {
       
       if (!token) {
         showError('Please log in to view your menu');
+        setLoading(false);
         return;
       }
       
-      console.log('Loading menu items with token:', token.substring(0, 20) + '...');
-      
       const response = await apiClient.get('/food/chef/foods/');
       
-      console.log('Menu API response:', response.data);
-      
       // Handle different response structures
-      let data = [];
-      if (Array.isArray(response.data)) {
-        data = response.data;
-      } else if (response.data?.results) {
-        data = response.data.results;
-      } else if (response.data?.food) {
-        data = [response.data.food];
-      }
+      const data = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data?.results || (response.data?.food ? [response.data.food] : []));
       
-      console.log('Processed menu data:', data);
       setMenuItems(data);
       setFilteredMenuItems(data);
-      
-      if (data.length === 0) {
-        console.log('No menu items found for this chef');
-      }
       
     } catch (error: any) {
       console.error('Error loading menu items:', error);
       
       if (error.response?.status === 401) {
         showError('Your session has expired. Please log in again.');
-        // Redirect to login if needed
         localStorage.removeItem('access_token');
+      } else if (error.response?.status === 404) {
+        setMenuItems([]);
+        setFilteredMenuItems([]);
       } else {
-        showError('Error loading menu items. Please try again.');
+        showError(`Error loading menu items: ${error.response?.data?.detail || error.message}`);
       }
     } finally {
       setLoading(false);
@@ -500,18 +492,16 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
               size: variant.size,
               preparation_time: variant.preparation_time
             });
-            console.log(`✅ Additional variant created: ${variant.size} - $${variant.price}`);
           } catch (variantError) {
             console.error(`❌ Error creating variant ${variant.size}:`, variantError);
           }
         }
       }
       
-      showSuccess("New food item created successfully! It's pending admin approval.");
+      showSuccess("✅ New food item created successfully! It will appear in your menu shortly.");
+      console.log("🔄 Reloading menu after food creation...");
     } else {
       // Adding price variants to existing food
-      console.log("📝 Adding price variants to existing food:", selectedFood);
-      
       if (!selectedFood || !selectedFood.id) {
         showError("Selected food is invalid. Please select again.");
         setIsSubmitting(false);
@@ -531,11 +521,8 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
             preparation_time: variant.preparation_time
           };
           
-          console.log(`Creating price variant:`, priceData);
-          
           await apiClient.post('/food/chef/prices/', priceData);
           successCount++;
-          console.log(`✅ Variant created: ${variant.size} - $${variant.price}`);
         } catch (variantError: any) {
           errorCount++;
           console.error(`❌ Error creating variant ${variant.size}:`, variantError);
@@ -557,9 +544,17 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
       }
     }
 
-    resetForm();
+    // Close dialog and reset form
     setIsAddDialogOpen(false);
-    await loadMenuItems();
+    resetForm();
+    
+    // Small delay to ensure backend has processed
+    setTimeout(async () => {
+      // Force reload menu items
+      console.log("🔄 Force reloading menu items after add...");
+      await loadMenuItems();
+      console.log("✅ Menu reload complete!");
+    }, 500);
   } catch (error: any) {
     console.error("❌ Error submitting:", error);
     console.error("Error response data:", error.response?.data);
@@ -1181,111 +1176,138 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredMenuItems.map((food) => (
-            <Card key={food.food_id} className="overflow-hidden">
-              <div className="relative">
+            <Card key={food.food_id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300 border-2">
+              <div className="relative group">
                 {food.image_url ? (
                   <img
                     src={food.image_url}
                     alt={food.name}
-                    className="w-full h-48 object-cover"
+                    className="w-full h-56 object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
-                  <div className="w-full h-48 bg-muted flex items-center justify-center">
-                    <Users className="h-12 w-12 text-muted-foreground" />
+                  <div className="w-full h-56 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900 dark:to-orange-800 flex items-center justify-center">
+                    <Users className="h-16 w-16 text-orange-400 dark:text-orange-600" />
                   </div>
                 )}
                 
+                {/* Overlay gradient */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
                 {/* Status indicator */}
-                <div className="absolute top-2 right-2">
+                <div className="absolute top-3 right-3">
                   <Badge
                     variant={food.is_available ? "default" : "secondary"}
-                    className={food.is_available ? "bg-green-500" : "bg-red-500"}
+                    className={`${food.is_available ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"} text-white shadow-lg`}
                   >
                     {food.is_available ? (
                       <>
                         <Eye className="w-3 h-3 mr-1" />
-                        Available
+                        Active
                       </>
                     ) : (
                       <>
                         <EyeOff className="w-3 h-3 mr-1" />
-                        Unavailable
+                        Inactive
                       </>
                     )}
                   </Badge>
                 </div>
 
                 {/* Approval status */}
-                <div className="absolute top-2 left-2">
+                <div className="absolute top-3 left-3">
                   <Badge
                     variant={food.status === 'Approved' ? "default" : food.status === 'Pending' ? "secondary" : "destructive"}
-                    className={
+                    className={`${
                       food.status === 'Approved' 
-                        ? "bg-green-600" 
+                        ? "bg-blue-600 hover:bg-blue-700" 
                         : food.status === 'Pending' 
-                          ? "bg-yellow-600" 
-                          : "bg-red-600"
-                    }
+                          ? "bg-yellow-500 hover:bg-yellow-600 animate-pulse" 
+                          : "bg-red-600 hover:bg-red-700"
+                    } text-white shadow-lg font-semibold`}
                   >
-                    {food.status}
+                    {food.status === 'Pending' ? '⏳ Pending Approval' : food.status}
                   </Badge>
                 </div>
               </div>
               
-              <CardHeader>
-                <CardTitle className="text-lg">{food.name}</CardTitle>
-                <CardDescription className="text-sm line-clamp-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl font-bold line-clamp-1">{food.name}</CardTitle>
+                <CardDescription className="text-sm line-clamp-2 mt-2">
                   {food.description}
                 </CardDescription>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="w-fit">
+                    {food.category}
+                  </Badge>
+                  {food.status === 'Pending' && (
+                    <Badge variant="outline" className="w-fit bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-300">
+                      Awaiting Admin Review
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
               
               <CardContent>
-                <div className="space-y-3">
-                  {/* Category */}
-                  <div className="text-sm text-muted-foreground">
-                    <strong>Category:</strong> {food.category}
-                  </div>
-
-                  {/* Prices */}
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium text-foreground">Prices:</div>
-                    {food.prices && food.prices.length > 0 ? (
-                      <div className="grid gap-2">
-                        {food.prices.map((price) => (
-                          <div key={price.price_id} className="flex justify-between items-center text-sm bg-muted/50 rounded-lg p-2">
-                            <span className="font-medium">{price.size}</span>
-                            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                              <div className="flex items-center">
-                                <div className="w-3 h-3 mr-1" />
-                                Rs. {price.price}
-                              </div>
-                              <div className="flex items-center">
-                                <Clock className="w-3 h-3 mr-1" />
-                                {price.preparation_time}min
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No prices set</p>
-                    )}
+                <div className="space-y-4">
+                  {/* Prices - Grouped in one card */}
+                  <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 rounded-xl p-4 border-2 border-orange-200 dark:border-orange-800">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-bold text-orange-900 dark:text-orange-100 flex items-center">
+                        <DollarSign className="w-4 h-4 mr-1" />
+                        Price Options
+                      </h4>
+                 <span className="text-xs text-orange-700 dark:text-orange-300">
+                   {food.prices?.length || 0} {food.prices?.length === 1 ? 'size' : 'sizes'}
+                 </span>
+               </div>
+               
+               {food.prices && food.prices.length > 0 ? (
+                 <div className="space-y-2">
+                   {food.prices.map((price) => (
+                     <div key={price.price_id} className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border border-orange-200 dark:border-orange-700">
+                       <div className="flex justify-between items-center">
+                         <div>
+                           <p className="font-semibold text-orange-900 dark:text-orange-100">{price.size || 'Unknown Size'}</p>
+                           <div className="flex items-center mt-1 text-xs text-muted-foreground">
+                             <Clock className="w-3 h-3 mr-1" />
+                             {price.preparation_time || 0} min prep
+                           </div>
+                         </div>
+                         <div className="text-right">
+                           <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                             Rs. {price.price ? Number(price.price).toFixed(2) : '0.00'}
+                           </p>
+                         </div>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               ) : (
+                 <p className="text-sm text-center text-orange-700 dark:text-orange-300 py-2">No prices set</p>
+               )}
                   </div>
 
                   {/* Stats */}
-                  <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border">
-                    <span>★ {Number(food.rating_average).toFixed(1)} ({food.total_reviews} reviews)</span>
-                    <span>{food.total_orders} orders</span>
+                  <div className="flex justify-between items-center text-sm bg-muted/50 rounded-lg p-3">
+                    <div className="flex items-center space-x-1">
+                      <span className="text-yellow-500">★</span>
+                      <span className="font-semibold">{Number(food.rating_average).toFixed(1)}</span>
+                      <span className="text-muted-foreground">({food.total_reviews})</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {food.total_orders} orders
+                    </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex justify-between items-center space-x-2 pt-4">
+                  <div className="flex flex-col gap-2 pt-2">
                     {/* Quick availability toggle */}
                     <Button
                       variant={food.is_available ? "outline" : "default"}
                       size="sm"
+                      className={`w-full ${food.is_available ? "hover:bg-red-50 dark:hover:bg-red-950 border-2" : "bg-green-600 hover:bg-green-700"}`}
                       onClick={async () => {
                         try {
                           const token = localStorage.getItem('access_token');
@@ -1307,6 +1329,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
                             handleMenuSearch(menuSearchTerm);
                           }
                           
+                          showSuccess(`${food.name} ${!food.is_available ? 'activated' : 'deactivated'} successfully!`);
                         } catch (error: any) {
                           console.error('Error updating availability:', error);
                           showError('Error updating availability. Please try again.');
@@ -1315,23 +1338,24 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
                     >
                       {food.is_available ? (
                         <>
-                          <EyeOff className="w-4 h-4 mr-1" />
-                          Deactivate
+                          <EyeOff className="w-4 h-4 mr-2" />
+                          Mark as Inactive
                         </>
                       ) : (
                         <>
-                          <Eye className="w-4 h-4 mr-1" />
-                          Activate
+                          <Eye className="w-4 h-4 mr-2" />
+                          Mark as Active
                         </>
                       )}
                     </Button>
                     
-                    <div className="flex space-x-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                         <DialogTrigger asChild>
                           <Button
                             variant="outline"
                             size="sm"
+                            className="border-2 hover:bg-blue-50 dark:hover:bg-blue-950"
                             onClick={() => {
                               setEditingItem(food);
                               setEditedPrices([]);
@@ -1479,6 +1503,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
                       <Button
                         variant="destructive"
                         size="sm"
+                        className="border-2 hover:bg-red-600"
                         onClick={() => handleDeleteFood(food.food_id)}
                       >
                         <Trash2 className="w-4 h-4 mr-1" />

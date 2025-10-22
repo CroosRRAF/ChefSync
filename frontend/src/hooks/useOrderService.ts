@@ -34,17 +34,9 @@ export const useOrderService = () => {
   const loadDashboardStats = useCallback(async () => {
     setLoading(true);
     try {
-      // Mock dashboard stats for now - replace with actual API call
-      const mockStats: ChefDashboardStats = {
-        total_orders: 45,
-        total_revenue: 12500.00,
-        pending_orders: 3,
-        completed_orders: 42,
-        average_rating: 4.8,
-        recent_orders: []
-      };
-      setDashboardStats(mockStats);
-      return mockStats;
+      const dashboardStats = await orderService.getChefDashboardStats();
+      setDashboardStats(dashboardStats);
+      return dashboardStats;
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
       toast.error('Failed to load dashboard stats');

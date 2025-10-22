@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useOrderService } from '@/hooks/useOrderService';
 import { ChefDashboardStats } from '@/hooks/useOrderService';
+import { useAuth } from '@/context/AuthContext';
+import Greeting from '@/components/cook/Greeting';
 
 export default function Dashboard() {
   // State for API data
@@ -23,8 +25,9 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  // Use orderService hook
+  // Use orderService hook and auth context
   const { loadDashboardStats } = useOrderService();
+  const { user } = useAuth();
 
   // No sample data - all data loaded from API
 
@@ -41,23 +44,23 @@ export default function Dashboard() {
 
   const fetchReviews = async () => {
     try {
-      // const reviewsData = await loadReviews();
-      // setReviews(reviewsData);
-      setReviews([]); // No reviews API yet
+      const { orderService } = await import('@/services/orderService');
+      const reviewsData = await orderService.getChefRecentReviews();
+      setReviews(reviewsData);
     } catch (error) {
       console.error('Error loading reviews:', error);
-      throw error;
+      setReviews([]); // Set empty array on error
     }
   };
 
   const fetchRecentActivity = async () => {
     try {
-      // const activityData = await loadRecentActivity();
-      // setRecentActivity(activityData);
-      setRecentActivity([]); // No activity API yet
+      const { orderService } = await import('@/services/orderService');
+      const activityData = await orderService.getChefRecentActivity();
+      setRecentActivity(activityData);
     } catch (error) {
       console.error('Error loading recent activity:', error);
-      throw error;
+      setRecentActivity([]); // Set empty array on error
     }
   };
 
@@ -131,12 +134,10 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background p-6 space-y-6">
       {/* Welcome Section */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Good Morning, Chef!</h1>
-          <p className="text-muted-foreground mt-1">
-            {error ? '⚠️ ' + error : "Here's what's happening in your kitchen today"}
-          </p>
-        </div>
+        <Greeting 
+          chefName={user?.name || 'Chef'} 
+          error={error}
+        />
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="px-3 py-1">
             <Clock className="h-3 w-3 mr-1" />
@@ -248,7 +249,7 @@ export default function Dashboard() {
             {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
               <div key={index} className="flex items-center gap-3">
                 <div className="p-2 bg-accent/10 rounded-lg">
-                  <activity.icon className="h-4 w-4 text-accent" />
+                  <Activity className="h-4 w-4 text-accent" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-card-foreground">{activity.action}</p>

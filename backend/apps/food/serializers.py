@@ -180,7 +180,7 @@ class FoodSerializer(serializers.ModelSerializer):
         decimal_places=2,
         read_only=True,
     )
-    prices = FoodPriceSerializer(many=True, read_only=True)
+    prices = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
     optimized_image_url = serializers.SerializerMethodField()
     
@@ -322,6 +322,22 @@ class FoodSerializer(serializers.ModelSerializer):
             return estimate_delivery_time(distance, obj.preparation_time or 30)
         except Exception:
             return None
+    
+    def get_prices(self, obj):
+        """Get prices for this food"""
+        request = self.context.get('request')
+        
+        # Check if this is from the chef's own menu management (ChefFoodViewSet)
+        # We can determine this by checking if 'chef_view' flag is in context
+        is_chef_view = self.context.get('chef_view', False)
+        
+        if is_chef_view and request and request.user and request.user.is_authenticated:
+            # For chef food viewset, only show prices created by the current user
+            prices = obj.prices.filter(cook=request.user)
+            return FoodPriceSerializer(prices, many=True).data
+        
+        # For customer menu and other cases, return all prices from all cooks
+        return FoodPriceSerializer(obj.prices.all(), many=True).data
     
     def get_kitchen_location(self, obj):
         """Get chef's kitchen location details"""

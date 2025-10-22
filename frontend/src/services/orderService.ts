@@ -507,6 +507,55 @@ class OrderService {
   }
 
   /**
+   * Get chef dashboard statistics
+   */
+  async getChefDashboardStats(): Promise<any> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/chef/dashboard/stats/`);
+      // Map backend response to frontend format
+      return {
+        total_orders: response.data.orders_completed + response.data.orders_active + response.data.pending_orders,
+        total_revenue: response.data.today_revenue || 0,
+        pending_orders: response.data.pending_orders,
+        completed_orders: response.data.orders_completed,
+        average_rating: response.data.average_rating,
+        recent_orders: [],
+        monthly_orders: response.data.monthly_orders || 0,
+        active_orders: response.data.orders_active || 0,
+      };
+    } catch (error: any) {
+      console.error('Error loading chef dashboard stats:', error);
+      throw new Error(`Failed to load dashboard stats: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Get chef recent reviews
+   */
+  async getChefRecentReviews(): Promise<any[]> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/chef/reviews/recent/`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error loading chef reviews:', error);
+      throw new Error(`Failed to load reviews: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Get chef recent activity
+   */
+  async getChefRecentActivity(): Promise<any[]> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/chef/activity/recent/`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error loading chef activity:', error);
+      throw new Error(`Failed to load activity: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
    * Accept an order (Chef accepts a pending order)
    */
   async acceptOrder(orderId: number, notes?: string): Promise<{ success: string; status: string }> {

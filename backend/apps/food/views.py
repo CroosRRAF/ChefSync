@@ -97,12 +97,24 @@ class ChefFoodViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Food.objects.filter(chef=self.request.user).prefetch_related("prices")
+        # Get foods where either:
+        # 1. User is the chef (created the food)
+        # 2. User has prices for the food (is a cook offering this food)
+        user = self.request.user
+        return Food.objects.filter(
+            Q(chef=user) | Q(prices__cook=user)
+        ).distinct().prefetch_related("prices")
 
     def get_serializer_class(self):
         if self.action == "create":
             return ChefFoodCreateSerializer
         return FoodSerializer
+    
+    def get_serializer_context(self):
+        """Add chef_view flag to context so serializer knows to filter prices"""
+        context = super().get_serializer_context()
+        context['chef_view'] = True
+        return context
 
     def create(self, request, *args, **kwargs):
         """Create new food item with initial price"""
