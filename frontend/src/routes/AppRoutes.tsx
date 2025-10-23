@@ -8,6 +8,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 // Layout components
 import CustomerDashboardLayout from "@/components/layout/CustomerDashboardLayout";
 import CustomerHomeNavbar from "@/components/layout/CustomerHomeNavbar";
+import CustomerPageWrapper from "@/components/layout/CustomerPageWrapper";
 import Navbar from "@/components/layout/Navbar";
 // New unified admin layout
 import AdminLayout from "@/components/admin/layout/AdminLayout";
@@ -229,7 +230,7 @@ const InnerRoutes: React.FC = () => {
               user.role.toLowerCase() !== "customer" ? (
               <Navigate to={getDefaultRoute()} replace />
             ) : (
-              <>
+              <CustomerPageWrapper>
                 {isAuthenticated &&
                   user &&
                   user.role.toLowerCase() === "customer" ? (
@@ -238,58 +239,64 @@ const InnerRoutes: React.FC = () => {
                   <Navbar />
                 )}
                 <Home />
-              </>
+              </CustomerPageWrapper>
             )
           }
         />
         <Route
           path="/menu"
           element={
-            <>
+            <CustomerPageWrapper>
               {isAuthenticated && user && user.role === "customer" ? (
                 <CustomerHomeNavbar />
               ) : (
                 <Navbar />
               )}
               <MenuPage />
-            </>
+            </CustomerPageWrapper>
           }
         />
         <Route
           path="/chef-profile/:cookId"
-          element={<ChefProfilePage />}
+          element={
+            <CustomerPageWrapper>
+              <ChefProfilePage />
+            </CustomerPageWrapper>
+          }
         />
         <Route
           path="/about"
           element={
-            <>
+            <CustomerPageWrapper>
               {isAuthenticated && user && user.role === "customer" ? (
                 <CustomerHomeNavbar />
               ) : (
                 <Navbar />
               )}
               <About />
-            </>
+            </CustomerPageWrapper>
           }
         />
         <Route
           path="/contact"
           element={
-            <>
+            <CustomerPageWrapper>
               {isAuthenticated && user && user.role === "customer" ? (
                 <CustomerHomeNavbar />
               ) : (
                 <Navbar />
               )}
               <Contact />
-            </>
+            </CustomerPageWrapper>
           }
         />
         <Route
           path="/checkout"
           element={
             <ProtectedRoute allowedRoles={["customer"]}>
-              <CheckoutPage />
+              <CustomerPageWrapper>
+                <CheckoutPage />
+              </CustomerPageWrapper>
             </ProtectedRoute>
           }
         />

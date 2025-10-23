@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, Star, Clock, MapPin, ShoppingCart, Heart, ChefHat, Target, SlidersHorizontal, X, ExternalLink, Minus, Plus, Eye, Sun, Moon, Truck } from 'lucide-react';
+import { Search, Filter, Star, Clock, MapPin, ShoppingCart, Heart, ChefHat, Target, SlidersHorizontal, X, ExternalLink, Minus, Plus, Eye, Sun, Moon, Truck, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import FilterSidebar from './FilterSidebar';
 import { toast } from 'sonner';
 import LocationSelector from '@/components/location/LocationSelector';
 import DatabaseCartButton from '@/components/cart/DatabaseCartButton';
+import FoodInfoPopup from './FoodInfoPopup';
 
 interface EnhancedMenuPageProps {
   className?: string;
@@ -67,6 +68,9 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
   // Modal interaction states
   const [selectedPriceId, setSelectedPriceId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
+  // AI Food Info popup state
+  const [showAIFoodInfo, setShowAIFoodInfo] = useState(false);
+  const [aiFoodForInfo, setAIFoodForInfo] = useState<MenuFood | null>(null);
 
   useEffect(() => {
     // Reset selection when opening a new food detail
@@ -196,6 +200,12 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
     setShowFilters(false);
     setSelectedFood(food);
     setShowFoodDetail(true);
+  };
+
+  const handleAIInfoClick = (food: MenuFood, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAIFoodForInfo(food);
+    setShowAIFoodInfo(true);
   };
 
   const handleAddToCart = () => {
@@ -566,16 +576,28 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                       loading="lazy"
                     />
                     
-                    {/* Favorite Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(food.food_id);
-                      }}
-                      className="absolute top-2 right-2 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
-                    >
-                      <Heart className={`h-4 w-4 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
-                    </button>
+                    {/* Action Buttons - Top Right */}
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      {/* AI Info Button */}
+                      <button
+                        onClick={(e) => handleAIInfoClick(food, e)}
+                        className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 backdrop-blur-sm rounded-full hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg group"
+                        title="View AI Food Insights"
+                      >
+                        <Sparkles className="h-4 w-4 text-white group-hover:scale-110 transition-transform" />
+                      </button>
+                      
+                      {/* Favorite Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(food.food_id);
+                        }}
+                        className="p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
+                      >
+                        <Heart className={`h-4 w-4 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
+                      </button>
+                    </div>
 
                     {/* Badges */}
                     <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -1171,6 +1193,20 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
 
       {/* Floating Cart Button */}
       <DatabaseCartButton />
+
+      {/* AI Food Info Popup */}
+      {aiFoodForInfo && (
+        <FoodInfoPopup
+          isOpen={showAIFoodInfo}
+          onClose={() => {
+            setShowAIFoodInfo(false);
+            setAIFoodForInfo(null);
+          }}
+          foodName={aiFoodForInfo.name}
+          foodDescription={aiFoodForInfo.description}
+          foodImage={aiFoodForInfo.optimized_image_url || aiFoodForInfo.primary_image}
+        />
+      )}
     </div>
   );
 };

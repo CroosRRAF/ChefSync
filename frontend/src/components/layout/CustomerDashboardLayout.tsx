@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import AIChatBox from '@/components/ai/AIChatBox';
 
 interface CustomerDashboardLayoutProps {
   children: React.ReactNode;
@@ -335,6 +336,9 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
           {children}
         </div>
       </main>
+
+      {/* AI ChatBox - Floating in bottom-right corner */}
+      <AIChatBox />
     </div>
   );
 };
