@@ -1,4 +1,5 @@
 import math
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 
@@ -1480,7 +1481,6 @@ def place_order(request):
             order_data['delivery_address'] = "Pickup"
         
         # Create order
-        import uuid
         order = Order.objects.create(**order_data)
         
         logger.info(f"✅ Order {order.order_number} created successfully with status 'pending' for user {request.user.username}")

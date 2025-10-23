@@ -113,9 +113,12 @@ class AddressService {
    */
   async createAddress(addressData: CreateAddressData): Promise<DeliveryAddress> {
     // Ensure state is set (required by backend)
+    // Format coordinates to 6 decimal places to fit backend's max_digits=9 constraint
     const dataToSend = {
       ...addressData,
       state: addressData.state || addressData.city || 'Unknown',
+      latitude: parseFloat(addressData.latitude.toFixed(6)),
+      longitude: parseFloat(addressData.longitude.toFixed(6)),
     };
 
     // Try new system first
@@ -140,6 +143,12 @@ class AddressService {
           const status = anyErr.response.status;
           const respData = anyErr.response.data;
           console.error('Address creation response data:', status, respData);
+          
+          // Check for duplicate label error
+          if (status === 500 && typeof respData === 'string' && respData.includes('Duplicate entry')) {
+            throw new Error('An address with this label already exists. Please use a different label (e.g., "Home 2", "Work", "Office").');
+          }
+          
           const respString = typeof respData === 'string' ? respData : JSON.stringify(respData);
           throw new Error(`Failed to create address (status ${status}): ${respString}`);
         }

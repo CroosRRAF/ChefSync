@@ -27,9 +27,10 @@ import {
   Edit2,
   ChefHat,
   Package,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
-import SimpleAddressPicker from '../components/address/SimpleAddressPicker';
+import GoogleMapsAddressPicker from '../components/checkout/GoogleMapsAddressPicker';
 
 type OrderMode = 'delivery' | 'pickup';
 
@@ -58,6 +59,7 @@ const CheckoutPage: React.FC = () => {
   const [promoCode, setPromoCode] = useState('');
   const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState(30);
   const [chefId, setChefId] = useState<number | null>(null);
+  const [editingAddress, setEditingAddress] = useState<DeliveryAddress | null>(null);
 
   // Get chefId from router state
   useEffect(() => {
@@ -108,9 +110,9 @@ const CheckoutPage: React.FC = () => {
     }
   }, [chefItems, cartLoading, navigate, chefId]);
 
-  // Load default address on mount
+  // Load addresses on mount
   useEffect(() => {
-    const loadDefaultAddress = async () => {
+    const loadAddresses = async () => {
       if (orderMode !== 'delivery') {
         setIsLoadingDefaultAddress(false);
         return;
@@ -118,27 +120,26 @@ const CheckoutPage: React.FC = () => {
 
       try {
         setIsLoadingDefaultAddress(true);
+        setIsLoadingAddresses(true);
         
-        // Try to get default address first
-        const defaultAddr = await addressService.getDefaultAddress();
+        // Load all addresses
+        const fetchedAddresses = await addressService.getAddresses();
+        setAddresses(fetchedAddresses);
+        
+        // Set default or first address
+        const defaultAddr = fetchedAddresses.find(addr => addr.is_default) || fetchedAddresses[0] || null;
         if (defaultAddr) {
           setSelectedAddress(defaultAddr);
-        } else {
-          // If no default, get first address from list
-          const fetchedAddresses = await addressService.getAddresses();
-          setAddresses(fetchedAddresses);
-          if (fetchedAddresses.length > 0) {
-            setSelectedAddress(fetchedAddresses[0]);
-          }
         }
       } catch (error) {
-        console.error('Error loading default address:', error);
+        console.error('Error loading addresses:', error);
       } finally {
         setIsLoadingDefaultAddress(false);
+        setIsLoadingAddresses(false);
       }
     };
 
-    loadDefaultAddress();
+    loadAddresses();
   }, [orderMode]);
 
   // Calculate delivery fee and taxes when address or mode changes
@@ -215,11 +216,60 @@ const CheckoutPage: React.FC = () => {
     }
   }, [user]);
 
-  // Handle address picker
-  const handleAddressSelect = (address: DeliveryAddress) => {
+  // Handle address picker - for new/edited addresses
+  const handleAddressSaved = async (address: DeliveryAddress) => {
+    // Refresh addresses list
+    const fetchedAddresses = await addressService.getAddresses();
+    setAddresses(fetchedAddresses);
+    
+    // Select the new/updated address
     setSelectedAddress(address);
     setIsAddressPickerOpen(false);
-    toast.success(`Delivery address set to ${address.label}`);
+    setEditingAddress(null);
+    
+    toast.success(`Address ${editingAddress ? 'updated' : 'added'} successfully`, {
+      description: `${address.label} - ${address.city}, ${address.pincode}`
+    });
+  };
+
+  // Handle address selection from list
+  const handleAddressSelect = (address: DeliveryAddress) => {
+    setSelectedAddress(address);
+  };
+
+  // Handle delete address
+  const handleDeleteAddress = async (addressId: number) => {
+    try {
+      await addressService.deleteAddress(addressId);
+      const updatedAddresses = addresses.filter(addr => addr.id !== addressId);
+      setAddresses(updatedAddresses);
+      
+      // If deleted address was selected, select another one
+      if (selectedAddress?.id === addressId) {
+        setSelectedAddress(updatedAddresses[0] || null);
+      }
+      
+      toast.success('Address deleted');
+    } catch (error) {
+      console.error('Error deleting address:', error);
+      toast.error('Failed to delete address');
+    }
+  };
+
+  // Handle set default address
+  const handleSetDefault = async (addressId: number) => {
+    try {
+      await addressService.setDefaultAddress(addressId);
+      const updatedAddresses = addresses.map(addr => ({
+        ...addr,
+        is_default: addr.id === addressId
+      }));
+      setAddresses(updatedAddresses);
+      toast.success('Default address updated');
+    } catch (error) {
+      console.error('Error setting default:', error);
+      toast.error('Failed to set default address');
+    }
   };
 
   // Handle order placement
@@ -401,52 +451,125 @@ const CheckoutPage: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">
-                  {isLoadingDefaultAddress ? (
+                  {isLoadingDefaultAddress || isLoadingAddresses ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-2 border-orange-500 border-t-transparent mx-auto mb-2" />
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Loading your address...</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Loading addresses...</p>
                     </div>
-                  ) : selectedAddress ? (
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-5 rounded-xl border-2 border-green-200 dark:border-green-700">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <MapPin className="w-5 h-5 text-green-600" />
-                            <h4 className="font-bold text-green-900 dark:text-green-100">{selectedAddress.label}</h4>
-                            {selectedAddress.is_default && (
-                              <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100 text-xs">Default</Badge>
-                            )}
-                          </div>
-                          <p className="text-gray-700 dark:text-gray-300 mb-1">{selectedAddress.address_line1}</p>
-                          {selectedAddress.address_line2 && (
-                            <p className="text-gray-600 dark:text-gray-400 text-sm">{selectedAddress.address_line2}</p>
-                          )}
-                          <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                            {selectedAddress.city}, {selectedAddress.pincode}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => setIsAddressPickerOpen(true)}
-                          variant="outline"
-                          size="sm"
-                          className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/30"
-                        >
-                          <Edit2 className="w-4 h-4 mr-1" />
-                          Change
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600">
-                      <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-700 dark:text-gray-300 font-medium mb-2">No delivery address selected</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Please add a delivery address to continue</p>
+                  ) : addresses.length === 0 ? (
+                    <div className="text-center py-8 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-xl border-2 border-dashed border-orange-300 dark:border-orange-700">
+                      <MapPin className="w-16 h-16 text-orange-400 mx-auto mb-4" />
+                      <p className="text-gray-700 dark:text-gray-300 font-medium mb-2">No delivery addresses yet</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Add your first delivery address to continue
+                      </p>
                       <Button
-                        onClick={() => setIsAddressPickerOpen(true)}
-                        className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                        onClick={() => {
+                          setEditingAddress(null);
+                          setIsAddressPickerOpen(true);
+                        }}
+                        className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-lg"
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Add Delivery Address
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Saved Addresses List */}
+                      <div className="space-y-3">
+                        {addresses.map((address) => (
+                          <Card
+                            key={address.id}
+                            className={`cursor-pointer transition-all ${
+                              selectedAddress?.id === address.id
+                                ? 'ring-2 ring-orange-500 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 shadow-md'
+                                : 'hover:bg-gray-50 dark:hover:bg-gray-800 hover:shadow-md'
+                            }`}
+                            onClick={() => handleAddressSelect(address)}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <MapPin className={`w-4 h-4 ${selectedAddress?.id === address.id ? 'text-orange-600' : 'text-gray-500'}`} />
+                                    <h4 className="font-semibold text-gray-900 dark:text-white">{address.label}</h4>
+                                    {address.is_default && (
+                                      <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100 text-xs">Default</Badge>
+                                    )}
+                                    {selectedAddress?.id === address.id && (
+                                      <Badge className="bg-orange-500 text-white text-xs">Selected</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-gray-700 dark:text-gray-300 text-sm mb-1">{address.address_line1}</p>
+                                  {address.address_line2 && (
+                                    <p className="text-gray-600 dark:text-gray-400 text-xs mb-1">{address.address_line2}</p>
+                                  )}
+                                  <p className="text-gray-500 dark:text-gray-500 text-xs">
+                                    {address.city}, {address.pincode}
+                                  </p>
+                                </div>
+                                
+                                <div className="flex items-center gap-1 ml-4">
+                                  {!address.is_default && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSetDefault(address.id);
+                                      }}
+                                      title="Set as default"
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingAddress(address);
+                                      setIsAddressPickerOpen(true);
+                                    }}
+                                    title="Edit address"
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm('Are you sure you want to delete this address?')) {
+                                        handleDeleteAddress(address.id);
+                                      }
+                                    }}
+                                    title="Delete address"
+                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+
+                      {/* Add New Address Button */}
+                      <Button
+                        onClick={() => {
+                          setEditingAddress(null);
+                          setIsAddressPickerOpen(true);
+                        }}
+                        variant="outline"
+                        className="w-full border-2 border-dashed border-orange-300 text-orange-600 hover:bg-orange-50 hover:border-orange-400 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add New Address
                       </Button>
                     </div>
                   )}
@@ -736,12 +859,16 @@ const CheckoutPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Address Picker Modal */}
-      <SimpleAddressPicker
+      {/* Address Picker Modal - Only for Add/Edit */}
+      <GoogleMapsAddressPicker
         isOpen={isAddressPickerOpen}
-        onClose={() => setIsAddressPickerOpen(false)}
-        onSelectAddress={handleAddressSelect}
-        selectedAddress={selectedAddress}
+        onClose={() => {
+          setIsAddressPickerOpen(false);
+          setEditingAddress(null);
+        }}
+        onAddressSaved={handleAddressSaved}
+        editingAddress={editingAddress}
+        existingAddresses={addresses}
       />
     </div>
   );

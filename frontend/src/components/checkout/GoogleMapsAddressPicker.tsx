@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Search, Plus, Check, X, Edit2, Trash2 } from 'lucide-react';
+import { MapPin, Navigation, Search, X, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,32 +12,21 @@ import { addressService, DeliveryAddress } from '@/services/addressService';
 interface GoogleMapsAddressPickerProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddressSelect: (address: DeliveryAddress) => void;
-  selectedAddress?: DeliveryAddress | null;
-}
-
-interface LocationState {
-  lat: number;
-  lng: number;
-  address: string;
-  formatted_address: string;
+  onAddressSaved: (address: DeliveryAddress) => void;
+  editingAddress?: DeliveryAddress | null;
+  existingAddresses: DeliveryAddress[];
 }
 
 const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
   isOpen,
   onClose,
-  onAddressSelect,
-  selectedAddress
+  onAddressSaved,
+  editingAddress,
+  existingAddresses
 }) => {
-  const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentLocation, setCurrentLocation] = useState<LocationState | null>(null);
-  const [gettingLocation, setGettingLocation] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<DeliveryAddress | null>(null);
   const [mapsLoaded, setMapsLoaded] = useState(false);
-  const [activeTab, setActiveTab] = useState<'saved' | 'map' | 'current'>('saved');
+  const [gettingLocation, setGettingLocation] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -58,175 +45,125 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
+  // Load editing address data
+  useEffect(() => {
+    if (editingAddress && isOpen) {
+      setFormData({
+        label: editingAddress.label,
+        address_line1: editingAddress.address_line1,
+        address_line2: editingAddress.address_line2 || '',
+        city: editingAddress.city,
+        state: editingAddress.state || editingAddress.city || '',
+        pincode: editingAddress.pincode,
+        latitude: Number(editingAddress.latitude) || 0,
+        longitude: Number(editingAddress.longitude) || 0,
+        is_default: editingAddress.is_default
+      });
+    } else if (!editingAddress && isOpen) {
+      resetForm();
+    }
+  }, [editingAddress, isOpen]);
+
+  // Load Google Maps script and initialize
   useEffect(() => {
     if (isOpen) {
-      loadAddresses();
-      // Delay map loading to ensure DOM is ready
-      setTimeout(() => {
-        loadGoogleMaps();
-      }, 100);
+      loadGoogleMapsScript();
     }
   }, [isOpen]);
 
-  const loadAddresses = async () => {
-    setLoading(true);
-    try {
-      const addresses = await addressService.getAddresses();
-      console.log('Loaded addresses:', addresses);
-      setAddresses(Array.isArray(addresses) ? addresses : []);
-    } catch (error) {
-      console.error('Error loading addresses:', error);
-      // Fallback to mock data if API is not available
-      const mockAddresses: DeliveryAddress[] = [
-        {
-          id: 1,
-          label: "Home",
-          address_line1: "123 Main Street, Apartment 4B",
-          address_line2: "Near Central Park",
-          city: "Colombo",
-          pincode: "00100",
-          latitude: 6.9271,
-          longitude: 79.8612,
-          is_default: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: 2,
-          label: "Work",
-          address_line1: "456 Business Avenue, Floor 12",
-          city: "Colombo",
-          pincode: "00200",
-          latitude: 6.9344,
-          longitude: 79.8428,
-          is_default: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+  // Initialize map after dialog is rendered
+  useEffect(() => {
+    if (isOpen && mapsLoaded && !mapRef.current) {
+      const timer = setTimeout(() => {
+        initializeMap();
+        // Auto-detect location for new addresses
+        if (!editingAddress && formData.latitude === 0 && formData.longitude === 0) {
+          getCurrentLocation();
         }
-      ];
-      setAddresses(mockAddresses);
-      toast.warning('Using offline mode - addresses will not be saved');
-    } finally {
-      setLoading(false);
+      }, 300);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [isOpen, mapsLoaded]);
 
-  const loadGoogleMaps = () => {
+  const loadGoogleMapsScript = () => {
+    if (window.google && window.google.maps) {
+      setMapsLoaded(true);
+      return;
+    }
+
+    if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+      const checkInterval = setInterval(() => {
+        if (window.google && window.google.maps) {
+          setMapsLoaded(true);
+          clearInterval(checkInterval);
+        }
+      }, 100);
+      return;
+    }
+
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     
-    console.log('Loading Google Maps with API key:', apiKey ? 'Present' : 'Missing');
-    
     if (!apiKey) {
-      console.error('Google Maps API key not found');
-      toast.error('Google Maps API key is not configured');
+      toast.error('Google Maps API key not configured');
       return;
     }
 
-    if (window.google && window.google.maps) {
-      console.log('Google Maps already loaded');
-      setMapsLoaded(true);
-      initializeMap();
-      return;
-    }
-
-    // Check if script is already loading
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-    if (existingScript) {
-      console.log('Google Maps script already exists, waiting for load...');
-      // Script is already loading, wait for it
-      const checkLoaded = () => {
-        if (window.google && window.google.maps) {
-          console.log('Google Maps loaded successfully');
-          setMapsLoaded(true);
-          initializeMap();
-        } else {
-          setTimeout(checkLoaded, 100);
-        }
-      };
-      checkLoaded();
-      return;
-    }
-
-    console.log('Loading Google Maps script...');
-    // Load Google Maps script with proper async loading
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGoogleMaps&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
     script.defer = true;
-    script.setAttribute('type', 'text/javascript');
-    script.setAttribute('loading', 'async');
     
-    (window as any).initGoogleMaps = () => {
-      console.log('Google Maps callback triggered');
+    script.onload = () => {
       setMapsLoaded(true);
-      initializeMap();
     };
     
     script.onerror = () => {
-      console.error('Failed to load Google Maps script');
       toast.error('Failed to load Google Maps');
     };
     
     document.head.appendChild(script);
-
-    // Cleanup function
-    return () => {
-      if (script && script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-      delete (window as any).initGoogleMaps;
-    };
   };
 
   const initializeMap = () => {
-    console.log('Initializing Google Map...');
-    
-    // Default to Colombo, Sri Lanka
-    const defaultCenter = { lat: 6.9271, lng: 79.8612 };
-    
-    const mapElement = document.getElementById('address-picker-map');
-    if (!mapElement) {
-      console.error('Map element not found');
-      return;
-    }
-    
-    if (!window.google || !window.google.maps) {
-      console.error('Google Maps not loaded');
+    if (!mapContainerRef.current || !window.google || !window.google.maps) {
       return;
     }
 
+    if (mapRef.current) {
+      return;
+    }
+
+    const defaultCenter = formData.latitude !== 0 && formData.longitude !== 0
+      ? { lat: formData.latitude, lng: formData.longitude }
+      : { lat: 7.8731, lng: 80.7718 };
+
     try {
-      mapRef.current = new google.maps.Map(mapElement, {
-        zoom: 13,
+      mapRef.current = new google.maps.Map(mapContainerRef.current, {
+        zoom: formData.latitude !== 0 ? 15 : 8,
         center: defaultCenter,
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        styles: [
-          {
-            featureType: 'poi',
-            elementType: 'labels',
-            stylers: [{ visibility: 'off' }]
-          }
-        ]
       });
 
-      console.log('Google Map initialized successfully');
-
-      // Add click listener to map
       mapRef.current.addListener('click', (event: google.maps.MapMouseEvent) => {
         if (event.latLng) {
           const lat = event.latLng.lat();
           const lng = event.latLng.lng();
-          console.log('Map clicked at:', lat, lng);
-          updateLocation(lat, lng);
+          updateMarker(lat, lng);
           reverseGeocode(lat, lng);
         }
       });
 
-      // Initialize autocomplete
-      initAutocomplete();
+      if (searchInputRef.current) {
+        initAutocomplete();
+      }
+
+      if (formData.latitude !== 0 && formData.longitude !== 0) {
+        updateMarker(formData.latitude, formData.longitude);
+      }
     } catch (error) {
       console.error('Error initializing map:', error);
       toast.error('Failed to initialize map');
@@ -238,121 +175,31 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
 
     autocompleteRef.current = new google.maps.places.Autocomplete(searchInputRef.current, {
       types: ['address'],
-      componentRestrictions: { country: 'lk' } // Restrict to Sri Lanka
+      componentRestrictions: { country: 'lk' }
     });
 
-    autocompleteRef.current.addListener('place_changed', handlePlaceSelect);
-  };
-
-  const handlePlaceSelect = () => {
-    if (!autocompleteRef.current) return;
-
-    const place = autocompleteRef.current.getPlace();
-    if (place.geometry && place.geometry.location) {
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
-      
-      updateLocation(lat, lng);
-      
-      setCurrentLocation({
-        lat,
-        lng,
-        address: place.name || '',
-        formatted_address: place.formatted_address || ''
-      });
-
-      // Update form data
-      setFormData(prev => ({
-        ...prev,
-        address_line1: place.formatted_address || '',
-        latitude: lat,
-        longitude: lng
-      }));
-
-      // Parse address components
-      parseAddressComponents(place.address_components || []);
-    }
-  };
-
-  const parseAddressComponents = (components: google.maps.GeocoderAddressComponent[]) => {
-    let city = '';
-    let state = '';
-    let pincode = '';
-
-    components.forEach(component => {
-      const types = component.types;
-      
-      if (types.includes('locality') || types.includes('administrative_area_level_2')) {
-        city = component.long_name;
-      }
-      
-      if (types.includes('administrative_area_level_1')) {
-        state = component.long_name;
-      }
-      
-      if (types.includes('postal_code')) {
-        pincode = component.long_name;
+    autocompleteRef.current.addListener('place_changed', () => {
+      const place = autocompleteRef.current?.getPlace();
+      if (place?.geometry?.location) {
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        
+        updateMarker(lat, lng);
+        parseAddressComponents(place, lat, lng);
       }
     });
-
-    setFormData(prev => ({
-      ...prev,
-      city: city || prev.city,
-      state: state || prev.state || city, // Fallback to city if state not found
-      pincode: pincode || prev.pincode
-    }));
   };
 
-  const reverseGeocode = async (lat: number, lng: number) => {
-    if (!window.google) return;
-
-    const geocoder = new google.maps.Geocoder();
-    geocoder.geocode(
-      { location: { lat, lng } },
-      (results, status) => {
-        if (status === 'OK' && results?.[0]) {
-          const result = results[0];
-          
-          setCurrentLocation({
-            lat,
-            lng,
-            address: result.address_components?.[0]?.long_name || '',
-            formatted_address: result.formatted_address
-          });
-
-          setFormData(prev => ({
-            ...prev,
-            address_line1: result.formatted_address,
-            latitude: lat,
-            longitude: lng
-          }));
-
-          // Parse address components
-          parseAddressComponents(result.address_components || []);
-          
-          // Auto-open the form when location is selected from map
-          if (!showAddForm) {
-            setShowAddForm(true);
-            toast.success('Location selected! Fill in the remaining details.');
-          }
-        }
-      }
-    );
-  };
-
-  const updateLocation = (lat: number, lng: number) => {
+  const updateMarker = (lat: number, lng: number) => {
     if (!mapRef.current) return;
 
-    // Center map
     mapRef.current.setCenter({ lat, lng });
     mapRef.current.setZoom(16);
     
-    // Remove existing marker
     if (markerRef.current) {
       markerRef.current.setMap(null);
     }
 
-    // Add new marker
     markerRef.current = new google.maps.Marker({
       position: { lat, lng },
       map: mapRef.current,
@@ -361,53 +208,130 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
     });
   };
 
+  const reverseGeocode = async (lat: number, lng: number) => {
+    if (!window.google) return;
+
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+      if (status === 'OK' && results?.[0]) {
+        parseAddressComponents(results[0], lat, lng);
+      }
+    });
+  };
+
+  const parseAddressComponents = (
+    place: google.maps.places.PlaceResult | google.maps.GeocoderResult,
+    lat: number,
+    lng: number
+  ) => {
+    const components = place.address_components || [];
+    
+    let streetNumber = '';
+    let route = '';
+    let sublocality = '';
+    let city = '';
+    let state = '';
+    let pincode = '';
+
+    components.forEach(component => {
+      const types = component.types;
+      
+      if (types.includes('street_number')) streetNumber = component.long_name;
+      if (types.includes('route')) route = component.long_name;
+      if (types.includes('sublocality_level_1') || types.includes('sublocality')) sublocality = component.long_name;
+      if (types.includes('locality')) city = component.long_name;
+      else if (types.includes('administrative_area_level_2') && !city) city = component.long_name;
+      if (types.includes('administrative_area_level_1')) state = component.long_name;
+      if (types.includes('postal_code')) pincode = component.long_name;
+    });
+
+    let addressLine1Parts = [];
+    if (streetNumber) addressLine1Parts.push(streetNumber);
+    if (route) addressLine1Parts.push(route);
+    if (sublocality && !route) addressLine1Parts.push(sublocality);
+    
+    const addressLine1 = addressLine1Parts.join(', ') || 
+                        ('formatted_address' in place ? place.formatted_address : '') ||
+                        `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+    const formattedLat = parseFloat(lat.toFixed(6));
+    const formattedLng = parseFloat(lng.toFixed(6));
+
+    let suggestedLabel = '';
+    if (!formData.label || !editingAddress) {
+      const baseLabel = city || sublocality || 'My Location';
+      suggestedLabel = baseLabel;
+      
+      let counter = 1;
+      while (existingAddresses.some(addr => 
+        addr.label.toLowerCase() === suggestedLabel.toLowerCase() && 
+        (!editingAddress || addr.id !== editingAddress.id)
+      )) {
+        counter++;
+        suggestedLabel = `${baseLabel} ${counter}`;
+      }
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      label: suggestedLabel || prev.label,
+      address_line1: addressLine1,
+      city: city || sublocality || prev.city,
+      state: state || city || sublocality || prev.state,
+      pincode: pincode || prev.pincode,
+      latitude: formattedLat,
+      longitude: formattedLng
+    }));
+
+    toast.success('Location selected! Address details auto-filled', {
+      description: `${city || sublocality || 'Location'} selected`,
+    });
+  };
+
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by this browser');
+      toast.error('Geolocation is not supported by your browser');
       return;
     }
 
     setGettingLocation(true);
+    toast.info('Detecting your location...', { duration: 2000 });
+    
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        updateLocation(latitude, longitude);
+        updateMarker(latitude, longitude);
         reverseGeocode(latitude, longitude);
         setGettingLocation(false);
-        setActiveTab('current');
-        toast.success('Current location detected');
+        toast.success('Current location detected!', {
+          description: `Latitude: ${latitude.toFixed(6)}, Longitude: ${longitude.toFixed(6)}`
+        });
       },
       (error) => {
-        console.error('Error getting location:', error);
+        console.error('Geolocation error:', error);
         let errorMessage = 'Failed to get current location';
+        let description = '';
         
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied. Please allow location access.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information is unavailable.';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Location request timed out.';
-            break;
+        if (error.code === error.PERMISSION_DENIED) {
+          errorMessage = 'Location access denied';
+          description = 'Please enable location access in your browser settings or search for your location instead.';
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          errorMessage = 'Location unavailable';
+          description = 'Your location could not be determined. Try searching for your address instead.';
+        } else if (error.code === error.TIMEOUT) {
+          errorMessage = 'Location request timed out';
+          description = 'Please try again or search for your location manually.';
         }
         
-        toast.error(errorMessage);
+        toast.error(errorMessage, { description });
         setGettingLocation(false);
       },
       { 
         enableHighAccuracy: true, 
-        timeout: 10000, 
-        maximumAge: 60000 
+        timeout: 15000, 
+        maximumAge: 0 
       }
     );
-  };
-
-  const handleAddressSelect = (address: DeliveryAddress) => {
-    onAddressSelect(address);
-    toast.success(`Selected ${address.label} address`);
-    onClose();
   };
 
   const handleSaveAddress = async () => {
@@ -421,76 +345,42 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
       return;
     }
 
+    // Check for duplicate label
+    if (!editingAddress || editingAddress.label.toLowerCase() !== formData.label.toLowerCase()) {
+      const duplicateLabel = existingAddresses.find(
+        addr => addr.label.toLowerCase() === formData.label.toLowerCase()
+      );
+      if (duplicateLabel) {
+        toast.error('Duplicate Label', {
+          description: `You already have an address labeled "${duplicateLabel.label}". Please use a different label.`
+        });
+        return;
+      }
+    }
+
     try {
+      setLoading(true);
+      
+      let savedAddress: DeliveryAddress;
+      
       if (editingAddress) {
-        const updatedAddress = await addressService.updateAddress({
+        savedAddress = await addressService.updateAddress({
           id: editingAddress.id,
           ...formData
         });
-        setAddresses(prev => prev.map(addr => addr.id === editingAddress.id ? updatedAddress : addr));
-        toast.success('Address updated successfully');
       } else {
-        const newAddress = await addressService.createAddress(formData);
-        setAddresses(prev => [...prev, newAddress]);
-        toast.success('Address added successfully');
+        savedAddress = await addressService.createAddress(formData);
       }
       
-      resetForm();
-      setShowAddForm(false);
-      setEditingAddress(null);
-    } catch (error) {
+      onAddressSaved(savedAddress);
+    } catch (error: any) {
       console.error('Error saving address:', error);
-      // Fallback to local storage for offline mode
-      const newAddress: DeliveryAddress = {
-        id: editingAddress?.id || Date.now(),
-        ...formData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      if (editingAddress) {
-        setAddresses(prev => prev.map(addr => addr.id === editingAddress.id ? newAddress : addr));
-        toast.success('Address updated locally');
-      } else {
-        setAddresses(prev => [...prev, newAddress]);
-        toast.success('Address added locally');
-      }
-      
-      resetForm();
-      setShowAddForm(false);
-      setEditingAddress(null);
-    }
-  };
-
-  const handleDeleteAddress = async (addressId: number) => {
-    try {
-      await addressService.deleteAddress(addressId);
-      setAddresses(prev => prev.filter(addr => addr.id !== addressId));
-      toast.success('Address deleted');
-    } catch (error) {
-      console.error('Error deleting address:', error);
-      // Fallback to local deletion
-      setAddresses(prev => prev.filter(addr => addr.id !== addressId));
-      toast.success('Address deleted locally');
-    }
-  };
-
-  const handleSetDefault = async (addressId: number) => {
-    try {
-      await addressService.setDefaultAddress(addressId);
-      setAddresses(prev => prev.map(addr => ({ 
-        ...addr, 
-        is_default: addr.id === addressId 
-      })));
-      toast.success('Default address updated');
-    } catch (error) {
-      console.error('Error setting default address:', error);
-      // Fallback to local update
-      setAddresses(prev => prev.map(addr => ({ 
-        ...addr, 
-        is_default: addr.id === addressId 
-      })));
-      toast.success('Default address updated locally');
+      const errorMessage = error.message || 'Failed to save address. Please try again.';
+      toast.error('Failed to Save Address', {
+        description: errorMessage
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -506,518 +396,211 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
       longitude: 0,
       is_default: false
     });
-    setCurrentLocation(null);
-    setSearchQuery('');
-  };
-
-  const openAddForm = () => {
-    resetForm();
-    setEditingAddress(null);
-    setShowAddForm(true);
-  };
-
-  const openEditForm = (address: DeliveryAddress) => {
-    setFormData({
-      label: address.label,
-      address_line1: address.address_line1,
-      address_line2: address.address_line2 || '',
-      city: address.city,
-      state: address.state || address.city || '',
-      pincode: address.pincode,
-      latitude: Number(address.latitude) || 0,
-      longitude: Number(address.longitude) || 0,
-      is_default: address.is_default
-    });
-    setEditingAddress(address);
-    setShowAddForm(true);
     
-    // Update map location if coordinates exist
-    if (address.latitude && address.longitude) {
-      updateLocation(Number(address.latitude), Number(address.longitude));
+    if (markerRef.current) {
+      markerRef.current.setMap(null);
+      markerRef.current = null;
+    }
+
+    // Reset map when closing
+    if (mapRef.current) {
+      mapRef.current = null;
     }
   };
 
-  const useCurrentLocation = () => {
-    if (currentLocation) {
-      // Auto-fill the form with current location
-      setFormData(prev => ({
-        ...prev,
-        address_line1: currentLocation.formatted_address,
-        latitude: currentLocation.lat,
-        longitude: currentLocation.lng
-      }));
-      
-      // Open the form to let user complete the details
-      if (!showAddForm) {
-        setShowAddForm(true);
-        toast.success('Current location set! Please complete the address details.');
-      }
-    }
+  const handleClose = () => {
+    resetForm();
+    onClose();
   };
-
-  if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-orange-500" />
-            Choose Delivery Address
-          </DialogTitle>
-          <DialogDescription>
-            Select your delivery address using current location, map search, or saved addresses.
-          </DialogDescription>
-        </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden p-0">
+        <div className="flex flex-col h-full max-h-[90vh]">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <MapPin className="h-5 w-5 text-orange-500" />
+              {editingAddress ? 'Edit Address' : 'Add New Address'}
+            </DialogTitle>
+            <DialogDescription>
+              {gettingLocation 
+                ? "Detecting your location..." 
+                : "Click the map, search for an address, or use your current location"
+              }
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left Panel - Address Options */}
-          <div className="lg:w-1/2 space-y-4">
-            {/* Tab Navigation */}
-            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-              <button
-                onClick={() => setActiveTab('saved')}
-                className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'saved'
-                    ? 'bg-white text-orange-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Saved Addresses
-              </button>
-              <button
-                onClick={() => setActiveTab('map')}
-                className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'map'
-                    ? 'bg-white text-orange-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Map Search
-              </button>
-              <button
-                onClick={() => setActiveTab('current')}
-                className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'current'
-                    ? 'bg-white text-orange-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Current Location
-              </button>
-            </div>
-
-            {/* Tab Content */}
-            {activeTab === 'saved' && (
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="grid lg:grid-cols-2 gap-6">
+              {/* Left: Map Section */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Saved Addresses</h3>
-                  <Button
-                    size="sm"
-                    onClick={openAddForm}
-                    className="bg-orange-500 hover:bg-orange-600"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add New
-                  </Button>
-                </div>
-
-                <ScrollArea className="h-64">
-                  <div className="space-y-3">
-                    {loading ? (
-                      <div className="text-center py-8">
-                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-orange-500 border-t-transparent mx-auto" />
-                        <p className="text-sm text-gray-500 mt-2">Loading addresses...</p>
-                      </div>
-                    ) : addresses.length === 0 ? (
-                      <Card className="p-6 text-center">
-                        <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-500 mb-2">No saved addresses</p>
-                        <p className="text-sm text-gray-400">Add your first delivery address</p>
-                      </Card>
-                    ) : (
-                      (addresses || []).map((address) => (
-                        <Card 
-                          key={address.id} 
-                          className={`cursor-pointer transition-colors ${
-                            selectedAddress?.id === address.id 
-                              ? 'ring-2 ring-orange-500 bg-orange-50' 
-                              : 'hover:bg-gray-50'
-                          }`}
-                          onClick={() => handleAddressSelect(address)}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-medium">{address.label}</h4>
-                                  {address.is_default && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      Default
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-sm text-gray-600 mb-2">
-                                  {address.address_line1}
-                                </p>
-                                {address.address_line2 && (
-                                  <p className="text-sm text-gray-500 mb-2">
-                                    {address.address_line2}
-                                  </p>
-                                )}
-                                <p className="text-xs text-gray-500">
-                                  {address.city}, {address.pincode}
-                                </p>
-                              </div>
-                              
-                              <div className="flex items-center gap-1">
-                                {!address.is_default && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSetDefault(address.id);
-                                    }}
-                                    title="Set as default"
-                                  >
-                                    <Check className="h-3 w-3" />
-                                  </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditForm(address);
-                                  }}
-                                  title="Edit address"
-                                >
-                                  <Edit2 className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteAddress(address.id);
-                                  }}
-                                  title="Delete address"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
-            )}
-
-            {activeTab === 'map' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Search on Map</h3>
-                  {showAddForm && (
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      Click map to auto-fill form
-                    </Badge>
-                  )}
-                </div>
-                
-                {/* Instructions */}
-                <Card className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                    📍 How to select your location:
-                  </p>
-                  <ul className="text-xs text-blue-700 dark:text-blue-200 space-y-1 list-disc list-inside">
-                    <li>Search for an address in the box below</li>
-                    <li>Click anywhere on the map to select a location</li>
-                    {showAddForm && <li className="font-semibold">Selected location will auto-fill your form →</li>}
-                  </ul>
-                </Card>
-                
-                {/* Search Input */}
-                <div className="space-y-3">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      ref={searchInputRef}
-                      placeholder="Search for location..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10"
-                    />
-                  </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Select Location</h3>
                   
-                  {currentLocation && (
-                    <Card className="p-3 bg-green-50 border-green-200">
-                      <div className="flex items-start gap-2">
-                        <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-green-900">
-                            Location Selected
-                          </p>
-                          <p className="text-xs text-green-700 mt-1">
-                            {currentLocation.formatted_address}
-                          </p>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-                </div>
-
-        {/* Google Map */}
-        <div className="relative">
-          <div 
-            id="address-picker-map" 
-            className="w-full h-64 bg-gray-200 rounded-lg"
-          />
-          {!mapsLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-2 border-orange-500 border-t-transparent mx-auto mb-2" />
-                <p className="text-sm text-gray-600">Loading map...</p>
-                <p className="text-xs text-gray-500 mt-1">If map doesn't load, check your Google Maps API key</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-                {/* Use Selected Location Button */}
-                {currentLocation && (
-                  <Button
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        address_line1: currentLocation.formatted_address,
-                        latitude: currentLocation.lat,
-                        longitude: currentLocation.lng
-                      }));
-                      setShowAddForm(true);
-                    }}
-                    className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add This Location
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'current' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Current Location</h3>
-                
-                <Button
-                  onClick={getCurrentLocation}
-                  disabled={gettingLocation}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                >
-                  {gettingLocation ? (
-                    <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                      Getting Location...
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Navigation className="h-4 w-4" />
-                      Use Current Location
-                    </div>
-                  )}
-                </Button>
-                
-                {currentLocation && (
-                  <Card className="p-4 bg-green-50 border-green-200">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-green-900 mb-1">
-                          Current Location Detected
-                        </p>
-                        <p className="text-xs text-green-700 mb-3">
-                          {currentLocation.formatted_address}
-                        </p>
-                        <Button
-                          onClick={useCurrentLocation}
-                          size="sm"
-                          className="bg-green-500 hover:bg-green-600"
-                        >
-                          <Check className="h-3 w-3 mr-1" />
-                          Use This Location
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Right Panel - Add/Edit Form */}
-          {showAddForm && (
-            <div className="lg:w-1/2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    {editingAddress ? 'Edit Address' : 'Add New Address'}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Quick Action Buttons */}
-                  <div className="grid grid-cols-2 gap-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                  {/* Quick Actions */}
+                  <div className="flex gap-2 mb-4">
                     <Button
                       type="button"
-                      size="sm"
+                      onClick={getCurrentLocation}
+                      disabled={gettingLocation || !mapsLoaded}
                       variant="outline"
-                      onClick={() => {
-                        setActiveTab('map');
-                        setShowAddForm(true);
-                      }}
-                      className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 hover:text-blue-800"
-                    >
-                      <MapPin className="h-4 w-4 mr-2" />
-                      Choose on Map
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        getCurrentLocation();
-                        setActiveTab('current');
-                      }}
-                      disabled={gettingLocation}
-                      className="bg-white hover:bg-green-50 border-green-300 text-green-700 hover:text-green-800"
+                      className="flex-1"
                     >
                       {gettingLocation ? (
                         <>
-                          <div className="animate-spin rounded-full h-3 w-3 border-2 border-green-600 border-t-transparent mr-2" />
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Getting...
                         </>
                       ) : (
                         <>
                           <Navigation className="h-4 w-4 mr-2" />
-                          Current Location
+                          Use Current Location
                         </>
                       )}
                     </Button>
                   </div>
 
-                  <div>
-                    <Label htmlFor="label">Address Label *</Label>
+                  {/* Search Input */}
+                  <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
-                      id="label"
-                      placeholder="e.g. Home, Work, Office"
-                      value={formData.label}
-                      onChange={(e) => setFormData(prev => ({ ...prev, label: e.target.value }))}
+                      ref={searchInputRef}
+                      placeholder="Search: Jaffna, Colombo, or any location in Sri Lanka..."
+                      className="pl-10"
+                      disabled={!mapsLoaded}
                     />
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="address_line1">Address Line 1 *</Label>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setActiveTab('map')}
-                        className="text-xs h-7 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                      >
-                        <MapPin className="h-3 w-3 mr-1" />
-                        Choose on Map
-                      </Button>
-                    </div>
-                    <Textarea
-                      id="address_line1"
-                      placeholder="Street address, building name, etc."
-                      value={formData.address_line1}
-                      onChange={(e) => setFormData(prev => ({ ...prev, address_line1: e.target.value }))}
-                      rows={2}
-                    />
-                    <p className="text-xs text-gray-500">
-                      Tip: Click "Choose on Map" to select your location visually
+                  
+                  {/* Location Helper Card */}
+                  <Card className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800 mb-4">
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      <strong>💡 Quick Tip:</strong> Type your city name (e.g., "Jaffna", "Kandy", "Galle") or click "Use Current Location" for automatic detection
                     </p>
-                  </div>
+                  </Card>
 
-                  <div>
-                    <Label htmlFor="address_line2">Address Line 2 (Optional)</Label>
-                    <Input
-                      id="address_line2"
-                      placeholder="Apartment, suite, floor, etc."
-                      value={formData.address_line2}
-                      onChange={(e) => setFormData(prev => ({ ...prev, address_line2: e.target.value }))}
+                  {/* Map Container */}
+                  <div className="relative rounded-lg overflow-hidden border-2 border-gray-200">
+                    <div 
+                      ref={mapContainerRef}
+                      className="w-full h-96 bg-gray-100"
                     />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        placeholder="City"
-                        value={formData.city}
-                        onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="pincode">Postal Code</Label>
-                      <Input
-                        id="pincode"
-                        placeholder="Postal code"
-                        value={formData.pincode}
-                        onChange={(e) => setFormData(prev => ({ ...prev, pincode: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  {formData.latitude !== 0 && formData.longitude !== 0 && (
-                    <Card className="p-3 bg-green-50 border-green-200">
-                      <div className="flex items-start gap-2">
-                        <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium text-green-900">
-                            Location Set Successfully
-                          </p>
-                          <p className="text-xs text-green-700 mt-1">
-                            <strong>Coordinates:</strong> {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
-                          </p>
-                          <p className="text-xs text-green-600 mt-1">
-                            Your delivery address is pinpointed for accurate delivery
-                          </p>
+                    {!mapsLoaded && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90">
+                        <div className="text-center">
+                          <Loader2 className="h-8 w-8 animate-spin text-orange-500 mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">Loading map...</p>
                         </div>
                       </div>
-                    </Card>
-                  )}
-
-                  <div className="flex justify-end gap-3">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowAddForm(false);
-                        setEditingAddress(null);
-                        resetForm();
-                      }}
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSaveAddress}
-                      className="bg-orange-500 hover:bg-orange-600"
-                      disabled={!formData.label || !formData.address_line1 || formData.latitude === 0}
-                    >
-                      <Check className="h-4 w-4 mr-1" />
-                      {editingAddress ? 'Update' : 'Save'} Address
-                    </Button>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
+
+                  <p className="text-xs text-gray-500 mt-2">
+                    💡 Click on the map or search for a location to auto-fill address details
+                  </p>
+                </div>
+              </div>
+
+              {/* Right: Form Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold mb-3">Address Details</h3>
+                
+                {formData.latitude !== 0 && formData.longitude !== 0 && (
+                  <Card className="p-3 bg-green-50 border-green-200">
+                    <div className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                      <p className="text-sm font-medium text-green-900">
+                        Location selected: {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
+                      </p>
+                    </div>
+                  </Card>
+                )}
+
+                <div>
+                  <Label htmlFor="label">Address Label *</Label>
+                  <Input
+                    id="label"
+                    placeholder="e.g., Home, Work, Office, Jaffna Home"
+                    value={formData.label}
+                    onChange={(e) => setFormData(prev => ({ ...prev, label: e.target.value }))}
+                  />
+                  {existingAddresses.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Existing labels: {existingAddresses.map(a => a.label).join(', ')}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="address_line1">Address Line 1 *</Label>
+                  <Textarea
+                    id="address_line1"
+                    placeholder="Street address, building name, etc."
+                    value={formData.address_line1}
+                    onChange={(e) => setFormData(prev => ({ ...prev, address_line1: e.target.value }))}
+                    rows={2}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="address_line2">Address Line 2 (Optional)</Label>
+                  <Input
+                    id="address_line2"
+                    placeholder="Apartment, suite, floor, etc."
+                    value={formData.address_line2}
+                    onChange={(e) => setFormData(prev => ({ ...prev, address_line2: e.target.value }))}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      placeholder="City"
+                      value={formData.city}
+                      onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="pincode">Postal Code</Label>
+                    <Input
+                      id="pincode"
+                      placeholder="Postal code"
+                      value={formData.pincode}
+                      onChange={(e) => setFormData(prev => ({ ...prev, pincode: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={handleClose}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveAddress}
+                    disabled={loading || !formData.label || !formData.address_line1 || formData.latitude === 0}
+                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        {editingAddress ? 'Update' : 'Save'} Address
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
