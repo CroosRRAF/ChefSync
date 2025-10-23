@@ -15,6 +15,7 @@ export interface ChefDashboardStats {
   total_revenue: number;
   completed_orders: number;
   recent_orders: any[];
+  total_orders: number;
 }
 
 export const useOrderService = () => {

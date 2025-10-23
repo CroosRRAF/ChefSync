@@ -677,7 +677,8 @@ const OrderManagement: React.FC = () => {
         customer_satisfaction: 0,
         total_revenue: 0,
         completed_orders: 0,
-        recent_orders: []
+        recent_orders: [],
+        total_orders: 0
       });
     }
   };
