@@ -14,30 +14,60 @@ import { browserCompatibility } from "./utils/browserCompatibility";
 // Clean up known console warnings in development
 suppressKnownWarnings();
 
-// Register service worker for offline support
+// Register service worker for offline support and cross-device caching
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
-        console.log('SW registered: ', registration);
+        console.log('✓ Service Worker registered successfully');
         
-        // Check for updates
+        // Check for updates every 60 seconds
+        setInterval(() => {
+          registration.update();
+        }, 60000);
+        
+        // Handle service worker updates
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New content is available, notify user
-                console.log('New content available, please refresh.');
-                // You could show a toast notification here
+                // New version available - show notification
+                console.log('🔄 New version available! Reloading...');
+                
+                // Automatically reload after a short delay
+                setTimeout(() => {
+                  window.location.reload();
+                }, 1000);
               }
             });
           }
         });
       })
-      .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError);
+      .catch((error) => {
+        console.error('❌ Service Worker registration failed:', error);
       });
+    
+    // Listen for service worker messages
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      console.log('Message from SW:', event.data);
+      
+      if (event.data.type === 'SW_UPDATED') {
+        console.log(`Service Worker updated to version ${event.data.version}`);
+        // Clear any stale data from localStorage if needed
+        // You could show a notification here
+      }
+    });
+  });
+  
+  // Handle service worker controller change (when new SW takes control)
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log('🔄 Service Worker controller changed - reloading page');
+    // Only reload if we're not already reloading
+    if (!window.sessionStorage.getItem('sw_reloaded')) {
+      window.sessionStorage.setItem('sw_reloaded', 'true');
+      window.location.reload();
+    }
   });
 }
 

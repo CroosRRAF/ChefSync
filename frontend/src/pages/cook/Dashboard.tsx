@@ -9,16 +9,16 @@ import {
   Clock,
   Star,
   Activity,
-  RefreshCw
+  RefreshCw,
+  AlertCircle
 } from "lucide-react";
 import { useOrderService } from '@/hooks/useOrderService';
 import { ChefDashboardStats } from '@/hooks/useOrderService';
 import { useAuth } from '@/context/AuthContext';
 import { userService } from '@/services/userService';
 import Greeting from '@/components/cook/Greeting';
-import RealTimeLocationTracker from '@/components/maps/RealTimeLocationTracker';
 
-export default function Dashboard() {
+function CookDashboardContent() {
   // State for API data
   const [stats, setStats] = useState<ChefDashboardStats | null>(null);
   const [reviews, setReviews] = useState<any[]>([]);
@@ -158,7 +158,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {loading && !stats ? (
           // Loading skeleton
           Array.from({ length: 4 }).map((_, index) => (
@@ -196,42 +196,8 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Real-Time Location Tracker */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <RealTimeLocationTracker
-            isActive={stats ? stats.pending_orders > 0 : false}
-            onLocationUpdate={async (location) => {
-              try {
-                await userService.updateChefLocation({
-                  latitude: location.coordinates.latitude,
-                  longitude: location.coordinates.longitude,
-                  accuracy: location.accuracy
-                });
-                console.log('Location updated successfully:', location);
-              } catch (error) {
-                console.error('Failed to update location:', error);
-              }
-            }}
-            onTrackingStatusChange={async (isTracking) => {
-              try {
-                await userService.toggleLocationTracking(isTracking);
-                console.log('Tracking status saved to database:', isTracking);
-              } catch (error) {
-                console.error('Failed to save tracking status:', error);
-              }
-            }}
-            updateInterval={30000} // Update every 30 seconds
-          />
-        </div>
-        
-        {/* Additional dashboard content could go in remaining columns */}
-        <div className="lg:col-span-2">
-          {/* Placeholder for future dashboard widgets */}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">{/* Customer Reviews */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Customer Reviews */}
         <Card className="chef-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -302,6 +268,37 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Error State */}
+      {error && (
+        <Card className="border-red-200 bg-red-50 dark:bg-red-900/20">
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-4">
+              <AlertCircle className="h-8 w-8 text-red-500" />
+              <div>
+                <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">Error Loading Dashboard</h3>
+                <p className="text-red-600 dark:text-red-300">{error}</p>
+                <Button
+                  onClick={refreshDashboard}
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                >
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <DashboardErrorBoundary>
+      <CookDashboardContent />
+    </DashboardErrorBoundary>
   );
 }

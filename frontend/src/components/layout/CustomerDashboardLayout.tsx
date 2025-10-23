@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import AIChatBox from '@/components/ai/AIChatBox';
 
 interface CustomerDashboardLayoutProps {
   children: React.ReactNode;
@@ -108,19 +109,19 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
             </Link>
 
             {/* Desktop Top Navigation */}
-            <div className="hidden md:flex items-center space-x-6">
+            <div className="hidden lg:flex items-center space-x-4 xl:space-x-6">
               {topNavItems.map((item) => (
                 <Link
                   key={item.name}
                   to={item.path}
-                  className={`flex items-center space-x-2 text-sm font-medium transition-all duration-200 hover:text-orange-500 relative group ${
+                  className={`flex items-center space-x-1 xl:space-x-2 text-sm font-medium transition-all duration-200 hover:text-orange-500 relative group ${
                     isActive(item.path)
                       ? 'text-orange-500'
                       : 'text-gray-700 dark:text-gray-300'
                   }`}
                 >
                   <item.icon className="h-4 w-4" />
-                  <span>{item.name}</span>
+                  <span className="hidden xl:inline">{item.name}</span>
                   {isActive(item.path) && (
                     <div className="absolute -bottom-2 left-0 right-0 h-0.5 bg-gradient-to-r from-orange-500 to-red-500 rounded-full"></div>
                   )}
@@ -130,7 +131,7 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
             </div>
 
             {/* Right Section */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 md:space-x-4">
               {/* Notifications */}
               <Button
                 variant="ghost"
@@ -202,10 +203,11 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
               <Button
                 variant="ghost"
                 size="sm"
-                className="md:hidden"
+                className="lg:hidden"
                 onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+                aria-label="Toggle menu"
               >
-                <Menu className="h-6 w-6" />
+                {isMobileSidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </Button>
             </div>
           </div>
@@ -214,9 +216,9 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed top-16 left-0 z-40 h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 shadow-lg",
+        "fixed top-16 left-0 z-40 h-[calc(100vh-4rem)] bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 shadow-lg overflow-hidden",
         isSidebarCollapsed ? "w-16" : "w-64",
-        "hidden md:block"
+        "hidden lg:block"
       )}>
         <div className="flex flex-col h-full">
           {/* Sidebar Toggle */}
@@ -283,9 +285,13 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
 
       {/* Mobile Sidebar Overlay */}
       {isMobileSidebarOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setIsMobileSidebarOpen(false)}></div>
-          <aside className="fixed top-16 left-0 z-50 w-64 h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-lg">
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm" 
+            onClick={() => setIsMobileSidebarOpen(false)}
+            aria-hidden="true"
+          ></div>
+          <aside className="fixed top-16 left-0 z-50 w-64 h-[calc(100vh-4rem)] bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-lg overflow-y-auto">
             <div className="flex flex-col h-full">
               <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Navigation</h2>
@@ -323,13 +329,16 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
 
       {/* Main Content */}
       <main className={cn(
-        "pt-16 transition-all duration-300",
-        isSidebarCollapsed ? "md:ml-16" : "md:ml-64"
+        "pt-16 transition-all duration-300 min-h-screen",
+        isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
       )}>
-        <div className="p-6">
+        <div className="p-4 md:p-6 max-w-7xl mx-auto">
           {children}
         </div>
       </main>
+
+      {/* AI ChatBox - Floating in bottom-right corner */}
+      <AIChatBox />
     </div>
   );
 };

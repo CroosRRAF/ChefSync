@@ -32,6 +32,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import DeliveryAddressSelector from '@/components/delivery/DeliveryAddressSelector';
 import { DeliveryAddress } from '@/services/addressService';
+import FoodInfoPopup from '@/components/menu/FoodInfoPopup';
 
 // Types
 interface BulkMenu {
@@ -97,6 +98,12 @@ const CustomerBulkOrderDashboard: React.FC = () => {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isAddressPickerOpen, setIsAddressPickerOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<DeliveryAddress | null>(null);
+  
+  // AI Food Info popup state
+  const [showAIFoodInfo, setShowAIFoodInfo] = useState(false);
+  const [aiFoodName, setAIFoodName] = useState('');
+  const [aiFoodDescription, setAIFoodDescription] = useState('');
+  const [aiFoodImage, setAIFoodImage] = useState('');
   
   // Order form state
   const [orderForm, setOrderForm] = useState<OrderFormData>({
@@ -229,6 +236,13 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       selected_optional_items: [],
     });
     setIsOrderDialogOpen(true);
+  };
+
+  const handleAIInfoClick = (menu: BulkMenu) => {
+    setAIFoodName(menu.menu_name);
+    setAIFoodDescription(menu.description);
+    setAIFoodImage(menu.image_url || menu.thumbnail_url || '');
+    setShowAIFoodInfo(true);
   };
 
   const calculateTotalCost = (): number => {
@@ -571,6 +585,7 @@ const CustomerBulkOrderDashboard: React.FC = () => {
                   menu={menu}
                   onViewDetails={handleViewDetails}
                   onOrder={handleOrderClick}
+                  onAIInfo={handleAIInfoClick}
                 />
               ))}
             </div>
@@ -956,6 +971,20 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         selectedAddress={selectedAddress}
         showHeader={true}
       />
+
+      {/* AI Food Info Popup */}
+      <FoodInfoPopup
+        isOpen={showAIFoodInfo}
+        onClose={() => {
+          setShowAIFoodInfo(false);
+          setAIFoodName('');
+          setAIFoodDescription('');
+          setAIFoodImage('');
+        }}
+        foodName={aiFoodName}
+        foodDescription={aiFoodDescription}
+        foodImage={aiFoodImage}
+      />
     </div>
   );
 };
@@ -965,9 +994,10 @@ interface BulkMenuCardProps {
   menu: BulkMenu;
   onViewDetails: (menu: BulkMenu) => void;
   onOrder: (menu: BulkMenu) => void;
+  onAIInfo: (menu: BulkMenu) => void;
 }
 
-const BulkMenuCard: React.FC<BulkMenuCardProps> = ({ menu, onViewDetails, onOrder }) => {
+const BulkMenuCard: React.FC<BulkMenuCardProps> = ({ menu, onViewDetails, onOrder, onAIInfo }) => {
   return (
     <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 group">
       {/* Image */}
@@ -983,12 +1013,34 @@ const BulkMenuCard: React.FC<BulkMenuCardProps> = ({ menu, onViewDetails, onOrde
               {menu.meal_type_display}
             </Badge>
           </div>
+          {/* AI Info Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAIInfo(menu);
+            }}
+            className="absolute top-3 right-3 p-2 bg-gradient-to-r from-purple-500 to-pink-500 backdrop-blur-sm rounded-full hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg group/ai"
+            title="View AI Food Insights"
+          >
+            <Sparkles className="h-4 w-4 text-white group-hover/ai:scale-110 transition-transform" />
+          </button>
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
             <h3 className="text-white font-bold text-lg">{menu.menu_name}</h3>
           </div>
         </div>
       ) : (
-        <div className="h-48 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/30 dark:to-orange-800/20 flex items-center justify-center">
+        <div className="relative h-48 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/30 dark:to-orange-800/20 flex items-center justify-center">
+          {/* AI Info Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAIInfo(menu);
+            }}
+            className="absolute top-3 right-3 p-2 bg-gradient-to-r from-purple-500 to-pink-500 backdrop-blur-sm rounded-full hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg group/ai"
+            title="View AI Food Insights"
+          >
+            <Sparkles className="h-4 w-4 text-white group-hover/ai:scale-110 transition-transform" />
+          </button>
           <div className="text-center">
             <ChefHat className="h-12 w-12 text-orange-500 mx-auto mb-2" />
             <Badge className="bg-orange-500 text-white">{menu.meal_type_display}</Badge>
