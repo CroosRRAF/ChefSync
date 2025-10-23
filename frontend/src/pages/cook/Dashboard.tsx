@@ -15,7 +15,6 @@ import {
 import { useOrderService } from '@/hooks/useOrderService';
 import { ChefDashboardStats } from '@/hooks/useOrderService';
 import { useAuth } from '@/context/AuthContext';
-import { userService } from '@/services/userService';
 import Greeting from '@/components/cook/Greeting';
 import DashboardErrorBoundary from '@/components/dashboard/DashboardErrorBoundary';
 
@@ -197,7 +196,7 @@ function CookDashboardContent() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Customer Reviews */}
         <Card className="chef-card">
           <CardHeader>

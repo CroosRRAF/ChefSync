@@ -430,49 +430,6 @@ class Cook(models.Model):
         max_digits=3, decimal_places=2, blank=True, null=True
     )
     availability_hours = models.CharField(max_length=50, blank=True, null=True)
-    
-    # Kitchen coordinates for location picker
-    kitchen_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
-    kitchen_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
-    
-    # Real-time location tracking fields
-    current_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
-    current_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
-    location_accuracy = models.FloatField(blank=True, null=True, help_text="Location accuracy in meters")
-    last_location_update = models.DateTimeField(blank=True, null=True)
-    is_location_tracking_enabled = models.BooleanField(default=False)
-
-    def update_current_location(self, latitude, longitude, accuracy=None):
-        """Update cook's current location"""
-        from django.utils import timezone
-        
-        self.current_latitude = latitude
-        self.current_longitude = longitude
-        if accuracy:
-            self.location_accuracy = accuracy
-        self.last_location_update = timezone.now()
-        self.save(update_fields=['current_latitude', 'current_longitude', 'location_accuracy', 'last_location_update'])
-    
-    def get_current_location(self):
-        """Get cook's current location as dict"""
-        if self.current_latitude and self.current_longitude:
-            return {
-                'latitude': float(self.current_latitude),
-                'longitude': float(self.current_longitude),
-                'accuracy': self.location_accuracy,
-                'last_update': self.last_location_update.isoformat() if self.last_location_update else None
-            }
-        return None
-    
-    def get_kitchen_location(self):
-        """Get cook's kitchen location as dict"""
-        if self.kitchen_latitude and self.kitchen_longitude:
-            return {
-                'latitude': float(self.kitchen_latitude),
-                'longitude': float(self.kitchen_longitude),
-                'address': self.kitchen_location
-            }
-        return None
 
     def __str__(self):
         return f"Cook: {self.user.name} - {self.specialty}"

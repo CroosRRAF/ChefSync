@@ -15,7 +15,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useOrderService } from '@/hooks/useOrderService';
 import { ChefDashboardStats } from '@/hooks/useOrderService';
-import { ChefOrder } from '@/services/orderService';
 import { 
   Search, Filter, RefreshCw, MoreVertical, Eye, Edit, Trash2, 
   Users, Clock, CheckCircle, AlertCircle, Package, TrendingUp,
@@ -107,7 +106,7 @@ const RejectionModal: React.FC<{
   setRejectionReason: (reason: string) => void;
   isSubmitting: boolean;
   orderNumber?: string;
-  order?: ChefOrder;
+  order?: Order;
 }> = ({ isOpen, onClose, onSubmit, rejectionReason, setRejectionReason, isSubmitting, orderNumber, order }) => {
   
   const [selectedReason, setSelectedReason] = useState('');
@@ -429,9 +428,9 @@ const DashboardStats: React.FC<{ stats: ChefDashboardStats | null }> = ({ stats 
 const OrderDetailModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  order: ChefOrder | null;
+  order: Order | null;
   onAccept: (orderId: number) => void;
-  onReject: (order: ChefOrder) => void;
+  onReject: (order: Order) => void;
   onUpdateStatus: (orderId: number, status: string) => void;
 }> = ({ isOpen, onClose, order, onAccept, onReject, onUpdateStatus }) => {
   
@@ -505,9 +504,9 @@ const OrderDetailModal: React.FC<{
               {order.items?.map((item, index) => (
                 <div key={index} className="flex justify-between items-start p-3 bg-gray-50 dark:bg-gray-700 rounded">
                   <div className="flex-1">
-                    <p className="font-medium">{item.food_name || 'Unknown Item'}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{item.food_description || ''}</p>
-                    <p className="text-xs text-gray-500">Size: {item.size || 'Standard'}</p>
+                    <p className="font-medium">{item.price_details?.food_name || item.food_name || 'Unknown Item'}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{item.price_details?.food_description || item.food_description || ''}</p>
+                    <p className="text-xs text-gray-500">Size: {item.price_details?.size || item.size || 'Standard'}</p>
                     {item.special_instructions && (
                       <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
                         Note: {item.special_instructions}
@@ -516,8 +515,8 @@ const OrderDetailModal: React.FC<{
                   </div>
                   <div className="text-right ml-4">
                     <p className="font-medium">Qty: {item.quantity}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">${item.unit_price || '0.00'}</p>
-                    <p className="font-bold">${item.total_price}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">${item.price_details?.price || item.price || '0.00'}</p>
+                    <p className="font-bold">${item.item_total}</p>
                   </div>
                 </div>
               ))}
@@ -541,7 +540,7 @@ const OrderDetailModal: React.FC<{
               </div>
               <div className="flex justify-between">
                 <span>Payment Status</span>
-                <span className={order.payment_status === 'paid' ? 'text-green-600' : 'text-orange-600'}>
+                <span className={order.payment_status === 'Paid' ? 'text-green-600' : 'text-orange-600'}>
                   {order.payment_status}
                 </span>
               </div>
@@ -610,8 +609,8 @@ const OrderDetailModal: React.FC<{
 };
 
 // Main Order Component
-const OrderManagement: React.FC = () => {
-  const [orders, setOrders] = useState<ChefOrder[]>([]);
+const Order: React.FC = () => {
+  const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<ChefDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
@@ -619,7 +618,7 @@ const OrderManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedOrder, setSelectedOrder] = useState<ChefOrder | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [notification, setNotification] = useState<NotificationState>({
     show: false,
@@ -629,7 +628,7 @@ const OrderManagement: React.FC = () => {
 
   // Rejection modal state
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
-  const [orderToReject, setOrderToReject] = useState<ChefOrder | null>(null);
+  const [orderToReject, setOrderToReject] = useState<Order | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
 
@@ -674,10 +673,7 @@ const OrderManagement: React.FC = () => {
         today_revenue: 0,
         pending_orders: 0,
         monthly_orders: 0,
-        customer_satisfaction: 0,
-        total_revenue: 0,
-        completed_orders: 0,
-        recent_orders: []
+        customer_satisfaction: 0
       });
     }
   };
@@ -729,18 +725,20 @@ const OrderManagement: React.FC = () => {
     try {
       await updateStatus(orderId, newStatus, notes);
       
-          // Update local state
+      // Update local state
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId 
             ? { 
                 ...order, 
-                status: newStatus as ChefOrder['status'], 
+                status: newStatus as Order['status'], 
                 status_display: newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ')
               }
             : order
         )
-      );      showNotification('Order status updated successfully', 'success');
+      );
+      
+      showNotification('Order status updated successfully', 'success');
       await fetchDashboardStats(); // Refresh stats
       
     } catch (error) {
@@ -773,7 +771,7 @@ const OrderManagement: React.FC = () => {
   };
 
   // Reject order function
-  const handleRejectOrder = (order: ChefOrder) => {
+  const handleRejectOrder = (order: Order) => {
     setOrderToReject(order);
     setRejectionReason('');
     setIsRejectionModalOpen(true);
@@ -1101,4 +1099,4 @@ const OrderManagement: React.FC = () => {
   );
 };
 
-export default OrderManagement;
+export default Order;
