@@ -22,12 +22,16 @@ import {
   Check,
   X,
   Sparkles,
-  Package
+  Package,
+  MapPin,
+  Navigation
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import DeliveryAddressSelector from '@/components/delivery/DeliveryAddressSelector';
+import { DeliveryAddress } from '@/services/addressService';
 
 // Types
 interface BulkMenu {
@@ -84,10 +88,15 @@ const CustomerBulkOrderDashboard: React.FC = () => {
   const [bulkMenus, setBulkMenus] = useState<BulkMenu[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [aiSearchQuery, setAiSearchQuery] = useState('');
+  const [isAiSearchActive, setIsAiSearchActive] = useState(false);
+  const [aiSearching, setAiSearching] = useState(false);
   const [selectedMealType, setSelectedMealType] = useState('all');
   const [selectedMenu, setSelectedMenu] = useState<BulkMenu | null>(null);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isAddressPickerOpen, setIsAddressPickerOpen] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<DeliveryAddress | null>(null);
   
   // Order form state
   const [orderForm, setOrderForm] = useState<OrderFormData>({
@@ -201,12 +210,21 @@ const CustomerBulkOrderDashboard: React.FC = () => {
 
     const items = await fetchMenuItems(menu.id);
     setSelectedMenu({ ...menu, items });
+    
+    // Use previously selected address if available, otherwise reset
+    const address = selectedAddress ? selectedAddress : null;
+    const addressText = address ? [
+      address.address_line1,
+      address.address_line2,
+      `${address.city}, ${address.pincode}`
+    ].filter(Boolean).join(', ') : '';
+    
     setOrderForm({
       menu_id: menu.id,
       num_persons: menu.min_persons,
       event_date: undefined,
       event_time: '',
-      delivery_address: '',
+      delivery_address: addressText,
       special_instructions: '',
       selected_optional_items: [],
     });
@@ -227,10 +245,33 @@ const CustomerBulkOrderDashboard: React.FC = () => {
   };
 
   const handleSubmitOrder = async () => {
-    if (!orderForm.event_date || !orderForm.event_time || !orderForm.delivery_address) {
-      toast.error('Please fill in all required fields');
+    // Validation
+    console.log('📝 Starting order submission...');
+    console.log('Order form data:', orderForm);
+    console.log('Selected address:', selectedAddress);
+    
+    if (!orderForm.event_date || !orderForm.event_time) {
+      toast.error('Please fill in event date and time');
       return;
     }
+
+    // Check if we have either a selected address or manual entry
+    const hasAddress = (selectedAddress && selectedAddress.address_line1) || 
+                       (orderForm.delivery_address && orderForm.delivery_address.trim().length > 0);
+    
+    if (!hasAddress) {
+      toast.error('Please select an address from the map or enter a delivery address manually');
+      return;
+    }
+
+    // Use selected address if available, otherwise use manual entry
+    const finalAddress = selectedAddress ? 
+      [
+        selectedAddress.address_line1,
+        selectedAddress.address_line2,
+        `${selectedAddress.city}, ${selectedAddress.pincode}`
+      ].filter(Boolean).join(', ') : 
+      orderForm.delivery_address;
 
     // Check advance notice requirement
     if (selectedMenu) {
@@ -239,6 +280,8 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       eventDateTime.setHours(parseInt(hours), parseInt(minutes));
       
       const hoursUntilEvent = (eventDateTime.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+      
+      console.log(`⏰ Hours until event: ${hoursUntilEvent.toFixed(1)}, Required: ${selectedMenu.advance_notice_hours}`);
       
       if (hoursUntilEvent < selectedMenu.advance_notice_hours) {
         toast.error(`This menu requires ${selectedMenu.advance_notice_hours} hours advance notice`);
@@ -249,16 +292,26 @@ const CustomerBulkOrderDashboard: React.FC = () => {
     try {
       const token = localStorage.getItem('access_token');
       
+      if (!token) {
+        toast.error('Please login to place an order');
+        console.error('❌ No authentication token found');
+        navigate('/login');
+        return;
+      }
+      
       const orderData = {
         bulk_menu_id: orderForm.menu_id,
         num_persons: orderForm.num_persons,
         event_date: format(orderForm.event_date, 'yyyy-MM-dd'),
         event_time: orderForm.event_time,
-        delivery_address: orderForm.delivery_address,
-        special_instructions: orderForm.special_instructions,
+        delivery_address: finalAddress, // Use the validated final address
+        special_instructions: orderForm.special_instructions || '',
         selected_optional_items: orderForm.selected_optional_items,
         total_amount: calculateTotalCost(),
       };
+
+      console.log('📤 Sending order data:', orderData);
+      console.log('🔑 Authorization token present:', !!token);
 
       const response = await fetch('/api/orders/customer-bulk-orders/', {
         method: 'POST',
@@ -269,17 +322,44 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         body: JSON.stringify(orderData),
       });
 
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response OK:', response.ok);
+
       if (response.ok) {
+        const responseData = await response.json();
+        console.log('✅ Order placed successfully:', responseData);
         toast.success('Bulk order placed successfully!');
         setIsOrderDialogOpen(false);
         navigate('/customer/orders');
       } else {
         const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to place order');
+        console.error('❌ Order failed:', errorData);
+        
+        // Handle specific error types
+        if (response.status === 401) {
+          toast.error('Please login to place an order');
+          navigate('/login');
+        } else if (response.status === 403) {
+          toast.error('You do not have permission to place this order');
+        } else if (response.status === 400) {
+          // Validation errors
+          const errorMessage = errorData.error || errorData.message || 'Invalid order data';
+          if (typeof errorData === 'object' && !errorData.error && !errorData.message) {
+            // Field-specific errors
+            const errors = Object.entries(errorData)
+              .map(([field, msg]) => `${field}: ${msg}`)
+              .join(', ');
+            toast.error(`Validation errors: ${errors}`);
+          } else {
+            toast.error(errorMessage);
+          }
+        } else {
+          toast.error(errorData.error || errorData.message || 'Failed to place order');
+        }
       }
     } catch (error) {
-      console.error('Error placing bulk order:', error);
-      toast.error('Error placing order');
+      console.error('💥 Exception during order placement:', error);
+      toast.error('Network error. Please check your connection and try again.');
     }
   };
 
@@ -290,6 +370,69 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         ? prev.selected_optional_items.filter(id => id !== itemId)
         : [...prev.selected_optional_items, itemId]
     }));
+  };
+
+  const handleAddressSelect = (address: DeliveryAddress) => {
+    console.log('📍 Address selected:', address);
+    setSelectedAddress(address);
+    // Format address for the order form
+    const fullAddress = [
+      address.address_line1,
+      address.address_line2,
+      `${address.city}, ${address.pincode}`
+    ].filter(Boolean).join(', ');
+    
+    setOrderForm(prev => ({
+      ...prev,
+      delivery_address: fullAddress
+    }));
+    setIsAddressPickerOpen(false);
+    toast.success(`Address selected: ${address.label}`);
+  };
+
+  // AI-powered search function
+  const handleAiSearch = async () => {
+    if (!aiSearchQuery.trim()) {
+      toast.error('Please enter a search query');
+      return;
+    }
+    
+    setAiSearching(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('/api/orders/customer-bulk-orders/ai-search/', {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: aiSearchQuery,
+          meal_type: selectedMealType !== 'all' ? selectedMealType : undefined
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setBulkMenus(data.menus);
+        setIsAiSearchActive(true);
+        toast.success(`Found ${data.total_results} menu(s) ${data.ai_powered ? '✨ with AI' : ''}`);
+      } else {
+        toast.error('AI search failed');
+      }
+    } catch (error) {
+      console.error('AI search error:', error);
+      toast.error('Failed to perform AI search');
+    } finally {
+      setAiSearching(false);
+    }
+  };
+
+  // Reset to normal view
+  const handleClearAiSearch = () => {
+    setAiSearchQuery('');
+    setIsAiSearchActive(false);
+    fetchBulkMenus();
   };
 
   const filteredMenus = bulkMenus
@@ -320,16 +463,77 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       </div>
 
       {/* Search and Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            type="text"
-            placeholder="Search bulk menus..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      <div className="space-y-4">
+        {/* AI Search Section */}
+        <Card className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-2 border-purple-200 dark:border-purple-700">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h3 className="font-semibold text-purple-900 dark:text-purple-100">AI-Powered Smart Search</h3>
+              {isAiSearchActive && (
+                <Badge className="bg-purple-600 text-white">Active</Badge>
+              )}
+            </div>
+            <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
+              Ask in natural language: "vegetarian food for wedding", "healthy breakfast for 50 people", "spicy dinner menu"
+            </p>
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Sparkles className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Try: 'healthy vegetarian food for corporate event'..."
+                  value={aiSearchQuery}
+                  onChange={(e) => setAiSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAiSearch()}
+                  className="pl-9 border-purple-300 focus:border-purple-500"
+                  disabled={aiSearching}
+                />
+              </div>
+              <Button 
+                onClick={handleAiSearch}
+                disabled={aiSearching || !aiSearchQuery.trim()}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+              >
+                {aiSearching ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    AI Search
+                  </>
+                )}
+              </Button>
+              {isAiSearchActive && (
+                <Button 
+                  onClick={handleClearAiSearch}
+                  variant="outline"
+                  className="border-purple-300 text-purple-700 hover:bg-purple-100"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Traditional Search */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Or use traditional search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+              disabled={isAiSearchActive}
+            />
+          </div>
         </div>
       </div>
 
@@ -577,16 +781,87 @@ const CustomerBulkOrderDashboard: React.FC = () => {
               </div>
 
               {/* Delivery Address */}
-              <div>
-                <Label htmlFor="delivery_address">Delivery Address *</Label>
-                <Textarea
-                  id="delivery_address"
-                  value={orderForm.delivery_address}
-                  onChange={(e) => setOrderForm({ ...orderForm, delivery_address: e.target.value })}
-                  placeholder="Enter full delivery address"
-                  className="mt-1"
-                  rows={3}
-                />
+              <div className="space-y-2">
+                <Label>Delivery Address *</Label>
+                {selectedAddress ? (
+                  <Card className="p-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MapPin className="h-4 w-4 text-green-600" />
+                          <span className="font-semibold text-green-900 dark:text-green-100">
+                            {selectedAddress.label}
+                          </span>
+                          {selectedAddress.is_default && (
+                            <Badge variant="secondary" className="text-xs">Default</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          {selectedAddress.address_line1}
+                        </p>
+                        {selectedAddress.address_line2 && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {selectedAddress.address_line2}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                          {selectedAddress.city}, {selectedAddress.pincode}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setIsAddressPickerOpen(true)}
+                          className="whitespace-nowrap"
+                        >
+                          Change
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedAddress(null);
+                            setOrderForm(prev => ({ ...prev, delivery_address: '' }));
+                            toast.info('Address cleared. You can enter manually below.');
+                          }}
+                          className="whitespace-nowrap text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start h-auto py-4"
+                      onClick={() => setIsAddressPickerOpen(true)}
+                    >
+                      <MapPin className="h-5 w-5 mr-2 text-orange-500" />
+                      <div className="text-left">
+                        <div className="font-medium">Select Delivery Address</div>
+                        <div className="text-xs text-gray-500">
+                          Choose from saved addresses or add new with map
+                        </div>
+                      </div>
+                    </Button>
+                    <p className="text-xs text-gray-500">
+                      Or enter manual address below
+                    </p>
+                    <Textarea
+                      id="delivery_address"
+                      value={orderForm.delivery_address}
+                      onChange={(e) => setOrderForm({ ...orderForm, delivery_address: e.target.value })}
+                      placeholder="Enter event venue address"
+                      className="mt-1"
+                      rows={3}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Optional Items */}
@@ -672,6 +947,15 @@ const CustomerBulkOrderDashboard: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Address Picker Dialog */}
+      <DeliveryAddressSelector
+        isOpen={isAddressPickerOpen}
+        onClose={() => setIsAddressPickerOpen(false)}
+        onAddressSelect={handleAddressSelect}
+        selectedAddress={selectedAddress}
+        showHeader={true}
+      />
     </div>
   );
 };

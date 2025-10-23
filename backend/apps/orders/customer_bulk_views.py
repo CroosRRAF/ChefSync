@@ -14,6 +14,7 @@ from django.db import transaction
 from .models import Order, OrderItem, BulkOrder
 from .serializers import CustomerBulkOrderSerializer, BulkOrderDetailSerializer
 from apps.food.models import BulkMenu, BulkMenuItem
+from apps.food.ai_service import ai_service
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +41,13 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
             "total_amount": 5000.00
         }
         """
+        logger.info(f"📥 Bulk order request from user: {request.user.email if request.user.is_authenticated else 'Anonymous'}")
+        logger.info(f"📝 Request data: {request.data}")
+        
         serializer = CustomerBulkOrderSerializer(data=request.data)
         
         if not serializer.is_valid():
+            logger.warning(f"❌ Validation failed: {serializer.errors}")
             return Response(
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
@@ -131,6 +136,7 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
                 )
                 
                 # Return success response
+                logger.info(f"✅ Bulk order created successfully: Order #{order.order_number}, BulkOrder #{bulk_order.bulk_order_id}")
                 return Response({
                     'message': 'Bulk order placed successfully',
                     'order_id': order.id,
@@ -142,12 +148,13 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
                 }, status=status.HTTP_201_CREATED)
                 
         except BulkMenu.DoesNotExist:
+            logger.error(f"❌ Bulk menu not found: {validated_data.get('bulk_menu_id')}")
             return Response(
                 {'error': 'Bulk menu not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
-            logger.error(f"Error creating bulk order: {str(e)}", exc_info=True)
+            logger.error(f"💥 Error creating bulk order: {str(e)}", exc_info=True)
             return Response(
                 {'error': f'Failed to create bulk order: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -183,5 +190,185 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
             return Response(
                 {'error': 'Bulk order not found'},
                 status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['post'], url_path='ai-search')
+    def ai_search(self, request):
+        """
+        AI-powered natural language search for bulk menus
+        
+        Request body:
+        {
+            "query": "healthy vegetarian food for corporate event",
+            "meal_type": "lunch" (optional)
+        }
+        """
+        query = request.data.get('query', '').strip()
+        meal_type_filter = request.data.get('meal_type')
+        
+        if not query:
+            return Response(
+                {'error': 'Search query is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        logger.info(f"🔍 AI Search query: '{query}' from user: {request.user.email}")
+        
+        try:
+            # Get available bulk menus
+            menus_queryset = BulkMenu.objects.filter(
+                availability_status=True,
+                approval_status='approved'
+            ).select_related('chef')
+            
+            if meal_type_filter:
+                menus_queryset = menus_queryset.filter(meal_type=meal_type_filter)
+            
+            # Convert to list of dicts for AI processing
+            menus_data = []
+            for menu in menus_queryset:
+                menu_items = BulkMenuItem.objects.filter(bulk_menu=menu)
+                mandatory_items = [item.item_name for item in menu_items if not item.is_optional]
+                optional_items = [item.item_name for item in menu_items if item.is_optional]
+                
+                menus_data.append({
+                    'id': menu.id,
+                    'menu_name': menu.menu_name,
+                    'description': menu.description or '',
+                    'meal_type': menu.meal_type,
+                    'meal_type_display': menu.get_meal_type_display(),
+                    'chef_name': menu.chef.name if hasattr(menu.chef, 'name') else menu.chef.username,
+                    'base_price_per_person': float(menu.base_price_per_person),
+                    'min_persons': menu.min_persons,
+                    'max_persons': menu.max_persons,
+                    'image_url': str(menu.image) if menu.image else None,
+                    'menu_items_summary': {
+                        'mandatory_items': mandatory_items,
+                        'optional_items': optional_items,
+                        'total_items': len(mandatory_items) + len(optional_items)
+                    }
+                })
+            
+            # Use AI to filter and rank menus
+            filtered_menus = ai_service.filter_menus_by_query(query, menus_data)
+            
+            return Response({
+                'query': query,
+                'total_results': len(filtered_menus),
+                'ai_powered': ai_service.is_available(),
+                'menus': filtered_menus
+            })
+            
+        except Exception as e:
+            logger.error(f"❌ AI search failed: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Search failed', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['get'], url_path='ai-analyze')
+    def ai_analyze_menu(self, request, pk=None):
+        """
+        Get AI-powered analysis and categorization of a specific bulk menu
+        
+        URL: /api/orders/customer-bulk-orders/{menu_id}/ai-analyze/
+        """
+        try:
+            menu = BulkMenu.objects.select_related('chef').get(
+                id=pk,
+                availability_status=True,
+                approval_status='approved'
+            )
+            
+            # Get menu items
+            menu_items = BulkMenuItem.objects.filter(bulk_menu=menu)
+            items_list = [item.item_name for item in menu_items]
+            
+            menu_data = {
+                'menu_name': menu.menu_name,
+                'description': menu.description or '',
+                'meal_type': menu.get_meal_type_display(),
+                'items': items_list
+            }
+            
+            # Get AI analysis
+            analysis = ai_service.analyze_menu_categories(menu_data)
+            
+            return Response({
+                'menu_id': menu.id,
+                'menu_name': menu.menu_name,
+                'analysis': analysis
+            })
+            
+        except BulkMenu.DoesNotExist:
+            return Response(
+                {'error': 'Bulk menu not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"❌ AI analysis failed: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Analysis failed', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], url_path='ai-recommendations')
+    def ai_recommendations(self, request):
+        """
+        Get AI-powered personalized menu recommendations
+        
+        Query params:
+        - dietary_preference: vegetarian, vegan, etc.
+        - occasion: corporate_event, wedding, etc.
+        - guest_count: number of guests
+        """
+        try:
+            # Extract user preferences from query params
+            user_preferences = {
+                'dietary_preference': request.query_params.get('dietary_preference'),
+                'occasion': request.query_params.get('occasion'),
+                'guest_count': request.query_params.get('guest_count'),
+                'meal_type': request.query_params.get('meal_type')
+            }
+            
+            # Remove None values
+            user_preferences = {k: v for k, v in user_preferences.items() if v is not None}
+            
+            # Get available menus
+            menus_queryset = BulkMenu.objects.filter(
+                availability_status=True,
+                approval_status='approved'
+            ).select_related('chef')
+            
+            # Convert to list of dicts
+            menus_data = []
+            for menu in menus_queryset:
+                menu_items = BulkMenuItem.objects.filter(bulk_menu=menu)
+                mandatory_items = [item.item_name for item in menu_items if not item.is_optional]
+                
+                menus_data.append({
+                    'id': menu.id,
+                    'menu_name': menu.menu_name,
+                    'description': menu.description or '',
+                    'meal_type': menu.meal_type,
+                    'chef_name': menu.chef.name if hasattr(menu.chef, 'name') else menu.chef.username,
+                    'base_price_per_person': float(menu.base_price_per_person),
+                    'items': mandatory_items[:10]  # First 10 items
+                })
+            
+            # Get AI recommendations
+            recommendations = ai_service.get_smart_recommendations(user_preferences, menus_data)
+            
+            return Response({
+                'preferences': user_preferences,
+                'recommendations': recommendations[:5],  # Top 5
+                'ai_powered': ai_service.is_available()
+            })
+            
+        except Exception as e:
+            logger.error(f"❌ AI recommendations failed: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Recommendations failed', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

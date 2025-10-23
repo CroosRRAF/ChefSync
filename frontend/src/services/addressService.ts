@@ -6,6 +6,7 @@ export interface DeliveryAddress {
   address_line1: string;
   address_line2?: string;
   city: string;
+  state?: string;
   pincode: string;
   latitude: number;
   longitude: number;
@@ -19,6 +20,7 @@ export interface CreateAddressData {
   address_line1: string;
   address_line2?: string;
   city: string;
+  state?: string;
   pincode: string;
   latitude: number;
   longitude: number;
@@ -155,9 +157,7 @@ class AddressService {
    */
   async setDefaultAddress(addressId: number): Promise<void> {
     try {
-      await apiClient.post(`${this.baseUrl}set_default/`, {
-        address_id: addressId
-      });
+      await apiClient.post(`${this.baseUrl}${addressId}/set_default/`);
     } catch (error) {
       console.error('Error setting default address:', error);
       throw new Error('Failed to set default address');

@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { addressService, CreateAddressData } from '@/services/addressService';
 
 interface DeliveryAddress {
   id: number;
@@ -38,35 +39,6 @@ interface LocationState {
   address: string;
   formatted_address: string;
 }
-
-// Mock API functions - replace with actual API calls
-const mockDeliveryAddresses: DeliveryAddress[] = [
-  {
-    id: 1,
-    label: "Home",
-    address_line1: "123 Main Street, Apartment 4B",
-    address_line2: "Near Central Park",
-    city: "Colombo",
-    pincode: "00100",
-    latitude: 6.9271,
-    longitude: 79.8612,
-    is_default: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: 2,
-    label: "Work",
-    address_line1: "456 Business Avenue, Floor 12",
-    city: "Colombo",
-    pincode: "00200",
-    latitude: 6.9344,
-    longitude: 79.8428,
-    is_default: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-];
 
 const DeliveryAddressSelector: React.FC<DeliveryAddressSelectorProps> = ({
   isOpen,
@@ -111,9 +83,8 @@ const DeliveryAddressSelector: React.FC<DeliveryAddressSelectorProps> = ({
   const loadAddresses = async () => {
     setLoading(true);
     try {
-      // Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setAddresses(mockDeliveryAddresses);
+      const fetchedAddresses = await addressService.getAddresses();
+      setAddresses(fetchedAddresses);
     } catch (error) {
       console.error('Error loading addresses:', error);
       toast.error('Failed to load saved addresses');
@@ -373,20 +344,27 @@ const DeliveryAddressSelector: React.FC<DeliveryAddressSelectorProps> = ({
     }
 
     try {
-      // Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       if (editingAddress) {
-        const updatedAddress = { ...editingAddress, ...formData };
+        // Update existing address
+        const updatedAddress = await addressService.updateAddress({
+          id: editingAddress.id,
+          ...formData
+        });
         setAddresses(prev => prev.map(addr => addr.id === editingAddress.id ? updatedAddress : addr));
         toast.success('Address updated successfully');
       } else {
-        const newAddress: DeliveryAddress = {
-          id: Date.now(),
-          ...formData,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+        // Create new address
+        const addressData: CreateAddressData = {
+          label: formData.label,
+          address_line1: formData.address_line1,
+          address_line2: formData.address_line2 || undefined,
+          city: formData.city || 'Unknown',
+          pincode: formData.pincode || '000000',
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          is_default: formData.is_default
         };
+        const newAddress = await addressService.createAddress(addressData);
         setAddresses(prev => [...prev, newAddress]);
         toast.success('Address added successfully');
       }
@@ -395,31 +373,30 @@ const DeliveryAddressSelector: React.FC<DeliveryAddressSelectorProps> = ({
       setShowAddForm(false);
       setEditingAddress(null);
     } catch (error) {
+      console.error('Error saving address:', error);
       toast.error('Failed to save address');
     }
   };
 
   const handleDeleteAddress = async (addressId: number) => {
     try {
-      // Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await addressService.deleteAddress(addressId);
       setAddresses(prev => prev.filter(addr => addr.id !== addressId));
       toast.success('Address deleted');
     } catch (error) {
+      console.error('Error deleting address:', error);
       toast.error('Failed to delete address');
     }
   };
 
   const handleSetDefault = async (addressId: number) => {
     try {
-      // Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setAddresses(prev => prev.map(addr => ({ 
-        ...addr, 
-        is_default: addr.id === addressId 
-      })));
+      await addressService.setDefaultAddress(addressId);
+      // Reload addresses to get updated default status
+      await loadAddresses();
       toast.success('Default address updated');
     } catch (error) {
+      console.error('Error updating default address:', error);
       toast.error('Failed to update default address');
     }
   };

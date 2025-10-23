@@ -33,11 +33,14 @@ import {
   Star,
   AlertTriangle,
   Home,
-  Camera
+  Camera,
+  Plus
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { userService } from "@/services/userService";
 import { toast } from "sonner";
+import DeliveryAddressSelector from "@/components/delivery/DeliveryAddressSelector";
+import { addressService, DeliveryAddress } from "@/services/addressService";
 
 // Types for customer profile data
 interface CustomerProfile {
@@ -76,6 +79,8 @@ const CustomerProfile = () => {
   const { user, logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
+  const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
   const [stats, setStats] = useState<CustomerStats>({
     total_orders: 0,
     completed_orders: 0,
@@ -100,6 +105,7 @@ const CustomerProfile = () => {
   useEffect(() => {
     fetchProfileData();
     fetchCustomerStats();
+    fetchAddresses();
   }, []);
 
   const fetchProfileData = async () => {
@@ -126,6 +132,16 @@ const CustomerProfile = () => {
       toast.error('Failed to load profile data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAddresses = async () => {
+    try {
+      const fetchedAddresses = await addressService.getAddresses();
+      setAddresses(fetchedAddresses);
+    } catch (error) {
+      console.error('Error fetching addresses:', error);
+      // Don't show error toast here, as addresses are optional
     }
   };
 
@@ -374,37 +390,71 @@ const CustomerProfile = () => {
             </CardContent>
           </Card>
 
-          {/* Delivery Preferences Card */}
+          {/* Delivery Addresses Card */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Home className="h-5 w-5 text-orange-500" />
-                Delivery Preferences
+                Delivery Addresses
               </CardTitle>
+              <Button 
+                onClick={() => setIsAddressDialogOpen(true)} 
+                size="sm"
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Manage Addresses
+              </Button>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="delivery_address">Default Delivery Address</Label>
-                <Input
-                  id="delivery_address"
-                  value={profileData.delivery_address}
-                  onChange={(e) => setProfileData({ ...profileData, delivery_address: e.target.value })}
-                  disabled={!isEditing}
-                  placeholder="Enter your preferred delivery address"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="delivery_instructions">Delivery Instructions</Label>
-                <Textarea
-                  id="delivery_instructions"
-                  value={profileData.delivery_instructions}
-                  onChange={(e) => setProfileData({ ...profileData, delivery_instructions: e.target.value })}
-                  disabled={!isEditing}
-                  placeholder="E.g., Ring the bell twice, leave at door, call when arriving..."
-                  rows={3}
-                />
-              </div>
+            <CardContent className="space-y-3">
+              {addresses.length === 0 ? (
+                <div className="text-center py-8">
+                  <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500 mb-2">No saved addresses</p>
+                  <p className="text-sm text-gray-400 mb-4">Add your delivery addresses for faster checkout</p>
+                  <Button 
+                    onClick={() => setIsAddressDialogOpen(true)}
+                    variant="outline"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Your First Address
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {addresses.map((address) => (
+                    <Card 
+                      key={address.id} 
+                      className={`${address.is_default ? 'ring-2 ring-orange-500 bg-orange-50 dark:bg-orange-900/20' : ''}`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <MapPin className="h-4 w-4 text-orange-500" />
+                              <h4 className="font-medium">{address.label}</h4>
+                              {address.is_default && (
+                                <Badge className="bg-orange-500 text-white">Default</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                              {address.address_line1}
+                            </p>
+                            {address.address_line2 && (
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {address.address_line2}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-1">
+                              {address.city}, {address.pincode}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -461,6 +511,20 @@ const CustomerProfile = () => {
           </Card>
         </div>
       </div>
+
+      {/* Address Management Dialog */}
+      <DeliveryAddressSelector
+        isOpen={isAddressDialogOpen}
+        onClose={() => {
+          setIsAddressDialogOpen(false);
+          fetchAddresses(); // Refresh addresses after closing dialog
+        }}
+        onAddressSelect={(address) => {
+          // Optional: Do something when an address is selected
+          console.log('Address selected:', address);
+        }}
+        showHeader={true}
+      />
     </div>
   );
 };

@@ -19,6 +19,7 @@ class UserAddressSerializer(serializers.ModelSerializer):
             "address_line1",
             "address_line2",
             "city",
+            "state",
             "pincode",
             "latitude",
             "longitude",
@@ -772,7 +773,7 @@ class CustomerBulkOrderSerializer(serializers.Serializer):
         default=list
     )
     total_amount = serializers.DecimalField(
-        max_digits=10, 
+        max_digits=12, 
         decimal_places=2, 
         required=True,
         min_value=0
