@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useOrderService } from '@/hooks/useOrderService';
 import { ChefDashboardStats } from '@/hooks/useOrderService';
+import type { Order } from '@/types/orderType';
 import { 
   Search, Filter, RefreshCw, MoreVertical, Eye, Edit, Trash2, 
   Users, Clock, CheckCircle, AlertCircle, Package, TrendingUp,
@@ -386,7 +387,7 @@ const DashboardStats: React.FC<{ stats: ChefDashboardStats | null }> = ({ stats 
   const dashboardCards = [
     {
       title: 'Completed Orders',
-      value: stats.orders_completed,
+      value: stats.completed_orders,
       icon: Package,
       color: 'text-blue-600'
     },
@@ -397,8 +398,8 @@ const DashboardStats: React.FC<{ stats: ChefDashboardStats | null }> = ({ stats 
       color: 'text-yellow-600'
     },
     {
-      title: 'Today Revenue',
-      value: `LKR ${(stats.today_revenue || 0).toFixed(2)}`,
+      title: 'Total Revenue',
+      value: `LKR ${(stats.total_revenue || 0).toFixed(2)}`,
       icon: DollarSign,
       color: 'text-green-600'
     }
@@ -665,15 +666,12 @@ const Order: React.FC = () => {
       showNotification('Failed to load dashboard stats', 'error');
       // Set default empty stats on error
       setStats({
-        orders_completed: 0,
-        orders_active: 0,
-        bulk_orders: 0,
-        total_reviews: 0,
-        average_rating: 0,
-        today_revenue: 0,
+        total_orders: 0,
+        total_revenue: 0,
         pending_orders: 0,
-        monthly_orders: 0,
-        customer_satisfaction: 0
+        completed_orders: 0,
+        average_rating: 0,
+        recent_orders: []
       });
     }
   };
@@ -683,20 +681,9 @@ const Order: React.FC = () => {
     try {
       setLoading(true);
       
-      // Prepare filters for API call
-      const filters: any = {};
-      if (statusFilter && statusFilter !== 'all') {
-        filters.status = statusFilter;
-      }
-      if (searchTerm) {
-        filters.search = searchTerm;
-      }
-      if (dateFilter) {
-        filters.date_from = dateFilter;
-      }
-      
-      const fetchedOrders = await loadOrders(filters);
-      setOrders(fetchedOrders);
+      // Load all orders from API (filtering will be done client-side)
+      const fetchedOrders = await loadOrders();
+      setOrders(fetchedOrders as any);
       showNotification(`Loaded ${fetchedOrders.length} orders`, 'success');
       
     } catch (error) {
@@ -712,7 +699,7 @@ const Order: React.FC = () => {
   const fetchOrderDetails = async (orderId: number) => {
     try {
       const order = await loadOrderDetails(orderId);
-      setSelectedOrder(order);
+      setSelectedOrder(order as any);
       setIsDetailModalOpen(true);
     } catch (error) {
       console.error('Error fetching order details:', error);
