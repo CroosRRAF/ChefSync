@@ -1,22 +1,28 @@
 import { useState, useCallback } from 'react';
-import { orderService, CreateOrderData, OrderResponse } from '@/services/orderService';
+import { orderService, CreateOrderData, ChefOrder } from '@/services/orderService';
 import { toast } from 'sonner';
 
 export interface ChefDashboardStats {
-  total_orders: number;
-  total_revenue: number;
-  pending_orders: number;
-  completed_orders: number;
+  orders_completed: number;
+  orders_active: number;
+  bulk_orders: number;
+  total_reviews: number;
   average_rating: number;
+  today_revenue: number;
+  pending_orders: number;
+  monthly_orders: number;
+  customer_satisfaction: number;
+  total_revenue: number;
+  completed_orders: number;
   recent_orders: any[];
 }
 
 export const useOrderService = () => {
   const [loading, setLoading] = useState(false);
-  const [orders, setOrders] = useState<OrderResponse[]>([]);
+  const [orders, setOrders] = useState<ChefOrder[]>([]);
   const [dashboardStats, setDashboardStats] = useState<ChefDashboardStats | null>(null);
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (filters?: any) => {
     setLoading(true);
     try {
       const userOrders = await orderService.getUserOrders();

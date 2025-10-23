@@ -14,7 +14,9 @@ import {
 import { useOrderService } from '@/hooks/useOrderService';
 import { ChefDashboardStats } from '@/hooks/useOrderService';
 import { useAuth } from '@/context/AuthContext';
+import { userService } from '@/services/userService';
 import Greeting from '@/components/cook/Greeting';
+import RealTimeLocationTracker from '@/components/maps/RealTimeLocationTracker';
 
 export default function Dashboard() {
   // State for API data
@@ -194,8 +196,42 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Customer Reviews */}
+      {/* Real-Time Location Tracker */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <RealTimeLocationTracker
+            isActive={stats ? stats.pending_orders > 0 : false}
+            onLocationUpdate={async (location) => {
+              try {
+                await userService.updateChefLocation({
+                  latitude: location.coordinates.latitude,
+                  longitude: location.coordinates.longitude,
+                  accuracy: location.accuracy
+                });
+                console.log('Location updated successfully:', location);
+              } catch (error) {
+                console.error('Failed to update location:', error);
+              }
+            }}
+            onTrackingStatusChange={async (isTracking) => {
+              try {
+                await userService.toggleLocationTracking(isTracking);
+                console.log('Tracking status saved to database:', isTracking);
+              } catch (error) {
+                console.error('Failed to save tracking status:', error);
+              }
+            }}
+            updateInterval={30000} // Update every 30 seconds
+          />
+        </div>
+        
+        {/* Additional dashboard content could go in remaining columns */}
+        <div className="lg:col-span-2">
+          {/* Placeholder for future dashboard widgets */}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">{/* Customer Reviews */}
         <Card className="chef-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

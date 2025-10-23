@@ -54,6 +54,45 @@ export interface OrderResponse {
   created_at?: string;
 }
 
+// Order interface matching the SimpleOrderSerializer from backend
+export interface ChefOrder {
+  id: number;
+  order_number: string;
+  status: string;
+  status_display?: string;
+  total_amount: number;
+  delivery_fee?: number;
+  created_at: string;
+  updated_at: string;
+  customer_name: string;
+  chef_name: string;
+  time_since_order: string;
+  total_items: number;
+  delivery_address: string;
+  customer_notes?: string;
+  chef_notes?: string;
+  payment_method?: string;
+  payment_status?: string;
+  special_instructions?: string;
+  order_type?: string;
+  items?: {
+    id: number;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+    special_instructions: string;
+    food_name: string;
+    food_description: string;
+    food_image?: string;
+    size: string;
+    cook_name: string;
+  }[];
+  customer?: {
+    full_name?: string;
+    phone?: string;
+  };
+}
+
 // Bulk Order types - updated to match backend model
 export interface BulkOrder {
   id: number;
@@ -199,7 +238,7 @@ class OrderService {
   /**
    * Get all orders for the current user
    */
-  async getUserOrders(): Promise<OrderResponse[]> {
+  async getUserOrders(): Promise<ChefOrder[]> {
     try {
       const response = await apiClient.get(`${this.baseUrl}/orders/`);
       // Handle both paginated and non-paginated responses
@@ -220,7 +259,7 @@ class OrderService {
   /**
    * Get a specific order by ID
    */
-  async getOrder(orderId: number): Promise<OrderResponse> {
+  async getOrder(orderId: number): Promise<ChefOrder> {
     try {
       const response = await apiClient.get(`${this.baseUrl}/orders/${orderId}/`);
       return response.data;
