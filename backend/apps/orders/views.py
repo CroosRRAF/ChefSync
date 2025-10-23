@@ -1375,21 +1375,31 @@ def place_order(request):
             logger.error(f"❌ Cart is empty for user {request.user.id}. Total cart items in DB: {all_cart_count}")
             return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Get delivery address from orders app (only for delivery orders)
+        # Get delivery address (supports both old UserAddress and new Address systems)
         delivery_address = None
+        new_address = None
         if order_type == 'delivery':
             try:
-                # UserAddress is from the orders app, not users app
-                delivery_address = UserAddress.objects.get(id=delivery_address_id, user=request.user)
-                logger.info(f"✅ Found delivery address: {delivery_address.label} - {delivery_address.city}")
-            except UserAddress.DoesNotExist:
-                logger.error(f"❌ Delivery address ID {delivery_address_id} not found for user {request.user.id}")
-                # List all addresses for this user for debugging
-                user_addresses = UserAddress.objects.filter(user=request.user)
-                logger.error(f"Available addresses for user: {list(user_addresses.values_list('id', 'label'))}")
-                return Response({
-                    'error': 'Delivery address not found'
-                }, status=status.HTTP_404_NOT_FOUND)
+                # First try new Address model from users app
+                from apps.users.models import Address
+                new_address = Address.objects.get(id=delivery_address_id, user=request.user, address_type='customer')
+                logger.info(f"✅ Found new delivery address: {new_address.label} - {new_address.city}")
+            except:
+                # Fallback to old UserAddress model
+                try:
+                    delivery_address = UserAddress.objects.get(id=delivery_address_id, user=request.user)
+                    logger.info(f"✅ Found old delivery address: {delivery_address.label} - {delivery_address.city}")
+                except UserAddress.DoesNotExist:
+                    logger.error(f"❌ Delivery address ID {delivery_address_id} not found for user {request.user.id}")
+                    # List all addresses for this user for debugging
+                    user_addresses = UserAddress.objects.filter(user=request.user)
+                    from apps.users.models import Address
+                    new_addresses = Address.objects.filter(user=request.user, address_type='customer')
+                    logger.error(f"Available old addresses: {list(user_addresses.values_list('id', 'label'))}")
+                    logger.error(f"Available new addresses: {list(new_addresses.values_list('id', 'label'))}")
+                    return Response({
+                        'error': 'Delivery address not found'
+                    }, status=status.HTTP_404_NOT_FOUND)
         
         # Get chef from first cart item
         first_item = cart_items.first()
@@ -1402,11 +1412,21 @@ def place_order(request):
         
         # Get chef's kitchen location and calculate distance (only for delivery)
         distance_km = None
-        if order_type == 'delivery' and delivery_address:
+        if order_type == 'delivery' and (delivery_address or new_address):
             chef_lat, chef_lng = _resolve_chef_location(chef, request.data)
             
+            # Get delivery coordinates from either old or new address system
+            delivery_lat = None
+            delivery_lng = None
+            if new_address:
+                delivery_lat = new_address.latitude
+                delivery_lng = new_address.longitude
+            elif delivery_address:
+                delivery_lat = delivery_address.latitude
+                delivery_lng = delivery_address.longitude
+            
             # Calculate distance if both coordinates available
-            if chef_lat and chef_lng and delivery_address.latitude and delivery_address.longitude:
+            if chef_lat and chef_lng and delivery_lat and delivery_lng:
                 from math import radians, sin, cos, sqrt, atan2
                 
                 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -1418,31 +1438,50 @@ def place_order(request):
                     c = 2 * atan2(sqrt(a), sqrt(1-a))
                     return R * c
                 
-                distance_km = haversine_distance(chef_lat, chef_lng, 
-                                                delivery_address.latitude, 
-                                                delivery_address.longitude)
+                distance_km = haversine_distance(chef_lat, chef_lng, delivery_lat, delivery_lng)
+        
+        # Prepare address data for order creation
+        order_data = {
+            'customer': request.user,
+            'chef': chef,
+            'order_number': f'ORD-{uuid.uuid4().hex[:8].upper()}',
+            'status': 'pending',  # Order starts as pending, waiting for chef approval
+            'payment_method': payment_method,
+            'payment_status': 'pending',
+            'subtotal': Decimal(str(subtotal)),
+            'tax_amount': Decimal(str(tax_amount)),
+            'delivery_fee': Decimal(str(delivery_fee)),
+            'total_amount': Decimal(str(total_amount)),
+            'delivery_instructions': delivery_instructions if order_type == 'delivery' else '',
+            'customer_notes': customer_notes or delivery_instructions,
+            'distance_km': Decimal(str(distance_km)) if distance_km else None
+        }
+        
+        # Add address-specific fields based on which system is used
+        if order_type == 'delivery':
+            if new_address:
+                # Use new address system
+                order_data.update({
+                    'delivery_address_new_id': new_address.id,
+                    'delivery_address': f"{new_address.address_line1}, {new_address.city}",
+                    'delivery_latitude': new_address.latitude,
+                    'delivery_longitude': new_address.longitude,
+                })
+            elif delivery_address:
+                # Use old address system (backward compatibility)
+                order_data.update({
+                    'delivery_address_ref': delivery_address,
+                    'delivery_address': f"{delivery_address.address_line1}, {delivery_address.city}",
+                    'delivery_latitude': delivery_address.latitude,
+                    'delivery_longitude': delivery_address.longitude,
+                })
+        else:
+            # Pickup order
+            order_data['delivery_address'] = "Pickup"
         
         # Create order
         import uuid
-        order = Order.objects.create(
-            customer=request.user,
-            chef=chef,
-            order_number=f'ORD-{uuid.uuid4().hex[:8].upper()}',
-            status='pending',  # Order starts as pending, waiting for chef approval
-            payment_method=payment_method,
-            payment_status='pending',
-            subtotal=Decimal(str(subtotal)),
-            tax_amount=Decimal(str(tax_amount)),
-            delivery_fee=Decimal(str(delivery_fee)),
-            total_amount=Decimal(str(total_amount)),
-            delivery_address_ref=delivery_address,  # UserAddress FK reference
-            delivery_address=f"{delivery_address.address_line1}, {delivery_address.city}" if delivery_address else "Pickup",
-            delivery_latitude=delivery_address.latitude if delivery_address else None,
-            delivery_longitude=delivery_address.longitude if delivery_address else None,
-            delivery_instructions=delivery_instructions if order_type == 'delivery' else '',
-            customer_notes=customer_notes or delivery_instructions,
-            distance_km=Decimal(str(distance_km)) if distance_km else None
-        )
+        order = Order.objects.create(**order_data)
         
         logger.info(f"✅ Order {order.order_number} created successfully with status 'pending' for user {request.user.username}")
         

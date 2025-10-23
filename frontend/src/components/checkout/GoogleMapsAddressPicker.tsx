@@ -47,6 +47,7 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
     address_line1: '',
     address_line2: '',
     city: '',
+    state: '',
     pincode: '',
     latitude: 0,
     longitude: 0,
@@ -275,6 +276,7 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
 
   const parseAddressComponents = (components: google.maps.GeocoderAddressComponent[]) => {
     let city = '';
+    let state = '';
     let pincode = '';
 
     components.forEach(component => {
@@ -282,6 +284,10 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
       
       if (types.includes('locality') || types.includes('administrative_area_level_2')) {
         city = component.long_name;
+      }
+      
+      if (types.includes('administrative_area_level_1')) {
+        state = component.long_name;
       }
       
       if (types.includes('postal_code')) {
@@ -292,6 +298,7 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
     setFormData(prev => ({
       ...prev,
       city: city || prev.city,
+      state: state || prev.state || city, // Fallback to city if state not found
       pincode: pincode || prev.pincode
     }));
   };
@@ -493,6 +500,7 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
       address_line1: '',
       address_line2: '',
       city: '',
+      state: '',
       pincode: '',
       latitude: 0,
       longitude: 0,
@@ -514,6 +522,7 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
       address_line1: address.address_line1,
       address_line2: address.address_line2 || '',
       city: address.city,
+      state: address.state || address.city || '',
       pincode: address.pincode,
       latitude: Number(address.latitude) || 0,
       longitude: Number(address.longitude) || 0,

@@ -32,15 +32,18 @@ export interface UpdateAddressData extends Partial<CreateAddressData> {
 }
 
 class AddressService {
-  // Ensure trailing slash to match DRF router endpoints and avoid redirects
-  private baseUrl = '/orders/addresses/';
+  // Use new address endpoints for better structure and features
+  // The new system supports both simple addresses and detailed customer addresses
+  private baseUrl = '/users/addresses/';
+  private quickCreateUrl = '/users/customer-addresses/quick_create/';
 
   /**
-   * Get all addresses for the current user
+   * Get all addresses for the current user (customer addresses only for delivery)
    */
   async getAddresses(): Promise<DeliveryAddress[]> {
     try {
-      const response = await apiClient.get(this.baseUrl);
+      // Get customer-type addresses only
+      const response = await apiClient.get(`${this.baseUrl}by_type/?type=customer`);
       const data = response.data;
 
       // Normalize response to always return an array of addresses.
@@ -66,7 +69,8 @@ class AddressService {
       return [];
     } catch (error) {
       console.error('Error fetching addresses:', error);
-      throw new Error('Failed to fetch addresses');
+      // Don't throw - return empty array to allow graceful fallback
+      return [];
     }
   }
 
@@ -84,11 +88,17 @@ class AddressService {
   }
 
   /**
-   * Create a new address
+   * Create a new address (uses quick_create for simplified customer address creation)
    */
   async createAddress(addressData: CreateAddressData): Promise<DeliveryAddress> {
     try {
-      const response = await apiClient.post(this.baseUrl, addressData);
+      // Ensure state is set (required by backend)
+      const dataToSend = {
+        ...addressData,
+        state: addressData.state || addressData.city || 'Unknown',
+      };
+      
+      const response = await apiClient.post(this.quickCreateUrl, dataToSend);
       return response.data;
     } catch (error) {
       console.error('Error creating address:', error);
@@ -160,7 +170,8 @@ class AddressService {
       await apiClient.post(`${this.baseUrl}${addressId}/set_default/`);
     } catch (error) {
       console.error('Error setting default address:', error);
-      throw new Error('Failed to set default address');
+      // Don't throw - fail gracefully
+      console.warn('Failed to set default address, but continuing...');
     }
   }
 
@@ -169,6 +180,14 @@ class AddressService {
    */
   async getDefaultAddress(): Promise<DeliveryAddress | null> {
     try {
+      const response = await apiClient.get(`${this.baseUrl}default/?type=customer`);
+      const data = response.data;
+      
+      if (Array.isArray(data) && data.length > 0) {
+        return data[0];
+      }
+      
+      // Fallback to searching through all addresses
       const addresses = await this.getAddresses();
       return addresses.find(addr => addr.is_default) || null;
     } catch (error) {
