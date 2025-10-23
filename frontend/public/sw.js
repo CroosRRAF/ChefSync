@@ -1,9 +1,13 @@
-// ChefSync Admin Service Worker
-// Version 1.0.0 - Offline Support for Admin Dashboard
+// ChefSync Service Worker
+// Version 2.0.0 - Cross-Device Compatibility & Offline Support
 
-const CACHE_NAME = 'chefsync-admin-v1';
-const STATIC_CACHE_NAME = 'chefsync-static-v1';
-const DYNAMIC_CACHE_NAME = 'chefsync-dynamic-v1';
+const APP_VERSION = '2.0.0';
+const CACHE_NAME = `chefsync-v${APP_VERSION}`;
+const STATIC_CACHE_NAME = `chefsync-static-v${APP_VERSION}`;
+const DYNAMIC_CACHE_NAME = `chefsync-dynamic-v${APP_VERSION}`;
+
+// Update this when deploying new version to force cache refresh
+const BUILD_TIMESTAMP = new Date().toISOString();
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
@@ -42,16 +46,20 @@ const CACHE_FIRST_PATTERNS = [
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker...');
+  console.log(`[SW] Installing service worker v${APP_VERSION}...`);
+  console.log(`[SW] Build timestamp: ${BUILD_TIMESTAMP}`);
   
   event.waitUntil(
     Promise.all([
       // Cache static assets
       caches.open(STATIC_CACHE_NAME).then((cache) => {
         console.log('[SW] Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+        // Try to cache, but don't fail if some assets aren't available yet
+        return cache.addAll(STATIC_ASSETS).catch(err => {
+          console.warn('[SW] Some assets failed to cache during install:', err);
+        });
       }),
-      // Skip waiting to activate immediately
+      // Skip waiting to activate immediately (important for updates)
       self.skipWaiting()
     ])
   );
@@ -59,14 +67,16 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker...');
+  console.log(`[SW] Activating service worker v${APP_VERSION}...`);
   
   event.waitUntil(
     Promise.all([
-      // Clean up old caches
+      // Clean up ALL old caches (important for cross-device updates)
       caches.keys().then((cacheNames) => {
+        console.log('[SW] Existing caches:', cacheNames);
         return Promise.all(
           cacheNames.map((cacheName) => {
+            // Delete any cache that doesn't match current version
             if (
               cacheName !== STATIC_CACHE_NAME &&
               cacheName !== DYNAMIC_CACHE_NAME &&
@@ -78,8 +88,20 @@ self.addEventListener('activate', (event) => {
           })
         );
       }),
-      // Take control of all clients
-      self.clients.claim()
+      // Take control of all clients immediately (important for updates)
+      self.clients.claim().then(() => {
+        console.log('[SW] Service worker has claimed all clients');
+        // Notify all clients about the update
+        return self.clients.matchAll().then(clients => {
+          clients.forEach(client => {
+            client.postMessage({
+              type: 'SW_UPDATED',
+              version: APP_VERSION,
+              timestamp: BUILD_TIMESTAMP
+            });
+          });
+        });
+      })
     ])
   );
 });
@@ -366,4 +388,36 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-console.log('[SW] Service worker loaded successfully');
+// Message handler for commands from the app
+self.addEventListener('message', (event) => {
+  console.log('[SW] Message received:', event.data);
+  
+  if (event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  
+  if (event.data.type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys().then(cacheNames => {
+        return Promise.all(
+          cacheNames.map(cacheName => {
+            console.log('[SW] Clearing cache:', cacheName);
+            return caches.delete(cacheName);
+          })
+        );
+      }).then(() => {
+        event.ports[0].postMessage({ success: true });
+      })
+    );
+  }
+  
+  if (event.data.type === 'GET_VERSION') {
+    event.ports[0].postMessage({
+      version: APP_VERSION,
+      timestamp: BUILD_TIMESTAMP
+    });
+  }
+});
+
+console.log(`[SW] Service worker v${APP_VERSION} loaded successfully`);
+console.log('[SW] For cross-device compatibility, old caches will be cleared on activation');

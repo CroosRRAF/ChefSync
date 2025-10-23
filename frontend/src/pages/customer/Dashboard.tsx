@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { customerService, CustomerStats } from '@/services/customerService';
-// import { testCustomerAPI } from '@/utils/testCustomerAPI';
+import DashboardErrorBoundary from '@/components/dashboard/DashboardErrorBoundary';
 import { 
   ShoppingCart, 
   Clock, 
@@ -20,10 +20,11 @@ import {
   Target,
   Award,
   User,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 
-const CustomerDashboard: React.FC = () => {
+const CustomerDashboardContent: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -75,12 +76,27 @@ const CustomerDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-16">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-            <span className="ml-2 text-gray-600">Loading dashboard...</span>
-          </div>
+      <div className="space-y-6 animate-pulse">
+        <Card className="border-none shadow-sm dark:bg-gray-800">
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-4">
+              <div className="h-16 w-16 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+              <div className="flex-1 space-y-2">
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="border-none shadow-lg">
+              <CardContent className="p-6">
+                <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
@@ -88,11 +104,18 @@ const CustomerDashboard: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading your dashboard...</p>
-        </div>
+      <div className="space-y-6">
+        <Card className="border-none shadow-lg bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20">
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-4">
+              <AlertCircle className="h-10 w-10 text-red-500" />
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Not Authenticated</h3>
+                <p className="text-gray-600 dark:text-gray-400">Please log in to view your dashboard.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -144,7 +167,7 @@ const CustomerDashboard: React.FC = () => {
       </Card>
 
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <Card className="border-none shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white transform hover:scale-105 transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -219,7 +242,7 @@ const CustomerDashboard: React.FC = () => {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <Card className="border-none shadow-md dark:bg-gray-800">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-white">
@@ -319,6 +342,14 @@ const CustomerDashboard: React.FC = () => {
         </CardContent>
       </Card>
     </div>
+  );
+};
+
+const CustomerDashboard: React.FC = () => {
+  return (
+    <DashboardErrorBoundary>
+      <CustomerDashboardContent />
+    </DashboardErrorBoundary>
   );
 };
 

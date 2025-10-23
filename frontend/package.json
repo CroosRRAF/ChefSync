@@ -8,7 +8,11 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check-setup": "node check-setup.js",
+    "postinstall": "node check-setup.js || exit 0",
+    "clean": "rm -rf node_modules dist .vite package-lock.json",
+    "reset": "npm run clean && npm install"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
