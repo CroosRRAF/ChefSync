@@ -17,6 +17,7 @@ import { ChefDashboardStats } from '@/hooks/useOrderService';
 import { useAuth } from '@/context/AuthContext';
 import { userService } from '@/services/userService';
 import Greeting from '@/components/cook/Greeting';
+import DashboardErrorBoundary from '@/components/dashboard/DashboardErrorBoundary';
 
 function CookDashboardContent() {
   // State for API data
