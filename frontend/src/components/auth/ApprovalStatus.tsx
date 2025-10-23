@@ -63,29 +63,110 @@ const ApprovalStatus: React.FC<ApprovalStatusProps> = ({ onStatusChange }) => {
   const checkApprovalStatus = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const token = localStorage.getItem('chefsync_token');
+      const token = localStorage.getItem('access_token');
       
-      const response = await fetch(`${apiUrl}/api/auth/approval-status/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Debug logging
+      console.log('🔍 Checking approval status...');
+      console.log('📍 API URL:', apiUrl);
+      console.log('🔑 Has token:', !!token);
+      
+      // First try with authentication if token exists
+      if (token) {
+        try {
+          const response = await fetch(`${apiUrl}/api/auth/approval-status/`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
 
-      if (response.ok) {
-        const data = await response.json();
-        setStatusData(data);
-        onStatusChange?.(data.can_login);
+          console.log('🔐 Auth response status:', response.status);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('✅ Auth success:', data);
+            setStatusData(data);
+            onStatusChange?.(data.can_login);
+            return;
+          }
+        } catch (authError) {
+          console.log('🔐 Auth request failed:', authError);
+        }
+      }
+
+      // If authentication fails or no token, try to get user email and check without auth
+      let userEmail = localStorage.getItem('user_email');
+      
+      // If no user_email in localStorage, try to get it from user object
+      if (!userEmail) {
+        const userData = localStorage.getItem('user_data');
+        if (userData) {
+          try {
+            const user = JSON.parse(userData);
+            userEmail = user.email;
+            console.log('📧 Found email in user_data:', userEmail);
+          } catch (parseError) {
+            console.error('❌ Error parsing user data:', parseError);
+          }
+        }
       } else {
-        throw new Error('Failed to check approval status');
+        console.log('📧 Found email in user_email:', userEmail);
+      }
+
+      if (userEmail) {
+        console.log('🔍 Checking with email parameter...');
+        const responseWithoutAuth = await fetch(`${apiUrl}/api/auth/approval-status/?email=${encodeURIComponent(userEmail)}`, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        console.log('📧 Email response status:', responseWithoutAuth.status);
+        
+        if (responseWithoutAuth.ok) {
+          const data = await responseWithoutAuth.json();
+          console.log('✅ Email check success:', data);
+          setStatusData(data);
+          onStatusChange?.(data.can_login);
+        } else {
+          const errorText = await responseWithoutAuth.text();
+          console.error('❌ Failed to check approval status without auth:', responseWithoutAuth.status, errorText);
+          // Set a default error state instead of throwing
+          setStatusData({
+            approval_status: 'unknown',
+            approval_status_display: 'Unknown',
+            approval_notes: '',
+            approved_at: null,
+            can_login: false,
+            message: 'Unable to verify approval status. Please try logging in again.'
+          });
+          onStatusChange?.(false);
+        }
+      } else {
+        console.warn('⚠️ No user email available for approval status check');
+        // Set a default error state for missing email
+        setStatusData({
+          approval_status: 'unknown',
+          approval_status_display: 'Unknown',
+          approval_notes: '',
+          approved_at: null,
+          can_login: false,
+          message: 'Unable to verify approval status. Please try logging in again.'
+        });
+        onStatusChange?.(false);
       }
     } catch (error) {
-      console.error('Error checking approval status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to check approval status",
-        variant: "destructive",
+      console.error('💥 Error checking approval status:', error);
+      // Set a more user-friendly error state instead of showing toast immediately
+      setStatusData({
+        approval_status: 'error',
+        approval_status_display: 'Error',
+        approval_notes: '',
+        approved_at: null,
+        can_login: false,
+        message: 'Network error occurred while checking approval status. Please check your connection and try again.'
       });
+      onStatusChange?.(false);
     } finally {
       setIsLoading(false);
     }
@@ -105,6 +186,10 @@ const ApprovalStatus: React.FC<ApprovalStatusProps> = ({ onStatusChange }) => {
         return <XCircle className="h-8 w-8 text-red-500" />;
       case 'pending':
         return <Clock className="h-8 w-8 text-yellow-500" />;
+      case 'error':
+        return <AlertTriangle className="h-8 w-8 text-red-500" />;
+      case 'unknown':
+        return <AlertTriangle className="h-8 w-8 text-orange-500" />;
       default:
         return <AlertTriangle className="h-8 w-8 text-gray-500" />;
     }
@@ -118,6 +203,10 @@ const ApprovalStatus: React.FC<ApprovalStatusProps> = ({ onStatusChange }) => {
         return 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20';
       case 'pending':
         return 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/20';
+      case 'error':
+        return 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20';
+      case 'unknown':
+        return 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/20';
       default:
         return 'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/20';
     }
@@ -131,6 +220,10 @@ const ApprovalStatus: React.FC<ApprovalStatusProps> = ({ onStatusChange }) => {
         return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Rejected</Badge>;
       case 'pending':
         return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Pending</Badge>;
+      case 'error':
+        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Error</Badge>;
+      case 'unknown':
+        return <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Unknown</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -230,6 +323,26 @@ const ApprovalStatus: React.FC<ApprovalStatusProps> = ({ onStatusChange }) => {
                 <li>Review the admin notes (if provided) for specific reasons</li>
                 <li>Consider reapplying with updated information or documents</li>
                 <li>Contact us if you believe this was an error</li>
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {(statusData.approval_status === 'error' || statusData.approval_status === 'unknown') && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Unable to verify your approval status.</strong>
+              <br />
+              {statusData.message}
+              <br />
+              <br />
+              <strong>What you can do:</strong>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Click "Refresh Status" to try again</li>
+                <li>Check your internet connection</li>
+                <li>Try logging out and logging back in</li>
+                <li>Contact support if the problem persists</li>
               </ul>
             </AlertDescription>
           </Alert>

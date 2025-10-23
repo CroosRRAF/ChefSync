@@ -1,28 +1,56 @@
-import React, { useState } from 'react';
-import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { LoginCredentials } from '@/types/auth';
-import { Eye, EyeOff, Mail, Lock, AlertCircle, Loader2, ChefHat, Utensils, Heart, Sparkles, Clock, CheckCircle, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import AuthPattern from '@/assets/auth-pattern.svg';
-import logo from '@/assets/logo.svg';
+import AuthPattern from "@/assets/auth-pattern.svg";
+import navbarLogo from "@/assets/images/hero/navbarlogo.png";
+import GoogleAuthButton from "@/components/auth/GoogleAuthButton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { LoginCredentials } from "@/types/auth";
+import { apiClient } from "@/utils/fetcher";
+import { motion } from "framer-motion";
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle,
+  ChefHat,
+  Clock,
+  Eye,
+  EyeOff,
+  Heart,
+  Loader2,
+  Lock,
+  Mail,
+  Sparkles,
+  Utensils,
+} from "lucide-react";
+import React, { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 // Floating food icons component
 const FloatingIcons = () => {
   const icons = [
-    { icon: <Utensils className="w-5 h-5" />, position: 'top-10 left-1/4' },
-    { icon: <ChefHat className="w-6 h-6" />, position: 'top-1/3 right-10' },
-    { icon: <Heart className="w-5 h-5 text-rose-400" />, position: 'bottom-1/4 left-10' },
-    { icon: <Sparkles className="w-6 h-6 text-yellow-400" />, position: 'bottom-10 right-1/4' },
+    { icon: <Utensils className="w-5 h-5" />, position: "top-10 left-1/4" },
+    { icon: <ChefHat className="w-6 h-6" />, position: "top-1/3 right-10" },
+    {
+      icon: <Heart className="w-5 h-5 text-rose-400" />,
+      position: "bottom-1/4 left-10",
+    },
+    {
+      icon: <Sparkles className="w-6 h-6 text-yellow-400" />,
+      position: "bottom-10 right-1/4",
+    },
   ];
 
   return (
@@ -39,7 +67,7 @@ const FloatingIcons = () => {
           transition={{
             duration: 3 + Math.random() * 2,
             repeat: Infinity,
-            ease: 'easeInOut',
+            ease: "easeInOut",
             delay: Math.random() * 2,
           }}
         >
@@ -64,45 +92,41 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const redirectTo = location.state?.redirectTo || '/';
+  const redirectTo = location.state?.redirectTo || "/";
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     setError,
-    watch
+    watch,
   } = useForm<LoginCredentials>();
 
-  const emailValue = watch('email');
+  const emailValue = watch("email");
 
   // Function to check approval status
   const checkApprovalStatus = async (email: string) => {
-    if (!email || !email.includes('@')) return;
+    if (!email || !email.includes("@")) return;
+
+    // Ensure CSRF cookie is set before any POSTs
+    apiClient.get("/auth/csrf-token/").catch(() => {});
 
     setIsCheckingApproval(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const response = await fetch(`${apiUrl}/api/auth/check-user-status/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
+      const apiUrl =
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+      const data = await apiClient.post<{
+        approval_status?: string;
+        message?: string;
+        can_login?: boolean;
+      }>("/auth/check-user-status/", { email });
+      setApprovalStatus({
+        status: data.approval_status || "unknown",
+        message: data.message || "Status unknown",
+        canLogin: Boolean(data.can_login),
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setApprovalStatus({
-          status: data.approval_status || 'unknown',
-          message: data.message || 'Status unknown',
-          canLogin: data.can_login || false
-        });
-      } else {
-        setApprovalStatus(null);
-      }
     } catch (error) {
-      console.error('Error checking approval status:', error);
+      console.error("Error checking approval status:", error);
       setApprovalStatus(null);
     } finally {
       setIsCheckingApproval(false);
@@ -111,7 +135,7 @@ const Login: React.FC = () => {
 
   // Check approval status when email changes
   React.useEffect(() => {
-    if (emailValue && emailValue.includes('@')) {
+    if (emailValue && emailValue.includes("@")) {
       const timeoutId = setTimeout(() => {
         checkApprovalStatus(emailValue);
       }, 500); // Debounce for 500ms
@@ -126,13 +150,16 @@ const Login: React.FC = () => {
     // Check approval status first
     if (approvalStatus && !approvalStatus.canLogin) {
       // Store user data for approval status page
-      localStorage.setItem('pending_user_data', JSON.stringify({
-        email: data.email,
-        approval_status: approvalStatus.status,
-        message: approvalStatus.message
-      }));
+      localStorage.setItem(
+        "pending_user_data",
+        JSON.stringify({
+          email: data.email,
+          approval_status: approvalStatus.status,
+          message: approvalStatus.message,
+        })
+      );
 
-      navigate('/approval-status', { replace: true });
+      navigate("/approval-status", { replace: true });
       return;
     }
 
@@ -145,40 +172,44 @@ const Login: React.FC = () => {
         description: "You've been successfully logged in.",
       });
 
-      navigate(redirectTo);
+      // Don't navigate here - let AuthContext handle role-based navigation
+      // navigate(redirectTo);
     } catch (error: any) {
       // Handle specific error types
-      if (error.message === 'APPROVAL_PENDING') {
+      if (error.message === "APPROVAL_PENDING") {
         // Redirect to approval status page
-        navigate('/approval-status', { replace: true });
+        navigate("/approval-status", { replace: true });
         return;
-      } else if (error.message === 'APPROVAL_REJECTED') {
+      } else if (error.message === "APPROVAL_REJECTED") {
         // Show rejection message
-        const pendingData = localStorage.getItem('pending_user_data');
+        const pendingData = localStorage.getItem("pending_user_data");
         if (pendingData) {
           const userData = JSON.parse(pendingData);
-          setError('root', {
-            type: 'manual',
-            message: userData.message || 'Your account was not approved.'
+          setError("root", {
+            type: "manual",
+            message: userData.message || "Your account was not approved.",
           });
 
           toast({
             variant: "destructive",
             title: "Account Not Approved",
-            description: userData.message || "Your account was not approved. Please contact support.",
+            description:
+              userData.message ||
+              "Your account was not approved. Please contact support.",
           });
         }
       } else {
         // Handle other errors
-        setError('root', {
-          type: 'manual',
-          message: error.message || 'Invalid email or password'
+        setError("root", {
+          type: "manual",
+          message: error.message || "Invalid email or password",
         });
 
         toast({
           variant: "destructive",
           title: "Login failed",
-          description: error.message || "Please check your credentials and try again.",
+          description:
+            error.message || "Please check your credentials and try again.",
         });
       }
     } finally {
@@ -196,8 +227,8 @@ const Login: React.FC = () => {
           className="absolute inset-0 opacity-[0.02]"
           style={{
             backgroundImage: `url(${AuthPattern})`,
-            backgroundRepeat: 'repeat',
-            backgroundSize: 'auto'
+            backgroundRepeat: "repeat",
+            backgroundSize: "auto",
           }}
         />
         <FloatingIcons />
@@ -217,19 +248,19 @@ const Login: React.FC = () => {
               <motion.div
                 className="w-20 h-20 bg-gradient-to-br from-primary to-primary/80 rounded-2xl flex items-center justify-center text-primary-foreground font-bold text-2xl mx-auto mb-4 shadow-lg"
                 whileHover={{ scale: 1.05, rotate: 5 }}
-                transition={{ type: 'spring', stiffness: 300 }}
+                transition={{ type: "spring", stiffness: 300 }}
               >
-                <img 
-                  src={logo} 
-                  alt="ChefSync Logo" 
-                  className="w-10 h-10"
+                <img
+                  src={navbarLogo}
+                  alt="ChefSync"
+                  className="h-12 w-auto object-contain"
                 />
               </motion.div>
               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 Welcome Back
               </CardTitle>
               <CardDescription className="text-muted-foreground mt-2">
-                Sign in to your ChefSync account to continue your culinary journey
+                Sign in to your account to continue your culinary journey
               </CardDescription>
             </CardHeader>
 
@@ -240,7 +271,10 @@ const Login: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <Alert variant="destructive" className="border-l-4 border-destructive/90">
+                  <Alert
+                    variant="destructive"
+                    className="border-l-4 border-destructive/90"
+                  >
                     <AlertCircle className="h-5 w-5" />
                     <AlertDescription className="ml-2">
                       <div className="font-medium">Login Failed</div>
@@ -258,27 +292,40 @@ const Login: React.FC = () => {
                   transition={{ duration: 0.3 }}
                   className="space-y-4"
                 >
-                  {approvalStatus.status === 'pending' && (
+                  {approvalStatus.status === "pending" && (
                     <Alert className="bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-amber-400 dark:from-amber-900/20 dark:to-yellow-900/20 dark:border-amber-600">
                       <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                       <AlertDescription className="ml-2 text-amber-800 dark:text-amber-200">
-                        <div className="font-medium">Account Pending Approval</div>
-                        <div className="text-sm mt-1">{approvalStatus.message}</div>
+                        <div className="font-medium">
+                          Account Pending Approval
+                        </div>
+                        <div className="text-sm mt-1">
+                          {approvalStatus.message}
+                        </div>
                         <div className="text-sm mt-2 space-y-1">
-                          <p className="font-medium">You cannot login until your account is approved by an admin.</p>
-                          <p>Please wait for admin approval or contact support if you have questions.</p>
+                          <p className="font-medium">
+                            You cannot login until your account is approved by
+                            an admin.
+                          </p>
+                          <p>
+                            Please wait for admin approval or contact support if
+                            you have questions.
+                          </p>
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
                           className="mt-3 border-amber-400 text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-900/30"
                           onClick={() => {
-                            localStorage.setItem('pending_user_data', JSON.stringify({
-                              email: emailValue,
-                              approval_status: approvalStatus.status,
-                              message: approvalStatus.message
-                            }));
-                            navigate('/approval-status', { replace: true });
+                            localStorage.setItem(
+                              "pending_user_data",
+                              JSON.stringify({
+                                email: emailValue,
+                                approval_status: approvalStatus.status,
+                                message: approvalStatus.message,
+                              })
+                            );
+                            navigate("/approval-status", { replace: true });
                           }}
                         >
                           <Clock className="mr-2 h-4 w-4" />
@@ -288,27 +335,34 @@ const Login: React.FC = () => {
                     </Alert>
                   )}
 
-                  {approvalStatus.status === 'rejected' && (
+                  {approvalStatus.status === "rejected" && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-5 w-5" />
                       <AlertDescription>
                         <div className="font-medium">Account Not Approved</div>
-                        <div className="text-sm mt-1">{approvalStatus.message}</div>
+                        <div className="text-sm mt-1">
+                          {approvalStatus.message}
+                        </div>
                         <div className="text-sm mt-2">
-                          <strong>Your account application was not approved.</strong>
+                          <strong>
+                            Your account application was not approved.
+                          </strong>
                           <br />
-                          Please contact support for more information or to reapply.
+                          Please contact support for more information or to
+                          reapply.
                         </div>
                       </AlertDescription>
                     </Alert>
                   )}
 
-                  {approvalStatus.status === 'approved' && (
+                  {approvalStatus.status === "approved" && (
                     <Alert className="bg-gradient-to-r from-green-50 to-green-50 border-l-4 border-green-400 dark:from-green-900/20 dark:to-green-900/20 dark:border-green-600">
                       <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                       <AlertDescription className="ml-2 text-green-800 dark:text-green-200">
                         <div className="font-medium">Account Approved</div>
-                        <div className="text-sm mt-1">Your account is ready to use!</div>
+                        <div className="text-sm mt-1">
+                          Your account is ready to use!
+                        </div>
                       </AlertDescription>
                     </Alert>
                   )}
@@ -319,14 +373,19 @@ const Login: React.FC = () => {
               {isCheckingApproval && (
                 <div className="flex items-center justify-center py-2">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  <span className="text-sm text-muted-foreground">Checking account status...</span>
+                  <span className="text-sm text-muted-foreground">
+                    Checking account status...
+                  </span>
                 </div>
               )}
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 {/* Email Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
+                  <Label
+                    htmlFor="email"
+                    className="text-sm font-medium text-foreground/80"
+                  >
                     Email Address
                   </Label>
                   <div className="relative group">
@@ -341,9 +400,10 @@ const Login: React.FC = () => {
                         "pl-10 h-11 text-base transition-all duration-200 border-2 border-muted-foreground/20",
                         "focus:border-primary/50 focus:ring-2 focus:ring-primary/20",
                         "hover:border-muted-foreground/30",
-                        errors.email && "border-destructive/50 focus:border-destructive/70 focus:ring-destructive/20"
+                        errors.email &&
+                          "border-destructive/50 focus:border-destructive/70 focus:ring-destructive/20"
                       )}
-                      {...register('email', { required: 'Email is required' })}
+                      {...register("email", { required: "Email is required" })}
                     />
                   </div>
                   {errors.email && (
@@ -361,7 +421,10 @@ const Login: React.FC = () => {
                 {/* Password Field */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
+                    <Label
+                      htmlFor="password"
+                      className="text-sm font-medium text-foreground/80"
+                    >
                       Password
                     </Label>
                     <Link
@@ -377,21 +440,26 @@ const Login: React.FC = () => {
                     </div>
                     <Input
                       id="password"
-                      type={showPassword ? 'text' : 'password'}
+                      type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
                       className={cn(
                         "pl-10 pr-10 h-11 text-base transition-all duration-200 border-2 border-muted-foreground/20",
                         "focus:border-primary/50 focus:ring-2 focus:ring-primary/20",
                         "hover:border-muted-foreground/30",
-                        errors.password && "border-destructive/50 focus:border-destructive/70 focus:ring-destructive/20"
+                        errors.password &&
+                          "border-destructive/50 focus:border-destructive/70 focus:ring-destructive/20"
                       )}
-                      {...register('password', { required: 'Password is required' })}
+                      {...register("password", {
+                        required: "Password is required",
+                      })}
                     />
                     <button
                       type="button"
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                       onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4" />
@@ -451,7 +519,10 @@ const Login: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 gap-3">
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
                   <GoogleAuthButton mode="login" />
                 </motion.div>
               </div>
@@ -460,7 +531,7 @@ const Login: React.FC = () => {
             <CardFooter className="text-center pt-4">
               <div className="mt-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Don't have an account?{' '}
+                  Don't have an account?{" "}
                   <Link
                     to="/auth/register"
                     className="font-medium text-primary hover:text-primary/80 hover:underline underline-offset-4 transition-colors"
@@ -470,10 +541,21 @@ const Login: React.FC = () => {
                 </p>
 
                 <p className="mt-4 text-xs text-muted-foreground/70">
-                  By continuing, you agree to our{' '}
-                  <a href="#" className="hover:underline hover:text-foreground transition-colors">Terms</a>{' '}
-                  and{' '}
-                  <a href="#" className="hover:underline hover:text-foreground transition-colors">Privacy Policy</a>.
+                  By continuing, you agree to our{" "}
+                  <a
+                    href="#"
+                    className="hover:underline hover:text-foreground transition-colors"
+                  >
+                    Terms
+                  </a>{" "}
+                  and{" "}
+                  <a
+                    href="#"
+                    className="hover:underline hover:text-foreground transition-colors"
+                  >
+                    Privacy Policy
+                  </a>
+                  .
                 </p>
               </div>
             </CardFooter>

@@ -9,13 +9,13 @@ import { Button } from '@/components/ui/button';
 // Check if we have a valid Google OAuth client ID
 const hasValidGoogleClientId = () => {
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
-  // For development, allow any client ID that looks like a Google OAuth client ID
-  // In production, you should use proper validation
+  // Check if client ID is properly configured
   return clientId && 
+         clientId.trim() !== '' &&
          clientId !== 'your-google-client-id' && 
          clientId !== 'YOUR_NEW_GOOGLE_CLIENT_ID_HERE' &&
          clientId !== '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com' &&
-         (clientId.includes('.apps.googleusercontent.com') || clientId.length > 20);
+         clientId.includes('.apps.googleusercontent.com');
 };
 
 interface GoogleAuthButtonProps {
@@ -34,8 +34,8 @@ const GoogleRegisterButton: React.FC<GoogleAuthButtonProps> = ({
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const res = await fetch(`${apiUrl}/api/auth/google/login/`, {
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+      const res = await fetch(`${apiUrl}/auth/google/login/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_token: credentialResponse.credential }),

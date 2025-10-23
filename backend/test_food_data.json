@@ -1,0 +1,570 @@
+{
+  "count": 5,
+  "results": [
+    {
+      "food_id": 11,
+      "name": "Palmyrah Toddy Infused Payasam",
+      "description": "Creamy payasam slow-cooked with palmyrah toddy reduction, roasted cashews, and raisins.",
+      "category": "Desserts",
+      "food_category": 1,
+      "category_name": "Desserts",
+      "cuisine_name": "Northern Sri Lankan",
+      "is_available": true,
+      "is_featured": false,
+      "preparation_time": 30,
+      "calories_per_serving": 430,
+      "ingredients": [
+        "vermicelli",
+        "palmyrah toddy",
+        "coconut milk",
+        "cashews",
+        "raisins"
+      ],
+      "allergens": [
+        "nuts"
+      ],
+      "nutritional_info": {
+        "fat_g": 18,
+        "carbs_g": 34,
+        "protein_g": 28,
+        "calories_kcal": 430
+      },
+      "is_vegetarian": true,
+      "is_vegan": false,
+      "is_gluten_free": false,
+      "spice_level": "mild",
+      "rating_average": "4.50",
+      "total_reviews": 41,
+      "total_orders": 139,
+      "primary_image": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80",
+      "available_cooks_count": 1,
+      "image_url": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80",
+      "thumbnail_url": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80&w=200&h=200",
+      "optimized_image_url": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80",
+      "image": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80",
+      "status": "Approved",
+      "chef": 9,
+      "chef_name": "poornachandran.chavakachcheri",
+      "chef_rating": "4.50",
+      "prices": [
+        {
+          "price_id": 33,
+          "size": "Large",
+          "price": "9.90",
+          "preparation_time": 28,
+          "image_url": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80",
+          "food": 11,
+          "food_name": "Palmyrah Toddy Infused Payasam",
+          "cook": {
+            "id": 9,
+            "name": "Chef Poornachandran Sivakumar",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Poornachandran Sivakumar",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.755382Z",
+          "updated_at": "2025-10-04T02:58:27.189498Z"
+        },
+        {
+          "price_id": 32,
+          "size": "Medium",
+          "price": "7.50",
+          "preparation_time": 24,
+          "image_url": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80",
+          "food": 11,
+          "food_name": "Palmyrah Toddy Infused Payasam",
+          "cook": {
+            "id": 9,
+            "name": "Chef Poornachandran Sivakumar",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Poornachandran Sivakumar",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.753300Z",
+          "updated_at": "2025-10-04T02:58:27.188477Z"
+        },
+        {
+          "price_id": 31,
+          "size": "Small",
+          "price": "5.75",
+          "preparation_time": 20,
+          "image_url": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1000&q=80",
+          "food": 11,
+          "food_name": "Palmyrah Toddy Infused Payasam",
+          "cook": {
+            "id": 9,
+            "name": "Chef Poornachandran Sivakumar",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Poornachandran Sivakumar",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.748646Z",
+          "updated_at": "2025-10-04T02:58:27.178398Z"
+        }
+      ],
+      "created_at": "2025-10-04T02:55:32.748646Z",
+      "updated_at": "2025-10-04T02:58:27.178398Z"
+    },
+    {
+      "food_id": 10,
+      "name": "Vaddukoddai Heritage Veg Kothu",
+      "description": "Whole wheat godhamba roti tossed with tempered vegetables, millet tofu, and roasted masala.",
+      "category": "Street Eats",
+      "food_category": 5,
+      "category_name": "Street Eats",
+      "cuisine_name": "Northern Sri Lankan",
+      "is_available": true,
+      "is_featured": false,
+      "preparation_time": 25,
+      "calories_per_serving": 540,
+      "ingredients": [
+        "godhamba roti",
+        "millet tofu",
+        "carrot",
+        "cabbage",
+        "roasted masala"
+      ],
+      "allergens": [
+        "gluten",
+        "soy"
+      ],
+      "nutritional_info": {
+        "fat_g": 18,
+        "carbs_g": 34,
+        "protein_g": 28,
+        "calories_kcal": 540
+      },
+      "is_vegetarian": true,
+      "is_vegan": true,
+      "is_gluten_free": false,
+      "spice_level": "medium",
+      "rating_average": "4.40",
+      "total_reviews": 44,
+      "total_orders": 156,
+      "primary_image": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80",
+      "available_cooks_count": 1,
+      "image_url": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80",
+      "thumbnail_url": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80&w=200&h=200",
+      "optimized_image_url": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80",
+      "image": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80",
+      "status": "Approved",
+      "chef": 10,
+      "chef_name": "tharsheni.vaddukoddai",
+      "chef_rating": "4.40",
+      "prices": [
+        {
+          "price_id": 30,
+          "size": "Large",
+          "price": "13.60",
+          "preparation_time": 26,
+          "image_url": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80",
+          "food": 10,
+          "food_name": "Vaddukoddai Heritage Veg Kothu",
+          "cook": {
+            "id": 10,
+            "name": "Chef Tharsheni Balasingam",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Tharsheni Balasingam",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.738739Z",
+          "updated_at": "2025-10-04T02:58:27.178398Z"
+        },
+        {
+          "price_id": 29,
+          "size": "Medium",
+          "price": "10.80",
+          "preparation_time": 22,
+          "image_url": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80",
+          "food": 10,
+          "food_name": "Vaddukoddai Heritage Veg Kothu",
+          "cook": {
+            "id": 10,
+            "name": "Chef Tharsheni Balasingam",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Tharsheni Balasingam",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.738739Z",
+          "updated_at": "2025-10-04T02:58:27.178398Z"
+        },
+        {
+          "price_id": 28,
+          "size": "Small",
+          "price": "7.90",
+          "preparation_time": 18,
+          "image_url": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80",
+          "food": 10,
+          "food_name": "Vaddukoddai Heritage Veg Kothu",
+          "cook": {
+            "id": 10,
+            "name": "Chef Tharsheni Balasingam",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Tharsheni Balasingam",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.738739Z",
+          "updated_at": "2025-10-04T02:58:27.178398Z"
+        }
+      ],
+      "created_at": "2025-10-04T02:55:32.738739Z",
+      "updated_at": "2025-10-04T02:58:27.173789Z"
+    },
+    {
+      "food_id": 9,
+      "name": "Karainagar Grilled Reef Fish",
+      "description": "Charcoal grilled reef fish brushed with tamarind glaze, served with green mango salad.",
+      "category": "Seafood Specials",
+      "food_category": 4,
+      "category_name": "Seafood Specials",
+      "cuisine_name": "Northern Sri Lankan",
+      "is_available": true,
+      "is_featured": true,
+      "preparation_time": 35,
+      "calories_per_serving": 455,
+      "ingredients": [
+        "reef fish",
+        "tamarind glaze",
+        "green mango",
+        "chilli flakes",
+        "coconut oil"
+      ],
+      "allergens": [
+        "fish"
+      ],
+      "nutritional_info": {
+        "fat_g": 18,
+        "carbs_g": 34,
+        "protein_g": 28,
+        "calories_kcal": 455
+      },
+      "is_vegetarian": false,
+      "is_vegan": false,
+      "is_gluten_free": true,
+      "spice_level": "medium",
+      "rating_average": "4.70",
+      "total_reviews": 66,
+      "total_orders": 221,
+      "primary_image": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80",
+      "available_cooks_count": 1,
+      "image_url": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80",
+      "thumbnail_url": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80&w=200&h=200",
+      "optimized_image_url": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80",
+      "image": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80",
+      "status": "Approved",
+      "chef": 8,
+      "chef_name": "dharshan.karainagar",
+      "chef_rating": "4.70",
+      "prices": [
+        {
+          "price_id": 27,
+          "size": "Large",
+          "price": "19.95",
+          "preparation_time": 40,
+          "image_url": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80",
+          "food": 9,
+          "food_name": "Karainagar Grilled Reef Fish",
+          "cook": {
+            "id": 8,
+            "name": "Chef Dharshan Rajadurai",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Dharshan Rajadurai",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.738739Z",
+          "updated_at": "2025-10-04T02:58:27.173789Z"
+        },
+        {
+          "price_id": 26,
+          "size": "Medium",
+          "price": "14.75",
+          "preparation_time": 33,
+          "image_url": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80",
+          "food": 9,
+          "food_name": "Karainagar Grilled Reef Fish",
+          "cook": {
+            "id": 8,
+            "name": "Chef Dharshan Rajadurai",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Dharshan Rajadurai",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.737210Z",
+          "updated_at": "2025-10-04T02:58:27.168528Z"
+        },
+        {
+          "price_id": 25,
+          "size": "Small",
+          "price": "10.50",
+          "preparation_time": 28,
+          "image_url": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1000&q=80",
+          "food": 9,
+          "food_name": "Karainagar Grilled Reef Fish",
+          "cook": {
+            "id": 8,
+            "name": "Chef Dharshan Rajadurai",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Dharshan Rajadurai",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.728739Z",
+          "updated_at": "2025-10-04T02:58:27.168528Z"
+        }
+      ],
+      "created_at": "2025-10-04T02:55:32.728739Z",
+      "updated_at": "2025-10-04T02:58:27.158545Z"
+    },
+    {
+      "food_id": 7,
+      "name": "Jaffna Fish Cutlet Platter",
+      "description": "Golden fried fish cutlets filled with smoked tuna, potato, and curry leaves served with lime aioli.",
+      "category": "Street Eats",
+      "food_category": 5,
+      "category_name": "Street Eats",
+      "cuisine_name": "Northern Sri Lankan",
+      "is_available": true,
+      "is_featured": false,
+      "preparation_time": 30,
+      "calories_per_serving": 410,
+      "ingredients": [
+        "smoked tuna",
+        "potato",
+        "curry leaves",
+        "breadcrumbs",
+        "lime aioli"
+      ],
+      "allergens": [
+        "fish",
+        "gluten"
+      ],
+      "nutritional_info": {
+        "fat_g": 18,
+        "carbs_g": 34,
+        "protein_g": 28,
+        "calories_kcal": 410
+      },
+      "is_vegetarian": false,
+      "is_vegan": false,
+      "is_gluten_free": false,
+      "spice_level": "medium",
+      "rating_average": "4.60",
+      "total_reviews": 59,
+      "total_orders": 205,
+      "primary_image": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80",
+      "available_cooks_count": 1,
+      "image_url": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80",
+      "thumbnail_url": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80&w=200&h=200",
+      "optimized_image_url": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80",
+      "image": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80",
+      "status": "Approved",
+      "chef": 7,
+      "chef_name": "aravinth.jaffna",
+      "chef_rating": "4.90",
+      "prices": [
+        {
+          "price_id": 21,
+          "size": "Large",
+          "price": "12.50",
+          "preparation_time": 32,
+          "image_url": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80",
+          "food": 7,
+          "food_name": "Jaffna Fish Cutlet Platter",
+          "cook": {
+            "id": 7,
+            "name": "Chef Aravinth Yogarajah",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Aravinth Yogarajah",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.718460Z",
+          "updated_at": "2025-10-04T02:58:27.158545Z"
+        },
+        {
+          "price_id": 20,
+          "size": "Medium",
+          "price": "9.90",
+          "preparation_time": 28,
+          "image_url": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80",
+          "food": 7,
+          "food_name": "Jaffna Fish Cutlet Platter",
+          "cook": {
+            "id": 7,
+            "name": "Chef Aravinth Yogarajah",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Aravinth Yogarajah",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.718460Z",
+          "updated_at": "2025-10-04T02:58:27.158545Z"
+        },
+        {
+          "price_id": 19,
+          "size": "Small",
+          "price": "7.25",
+          "preparation_time": 25,
+          "image_url": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1000&q=80",
+          "food": 7,
+          "food_name": "Jaffna Fish Cutlet Platter",
+          "cook": {
+            "id": 7,
+            "name": "Chef Aravinth Yogarajah",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Aravinth Yogarajah",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.718460Z",
+          "updated_at": "2025-10-04T02:58:27.158545Z"
+        }
+      ],
+      "created_at": "2025-10-04T02:55:32.718460Z",
+      "updated_at": "2025-10-04T02:58:27.158545Z"
+    },
+    {
+      "food_id": 6,
+      "name": "Chavakachcheri Mutton Poriyal",
+      "description": "Tender mutton pan-seared with black pepper, roasted coconut, and hand-ground masala.",
+      "category": "Heritage Curries",
+      "food_category": 2,
+      "category_name": "Heritage Curries",
+      "cuisine_name": "Northern Sri Lankan",
+      "is_available": true,
+      "is_featured": false,
+      "preparation_time": 55,
+      "calories_per_serving": 650,
+      "ingredients": [
+        "mutton",
+        "black pepper",
+        "roasted coconut",
+        "ginger",
+        "shallots"
+      ],
+      "allergens": [],
+      "nutritional_info": {
+        "fat_g": 18,
+        "carbs_g": 34,
+        "protein_g": 28,
+        "calories_kcal": 650
+      },
+      "is_vegetarian": false,
+      "is_vegan": false,
+      "is_gluten_free": true,
+      "spice_level": "hot",
+      "rating_average": "4.70",
+      "total_reviews": 71,
+      "total_orders": 232,
+      "primary_image": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80",
+      "available_cooks_count": 1,
+      "image_url": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80",
+      "thumbnail_url": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80&w=200&h=200",
+      "optimized_image_url": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80",
+      "image": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80",
+      "status": "Approved",
+      "chef": 9,
+      "chef_name": "poornachandran.chavakachcheri",
+      "chef_rating": "4.50",
+      "prices": [
+        {
+          "price_id": 18,
+          "size": "Large",
+          "price": "21.00",
+          "preparation_time": 58,
+          "image_url": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80",
+          "food": 6,
+          "food_name": "Chavakachcheri Mutton Poriyal",
+          "cook": {
+            "id": 9,
+            "name": "Chef Poornachandran Sivakumar",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Poornachandran Sivakumar",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.711257Z",
+          "updated_at": "2025-10-04T02:58:27.157477Z"
+        },
+        {
+          "price_id": 17,
+          "size": "Medium",
+          "price": "15.75",
+          "preparation_time": 50,
+          "image_url": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80",
+          "food": 6,
+          "food_name": "Chavakachcheri Mutton Poriyal",
+          "cook": {
+            "id": 9,
+            "name": "Chef Poornachandran Sivakumar",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Poornachandran Sivakumar",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.711257Z",
+          "updated_at": "2025-10-04T02:58:27.148663Z"
+        },
+        {
+          "price_id": 16,
+          "size": "Small",
+          "price": "11.25",
+          "preparation_time": 40,
+          "image_url": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80",
+          "image_data_url": "https://images.unsplash.com/photo-1604908178059-4a2b50d73ec9?auto=format&fit=crop&w=1000&q=80",
+          "food": 6,
+          "food_name": "Chavakachcheri Mutton Poriyal",
+          "cook": {
+            "id": 9,
+            "name": "Chef Poornachandran Sivakumar",
+            "rating": 4.5,
+            "is_active": true,
+            "profile_image": null
+          },
+          "cook_name": "Chef Poornachandran Sivakumar",
+          "cook_rating": 4.5,
+          "created_at": "2025-10-04T02:55:32.711257Z",
+          "updated_at": "2025-10-04T02:58:27.148663Z"
+        }
+      ],
+      "created_at": "2025-10-04T02:55:32.708453Z",
+      "updated_at": "2025-10-04T02:58:27.148663Z"
+    }
+  ]
+}

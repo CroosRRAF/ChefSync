@@ -61,43 +61,56 @@ const SimpleRegisterForm: React.FC = () => {
   // Enhanced Step indicator component
   const StepIndicator: React.FC = () => {
     const needsDocuments = selectedRole === 'cook' || selectedRole === 'delivery_agent';
-    const steps = [
-      { number: 1, title: 'Personal Info', active: currentStep === 1 && !otpSent, completed: false },
+    
+    // Define steps based on whether documents are needed
+    const baseSteps = [
+      { number: 1, title: 'Personal Info', active: currentStep === 1 && !otpSent, completed: otpVerified },
       { number: 2, title: 'Email Verification', active: currentStep === 1 && otpSent && !otpVerified, completed: otpVerified },
-      { number: 3, title: 'Role Selection', active: currentStep === 2, completed: currentStep > 2 },
-      ...(needsDocuments ? [{ number: 4, title: 'Documents', active: currentStep === 3, completed: currentStep > 3 }] : []),
+      { number: 3, title: 'Role Selection', active: currentStep === 2, completed: currentStep > 2 }
+    ];
+    
+    const documentStep = needsDocuments ? 
+      [{ number: 4, title: 'Documents', active: currentStep === 3, completed: currentStep > 3 }] : [];
+    
+    const finalStep = [
       { number: needsDocuments ? 5 : 4, title: 'Account Setup', active: currentStep === (needsDocuments ? 4 : 3), completed: false }
     ];
+    
+    const steps = [...baseSteps, ...documentStep, ...finalStep];
 
     return (
-      <div className="flex items-center justify-center space-x-2 mb-8 px-4">
-        {steps.map((step, index) => (
-          <div key={step.number} className="flex items-center">
-            <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${
-              step.completed
-                ? 'bg-green-500 border-green-500 text-white shadow-lg'
-                : step.active 
-                  ? 'bg-primary border-primary text-primary-foreground shadow-lg scale-110' 
-                  : 'bg-muted border-muted-foreground text-muted-foreground'
-            }`}>
-              {step.completed ? (
-                <CheckCircle className="w-5 h-5" />
-              ) : (
-                <span className="text-sm font-semibold">{step.number}</span>
+      <div className="flex items-center justify-center mb-8 px-4 overflow-x-auto">
+        <div className="flex items-center space-x-1 min-w-max">
+          {steps.map((step, index) => (
+            <div key={step.number} className="flex items-center">
+              <div className="flex flex-col items-center">
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${
+                  step.completed
+                    ? 'bg-green-500 border-green-500 text-white shadow-lg'
+                    : step.active 
+                      ? 'bg-primary border-primary text-primary-foreground shadow-lg scale-110' 
+                      : 'bg-muted border-muted-foreground text-muted-foreground'
+                }`}>
+                  {step.completed ? (
+                    <CheckCircle className="w-5 h-5" />
+                  ) : (
+                    <span className="text-sm font-semibold">{step.number}</span>
+                  )}
+                </div>
+                <span className={`mt-2 text-xs font-medium transition-colors duration-300 text-center max-w-20 ${
+                  step.active || step.completed ? 'text-primary' : 'text-muted-foreground'
+                }`}>
+                  {step.title}
+                </span>
+              </div>
+              {index < steps.length - 1 && (
+                <div className={`w-8 h-0.5 mx-2 transition-colors duration-300 ${
+                  step.completed ? 'bg-green-500' : step.active ? 'bg-primary' : 'bg-muted'
+                }`} />
               )}
             </div>
-            <span className={`ml-3 text-sm font-medium transition-colors duration-300 ${
-              step.active || step.completed ? 'text-primary' : 'text-muted-foreground'
-            }`}>
-              {step.title}
-            </span>
-            {index < steps.length - 1 && (
-              <div className={`w-12 h-0.5 mx-4 transition-colors duration-300 ${
-                step.completed ? 'bg-green-500' : step.active ? 'bg-primary' : 'bg-muted'
-              }`} />
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   };
@@ -130,8 +143,8 @@ const SimpleRegisterForm: React.FC = () => {
 
   const apiCall = async (endpoint: string, data: any) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      const response = await fetch(`${apiUrl}/api/auth/${endpoint}`, {
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+      const response = await fetch(`${apiUrl}/auth/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -293,7 +306,8 @@ const SimpleRegisterForm: React.FC = () => {
       if (selectedRole === 'customer') {
         // Store tokens in localStorage with correct keys for AuthContext
         if (result.tokens) {
-          localStorage.setItem('chefsync_token', result.tokens.access);
+          localStorage.setItem('access_token', result.tokens.access);
+          localStorage.setItem('refresh_token', result.tokens.refresh);
           localStorage.setItem('chefsync_refresh_token', result.tokens.refresh);
         }
         
@@ -312,8 +326,9 @@ const SimpleRegisterForm: React.FC = () => {
       } else {
         // For cooks and delivery agents, don't store tokens and show pending approval message
         // Clear any existing tokens to ensure they can't access the system
-        localStorage.removeItem('chefsync_token');
-        localStorage.removeItem('chefsync_refresh_token');
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('chefsync_refresh_token');
         
         toast({
           title: "Registration Complete!",

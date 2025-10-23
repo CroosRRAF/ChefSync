@@ -51,19 +51,29 @@ export const suppressKnownWarnings = () => {
         originalWarn.apply(console, args);
       }
     };
-    
-    // Override console.error for specific known errors
-    console.error = (...args: any[]) => {
-      const message = args.join(' ');
-      
-      // Check if this is a known error we want to suppress
-      const shouldSuppress = KNOWN_WARNINGS.some(warning => 
-        message.includes(warning)
-      );
-      
-      if (!shouldSuppress) {
-        originalError.apply(console, args);
+
+    // Override console.error for specific known deprecations
+    console.error = (...args) => {
+      // Filter out undefined or null arguments
+      const filteredArgs = args.filter(arg => arg !== undefined && arg !== null);
+
+      // If no valid arguments remain, skip logging entirely
+      if (filteredArgs.length === 0) {
+        return;
       }
+
+      const message = filteredArgs.join(' ');
+
+      // Filter out -ms-high-contrast deprecation (browser-level, can't be fixed by us)
+      if (
+        message.includes('-ms-high-contrast is in the process of being deprecated') ||
+        message.includes('Deprecation') && message.includes('-ms-high-contrast')
+      ) {
+        return; // Suppress this browser deprecation warning
+      }
+
+      // Allow all other errors through
+      originalError.apply(console, args);
     };
   }
 };

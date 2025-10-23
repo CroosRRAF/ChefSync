@@ -49,7 +49,7 @@ class JWTTokenService:
         access = refresh.access_token
         
         # Add custom claims to access token
-        access['user_id'] = user.user_id
+        access['user_id'] = user.id  # Use the id property which maps to user_id
         access['email'] = user.email
         access['name'] = user.name
         access['role'] = user.role
@@ -156,6 +156,7 @@ class JWTTokenService:
                 
                 # For refresh tokens: Check database record
                 token_hash = cls.generate_token_hash(token)
+                
                 try:
                     token_record = JWTToken.objects.get(
                         token_hash=token_hash,
@@ -218,31 +219,21 @@ class JWTTokenService:
         }
     
     @classmethod
-    def revoke_token(cls, token: str, token_type: str = 'refresh') -> bool:
-        """
-        Revoke a token
-        Only refresh tokens can be revoked (access tokens are stateless)
-        
-        Args:
-            token: JWT token string
-            token_type: Type of token (only 'refresh' supported)
-            
-        Returns:
-            True if token was revoked, False otherwise
-        """
-        if token_type != 'refresh':
-            return False  # Access tokens are stateless, cannot be revoked individually
-            
+    def revoke_token(cls, token: str, token_type: str):
+        """Revoke a specific token by setting is_revoked to True"""
+        token_hash = cls.generate_token_hash(token)
         try:
-            token_hash = cls.generate_token_hash(token)
-            token_record = JWTToken.objects.get(
-                token_hash=token_hash,
-                token_type='refresh'
-            )
-            token_record.revoke()
-            return True
+            jwt_token = JWTToken.objects.get(token_hash=token_hash, token_type=token_type)
+            jwt_token.is_revoked = True
+            jwt_token.save()
         except JWTToken.DoesNotExist:
-            return False
+            pass
+
+    @classmethod
+    def rotate_refresh_token(cls, old_refresh_token: str, user: User, request=None) -> Dict[str, Any]:
+        """Rotate the refresh token by revoking the old one and issuing a new one"""
+        cls.revoke_token(old_refresh_token, 'refresh')
+        return cls.create_tokens(user, request)
     
     @classmethod
     def revoke_all_user_tokens(cls, user: User, token_type: str = None) -> int:

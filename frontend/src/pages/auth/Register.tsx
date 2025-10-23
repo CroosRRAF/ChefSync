@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import AuthPattern from '@/assets/auth-pattern.svg';
 import logo from '@/assets/logo.svg';
+import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Floating food icons component for the background
@@ -111,13 +112,13 @@ const Register: React.FC = () => {
                 transition={{ type: 'spring', stiffness: 300 }}
               >
                 <img 
-                  src={logo} 
-                  alt="ChefSync Logo" 
-                  className="w-10 h-10"
+                  src={navbarLogo} 
+                  alt="ChefSync" 
+                  className="h-12 w-auto object-contain"
                 />
               </motion.div>
               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Join ChefSync
+                Join Us
               </CardTitle>
               <CardDescription className="text-muted-foreground mt-2">
                 Create your account to start your culinary journey with us

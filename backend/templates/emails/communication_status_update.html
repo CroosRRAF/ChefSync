@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Communication Status Update</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f8f9fa;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background-color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px 20px; 
+            text-align: center; 
+            color: white;
+        }
+        .header h1 { 
+            margin: 0; 
+            font-size: 24px; 
+            font-weight: 600;
+        }
+        .header h2 { 
+            margin: 10px 0 0 0; 
+            font-size: 18px; 
+            font-weight: 400;
+            opacity: 0.9;
+        }
+        .content { 
+            padding: 30px 20px; 
+        }
+        .status-box { 
+            background: {{ status_color }}15; 
+            border-left: 4px solid {{ status_color }}; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin: 25px 0; 
+        }
+        .status-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .status-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+        .status-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: {{ status_color }};
+            margin: 0;
+        }
+        .communication-details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: #6c757d;
+        }
+        .detail-value {
+            color: #333;
+        }
+        .notes-section {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #2196f3;
+        }
+        .notes-title {
+            font-weight: 600;
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .footer { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            text-align: center; 
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .logo {
+            max-width: 150px;
+            height: auto;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 0;
+                box-shadow: none;
+            }
+            .header, .content, .footer {
+                padding: 20px 15px;
+            }
+            .detail-row {
+                flex-direction: column;
+            }
+            .detail-label {
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {% if logo_base64 %}
+            <img src="data:image/svg+xml;base64,{{ logo_base64 }}" alt="{{ site_name }}" class="logo">
+            {% endif %}
+            <h1>{{ site_name }}</h1>
+            <h2>{{ status_title }}</h2>
+        </div>
+        
+        <div class="content">
+            <p>Hello <strong>{{ user_name }}</strong>,</p>
+            
+            <p>We have an update regarding your {{ communication_type }}:</p>
+            
+            <div class="status-box">
+                <div class="status-header">
+                    <span class="status-icon">{{ status_icon }}</span>
+                    <h3 class="status-title">{{ status_title }}</h3>
+                </div>
+                <p>{{ status_message }}</p>
+            </div>
+            
+            <div class="communication-details">
+                <h4 style="margin-top: 0; color: #333;">Communication Details</h4>
+                <div class="detail-row">
+                    <span class="detail-label">Reference Number:</span>
+                    <span class="detail-value"><strong>{{ reference_number }}</strong></span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Subject:</span>
+                    <span class="detail-value">{{ subject }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Type:</span>
+                    <span class="detail-value">{{ communication_type }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Previous Status:</span>
+                    <span class="detail-value">{{ old_status }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Current Status:</span>
+                    <span class="detail-value"><strong>{{ new_status }}</strong></span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Updated by:</span>
+                    <span class="detail-value">{{ admin_name }} ({{ admin_role }})</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Date:</span>
+                    <span class="detail-value">{{ update_date }}</span>
+                </div>
+            </div>
+            
+            {% if notes %}
+            <div class="notes-section">
+                <div class="notes-title">📝 Additional Notes:</div>
+                <p style="margin: 0;">{{ notes }}</p>
+            </div>
+            {% endif %}
+            
+            <p>You can view the full details of your communication by clicking the button below:</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{ communication_url }}" class="cta-button">View Communication Details</a>
+            </div>
+            
+            <p>If you have any questions or need further assistance, please don't hesitate to contact us.</p>
+            
+            <p>Best regards,<br>
+            <strong>The {{ site_name }} Team</strong></p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>{{ site_name }}</strong></p>
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p>If you need assistance, please contact our support team.</p>
+        </div>
+    </div>
+</body>
+</html>
