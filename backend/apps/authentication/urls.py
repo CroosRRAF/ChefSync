@@ -1,11 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-
-# Import views using try-except to handle different environments
-try:
-    from . import views
-except ImportError:
-    from apps.authentication import views
+from . import views
 
 router = DefaultRouter()
 router.register(r'users', views.UserViewSet, basename='users')
@@ -86,10 +81,4 @@ urlpatterns = [
     path('referral/stats/', views.get_referral_stats, name='get_referral_stats'),
     path('referral/tokens/', views.get_referral_tokens, name='get_referral_tokens'),
     path('referral/validate/', views.validate_referral_token, name='validate_referral_token'),
-
-    # Chef Location Management
-    path('chef/location/', views.update_chef_location, name='update_chef_location'),
-    path('chef/location/get/', views.get_chef_location, name='get_chef_location'),
-    path('chef/<int:chef_id>/location/', views.get_chef_location, name='get_chef_location_by_id'),
-    path('chef/location/toggle/', views.toggle_location_tracking, name='toggle_location_tracking'),
 ]

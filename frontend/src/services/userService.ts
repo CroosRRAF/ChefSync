@@ -41,18 +41,6 @@ export interface CookProfileResponse {
   bio?: string;
   rating_average?: number;
   total_reviews?: number;
-  kitchen_location?: {
-    id?: number;
-    latitude?: number;
-    longitude?: number;
-    address_line1?: string;
-    address_line2?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    pincode?: string;
-    landmark?: string;
-  };
 }
 
 export interface ProfileUpdateData {
@@ -67,18 +55,6 @@ export interface ProfileUpdateData {
   available_hours?: string;
   service_location?: string;
   bio?: string;
-  // Kitchen location data
-  kitchen_location?: {
-    latitude?: number;
-    longitude?: number;
-    address_line1?: string;
-    address_line2?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    pincode?: string;
-    landmark?: string;
-  };
 }
 
 export interface UserFilters {
@@ -123,7 +99,6 @@ class UserService {
       }
 
       const data = await response.json();
-      console.log('Cook profile data received:', data);
       return data;
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -133,23 +108,19 @@ class UserService {
 
   async updateUserProfile(profileData: ProfileUpdateData): Promise<User> {
     try {
-      // Use cook-specific profile update endpoint for cook users
-      console.log('Updating cook profile to /auth/cook-profile/update/ with data:', profileData);
-      const response = await fetch(`${this.apiUrl}/auth/cook-profile/update/`, {
-        method: 'PATCH',
+      // Use general profile update endpoint that works for all user roles
+      const response = await fetch(`${this.apiUrl}/auth/profile/update/`, {
+        method: 'PUT',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(profileData)
       });
 
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Update failed with status:', response.status, 'Error:', errorData);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Cook profile update response:', data);
-      return data.profile || data;
+      return data.user || data;
     } catch (error) {
       console.error('Error updating user profile:', error);
       throw error;
@@ -241,94 +212,6 @@ class UserService {
     } catch (error) {
       console.error('Error fetching users:', error);
       throw error;
-    }
-  }
-
-  // Location Management Methods
-  async updateChefLocation(location: { latitude: number; longitude: number; accuracy?: number }): Promise<void> {
-    try {
-      const response = await fetch(`${this.apiUrl}/auth/chef/location/`, {
-        method: 'PUT',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-          timestamp: new Date().toISOString()
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-    } catch (error) {
-      console.error('Error updating chef location:', error);
-      throw error;
-    }
-  }
-
-  async getChefLocation(chefId: number): Promise<{ latitude: number; longitude: number; lastUpdate: string } | null> {
-    try {
-      const response = await fetch(`${this.apiUrl}/auth/chef/${chefId}/location/`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null; // No location data available
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching chef location:', error);
-      throw error;
-    }
-  }
-
-  // Toggle location tracking status
-  async toggleLocationTracking(isActive: boolean): Promise<void> {
-    try {
-      const response = await fetch(`${this.apiUrl}/auth/chef/location/toggle/`, {
-        method: 'PUT',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({
-          is_tracking: isActive,
-          timestamp: new Date().toISOString()
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      console.log('Location tracking status updated:', isActive);
-    } catch (error) {
-      console.error('Error updating location tracking status:', error);
-      throw error;
-    }
-  }
-
-  // Get current location tracking status
-  async getLocationTrackingStatus(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.apiUrl}/auth/chef/location/status/`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data.is_tracking || false;
-    } catch (error) {
-      console.error('Error fetching location tracking status:', error);
-      return false; // Default to false if error
     }
   }
   
