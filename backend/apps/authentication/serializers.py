@@ -304,10 +304,13 @@ class CookProfileManagementSerializer(serializers.Serializer):
     rating_average = serializers.SerializerMethodField()
     total_reviews = serializers.SerializerMethodField()
     
+    # Kitchen location fields
+    kitchen_location = serializers.SerializerMethodField()
+    
     class Meta:
         fields = ['name', 'email', 'phone', 'username', 'address', 'specialty_cuisine', 
                  'experience_level', 'available_hours', 'service_location', 'bio',
-                 'rating_average', 'total_reviews']
+                 'rating_average', 'total_reviews', 'kitchen_location']
     
     def get_experience_level(self, obj):
         """Convert experience_years to experience_level enum"""
@@ -339,6 +342,14 @@ class CookProfileManagementSerializer(serializers.Serializer):
         except ChefProfile.DoesNotExist:
             return 0
     
+    def get_kitchen_location(self, obj):
+        """Get kitchen location from Cook model"""
+        try:
+            cook = Cook.objects.get(user=obj)
+            return cook.get_kitchen_location()
+        except Cook.DoesNotExist:
+            return None
+    
     def update(self, instance, validated_data):
         """Update both User and Cook models"""
         # Extract cook data
@@ -354,6 +365,22 @@ class CookProfileManagementSerializer(serializers.Serializer):
                 'expert': 10
             }
             cook_data['experience_years'] = experience_map.get(experience_level, 1)
+        
+        # Handle kitchen_location data
+        if 'kitchen_location' in self.initial_data:
+            kitchen_location_data = self.initial_data['kitchen_location']
+            if kitchen_location_data and isinstance(kitchen_location_data, dict):
+                if 'latitude' in kitchen_location_data:
+                    cook_data['kitchen_latitude'] = kitchen_location_data['latitude']
+                if 'longitude' in kitchen_location_data:
+                    cook_data['kitchen_longitude'] = kitchen_location_data['longitude']
+                # Build address string from location components
+                address_parts = []
+                for field in ['address_line1', 'address_line2', 'landmark', 'city', 'state', 'country', 'pincode']:
+                    if kitchen_location_data.get(field):
+                        address_parts.append(str(kitchen_location_data[field]))
+                if address_parts:
+                    cook_data['kitchen_location'] = ', '.join(address_parts)
         
         # Update User fields
         for attr, value in validated_data.items():

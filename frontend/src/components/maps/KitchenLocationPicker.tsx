@@ -78,15 +78,12 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
       return;
     }
 
-    let apiKey: string;
-    try {
-      const { getGoogleMapsKey } = require('@/config/apiKeys');
-      apiKey = getGoogleMapsKey();
-    } catch (error: any) {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
       toast({
         variant: "destructive",
         title: "Configuration Error",
-        description: "Google Maps API key not found. Please check your .env file.",
+        description: "Google Maps API key not found",
       });
       return;
     }
