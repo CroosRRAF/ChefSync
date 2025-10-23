@@ -108,7 +108,7 @@ function CookDashboardContent() {
     },
     {
       title: "Total Orders",
-      value: stats.monthly_orders.toString(),
+      value: stats.total_orders.toString(),
       change: `+${Math.floor(Math.random() * 3)} total`,
       icon: ClipboardList,
       color: "text-blue-600 dark:text-blue-400",
