@@ -38,38 +38,59 @@ class AddressService {
   private quickCreateUrl = '/users/customer-addresses/quick_create/';
 
   /**
-   * Get all addresses for the current user (customer addresses only for delivery)
+   * Get all addresses for the current user (supports both old and new systems)
    */
   async getAddresses(): Promise<DeliveryAddress[]> {
     try {
-      // Get customer-type addresses only
-      const response = await apiClient.get(`${this.baseUrl}by_type/?type=customer`);
-      const data = response.data;
+      // Try new address system first
+      try {
+        const response = await apiClient.get(`${this.baseUrl}by_type/?type=customer`);
+        const data = response.data;
 
-      // Normalize response to always return an array of addresses.
-      if (Array.isArray(data)) {
-        return data;
+        // Normalize response to always return an array of addresses.
+        let addresses: DeliveryAddress[] = [];
+        
+        if (Array.isArray(data)) {
+          addresses = data;
+        } else if (data && Array.isArray(data.results)) {
+          addresses = data.results;
+        } else if (data && Array.isArray(data.addresses)) {
+          addresses = data.addresses;
+        } else if (data && Array.isArray(data.data)) {
+          addresses = data.data;
+        }
+
+        if (addresses.length > 0) {
+          console.log('✅ Loaded addresses from new system:', addresses.length);
+          return addresses;
+        }
+      } catch (newSystemError) {
+        console.warn('New address system not available, trying old system...');
       }
 
-      // DRF pagination returns { count, next, previous, results: [...] }
-      if (data && Array.isArray(data.results)) {
-        return data.results;
+      // Fallback to old address system (user_addresses table)
+      try {
+        const response = await apiClient.get('/orders/addresses/');
+        const data = response.data;
+
+        let addresses: DeliveryAddress[] = [];
+        
+        if (Array.isArray(data)) {
+          addresses = data;
+        } else if (data && Array.isArray(data.results)) {
+          addresses = data.results;
+        }
+
+        console.log('✅ Loaded addresses from old system:', addresses.length);
+        return addresses;
+      } catch (oldSystemError) {
+        console.error('Failed to load from old system too:', oldSystemError);
       }
 
-      // Some endpoints may wrap results under 'addresses' or 'data'
-      if (data && Array.isArray(data.addresses)) {
-        return data.addresses;
-      }
-
-      if (data && Array.isArray(data.data)) {
-        return data.data;
-      }
-
-      // Fallback: return empty array if shape is unexpected
+      // Return empty array if both systems fail
       return [];
     } catch (error) {
       console.error('Error fetching addresses:', error);
-      // Don't throw - return empty array to allow graceful fallback
       return [];
     }
   }
@@ -88,31 +109,42 @@ class AddressService {
   }
 
   /**
-   * Create a new address (uses quick_create for simplified customer address creation)
+   * Create a new address (tries new system first, falls back to old)
    */
   async createAddress(addressData: CreateAddressData): Promise<DeliveryAddress> {
+    // Ensure state is set (required by backend)
+    const dataToSend = {
+      ...addressData,
+      state: addressData.state || addressData.city || 'Unknown',
+    };
+
+    // Try new system first
     try {
-      // Ensure state is set (required by backend)
-      const dataToSend = {
-        ...addressData,
-        state: addressData.state || addressData.city || 'Unknown',
-      };
-      
       const response = await apiClient.post(this.quickCreateUrl, dataToSend);
+      console.log('✅ Address created in new system');
       return response.data;
-    } catch (error) {
-      console.error('Error creating address:', error);
-      // If the server returned validation errors, include them in the thrown error
-      const anyErr: any = error;
-      if (anyErr.response) {
-        const status = anyErr.response.status;
-        const respData = anyErr.response.data;
-        console.error('Address creation response data:', status, respData);
-        const respString = typeof respData === 'string' ? respData : JSON.stringify(respData);
-        // Include status for easier debugging in the UI
-        throw new Error(`Failed to create address (status ${status}): ${respString}`);
+    } catch (newSystemError: any) {
+      console.warn('New system failed, trying old system...', newSystemError);
+      
+      // Fallback to old system (user_addresses table)
+      try {
+        const response = await apiClient.post('/orders/addresses/', dataToSend);
+        console.log('✅ Address created in old system');
+        return response.data;
+      } catch (oldSystemError: any) {
+        console.error('Both systems failed:', oldSystemError);
+        
+        // Format error message
+        const anyErr: any = oldSystemError;
+        if (anyErr.response) {
+          const status = anyErr.response.status;
+          const respData = anyErr.response.data;
+          console.error('Address creation response data:', status, respData);
+          const respString = typeof respData === 'string' ? respData : JSON.stringify(respData);
+          throw new Error(`Failed to create address (status ${status}): ${respString}`);
+        }
+        throw new Error('Failed to create address');
       }
-      throw new Error('Failed to create address');
     }
   }
 
@@ -180,16 +212,30 @@ class AddressService {
    */
   async getDefaultAddress(): Promise<DeliveryAddress | null> {
     try {
-      const response = await apiClient.get(`${this.baseUrl}default/?type=customer`);
-      const data = response.data;
-      
-      if (Array.isArray(data) && data.length > 0) {
-        return data[0];
+      // Try new system default endpoint
+      try {
+        const response = await apiClient.get(`${this.baseUrl}default/?type=customer`);
+        const data = response.data;
+        
+        if (Array.isArray(data) && data.length > 0) {
+          console.log('✅ Default address from new system');
+          return data[0];
+        }
+      } catch (error) {
+        console.warn('New system default endpoint not available');
       }
       
       // Fallback to searching through all addresses
       const addresses = await this.getAddresses();
-      return addresses.find(addr => addr.is_default) || null;
+      const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0] || null;
+      
+      if (defaultAddress) {
+        console.log('✅ Default address found:', defaultAddress.label);
+      } else {
+        console.log('ℹ️ No default address found');
+      }
+      
+      return defaultAddress;
     } catch (error) {
       console.error('Error fetching default address:', error);
       return null;

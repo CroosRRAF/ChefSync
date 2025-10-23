@@ -53,8 +53,14 @@ const SimpleAddressPicker: React.FC<SimpleAddressPickerProps> = ({
     try {
       const data = await addressService.getAddresses();
       setAddresses(data);
+      console.log('📍 Loaded addresses:', data.length);
+      
+      if (data.length === 0) {
+        console.warn('No addresses found - user may need to add first address');
+      }
     } catch (error) {
       console.error('Error loading addresses:', error);
+      toast.error('Failed to load addresses. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -135,6 +141,9 @@ const SimpleAddressPicker: React.FC<SimpleAddressPickerProps> = ({
     });
 
     setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }));
+    
+    console.log('📍 Location updated:', { lat, lng });
+    toast.success('Location set on map!', { duration: 2000 });
   };
 
   const reverseGeocode = async (lat: number, lng: number) => {
@@ -149,18 +158,31 @@ const SimpleAddressPicker: React.FC<SimpleAddressPickerProps> = ({
   };
 
   const parsePlace = (place: any) => {
-    let address = '';
+    let streetAddress = '';
     let city = '';
     let state = '';
     let pincode = '';
+    let sublocality = '';
 
     const components = place.address_components || [];
+    
+    // Extract all address components
     components.forEach((comp: any) => {
       const types = comp.types;
-      if (types.includes('street_number') || types.includes('route')) {
-        address += comp.long_name + ' ';
+      
+      if (types.includes('street_number')) {
+        streetAddress = comp.long_name + ' ' + streetAddress;
       }
-      if (types.includes('sublocality') || types.includes('locality')) {
+      if (types.includes('route')) {
+        streetAddress += comp.long_name;
+      }
+      if (types.includes('sublocality_level_1') || types.includes('sublocality')) {
+        sublocality = comp.long_name;
+      }
+      if (types.includes('locality')) {
+        city = comp.long_name;
+      }
+      if (types.includes('administrative_area_level_2') && !city) {
         city = comp.long_name;
       }
       if (types.includes('administrative_area_level_1')) {
@@ -171,13 +193,27 @@ const SimpleAddressPicker: React.FC<SimpleAddressPickerProps> = ({
       }
     });
 
+    // Build full address
+    const fullAddress = place.formatted_address || 
+                       (streetAddress.trim() + (sublocality ? ', ' + sublocality : ''));
+
+    // Update form data with all extracted info
     setFormData(prev => ({
       ...prev,
-      address_line1: place.formatted_address || address.trim(),
-      city: city || prev.city,
-      state: state || city,
+      address_line1: fullAddress || prev.address_line1,
+      city: city || sublocality || prev.city,
+      state: state || city || sublocality || prev.state,
       pincode: pincode || prev.pincode,
     }));
+
+    console.log('📍 Address parsed:', {
+      fullAddress,
+      city,
+      state,
+      pincode,
+      lat: formData.latitude,
+      lng: formData.longitude
+    });
   };
 
   const getCurrentLocation = () => {
@@ -210,20 +246,28 @@ const SimpleAddressPicker: React.FC<SimpleAddressPickerProps> = ({
     }
 
     if (formData.latitude === 0 || formData.longitude === 0) {
-      toast.error('Please select location on map');
+      toast.error('Please select location on map or use search/current location');
+      return;
+    }
+
+    if (!formData.city) {
+      toast.error('City is required. Please select location on map.');
       return;
     }
 
     try {
+      console.log('💾 Saving address:', formData);
+      
       const newAddress = await addressService.createAddress({
         ...formData,
-        state: formData.city, // Use city as state fallback
+        state: formData.state || formData.city, // Use city as state fallback
       });
       
       toast.success('Address saved successfully!');
       await loadAddresses();
       setShowNewForm(false);
       onSelectAddress(newAddress);
+      onClose();
       
       // Reset form
       setFormData({
@@ -237,7 +281,7 @@ const SimpleAddressPicker: React.FC<SimpleAddressPickerProps> = ({
       setSearchQuery('');
     } catch (error: any) {
       console.error('Error saving address:', error);
-      toast.error(error.message || 'Failed to save address');
+      toast.error(error.message || 'Failed to save address. Please try again.');
     }
   };
 

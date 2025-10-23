@@ -29,7 +29,7 @@ import {
   Package,
   AlertCircle
 } from 'lucide-react';
-import GoogleMapsAddressPicker from '../components/checkout/GoogleMapsAddressPicker';
+import SimpleAddressPicker from '../components/address/SimpleAddressPicker';
 
 type OrderMode = 'delivery' | 'pickup';
 
@@ -50,6 +50,7 @@ const CheckoutPage: React.FC = () => {
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isAddressPickerOpen, setIsAddressPickerOpen] = useState(false);
+  const [isLoadingDefaultAddress, setIsLoadingDefaultAddress] = useState(true);
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash_on_delivery');
@@ -107,32 +108,37 @@ const CheckoutPage: React.FC = () => {
     }
   }, [chefItems, cartLoading, navigate, chefId]);
 
-  // Load addresses
+  // Load default address on mount
   useEffect(() => {
-    const loadAddresses = async () => {
-      if (orderMode !== 'delivery') return;
+    const loadDefaultAddress = async () => {
+      if (orderMode !== 'delivery') {
+        setIsLoadingDefaultAddress(false);
+        return;
+      }
 
       try {
-        setIsLoadingAddresses(true);
-        const fetchedAddresses = await addressService.getAddresses();
-        setAddresses(fetchedAddresses);
-
-        // Set default address
-        const defaultAddr = fetchedAddresses.find(addr => addr.is_default);
+        setIsLoadingDefaultAddress(true);
+        
+        // Try to get default address first
+        const defaultAddr = await addressService.getDefaultAddress();
         if (defaultAddr) {
           setSelectedAddress(defaultAddr);
-        } else if (fetchedAddresses.length > 0) {
-          setSelectedAddress(fetchedAddresses[0]);
+        } else {
+          // If no default, get first address from list
+          const fetchedAddresses = await addressService.getAddresses();
+          setAddresses(fetchedAddresses);
+          if (fetchedAddresses.length > 0) {
+            setSelectedAddress(fetchedAddresses[0]);
+          }
         }
       } catch (error) {
-        console.error('Error loading addresses:', error);
-        toast.error('Failed to load addresses');
+        console.error('Error loading default address:', error);
       } finally {
-        setIsLoadingAddresses(false);
+        setIsLoadingDefaultAddress(false);
       }
     };
 
-    loadAddresses();
+    loadDefaultAddress();
   }, [orderMode]);
 
   // Calculate delivery fee and taxes when address or mode changes
@@ -213,17 +219,7 @@ const CheckoutPage: React.FC = () => {
   const handleAddressSelect = (address: DeliveryAddress) => {
     setSelectedAddress(address);
     setIsAddressPickerOpen(false);
-    // Refresh addresses list
-    loadAddresses();
-  };
-
-  const loadAddresses = async () => {
-    try {
-      const fetchedAddresses = await addressService.getAddresses();
-      setAddresses(fetchedAddresses);
-    } catch (error) {
-      console.error('Error loading addresses:', error);
-    }
+    toast.success(`Delivery address set to ${address.label}`);
   };
 
   // Handle order placement
@@ -405,10 +401,10 @@ const CheckoutPage: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">
-                  {isLoadingAddresses ? (
+                  {isLoadingDefaultAddress ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-2 border-orange-500 border-t-transparent mx-auto mb-2" />
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Loading addresses...</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Loading your address...</p>
                     </div>
                   ) : selectedAddress ? (
                     <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-5 rounded-xl border-2 border-green-200 dark:border-green-700">
@@ -741,10 +737,10 @@ const CheckoutPage: React.FC = () => {
       </div>
 
       {/* Address Picker Modal */}
-      <GoogleMapsAddressPicker
+      <SimpleAddressPicker
         isOpen={isAddressPickerOpen}
         onClose={() => setIsAddressPickerOpen(false)}
-        onAddressSelect={handleAddressSelect}
+        onSelectAddress={handleAddressSelect}
         selectedAddress={selectedAddress}
       />
     </div>
