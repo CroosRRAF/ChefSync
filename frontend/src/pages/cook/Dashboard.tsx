@@ -17,6 +17,7 @@ import { ChefDashboardStats } from '@/hooks/useOrderService';
 import { useAuth } from '@/context/AuthContext';
 import { userService } from '@/services/userService';
 import Greeting from '@/components/cook/Greeting';
+import DashboardErrorBoundary from '@/components/dashboard/DashboardErrorBoundary';
 
 function CookDashboardContent() {
   // State for API data
@@ -108,7 +109,7 @@ function CookDashboardContent() {
     },
     {
       title: "Total Orders",
-      value: stats.total_orders.toString(),
+      value: stats.monthly_orders.toString(),
       change: `+${Math.floor(Math.random() * 3)} total`,
       icon: ClipboardList,
       color: "text-blue-600 dark:text-blue-400",
