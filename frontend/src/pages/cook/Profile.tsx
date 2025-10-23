@@ -41,13 +41,6 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { userService, CookProfileResponse } from "@/services/userService";
-import KitchenLocationPicker from "@/components/maps/KitchenLocationPicker";
-
-// Location coordinates interface
-interface LocationCoordinates {
-  latitude: number;
-  longitude: number;
-}
 
 // Types for profile data
 interface UserProfile {
@@ -76,18 +69,6 @@ interface UserData {
   available_hours?: string;
   service_location?: string;
   bio?: string;
-  // Kitchen location object
-  kitchen_location?: {
-    latitude?: number;
-    longitude?: number;
-    address_line1?: string;
-    address_line2?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    pincode?: string;
-    landmark?: string;
-  };
 }
 
 interface NotificationState {
@@ -152,18 +133,7 @@ export default function Profile() {
     experience_level: "beginner" as 'beginner' | 'intermediate' | 'advanced' | 'expert',
     available_hours: "",
     service_location: "",
-    bio: "",
-    kitchen_location: undefined as {
-      latitude?: number;
-      longitude?: number;
-      address_line1?: string;
-      address_line2?: string;
-      city?: string;
-      state?: string;
-      country?: string;
-      pincode?: string;
-      landmark?: string;
-    } | undefined
+    bio: ""
   });
 
   // Show notification
@@ -193,8 +163,7 @@ export default function Profile() {
           experience_level: profile.experience_level || "beginner",
           available_hours: profile.available_hours || "",
           service_location: profile.service_location || "",
-          bio: profile.bio || "",
-          kitchen_location: profile.kitchen_location
+          bio: profile.bio || ""
         });
       } catch (error) {
         console.error('Failed to load profile:', error);
@@ -209,36 +178,14 @@ export default function Profile() {
     }
   }, [user]);
 
-  const handleFormChange = (field: string, value: string | number) => {
+  const handleFormChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
     try {
       setLoading(true);
-      console.log('Saving profile data:', formData);
       await userService.updateUserProfile(formData);
-      
-      // Refetch the profile data to update the UI
-      const updatedProfile = await userService.getUserProfile();
-      console.log('Updated profile received:', updatedProfile);
-      setProfileData(updatedProfile);
-      
-      // Update formData with the fresh data from server
-      setFormData({
-        name: updatedProfile.name || "",
-        email: updatedProfile.email || "",
-        phone: updatedProfile.phone || "",
-        username: updatedProfile.username || "",
-        address: updatedProfile.address || "",
-        specialty_cuisine: updatedProfile.specialty_cuisine || "",
-        experience_level: updatedProfile.experience_level || "beginner",
-        available_hours: updatedProfile.available_hours || "",
-        service_location: updatedProfile.service_location || "",
-        bio: updatedProfile.bio || "",
-        kitchen_location: updatedProfile.kitchen_location
-      });
-      
       setIsEditing(false);
       showNotification('Profile updated successfully!', 'success');
     } catch (error) {
@@ -261,8 +208,7 @@ export default function Profile() {
         experience_level: profileData.experience_level || "beginner",
         available_hours: profileData.available_hours || "",
         service_location: profileData.service_location || "",
-        bio: profileData.bio || "",
-        kitchen_location: profileData.kitchen_location
+        bio: profileData.bio || ""
       });
     }
     setIsEditing(false);
@@ -642,58 +588,14 @@ export default function Profile() {
                   />
                 </div>
                 <div className="space-y-2">
-                  {isEditing ? (
-                    <KitchenLocationPicker
-                      currentLocation={
-                        formData.kitchen_location?.latitude && formData.kitchen_location?.longitude
-                          ? { latitude: formData.kitchen_location.latitude, longitude: formData.kitchen_location.longitude }
-                          : undefined
-                      }
-                      currentAddress={formData.service_location || ""}
-                      onLocationSelect={(location, address) => {
-                        handleFormChange("service_location", address);
-                        setFormData(prev => ({
-                          ...prev,
-                          kitchen_location: {
-                            ...prev.kitchen_location,
-                            latitude: location.latitude,
-                            longitude: location.longitude
-                          }
-                        }));
-                      }}
-                      disabled={!isEditing}
-                      placeholder="Set your kitchen location"
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Kitchen Location 📍</Label>
-                      <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="flex-1 text-sm">
-                          {formData.service_location || "No kitchen location set"}
-                        </span>
-                        {formData.kitchen_location?.latitude && formData.kitchen_location?.longitude && (
-                          <Badge variant="outline" className="text-xs">
-                            Set
-                          </Badge>
-                        )}
-                      </div>
-                      {formData.kitchen_location?.latitude && formData.kitchen_location?.longitude && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            const url = `https://www.google.com/maps/search/?api=1&query=${formData.kitchen_location?.latitude},${formData.kitchen_location?.longitude}`;
-                            window.open(url, '_blank');
-                          }}
-                          className="w-full h-8 text-xs"
-                        >
-                          <MapPin className="h-3 w-3 mr-1" />
-                          View on Google Maps
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                  <Label htmlFor="service_location">Service Location 📍</Label>
+                  <Input
+                    id="service_location"
+                    value={formData.service_location || ""}
+                    onChange={(e) => handleFormChange("service_location", e.target.value)}
+                    disabled={!isEditing}
+                    placeholder="Where you provide services"
+                  />
                 </div>
               </div>
 
