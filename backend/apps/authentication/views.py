@@ -2096,3 +2096,112 @@ def get_jwt_token_location(request):
             return 'cookies', value
 
     return None, None
+
+
+# Chef Location Management Views
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_chef_location(request):
+    """
+    Update chef's current real-time location
+    """
+    try:
+        # Get cook profile
+        cook = Cook.objects.get(user=request.user)
+        
+        # Extract location data
+        latitude = request.data.get('latitude')
+        longitude = request.data.get('longitude')
+        accuracy = request.data.get('accuracy')
+        
+        if not latitude or not longitude:
+            return Response({
+                'error': 'Latitude and longitude are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update current location
+        cook.update_current_location(latitude, longitude, accuracy)
+        
+        return Response({
+            'message': 'Location updated successfully',
+            'location': cook.get_current_location()
+        }, status=status.HTTP_200_OK)
+        
+    except Cook.DoesNotExist:
+        return Response({
+            'error': 'Cook profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': f'Failed to update location: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_chef_location(request, chef_id=None):
+    """
+    Get chef's current location
+    """
+    try:
+        # If no chef_id provided, get current user's location
+        if chef_id is None:
+            cook = Cook.objects.get(user=request.user)
+        else:
+            cook = Cook.objects.get(user_id=chef_id)
+        
+        location = cook.get_current_location()
+        
+        if not location:
+            return Response({
+                'message': 'No location data available'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        return Response({
+            'location': location
+        }, status=status.HTTP_200_OK)
+        
+    except Cook.DoesNotExist:
+        return Response({
+            'error': 'Cook profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': f'Failed to get location: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT', 'POST'])
+@permission_classes([IsAuthenticated])
+def toggle_location_tracking(request):
+    """
+    Enable/disable location tracking for chef
+    """
+    try:
+        cook = Cook.objects.get(user=request.user)
+        
+        if request.method == 'PUT':
+            # Set specific tracking status from request data
+            is_tracking = request.data.get('is_tracking', False)
+            cook.is_location_tracking_enabled = is_tracking
+            message = f'Location tracking {"enabled" if is_tracking else "disabled"}'
+        else:
+            # POST method: Toggle tracking status (backward compatibility)
+            cook.is_location_tracking_enabled = not cook.is_location_tracking_enabled
+            message = f'Location tracking {"enabled" if cook.is_location_tracking_enabled else "disabled"}'
+        
+        cook.save(update_fields=['is_location_tracking_enabled'])
+        
+        return Response({
+            'message': message,
+            'is_tracking': cook.is_location_tracking_enabled
+        }, status=status.HTTP_200_OK)
+        
+    except Cook.DoesNotExist:
+        return Response({
+            'error': 'Cook profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': f'Failed to toggle tracking: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
