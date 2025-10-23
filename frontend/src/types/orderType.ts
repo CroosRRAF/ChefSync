@@ -29,6 +29,7 @@ export interface Order {
     | 'refunded';
   delivery_fee?: number;
   delivery_instructions?: string;
+  special_instructions?: string;
   total_amount: number;
   created_at: string;
   updated_at: string;
