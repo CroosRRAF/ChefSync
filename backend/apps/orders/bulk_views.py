@@ -313,9 +313,9 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            if bulk_order.status not in ['confirmed', 'preparing', 'ready_for_delivery']:
+            if bulk_order.status not in ['preparing', 'ready_for_delivery']:
                 return Response(
-                    {'error': 'Bulk order is not ready for delivery assignment'},
+                    {'error': 'Bulk order is not ready for delivery assignment. Confirmed orders are not available for delivery pickup.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             

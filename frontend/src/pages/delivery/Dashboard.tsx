@@ -47,7 +47,7 @@ import {
   Timer,
   Users,
 } from "lucide-react";
-import DeliveryPhaseCard from "@/components/delivery/DeliveryPhaseCard";
+import SimplifiedDeliveryFlow from "@/components/delivery/SimplifiedDeliveryFlow";
 
 const DeliveryDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -101,7 +101,92 @@ const DeliveryDashboard: React.FC = () => {
     fetchRecentDeliveries();
     fetchDeliveryLogs();
     fetchAssignedOrders();
+    checkLocationPermission();
   }, []);
+
+  // Check location permission on component mount
+  const checkLocationPermission = async () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation Not Supported",
+        description:
+          "Your browser doesn't support location services. Some features may not work properly.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Check if permission is already granted
+      const permission = await navigator.permissions.query({
+        name: "geolocation",
+      });
+
+      if (permission.state === "denied") {
+        toast({
+          title: "Location Permission Denied",
+          description:
+            "Location access is blocked. Please enable it in your browser settings to accept orders.",
+          variant: "destructive",
+        });
+      } else if (permission.state === "prompt") {
+        // Show a friendly message about why we need location
+        toast({
+          title: "Location Access Needed",
+          description:
+            "We'll need your location to assign orders and track deliveries. Please allow access when prompted.",
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      // Fallback for browsers that don't support permissions API
+      console.warn("Could not check location permission:", error);
+    }
+  };
+
+  // Manual location permission request
+  const requestLocationPermission = async () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation Not Supported",
+        description: "Your browser doesn't support location services.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Try to get position which will prompt for permission
+      await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+        });
+      });
+
+      toast({
+        title: "Location Access Granted",
+        description: "Great! You can now accept orders with location tracking.",
+        variant: "default",
+      });
+    } catch (error: any) {
+      if (error.code === 1) {
+        toast({
+          title: "Permission Denied",
+          description:
+            "Please enable location access in your browser settings to accept orders.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Location Error",
+          description:
+            "Could not access your location. Please check your settings.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -121,12 +206,8 @@ const DeliveryDashboard: React.FC = () => {
       console.log("Fetched available orders:", ordersData);
 
       // Define statuses considered "available for delivery"
-      const deliverableStatuses = [
-        "pending",
-        "confirmed",
-        "preparing",
-        "ready",
-      ];
+      // Only including preparing and ready orders, excluding confirmed, pending, cancelled, out_for_delivery
+      const deliverableStatuses = ["preparing", "ready"];
 
       // Filter orders that are in deliverable statuses
       const availableOrdersData = ordersData.filter((order) =>
@@ -180,6 +261,23 @@ const DeliveryDashboard: React.FC = () => {
   };
 
   const handleAcceptOrder = async (orderId: number, order: Order) => {
+    console.log("handleAcceptOrder called with:", {
+      orderId,
+      orderIdType: typeof orderId,
+      order,
+    });
+
+    // Validate orderId
+    if (typeof orderId !== "number" || isNaN(orderId)) {
+      console.error("Invalid order ID:", orderId);
+      toast({
+        title: "Error",
+        description: "Invalid order ID. Please refresh the page and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setAcceptingOrder(orderId);
 
     // Get current location for distance checking
@@ -208,8 +306,49 @@ const DeliveryDashboard: React.FC = () => {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         };
-      } catch (locationError) {
+      } catch (locationError: any) {
         console.warn("Could not get current location:", locationError);
+
+        // Handle location permission errors
+        if (locationError.code === 1) {
+          // PERMISSION_DENIED
+          toast({
+            title: "Location Permission Required",
+            description:
+              "Please allow location access to accept orders. This helps us track deliveries and provide better service.",
+            variant: "destructive",
+          });
+          setAcceptingOrder(null);
+          return;
+        } else if (locationError.code === 2) {
+          // POSITION_UNAVAILABLE
+          toast({
+            title: "Location Unavailable",
+            description:
+              "Unable to determine your location. Please check your GPS settings and try again.",
+            variant: "destructive",
+          });
+          setAcceptingOrder(null);
+          return;
+        } else if (locationError.code === 3) {
+          // TIMEOUT
+          toast({
+            title: "Location Timeout",
+            description:
+              "Location request timed out. Please try again or check your GPS settings.",
+            variant: "destructive",
+          });
+          setAcceptingOrder(null);
+          return;
+        } else {
+          // Show a warning but continue without location
+          toast({
+            title: "Location Warning",
+            description:
+              "Could not get your location, but proceeding with order acceptance.",
+            variant: "default",
+          });
+        }
       }
 
       // For now, we'll accept without chef location, but the backend will handle it
@@ -482,6 +621,31 @@ const DeliveryDashboard: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Location Permission Status */}
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <MapPin className="h-5 w-5 text-orange-600" />
+                      <div>
+                        <p className="font-medium text-orange-800">
+                          Location Access
+                        </p>
+                        <p className="text-sm text-orange-600">
+                          Required to accept orders and track deliveries
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={requestLocationPermission}
+                      variant="outline"
+                      size="sm"
+                      className="border-orange-300 text-orange-700 hover:bg-orange-100"
+                    >
+                      Enable Location
+                    </Button>
+                  </div>
+                </div>
+
                 {availableOrders.length === 0 ? (
                   <div className="text-center py-12 theme-animate-scale-in">
                     <div
@@ -602,7 +766,14 @@ const DeliveryDashboard: React.FC = () => {
                             </div>
                           </div>
                           <Button
-                            onClick={() => handleAcceptOrder(order.id, order)}
+                            onClick={() => {
+                              console.log("Accept button clicked for order:", {
+                                id: order.id,
+                                idType: typeof order.id,
+                                order,
+                              });
+                              handleAcceptOrder(order.id, order);
+                            }}
                             disabled={acceptingOrder === order.id}
                             className="ml-4 theme-button-primary"
                             size="lg"
@@ -744,17 +915,14 @@ const DeliveryDashboard: React.FC = () => {
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {assignedOrders.map((order, index) => (
-                      <DeliveryPhaseCard
+                      <SimplifiedDeliveryFlow
                         key={order.id}
                         order={order}
-                        onNavigateToMap={(order) =>
-                          navigate("/delivery/map", {
-                            state: {
-                              selectedOrderId: order.id,
-                              orderDetails: order,
-                            },
-                          })
-                        }
+                        onStatusUpdate={(orderId, newStatus) => {
+                          // Refresh assigned orders after status update
+                          fetchAssignedOrders();
+                          fetchDashboardData();
+                        }}
                         className="theme-animate-fade-in-up"
                         style={{ animationDelay: `${index * 0.1}s` }}
                       />

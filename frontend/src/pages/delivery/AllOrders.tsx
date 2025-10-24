@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import DeliveryLayout from "@/components/delivery/DeliveryLayout";
 import OrderStatusTracker from "@/components/delivery/OrderStatusTracker";
-import PickupDeliveryFlow from "@/components/delivery/PickupDeliveryFlow";
+import SimplifiedDeliveryFlow from "@/components/delivery/SimplifiedDeliveryFlow";
 import DeliveryContacts from "@/components/delivery/DeliveryContacts";
 import QuickContact from "@/components/delivery/QuickContact";
 import {
@@ -696,15 +696,18 @@ const AllOrdersPage: React.FC = () => {
 
             {selectedOrder && (
               <div className="space-y-6">
-                {/* If order is assigned to user, show pickup & delivery flow */}
+                {/* If order is assigned to user, show simplified delivery flow */}
                 {assignedOrders.some((o) => o.id === selectedOrder.id) && (
-                  <PickupDeliveryFlow
+                  <SimplifiedDeliveryFlow
                     order={selectedOrder}
-                    currentLocation={currentLocation}
-                    onStatusUpdate={handleStatusUpdate}
-                    onOrderComplete={(orderId) => {
-                      handleStatusUpdate(orderId, "delivered");
-                      setShowOrderDetails(false);
+                    onStatusUpdate={(orderId, newStatus) => {
+                      handleStatusUpdate(orderId, newStatus as Order["status"]);
+                      // Close dialog when order is completed
+                      if (newStatus === "delivered") {
+                        setShowOrderDetails(false);
+                      }
+                      // Refresh data
+                      fetchAllOrders();
                     }}
                   />
                 )}

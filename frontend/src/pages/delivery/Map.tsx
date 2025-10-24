@@ -46,8 +46,8 @@ import {
 import type { Order } from "../../types/orderType";
 import OrderStatusTracker from "@/components/delivery/OrderStatusTracker";
 import DeliveryTracker from "@/components/delivery/DeliveryTracker";
-import PickupDeliveryFlow from "@/components/delivery/PickupDeliveryFlow";
-import DeliveryPhaseCard from "@/components/delivery/DeliveryPhaseCard";
+
+import SimplifiedDeliveryFlow from "@/components/delivery/SimplifiedDeliveryFlow";
 import DeliveryContacts from "@/components/delivery/DeliveryContacts";
 
 interface Location {
@@ -657,12 +657,15 @@ const DeliveryMap: React.FC = () => {
             </DialogHeader>
             {selectedOrder && (
               <div className="space-y-6">
-                {/* Two-Stage Pickup & Delivery Flow */}{" "}
-                <PickupDeliveryFlow
+                {/* Simplified Delivery Flow */}
+                <SimplifiedDeliveryFlow
                   order={selectedOrder}
-                  currentLocation={currentLocation}
-                  onStatusUpdate={handleStatusUpdate}
-                  onOrderComplete={handleDeliveryComplete}
+                  onStatusUpdate={(orderId, newStatus) => {
+                    handleStatusUpdate(orderId, newStatus as Order["status"]);
+                    // Refresh orders after status update
+                    fetchAssignedOrders();
+                    fetchOrders();
+                  }}
                 />
                 {/* Contact Information */}
                 <DeliveryContacts order={selectedOrder} currentPhase="both" />
@@ -811,14 +814,13 @@ const DeliveryMap: React.FC = () => {
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {assignedOrders.map((order, index) => (
-                  <DeliveryPhaseCard
+                  <SimplifiedDeliveryFlow
                     key={order.id}
                     order={order}
-                    onNavigateToMap={(order) => {
-                      setSelectedOrder(order);
-                      setShowOrderDetails(true);
-                      // Scroll to top to see the selected order
-                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    onStatusUpdate={(orderId, newStatus) => {
+                      // Refresh assigned orders after status update
+                      fetchAssignedOrders();
+                      fetchOrders();
                     }}
                     className="transform hover:scale-[1.02] transition-all duration-300"
                     style={{ animationDelay: `${index * 0.1}s` }}

@@ -169,17 +169,23 @@ export const getAvailableOrders = async (): Promise<UnifiedOrder[]> => {
     // Fetch normal orders
     const normalRes = await apiClient.get("/orders/orders/");
     const normalOrders = (normalRes.data.results || normalRes.data) as Order[];
+    console.log("Raw normal orders fetched:", normalOrders.length, normalOrders.map(o => ({ id: o.id, status: o.status, delivery_partner: o.delivery_partner })));
 
     // Fetch bulk orders
     const bulkRes = await apiClient.get("/orders/bulk/");
     const bulkOrders = (bulkRes.data.results || bulkRes.data) as BulkOrder[];
+    console.log("Raw bulk orders fetched:", bulkOrders.length);
 
     // Filter normal orders for available states (ready for pickup/delivery)
+    // Only including preparing and ready orders, excluding confirmed, pending, cancelled, out_for_delivery
     const availableNormalOrders = normalOrders
       .filter(
-        (order: Order) =>
-          ["ready", "confirmed"].includes(order.status) &&
-          !order.delivery_partner
+        (order: Order) => {
+          const isAvailableStatus = ["preparing", "ready"].includes(order.status);
+          const hasNoDeliveryPartner = !order.delivery_partner;
+          console.log(`Order ${order.id}: status=${order.status}, hasDeliveryPartner=${!!order.delivery_partner}, available=${isAvailableStatus && hasNoDeliveryPartner}`);
+          return isAvailableStatus && hasNoDeliveryPartner;
+        }
       )
       .map(
         (order: Order): UnifiedOrder => ({
@@ -189,12 +195,16 @@ export const getAvailableOrders = async (): Promise<UnifiedOrder[]> => {
       );
 
     // Filter bulk orders for available delivery
+    // Only including preparing status for bulk orders, excluding pending, confirmed, cancelled
     const availableBulkOrders = bulkOrders
       .filter(
-        (bulkOrder: BulkOrder) =>
-          !bulkOrder.delivery_partner &&
-          ["confirmed", "preparing"].includes(bulkOrder.status) &&
-          bulkOrder.order_type === "delivery"
+        (bulkOrder: BulkOrder) => {
+          const isAvailableStatus = ["preparing"].includes(bulkOrder.status);
+          const hasNoDeliveryPartner = !bulkOrder.delivery_partner;
+          const isDeliveryType = bulkOrder.order_type === "delivery";
+          console.log(`Bulk Order ${bulkOrder.bulk_order_id}: status=${bulkOrder.status}, hasDeliveryPartner=${!!bulkOrder.delivery_partner}, isDelivery=${isDeliveryType}, available=${isAvailableStatus && hasNoDeliveryPartner && isDeliveryType}`);
+          return isAvailableStatus && hasNoDeliveryPartner && isDeliveryType;
+        }
       )
       .map(
         (bulkOrder: BulkOrder): UnifiedOrder => ({
@@ -220,7 +230,10 @@ export const getAvailableOrders = async (): Promise<UnifiedOrder[]> => {
         })
       );
 
-    return [...availableNormalOrders, ...availableBulkOrders];
+    const allAvailableOrders = [...availableNormalOrders, ...availableBulkOrders];
+    console.log("Total available orders to return:", allAvailableOrders.length, allAvailableOrders.map(o => ({ id: o.id, status: o.status, type: o.order_type_category })));
+    
+    return allAvailableOrders;
   } catch (error) {
     console.error("Error fetching available orders:", error);
     return [];
@@ -262,6 +275,8 @@ export const acceptOrder = async (
       allow_accept: boolean;
     }
 > => {
+  console.log("acceptOrder called with:", { orderId, orderIdType: typeof orderId, agentLocation, chefLocation, orderType });
+  
   const requestData: any = {};
 
   if (agentLocation) {
@@ -277,12 +292,14 @@ export const acceptOrder = async (
   let res;
   if (orderType === "bulk") {
     // For bulk orders, use the bulk management endpoint
+    console.log(`Making request to: /orders/bulk/${orderId}/assign_delivery/`);
     res = await apiClient.post(
       `/orders/bulk/${orderId}/assign_delivery/`,
       requestData
     );
   } else {
     // For normal orders, use the existing endpoint
+    console.log(`Making request to: /orders/orders/${orderId}/accept/`);
     res = await apiClient.post(
       `/orders/orders/${orderId}/accept/`,
       requestData

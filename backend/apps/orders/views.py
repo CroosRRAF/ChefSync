@@ -1383,9 +1383,10 @@ class OrderViewSet(viewsets.ModelViewSet):
     def available_for_delivery(self, request):
         """Get orders available for delivery agents to accept"""
         # Orders that are ready and don't have a delivery partner yet
+        # Excluding confirmed orders as per business requirement
         available_orders = (
             Order.objects.filter(
-                Q(status__in=["confirmed", "preparing", "ready"])
+                Q(status__in=["preparing", "ready"])
                 & Q(delivery_partner__isnull=True)
             )
             .select_related("customer", "chef")
