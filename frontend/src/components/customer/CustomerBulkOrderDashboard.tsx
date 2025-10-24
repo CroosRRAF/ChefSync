@@ -14,7 +14,7 @@ import {
   Search, 
   Users, 
   Clock, 
-  DollarSign, 
+  Banknote, 
   Calendar as CalendarIcon, 
   ChefHat, 
   ShoppingCart,
@@ -28,7 +28,10 @@ import {
   Plus,
   Edit2,
   Trash2,
-  User
+  User,
+  Filter,
+  Leaf,
+  TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -43,6 +46,7 @@ interface BulkMenu {
   id: number;
   chef: number;
   chef_name: string;
+  chef_profile_id?: number;
   meal_type: string;
   meal_type_display: string;
   menu_name: string;
@@ -62,6 +66,15 @@ interface BulkMenu {
     total_items: number;
   };
   items: BulkMenuItem[];
+  delivery_fee?: number;
+  distance_km?: number;
+  kitchen_location?: {
+    lat: number;
+    lng: number;
+    address: string;
+    city: string;
+    state: string;
+  };
 }
 
 interface BulkMenuItem {
@@ -164,6 +177,12 @@ const CustomerBulkOrderDashboard: React.FC = () => {
   const [isAiSearchActive, setIsAiSearchActive] = useState(false);
   const [aiSearching, setAiSearching] = useState(false);
   const [selectedMealType, setSelectedMealType] = useState('all');
+  
+  // Advanced filters
+  const [peopleCountFilter, setPeopleCountFilter] = useState<string>('all');
+  const [priceRangeFilter, setPriceRangeFilter] = useState<string>('all');
+  const [dietaryFilter, setDietaryFilter] = useState<string>('all');
+  
   const [selectedMenu, setSelectedMenu] = useState<BulkMenu | null>(null);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
@@ -206,10 +225,14 @@ const CustomerBulkOrderDashboard: React.FC = () => {
   ];
 
   useEffect(() => {
-    fetchBulkMenus();
     loadAddresses();
     fetchUserBulkOrders();
   }, []);
+
+  // Fetch bulk menus when selected address changes
+  useEffect(() => {
+    fetchBulkMenus();
+  }, [selectedAddress]);
 
   const fetchUserBulkOrders = async () => {
     try {
@@ -248,7 +271,6 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading addresses:', error);
-      toast.error('Failed to load saved addresses');
     }
   };
 
@@ -257,10 +279,19 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       setLoading(true);
       const token = localStorage.getItem('access_token');
       
-      // Debug: Log the request
-      console.log('Fetching bulk menus from /api/food/bulk-menus/');
+      // Build URL with location parameters if available
+      let url = '/api/food/bulk-menus/';
+      if (selectedAddress && selectedAddress.latitude && selectedAddress.longitude) {
+        url += `?user_lat=${selectedAddress.latitude}&user_lng=${selectedAddress.longitude}`;
+        console.log('Fetching bulk menus with user location:', {
+          lat: selectedAddress.latitude,
+          lng: selectedAddress.longitude
+        });
+      } else {
+        console.log('Fetching bulk menus without user location');
+      }
       
-      const response = await fetch('/api/food/bulk-menus/', {
+      const response = await fetch(url, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json',
@@ -290,17 +321,12 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         console.log('Available menus after filtering:', availableMenus.length);
         setBulkMenus(availableMenus);
         
-        if (availableMenus.length === 0 && allMenus.length > 0) {
-          toast.info('Some menus are pending approval or unavailable');
-        }
       } else {
         const errorText = await response.text();
         console.error('Error response:', errorText);
-        toast.error(`Failed to fetch bulk menus: ${response.status}`);
       }
     } catch (error) {
       console.error('Error fetching bulk menus:', error);
-      toast.error('Error loading bulk menus. Please check console for details.');
     } finally {
       setLoading(false);
     }
@@ -334,7 +360,6 @@ const CustomerBulkOrderDashboard: React.FC = () => {
 
   const handleOrderClick = async (menu: BulkMenu) => {
     if (!isAuthenticated) {
-      toast.error('Please login to place a bulk order');
       navigate('/auth/login');
       return;
     }
@@ -395,7 +420,6 @@ const CustomerBulkOrderDashboard: React.FC = () => {
     console.log('Selected address:', selectedAddress);
     
     if (!orderForm.event_date || !orderForm.event_time) {
-      toast.error('Please fill in event date and time');
       return;
     }
 
@@ -405,7 +429,6 @@ const CustomerBulkOrderDashboard: React.FC = () => {
                          (orderForm.delivery_address && orderForm.delivery_address.trim().length > 0);
       
       if (!hasAddress) {
-        toast.error('Please select an address from the map or enter a delivery address manually');
         return;
       }
     }
@@ -430,7 +453,6 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       console.log(`⏰ Hours until event: ${hoursUntilEvent.toFixed(1)}, Required: ${selectedMenu.advance_notice_hours}`);
       
       if (hoursUntilEvent < selectedMenu.advance_notice_hours) {
-        toast.error(`This menu requires ${selectedMenu.advance_notice_hours} hours advance notice`);
         return;
       }
     }
@@ -439,7 +461,6 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       const token = localStorage.getItem('access_token');
       
       if (!token) {
-        toast.error('Please login to place an order');
         console.error('❌ No authentication token found');
         navigate('/login');
         return;
@@ -480,7 +501,6 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       if (response.ok) {
         const responseData = await response.json();
         console.log('✅ Order placed successfully:', responseData);
-        toast.success('Bulk order placed successfully!');
         setIsOrderDialogOpen(false);
         navigate('/customer/orders');
       } else {
@@ -489,29 +509,11 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         
         // Handle specific error types
         if (response.status === 401) {
-          toast.error('Please login to place an order');
           navigate('/login');
-        } else if (response.status === 403) {
-          toast.error('You do not have permission to place this order');
-        } else if (response.status === 400) {
-          // Validation errors
-          const errorMessage = errorData.error || errorData.message || 'Invalid order data';
-          if (typeof errorData === 'object' && !errorData.error && !errorData.message) {
-            // Field-specific errors
-            const errors = Object.entries(errorData)
-              .map(([field, msg]) => `${field}: ${msg}`)
-              .join(', ');
-            toast.error(`Validation errors: ${errors}`);
-          } else {
-            toast.error(errorMessage);
-          }
-        } else {
-          toast.error(errorData.error || errorData.message || 'Failed to place order');
         }
       }
     } catch (error) {
       console.error('💥 Exception during order placement:', error);
-      toast.error('Network error. Please check your connection and try again.');
     }
   };
 
@@ -533,21 +535,43 @@ const CustomerBulkOrderDashboard: React.FC = () => {
     // Set the newly saved/edited address as selected
     setSelectedAddress(address);
     
-    // Calculate delivery fee based on distance if we have chef's location
-    let deliveryFee = 0;
+    // Calculate delivery fee using backend API with night/weather surcharges
+    let deliveryFee = 250; // Default base fee for bulk
     let distanceKm = 0;
     
-    if (selectedMenu && address.latitude && address.longitude) {
-      // For bulk orders, we need chef's kitchen location
-      // This would need to be fetched from the menu/chef data
-      // For now, we'll use a default calculation
-      // You may need to update this based on where chef location is stored
-      
-      // Simple calculation: LKR 300 within 5 km, LKR 100 per km after
-      // Since we don't have chef location here, we'll calculate when backend processes
-      // For now, set a default
-      deliveryFee = 300; // Base fee
-      distanceKm = 5; // Assume within 5 km for now
+    if (selectedMenu && address.latitude && address.longitude && selectedMenu.kitchen_location) {
+      try {
+        const { CartService } = await import('@/services/cartService');
+        
+        // Call backend API for accurate bulk order delivery fee
+        const calculation = await CartService.calculateCheckout(
+          [], // Empty cart items for bulk (calculated differently)
+          address.id,
+          {
+            order_type: 'bulk', // ✅ BULK ORDER TYPE
+            delivery_latitude: address.latitude,
+            delivery_longitude: address.longitude,
+            chef_latitude: selectedMenu.kitchen_location.lat,
+            chef_longitude: selectedMenu.kitchen_location.lng,
+          }
+        );
+
+        deliveryFee = calculation.delivery_fee;
+        distanceKm = calculation.delivery_fee_breakdown?.factors?.distance_km || 0;
+        
+        console.log('✅ Bulk delivery fee calculated:', {
+          totalFee: deliveryFee,
+          distance: distanceKm,
+          nightSurcharge: calculation.delivery_fee_breakdown?.breakdown?.time_surcharge,
+          weatherSurcharge: calculation.delivery_fee_breakdown?.breakdown?.weather_surcharge,
+        });
+      } catch (error) {
+        console.error('❌ Failed to calculate bulk delivery fee, using fallback:', error);
+        // Fallback: Bulk Order Formula
+        // First 5 km: 250 LKR, After 5 km: 15 LKR/km
+        deliveryFee = 250;
+        distanceKm = 5;
+      }
     }
     
     // Format address for the order form
@@ -566,15 +590,41 @@ const CustomerBulkOrderDashboard: React.FC = () => {
     
     setIsAddressPickerOpen(false);
     setEditingAddress(null);
-    toast.success(`Address ${editingAddress ? 'updated' : 'added'} successfully!`);
   };
 
-  const handleSelectExistingAddress = (address: DeliveryAddress) => {
+  const handleSelectExistingAddress = async (address: DeliveryAddress) => {
     setSelectedAddress(address);
     
-    // Calculate delivery fee
-    const deliveryFee = 300; // Base fee
-    const distanceKm = 5; // Default
+    // Calculate bulk delivery fee using backend API
+    let deliveryFee = 250; // Base fee for bulk
+    let distanceKm = 0;
+    
+    if (selectedMenu && address.latitude && address.longitude && selectedMenu.kitchen_location) {
+      try {
+        const { CartService } = await import('@/services/cartService');
+        
+        const calculation = await CartService.calculateCheckout(
+          [],
+          address.id,
+          {
+            order_type: 'bulk', // ✅ BULK ORDER TYPE
+            delivery_latitude: address.latitude,
+            delivery_longitude: address.longitude,
+            chef_latitude: selectedMenu.kitchen_location.lat,
+            chef_longitude: selectedMenu.kitchen_location.lng,
+          }
+        );
+
+        deliveryFee = calculation.delivery_fee;
+        distanceKm = calculation.delivery_fee_breakdown?.factors?.distance_km || 0;
+        
+        console.log('✅ Bulk delivery fee for existing address:', deliveryFee);
+      } catch (error) {
+        console.error('❌ Failed to calculate bulk delivery fee:', error);
+        deliveryFee = 250;
+        distanceKm = 5;
+      }
+    }
     
     const fullAddress = [
       address.address_line1,
@@ -588,8 +638,6 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       delivery_fee: deliveryFee,
       distance_km: distanceKm
     }));
-    
-    toast.success(`Selected: ${address.label}`);
   };
 
   const handleDeleteAddress = async (addressId: number) => {
@@ -600,17 +648,14 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         setSelectedAddress(null);
         setOrderForm(prev => ({ ...prev, delivery_address: '', delivery_fee: 0, distance_km: 0 }));
       }
-      toast.success('Address deleted successfully');
     } catch (error) {
       console.error('Error deleting address:', error);
-      toast.error('Failed to delete address');
     }
   };
 
   // AI-powered search function
   const handleAiSearch = async () => {
     if (!aiSearchQuery.trim()) {
-      toast.error('Please enter a search query');
       return;
     }
     
@@ -625,7 +670,11 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         },
         body: JSON.stringify({
           query: aiSearchQuery,
-          meal_type: selectedMealType !== 'all' ? selectedMealType : undefined
+          meal_type: selectedMealType !== 'all' ? selectedMealType : undefined,
+          people_count: peopleCountFilter !== 'all' ? peopleCountFilter : undefined,
+          price_range: priceRangeFilter !== 'all' ? priceRangeFilter : undefined,
+          dietary: dietaryFilter !== 'all' ? dietaryFilter : undefined,
+          include_menu_items: true
         })
       });
       
@@ -633,13 +682,9 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         const data = await response.json();
         setBulkMenus(data.menus);
         setIsAiSearchActive(true);
-        toast.success(`Found ${data.total_results} menu(s) ${data.ai_powered ? '✨ with AI' : ''}`);
-      } else {
-        toast.error('AI search failed');
       }
     } catch (error) {
       console.error('AI search error:', error);
-      toast.error('Failed to perform AI search');
     } finally {
       setAiSearching(false);
     }
@@ -660,8 +705,36 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       return (
         menu.menu_name.toLowerCase().includes(searchLower) ||
         menu.description.toLowerCase().includes(searchLower) ||
-        menu.chef_name.toLowerCase().includes(searchLower)
+        menu.chef_name.toLowerCase().includes(searchLower) ||
+        menu.menu_items_summary?.mandatory_items?.some(item => item.toLowerCase().includes(searchLower)) ||
+        menu.menu_items_summary?.optional_items?.some(item => item.toLowerCase().includes(searchLower))
       );
+    })
+    // People count filter
+    .filter(menu => {
+      if (peopleCountFilter === 'all') return true;
+      if (peopleCountFilter === 'small') return menu.min_persons <= 20;
+      if (peopleCountFilter === 'medium') return menu.min_persons <= 50 && menu.max_persons >= 20;
+      if (peopleCountFilter === 'large') return menu.max_persons >= 50;
+      return true;
+    })
+    // Price range filter
+    .filter(menu => {
+      if (priceRangeFilter === 'all') return true;
+      const price = menu.base_price_per_person;
+      if (priceRangeFilter === 'budget') return price < 500;
+      if (priceRangeFilter === 'mid') return price >= 500 && price < 1000;
+      if (priceRangeFilter === 'premium') return price >= 1000;
+      return true;
+    })
+    // Dietary filter
+    .filter(menu => {
+      if (dietaryFilter === 'all') return true;
+      const items = menu.items || [];
+      if (dietaryFilter === 'vegetarian') return items.some(item => item.is_vegetarian);
+      if (dietaryFilter === 'vegan') return items.some(item => item.is_vegan);
+      if (dietaryFilter === 'gluten_free') return items.some(item => item.is_gluten_free);
+      return true;
     });
 
   return (
@@ -707,7 +780,7 @@ const CustomerBulkOrderDashboard: React.FC = () => {
               )}
             </div>
             <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
-              Ask in natural language: "vegetarian food for wedding", "healthy breakfast for 50 people", "spicy dinner menu"
+              Ask in natural language: "vegetarian food for wedding with 100 guests", "healthy low-calorie breakfast for 50 people under LKR 600", "spicy Indian dinner menu", "gluten-free vegan options for corporate event"
             </p>
             <div className="flex gap-2">
               <div className="flex-1 relative">
@@ -767,6 +840,144 @@ const CustomerBulkOrderDashboard: React.FC = () => {
             />
           </div>
         </div>
+
+        {/* AI Analytics Dashboard */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">Available Menus</p>
+                  <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">{filteredMenus.length}</p>
+                  <p className="text-xs text-orange-500 mt-1">of {bulkMenus.length} total</p>
+                </div>
+                <Package className="h-10 w-10 text-orange-500 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">Vegetarian Options</p>
+                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                    {bulkMenus.filter(m => m.items?.some(i => i.is_vegetarian)).length}
+                  </p>
+                  <p className="text-xs text-green-500 mt-1">
+                    {bulkMenus.filter(m => m.items?.some(i => i.is_vegan)).length} vegan
+                  </p>
+                </div>
+                <Leaf className="h-10 w-10 text-green-500 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Avg. Price/Person</p>
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                    LKR {bulkMenus.length > 0 ? Math.round(bulkMenus.reduce((sum, m) => sum + m.base_price_per_person, 0) / bulkMenus.length) : 0}
+                  </p>
+                  <p className="text-xs text-blue-500 mt-1">
+                    {bulkMenus.length > 0 ? `LKR ${Math.min(...bulkMenus.map(m => m.base_price_per_person))} - LKR ${Math.max(...bulkMenus.map(m => m.base_price_per_person))}` : 'No data'}
+                  </p>
+                </div>
+                <TrendingUp className="h-10 w-10 text-blue-500 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Smart Filters */}
+        <Card className="bg-white dark:bg-gray-800">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="h-5 w-5 text-orange-500" />
+              <h3 className="font-semibold text-gray-900 dark:text-white">Smart Filters</h3>
+              {(peopleCountFilter !== 'all' || priceRangeFilter !== 'all' || dietaryFilter !== 'all') && (
+                <Badge className="bg-orange-500 text-white">Active</Badge>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* People Count Filter */}
+              <div>
+                <Label className="text-xs mb-1.5 flex items-center gap-1">
+                  <Users className="h-3.5 w-3.5" />
+                  People Count
+                </Label>
+                <select
+                  value={peopleCountFilter}
+                  onChange={(e) => setPeopleCountFilter(e.target.value)}
+                  className="w-full p-2 border rounded-md text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="all">All Sizes</option>
+                  <option value="small">Small (1-20)</option>
+                  <option value="medium">Medium (20-50)</option>
+                  <option value="large">Large (50+)</option>
+                </select>
+              </div>
+
+              {/* Price Range Filter */}
+              <div>
+                <Label className="text-xs mb-1.5 flex items-center gap-1">
+                  <Banknote className="h-3.5 w-3.5" />
+                  Price Range
+                </Label>
+                <select
+                  value={priceRangeFilter}
+                  onChange={(e) => setPriceRangeFilter(e.target.value)}
+                  className="w-full p-2 border rounded-md text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="all">All Prices</option>
+                  <option value="budget">Budget (&lt; LKR 500)</option>
+                  <option value="mid">Mid-Range (LKR 500-1000)</option>
+                  <option value="premium">Premium (LKR 1000+)</option>
+                </select>
+              </div>
+
+              {/* Dietary Preferences Filter */}
+              <div>
+                <Label className="text-xs mb-1.5 flex items-center gap-1">
+                  <Leaf className="h-3.5 w-3.5" />
+                  Dietary
+                </Label>
+                <select
+                  value={dietaryFilter}
+                  onChange={(e) => setDietaryFilter(e.target.value)}
+                  className="w-full p-2 border rounded-md text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="all">All Types</option>
+                  <option value="vegetarian">Vegetarian</option>
+                  <option value="vegan">Vegan</option>
+                  <option value="gluten_free">Gluten Free</option>
+                </select>
+              </div>
+
+              {/* Clear Filters Button */}
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setPeopleCountFilter('all');
+                    setPriceRangeFilter('all');
+                    setDietaryFilter('all');
+                    setSearchTerm('');
+                    if (isAiSearchActive) handleClearAiSearch();
+                  }}
+                  className="w-full"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Clear All
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Meal Type Tabs */}
@@ -841,10 +1052,10 @@ const CustomerBulkOrderDashboard: React.FC = () => {
               {/* Details Grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-orange-500" />
+                  <Banknote className="h-5 w-5 text-orange-500" />
                   <div>
                     <p className="text-sm text-gray-500">Base Price</p>
-                    <p className="font-semibold">Rs.{selectedMenu.base_price_per_person}/person</p>
+                    <p className="font-semibold">LKR {selectedMenu.base_price_per_person}/person</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -914,7 +1125,7 @@ const CustomerBulkOrderDashboard: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
                               <p className="font-medium">{item.item_name}</p>
-                              <p className="text-orange-600 font-semibold">+Rs.{item.extra_cost}/person</p>
+                              <p className="text-orange-600 font-semibold">+LKR {item.extra_cost}/person</p>
                             </div>
                             {item.description && (
                               <p className="text-sm text-gray-600 dark:text-gray-400">{item.description}</p>
@@ -953,7 +1164,7 @@ const CustomerBulkOrderDashboard: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Place Bulk Order</DialogTitle>
             <DialogDescription>
-              {selectedMenu?.menu_name} - Rs.{selectedMenu?.base_price_per_person}/person
+              {selectedMenu?.menu_name} - LKR {selectedMenu?.base_price_per_person}/person
             </DialogDescription>
           </DialogHeader>
 
@@ -1166,12 +1377,12 @@ const CustomerBulkOrderDashboard: React.FC = () => {
                           />
                           <div>
                             <p className="font-medium">{item.item_name}</p>
-                            <p className="text-sm text-gray-500">+Rs.{item.extra_cost}/person</p>
+                            <p className="text-sm text-gray-500">+LKR {item.extra_cost}/person</p>
                           </div>
                         </div>
                         {orderForm.selected_optional_items.includes(item.id) && (
                           <Badge className="bg-orange-500">
-                            +Rs.{item.extra_cost * orderForm.num_persons}
+                            +LKR {item.extra_cost * orderForm.num_persons}
                           </Badge>
                         )}
                       </div>
@@ -1198,14 +1409,14 @@ const CustomerBulkOrderDashboard: React.FC = () => {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-gray-600 dark:text-gray-400">Base Cost:</span>
                   <span className="font-semibold">
-                    Rs.{(selectedMenu.base_price_per_person * orderForm.num_persons).toFixed(2)}
+                    LKR {(selectedMenu.base_price_per_person * orderForm.num_persons).toFixed(2)}
                   </span>
                 </div>
                 {orderForm.selected_optional_items.length > 0 && (
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-gray-600 dark:text-gray-400">Optional Items:</span>
                     <span className="font-semibold">
-                      Rs.{selectedMenu.items
+                      LKR {selectedMenu.items
                         .filter(item => orderForm.selected_optional_items.includes(item.id))
                         .reduce((sum, item) => sum + (item.extra_cost * orderForm.num_persons), 0)
                         .toFixed(2)}
@@ -1218,14 +1429,14 @@ const CustomerBulkOrderDashboard: React.FC = () => {
                       Delivery Fee {orderForm.distance_km ? `(~${orderForm.distance_km.toFixed(1)} km)` : ''}:
                     </span>
                     <span className="font-semibold">
-                      Rs.{orderForm.delivery_fee.toFixed(2)}
+                      LKR {orderForm.delivery_fee.toFixed(2)}
                     </span>
                   </div>
                 )}
                 <div className="border-t pt-2 flex justify-between items-center">
                   <span className="text-lg font-bold">Total:</span>
                   <span className="text-2xl font-bold text-orange-600">
-                    Rs.{calculateTotalCost().toFixed(2)}
+                    LKR {calculateTotalCost().toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -1520,10 +1731,10 @@ const BulkMenuCard: React.FC<BulkMenuCardProps> = ({ menu, onViewDetails, onOrde
           {/* Price and Capacity */}
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-orange-500" />
+              <Banknote className="h-4 w-4 text-orange-500" />
               <div>
                 <p className="text-xs text-gray-500">Price</p>
-                <p className="font-semibold text-orange-600">Rs.{menu.base_price_per_person}/person</p>
+                <p className="font-semibold text-orange-600">LKR {menu.base_price_per_person}/person</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1543,15 +1754,40 @@ const BulkMenuCard: React.FC<BulkMenuCardProps> = ({ menu, onViewDetails, onOrde
             </span>
           </div>
 
-          {/* Items Count */}
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              {menu.items_count} items included
-            </Badge>
-            {menu.menu_items_summary.optional_items.length > 0 && (
-              <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700">
-                +{menu.menu_items_summary.optional_items.length} optional
+          {/* Items Count & Dietary Tags */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="outline" className="text-xs">
+                {menu.items_count} items included
               </Badge>
+              {menu.menu_items_summary.optional_items.length > 0 && (
+                <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 dark:bg-orange-900/20">
+                  +{menu.menu_items_summary.optional_items.length} optional
+                </Badge>
+              )}
+            </div>
+            
+            {/* Dietary & Food Type Tags */}
+            {menu.items && menu.items.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {menu.items.some(item => item.is_vegetarian) && (
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/20 border-green-300">
+                    <Leaf className="h-3 w-3 mr-0.5" />
+                    Veg
+                  </Badge>
+                )}
+                {menu.items.some(item => item.is_vegan) && (
+                  <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 border-emerald-300">
+                    <Leaf className="h-3 w-3 mr-0.5" />
+                    Vegan
+                  </Badge>
+                )}
+                {menu.items.some(item => item.is_gluten_free) && (
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/20 border-blue-300">
+                    GF
+                  </Badge>
+                )}
+              </div>
             )}
           </div>
 

@@ -39,10 +39,9 @@ const CustomerSettings: React.FC = () => {
   // Save settings handler
   const handleSaveSettings = async () => {
     try {
-      toast.success('Settings saved successfully!');
+      // Settings saved
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast.error('Error saving settings. Please try again.');
     }
   };
 
@@ -245,7 +244,6 @@ const CustomerSettings: React.FC = () => {
               setNotifications({ orderUpdates: true, promotions: true, newsletter: false, smsUpdates: true });
               setDeliveryPrefs({ instructions: '', contactPreference: 'phone', preferredTime: 'anytime' });
               setPrivacySettings({ dataSharing: false, locationTracking: true, orderHistory: true });
-              toast.info('Settings reset to defaults');
             }}
           >
             Reset to Defaults

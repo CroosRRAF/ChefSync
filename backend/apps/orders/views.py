@@ -1,7 +1,9 @@
 import math
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
+
+import pytz
 
 from apps.food.models import FoodPrice, FoodReview
 from apps.payments.models import Payment
@@ -2011,10 +2013,36 @@ def chef_income_breakdown(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def calculate_checkout(request):
-    """Calculate delivery fee, tax, and total for checkout with comprehensive validation"""
+    """Calculate delivery fee, tax, and total for checkout with dynamic pricing"""
+    print("\n" + "="*80)
+    print("🚀 CALCULATE_CHECKOUT API CALLED!")
+    print(f"📥 Request Data: {request.data}")
+    print("="*80 + "\n")
+    
     try:
+        from .services.delivery_fee_service import delivery_fee_calculator
+
         cart_items = request.data.get("cart_items", [])
-        customer_location = request.data.get("customer_location", {})
+        order_type = request.data.get("order_type", "regular")  # 'regular' or 'bulk'
+        
+        print(f"📦 Cart Items: {len(cart_items)}")
+        print(f"🏷️  Order Type: {order_type}")
+        
+        # Delivery address information
+        delivery_address_id = request.data.get("delivery_address_id")
+        delivery_latitude = request.data.get("delivery_latitude")
+        delivery_longitude = request.data.get("delivery_longitude")
+        
+        # Kitchen/chef location
+        chef_latitude = request.data.get("chef_latitude")
+        chef_longitude = request.data.get("chef_longitude")
+        
+        # Delivery time (optional, defaults to now)
+        delivery_time_str = request.data.get("delivery_time")
+        delivery_time = None
+        if delivery_time_str:
+            from dateutil import parser
+            delivery_time = parser.parse(delivery_time_str)
 
         if not cart_items:
             return Response(
@@ -2023,8 +2051,7 @@ def calculate_checkout(request):
 
         # Initialize calculation variables
         subtotal = Decimal("0.00")
-        delivery_fee = Decimal("15.00")  # Base delivery fee
-        tax_rate = Decimal("0.08")  # 8% tax
+        tax_rate = Decimal("0.10")  # 10% tax
 
         # Calculate subtotal
         for item in cart_items:
@@ -2043,23 +2070,182 @@ def calculate_checkout(request):
             item_total = food_price.price * item["quantity"]
             subtotal += item_total
 
+        # Get chef location if not provided
+        if not chef_latitude or not chef_longitude:
+            first_item = cart_items[0]
+            try:
+                food_price = FoodPrice.objects.select_related("price__cook").get(
+                    id=first_item["price_id"]
+                )
+                chef = food_price.cook
+                chef_lat, chef_lng = _resolve_chef_location(chef, request.data)
+                if chef_lat and chef_lng:
+                    chef_latitude = chef_lat
+                    chef_longitude = chef_lng
+            except Exception:
+                pass
+
+        # Get delivery location if address ID provided
+        if delivery_address_id and (not delivery_latitude or not delivery_longitude):
+            try:
+                from apps.users.models import Address
+                address = Address.objects.get(
+                    id=delivery_address_id, 
+                    user=request.user, 
+                    address_type="customer"
+                )
+                delivery_latitude = float(address.latitude) if address.latitude else None
+                delivery_longitude = float(address.longitude) if address.longitude else None
+            except Exception:
+                try:
+                    address = UserAddress.objects.get(
+                        id=delivery_address_id, 
+                        user=request.user
+                    )
+                    delivery_latitude = float(address.latitude) if address.latitude else None
+                    delivery_longitude = float(address.longitude) if address.longitude else None
+                except Exception:
+                    pass
+
+        # Calculate dynamic delivery fee
+        delivery_fee_result = None
+        delivery_fee = Decimal("0.00")
+        
+        print(f"\n📍 Coordinates Check:")
+        print(f"   Chef: ({chef_latitude}, {chef_longitude})")
+        print(f"   Delivery: ({delivery_latitude}, {delivery_longitude})")
+        
+        if chef_latitude and chef_longitude and delivery_latitude and delivery_longitude:
+            try:
+                print(f"\n🚀 Calling delivery_fee_calculator.calculate_delivery_fee()...")
+                print(f"   Order Type: {order_type}")
+                
+                logger.info(f"🚀 Calling delivery_fee_calculator with order_type={order_type}")
+                delivery_fee_result = delivery_fee_calculator.calculate_delivery_fee(
+                    order_type=order_type,
+                    origin_lat=float(chef_latitude),
+                    origin_lng=float(chef_longitude),
+                    dest_lat=float(delivery_latitude),
+                    dest_lng=float(delivery_longitude),
+                    delivery_time=delivery_time
+                )
+                delivery_fee = Decimal(str(delivery_fee_result['total_fee']))
+                
+                print(f"\n✅ API Response from calculator:")
+                print(f"   Total Fee: {delivery_fee} LKR")
+                print(f"   Breakdown: {delivery_fee_result.get('breakdown', {})}")
+                print(f"   Factors: {delivery_fee_result.get('factors', {})}")
+                
+                logger.info(f"✅ Delivery fee calculated: {delivery_fee} LKR (with surcharges)")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to calculate dynamic delivery fee: {str(e)}")
+                # Fallback to basic calculation with surcharges
+                distance_km = delivery_fee_calculator._haversine_distance(
+                    float(chef_latitude), float(chef_longitude),
+                    float(delivery_latitude), float(delivery_longitude)
+                )
+                
+                # Calculate base distance fee
+                if order_type == 'bulk':
+                    if distance_km <= 5:
+                        distance_fee = Decimal('250.00')
+                    else:
+                        distance_fee = Decimal('250.00') + (Decimal(str(distance_km - 5)) * Decimal('15.00'))
+                else:
+                    if distance_km <= 5:
+                        distance_fee = Decimal('50.00')
+                    else:
+                        distance_fee = Decimal('50.00') + (Decimal(str(distance_km - 5)) * Decimal('15.00'))
+                
+                # Calculate surcharges
+                time_surcharge = Decimal('0')
+                weather_surcharge = Decimal('0')
+                is_night = False
+                is_rainy = False
+                
+                # Check if night time (6 PM - 5 AM) in Sri Lanka time
+                current_time = delivery_time if delivery_time else datetime.now(pytz.UTC)
+                # Convert to Sri Lanka timezone
+                sri_lanka_tz = pytz.timezone('Asia/Colombo')
+                if current_time.tzinfo is None:
+                    current_time = pytz.UTC.localize(current_time)
+                local_time = current_time.astimezone(sri_lanka_tz)
+                current_hour = local_time.hour
+                logger.info(f"🌙 FALLBACK Night Check: Sri Lanka time = {local_time.strftime('%H:%M')}, Hour = {current_hour}")
+                if current_hour >= 18 or current_hour < 5:
+                    is_night = True
+                    time_surcharge = distance_fee * Decimal('0.10')
+                    logger.info(f"💰 FALLBACK Night Surcharge Applied: {time_surcharge} LKR")
+                
+                # Note: Weather check requires API, so skip in fallback
+                # Total includes surcharges
+                total_fee = distance_fee + time_surcharge + weather_surcharge
+                logger.info(f"📊 FALLBACK Total: Distance={distance_fee} + Night={time_surcharge} = {total_fee}")
+                
+                delivery_fee_result = {
+                    'total_fee': float(total_fee),
+                    'breakdown': {
+                        'distance_fee': float(distance_fee),
+                        'time_surcharge': float(time_surcharge),
+                        'weather_surcharge': float(weather_surcharge),
+                    },
+                    'factors': {
+                        'distance_km': distance_km,
+                        'order_type': order_type,
+                        'is_night_delivery': is_night,
+                        'is_rainy': is_rainy,
+                    }
+                }
+                
+                # Update delivery_fee to total
+                delivery_fee = total_fee
+        else:
+            # No location data, use minimal fee
+            delivery_fee = Decimal("50.00")
+            delivery_fee_result = {
+                'total_fee': 50.0,
+                'breakdown': {
+                    'distance_fee': 50.0,
+                    'time_surcharge': 0,
+                    'weather_surcharge': 0,
+                },
+                'factors': {
+                    'distance_km': 0,
+                    'order_type': order_type,
+                    'is_night_delivery': False,
+                    'is_rainy': False,
+                }
+            }
+
         # Calculate tax
         tax_amount = subtotal * tax_rate
 
         # Calculate total
         total_amount = subtotal + delivery_fee + tax_amount
 
-        return Response(
-            {
-                "subtotal": float(subtotal),
-                "delivery_fee": float(delivery_fee),
-                "tax_amount": float(tax_amount),
-                "total_amount": float(total_amount),
-                "tax_rate": float(tax_rate),
-            }
-        )
+        response_data = {
+            "subtotal": float(subtotal),
+            "delivery_fee": float(delivery_fee),
+            "tax_amount": float(tax_amount),
+            "total_amount": float(total_amount),
+            "tax_rate": float(tax_rate),
+        }
+        
+        # Add delivery fee breakdown if available
+        if delivery_fee_result:
+            response_data["delivery_fee_breakdown"] = delivery_fee_result
+            print(f"\n📤 SENDING RESPONSE WITH BREAKDOWN:")
+            print(f"   Delivery Fee: {float(delivery_fee)}")
+            print(f"   Night Surcharge: {delivery_fee_result.get('breakdown', {}).get('time_surcharge', 0)}")
+            print(f"   Is Night: {delivery_fee_result.get('factors', {}).get('is_night_delivery', False)}")
+        else:
+            print(f"\n⚠️  WARNING: No delivery_fee_breakdown in response!")
+
+        print("\n" + "="*80)
+        return Response(response_data)
 
     except Exception as e:
+        logger.error(f"Checkout calculation error: {str(e)}")
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

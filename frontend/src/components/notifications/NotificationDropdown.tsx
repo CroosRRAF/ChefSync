@@ -143,11 +143,11 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ className }
           variant="ghost"
           size="sm"
           className={cn(
-            "relative hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all duration-200",
+            "relative hover:bg-white/20 transition-all duration-200",
             className
           )}
         >
-          <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          <Bell className={cn("h-5 w-5", className ? className : "text-gray-600 dark:text-gray-400")} />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse font-semibold">
               {unreadCount > 99 ? '99+' : unreadCount}

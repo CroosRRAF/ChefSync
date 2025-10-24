@@ -391,6 +391,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     # Food and price information
     food_name = serializers.CharField(source="price.food.name", read_only=True)
+    name = serializers.CharField(source="price.food.name", read_only=True)  # Alias for frontend
     food_description = serializers.CharField(
         source="price.food.description", read_only=True
     )
@@ -401,7 +402,9 @@ class CartItemSerializer(serializers.ModelSerializer):
         source="price.price", max_digits=10, decimal_places=2, read_only=True
     )
     total_price = serializers.SerializerMethodField()
+    subtotal = serializers.SerializerMethodField()  # Alias for total_price
     food_image = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()  # Alias for frontend
 
     # Chef/Cook information
     chef_id = serializers.IntegerField(source="price.cook.user_id", read_only=True)
@@ -419,13 +422,16 @@ class CartItemSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "food_name",
+            "name",
             "food_description",
             "food_id",
             "price_id",
             "size",
             "unit_price",
             "total_price",
+            "subtotal",
             "food_image",
+            "image",
             "chef_id",
             "chef_name",
             "cook_name",
@@ -487,6 +493,15 @@ class CartItemSerializer(serializers.ModelSerializer):
                     user=cook, is_default=True, is_active=True
                 ).first()
 
+            # If cook doesn't have kitchen address, fall back to food's chef
+            if not kitchen_address:
+                food_chef = obj.price.food.chef if obj.price and obj.price.food else None
+                if food_chef and food_chef != cook:
+                    # Try to get kitchen address from food's chef
+                    kitchen_address = Address.objects.filter(
+                        user=food_chef, address_type="kitchen", is_active=True
+                    ).first()
+
             if kitchen_address:
                 # Format the address nicely
                 address_parts = []
@@ -508,7 +523,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
             logger = logging.getLogger(__name__)
             logger.error(
-                f"Error getting kitchen address for cook {obj.price.cook.user_id}: {str(e)}"
+                f"Error getting kitchen address for cart item {obj.id}: {str(e)}"
             )
             return "Address not available"
 
@@ -517,6 +532,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         try:
             from apps.users.models import Address
 
+            # Try to get kitchen from price.cook first
             cook = obj.price.cook
             if not cook:
                 return None
@@ -538,6 +554,15 @@ class CartItemSerializer(serializers.ModelSerializer):
                     user=cook, is_default=True, is_active=True
                 ).first()
 
+            # If cook doesn't have kitchen location, fall back to food's chef
+            if not kitchen_address or not kitchen_address.latitude or not kitchen_address.longitude:
+                food_chef = obj.price.food.chef if obj.price and obj.price.food else None
+                if food_chef and food_chef != cook:
+                    # Try to get kitchen address from food's chef
+                    kitchen_address = Address.objects.filter(
+                        user=food_chef, address_type="kitchen", is_active=True
+                    ).first()
+
             if (
                 kitchen_address
                 and kitchen_address.latitude
@@ -554,13 +579,21 @@ class CartItemSerializer(serializers.ModelSerializer):
 
             logger = logging.getLogger(__name__)
             logger.error(
-                f"Error getting kitchen location for cook {obj.price.cook.user_id}: {str(e)}"
+                f"Error getting kitchen location for cart item {obj.id}: {str(e)}"
             )
             return None
 
     def get_total_price(self, obj):
         """Calculate total price for this cart item"""
         return float(obj.total_price)
+    
+    def get_subtotal(self, obj):
+        """Alias for total_price"""
+        return float(obj.total_price)
+    
+    def get_image(self, obj):
+        """Alias for food_image"""
+        return self.get_food_image(obj)
 
 
 class OrderStatsSerializer(serializers.Serializer):

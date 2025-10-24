@@ -334,8 +334,10 @@ class AdminFoodViewSet(viewsets.ModelViewSet):
         if not self.request.user.is_staff:
             return Food.objects.none()
 
-        # Get all foods for admin management
-        queryset = Food.objects.all().order_by("-created_at")
+        # Get all foods for admin management with related data
+        queryset = Food.objects.select_related(
+            'chef', 'food_category', 'food_category__cuisine'
+        ).prefetch_related('prices').all().order_by("-created_at")
 
         # Apply filters
         status_filter = self.request.query_params.get("status")

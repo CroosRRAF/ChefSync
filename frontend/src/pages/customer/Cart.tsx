@@ -31,6 +31,7 @@ const CustomerCart: React.FC = () => {
   const { items, updateQuantity, removeItem, clearCart, getGrandTotal, getItemCount } = useDatabaseCart();
   const { isAuthenticated, user } = useAuth();
   const [selectedAddress, setSelectedAddress] = useState<DeliveryAddress | null>(null);
+  const [existingAddresses, setExistingAddresses] = useState<DeliveryAddress[]>([]);
   const [isAddressPickerOpen, setIsAddressPickerOpen] = useState(false);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
@@ -43,6 +44,7 @@ const CustomerCart: React.FC = () => {
       setAddressError(null);
       try {
         const addresses = await addressService.getAddresses();
+        setExistingAddresses(addresses || []);
         if (Array.isArray(addresses) && addresses.length > 0) {
           const defaultAddress = addresses.find(address => address.is_default) || addresses[0];
           setSelectedAddress(defaultAddress);
@@ -53,6 +55,7 @@ const CustomerCart: React.FC = () => {
         console.error('Failed to load delivery addresses:', error);
         setAddressError('Unable to load your saved addresses. You can add a new one.');
         setSelectedAddress(null);
+        setExistingAddresses([]);
       } finally {
         setIsLoadingAddress(false);
       }
@@ -90,7 +93,6 @@ const CustomerCart: React.FC = () => {
 
   const handleCheckout = () => {
     if (!isAuthenticated) {
-      toast.info('Please login to continue with checkout');
       navigate('/auth/login');
       return;
     }
@@ -100,14 +102,20 @@ const CustomerCart: React.FC = () => {
       const chefId = cart[0].chef_id;
       // Navigate to checkout page with chef ID
       navigate('/checkout', { state: { chefId } });
-    } else {
-      toast.error('Your cart is empty');
     }
   };
 
-  const handleAddressSelect = (address: DeliveryAddress) => {
+  const handleAddressSaved = async (address: DeliveryAddress) => {
     setSelectedAddress(address);
     setIsAddressPickerOpen(false);
+    
+    // Refresh the addresses list
+    try {
+      const addresses = await addressService.getAddresses();
+      setExistingAddresses(addresses || []);
+    } catch (error) {
+      console.error('Failed to refresh addresses:', error);
+    }
   };
 
   if (cart.length === 0) {
@@ -206,6 +214,37 @@ const CustomerCart: React.FC = () => {
               return Object.entries(itemsByChef).map(([chefId, chefData], chefIndex) => {
                 const chefTotal = chefData.items.reduce((sum, item) => sum + Number(item.subtotal), 0);
                 
+                // Calculate delivery fee and distance for this chef
+                let deliveryFee = 0;
+                let distance = 0;
+                const firstItem = chefData.items[0];
+                
+                if (selectedAddress && firstItem.kitchen_location) {
+                  // Calculate distance using Haversine formula
+                  const R = 6371; // Earth's radius in km
+                  const dLat = (firstItem.kitchen_location.lat - selectedAddress.latitude) * Math.PI / 180;
+                  const dLon = (firstItem.kitchen_location.lng - selectedAddress.longitude) * Math.PI / 180;
+                  const a = 
+                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(selectedAddress.latitude * Math.PI / 180) * 
+                    Math.cos(firstItem.kitchen_location.lat * Math.PI / 180) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  distance = R * c;
+                  
+                  // Calculate delivery fee: LKR 300 base + LKR 100 per km after 5km
+                  const baseFee = 300;
+                  const freeDistanceKm = 5;
+                  const perKmFee = 100;
+                  
+                  if (distance > freeDistanceKm) {
+                    const extraKm = Math.ceil(distance - freeDistanceKm);
+                    deliveryFee = baseFee + (extraKm * perKmFee);
+                  } else {
+                    deliveryFee = baseFee;
+                  }
+                }
+                
                 return (
                   <Card key={chefId} className="border-2 border-orange-100 dark:border-orange-900/20 animate-slideUp" style={{ animationDelay: `${chefIndex * 100}ms` }}>
                     <CardHeader className="bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/10">
@@ -221,6 +260,17 @@ const CustomerCart: React.FC = () => {
                             <p className="text-sm text-gray-600 dark:text-gray-400">
                               {chefData.items.length} item{chefData.items.length !== 1 ? 's' : ''}
                             </p>
+                            {selectedAddress && firstItem.kitchen_location && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                  <MapPin className="h-3 w-3 mr-1" />
+                                  {distance.toFixed(1)}km
+                                </Badge>
+                                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-xs">
+                                  Delivery: LKR {deliveryFee.toFixed(2)}
+                                </Badge>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <Badge variant="secondary" className="bg-orange-200 text-orange-800 dark:bg-orange-800 dark:text-orange-200 text-lg px-3 py-1">
@@ -429,8 +479,9 @@ const CustomerCart: React.FC = () => {
       <GoogleMapsAddressPicker
         isOpen={isAddressPickerOpen}
         onClose={() => setIsAddressPickerOpen(false)}
-        onAddressSelect={handleAddressSelect}
-        selectedAddress={selectedAddress}
+        onAddressSaved={handleAddressSaved}
+        editingAddress={null}
+        existingAddresses={existingAddresses}
       />
     </div>
   );

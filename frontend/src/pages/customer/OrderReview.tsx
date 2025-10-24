@@ -142,7 +142,6 @@ const OrderReview: React.FC = () => {
     }
 
     if (!orderId) {
-      toast.error('Order ID is required');
       navigate('/customer/orders');
       return;
     }
@@ -175,19 +174,16 @@ const OrderReview: React.FC = () => {
       setReviewStatus(status);
 
       if (!status.can_review) {
-        toast.error('This order cannot be reviewed yet');
         navigate('/customer/orders');
         return;
       }
 
       if (status.has_food_review && status.has_delivery_review) {
-        toast.info('You have already reviewed this order');
         navigate('/customer/orders');
         return;
       }
     } catch (error: any) {
       console.error('Failed to fetch review status:', error);
-      toast.error('Failed to load order details');
       navigate('/customer/orders');
     } finally {
       setLoading(false);
@@ -226,14 +222,12 @@ const OrderReview: React.FC = () => {
       if (template) {
         if (type === 'food') {
           setFoodComment(template);
-          toast.success('AI template generated!', { description: 'Feel free to personalize it' });
         } else {
           setDeliveryComment(template);
-          toast.success('AI template generated!', { description: 'Feel free to personalize it' });
         }
       }
     } catch (error) {
-      toast.error('Failed to generate template');
+      console.error('Failed to generate template:', error);
     }
   };
 
@@ -242,7 +236,6 @@ const OrderReview: React.FC = () => {
     const rating = type === 'food' ? foodRating : deliveryRating;
     
     if (!aiEnabled || !text.trim() || rating === 0) {
-      toast.error('Please write something first');
       return;
     }
 
@@ -256,13 +249,9 @@ const OrderReview: React.FC = () => {
         } else {
           setDeliveryComment(enhanced.enhancedText);
         }
-        
-        toast.success('Review enhanced!', {
-          description: enhanced.improvements.join(', '),
-        });
       }
     } catch (error) {
-      toast.error('Failed to enhance review');
+      console.error('Failed to enhance review:', error);
     } finally {
       setIsEnhancing(false);
     }
@@ -305,7 +294,6 @@ const OrderReview: React.FC = () => {
       setDeliveryComment(suggestion);
       setShowDeliverySuggestions(false);
     }
-    toast.success('Suggestion applied!');
   };
 
   const handleSubmitReviews = async () => {
@@ -313,12 +301,10 @@ const OrderReview: React.FC = () => {
 
     // Validate ratings
     if (!reviewStatus.has_food_review && foodRating === 0) {
-      toast.error('Please rate the food');
       return;
     }
 
     if (!reviewStatus.has_delivery_review && reviewStatus.delivery_agent_id && deliveryRating === 0) {
-      toast.error('Please rate the delivery service');
       return;
     }
 
@@ -330,9 +316,6 @@ const OrderReview: React.FC = () => {
       if (!reviewStatus.has_food_review && foodComment.trim()) {
         const foodOk = await checkContent(foodComment, 'food');
         if (!foodOk) {
-          toast.error('Food review contains inappropriate content', {
-            description: foodModeration?.suggestion || 'Please revise your review',
-          });
           contentOk = false;
         }
       }
@@ -341,9 +324,6 @@ const OrderReview: React.FC = () => {
       if (!reviewStatus.has_delivery_review && deliveryComment.trim()) {
         const deliveryOk = await checkContent(deliveryComment, 'delivery');
         if (!deliveryOk) {
-          toast.error('Delivery review contains inappropriate content', {
-            description: deliveryModeration?.suggestion || 'Please revise your review',
-          });
           contentOk = false;
         }
       }
@@ -394,9 +374,6 @@ const OrderReview: React.FC = () => {
       await Promise.all(promises);
 
       setShowSuccess(true);
-      toast.success('Thank you for your feedback! 🎉', {
-        description: aiEnabled ? 'Your review has been validated and submitted' : undefined,
-      });
 
       // Redirect after a short delay
       setTimeout(() => {
@@ -404,8 +381,7 @@ const OrderReview: React.FC = () => {
       }, 2000);
     } catch (error: any) {
       console.error('Failed to submit reviews:', error);
-      toast.error(error.error || 'Failed to submit reviews. Please try again.');
-    } finally {
+    } finally{
       setSubmitting(false);
     }
   };

@@ -22,9 +22,15 @@ class UserProfileViewSet(viewsets.ModelViewSet):
 
 
 class ChefProfileViewSet(viewsets.ModelViewSet):
-    queryset = ChefProfile.objects.all()
+    queryset = ChefProfile.objects.filter(approval_status='approved')
     serializer_class = ChefProfileSerializer
     permission_classes = [IsAuthenticated]
+    
+    def get_permissions(self):
+        """Allow read-only access for retrieve and list, require auth for modifications"""
+        if self.action in ['retrieve', 'list']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
 
 
 class DeliveryProfileViewSet(viewsets.ModelViewSet):

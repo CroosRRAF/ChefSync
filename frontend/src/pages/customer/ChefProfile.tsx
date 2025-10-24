@@ -54,7 +54,6 @@ const ChefProfile: React.FC<ChefProfileProps> = () => {
         setChefFoods(filteredFoods);
       } catch (error) {
         console.error('Error loading chef foods:', error);
-        toast.error('Failed to load chef foods');
       } finally {
         setLoading(false);
       }
@@ -109,7 +108,6 @@ const ChefProfile: React.FC<ChefProfileProps> = () => {
       }
     });
 
-    toast.success(`Added ${quantity} × ${selectedFood.name} (${selectedPrice.size}) to cart!`);
     setShowFoodDetail(false);
     setSelectedPriceId(null);
     setQuantity(1);
@@ -120,10 +118,8 @@ const ChefProfile: React.FC<ChefProfileProps> = () => {
       const newSet = new Set(prev);
       if (newSet.has(foodId)) {
         newSet.delete(foodId);
-        toast.success('Removed from favorites');
       } else {
         newSet.add(foodId);
-        toast.success('Added to favorites');
       }
       return newSet;
     });

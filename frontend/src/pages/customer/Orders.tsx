@@ -90,7 +90,6 @@ const CustomerOrders: React.FC = () => {
         setOrders(ordersData);
       } catch (error) {
         console.error('Error fetching orders:', error);
-        toast.error('Failed to load orders');
       } finally {
         setLoading(false);
       }
@@ -121,7 +120,6 @@ const CustomerOrders: React.FC = () => {
         }
       } catch (error) {
         console.error('Error fetching bulk orders:', error);
-        toast.error('Failed to load bulk orders');
         setBulkOrders([]);
       } finally {
         setBulkLoading(false);
@@ -186,14 +184,12 @@ const CustomerOrders: React.FC = () => {
     if (window.confirm('Are you sure you want to cancel this order?')) {
       try {
         await customerService.cancelOrder(orderId, 'Cancelled by customer');
-        toast.success('Order cancelled successfully');
         // Refresh orders
         const response = await customerService.getOrders({ page_size: 50 });
         const ordersData = Array.isArray(response) ? response : response.results || [];
         setOrders(ordersData);
       } catch (error) {
         console.error('Error cancelling order:', error);
-        toast.error('Failed to cancel order');
       }
     }
   };

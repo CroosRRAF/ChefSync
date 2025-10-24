@@ -28,6 +28,8 @@ interface DeliveryFeeInfo {
   perKmFee: number;
   totalFee: number;
   estimatedTime: number;
+  nightSurcharge?: number;
+  weatherSurcharge?: number;
 }
 
 const CheckoutPopup: React.FC<CheckoutPopupProps> = ({
@@ -130,36 +132,78 @@ const CheckoutPopup: React.FC<CheckoutPopupProps> = ({
         return;
       }
 
-      const distance = calculateDistance(
-        address.latitude,
-        address.longitude,
-        firstItem.chef_latitude,
-        firstItem.chef_longitude
-      );
+      // Call backend API for accurate delivery fee with surcharges (night/weather)
+      try {
+        const { CartService } = await import('../../services/cartService');
+        
+        const calculation = await CartService.calculateCheckout(
+          cartItems.map(item => ({
+            price_id: item.price_id,
+            quantity: item.quantity
+          })),
+          address.id,
+          {
+            order_type: 'regular',
+            delivery_latitude: address.latitude,
+            delivery_longitude: address.longitude,
+            chef_latitude: firstItem.chef_latitude,
+            chef_longitude: firstItem.chef_longitude,
+          }
+        );
 
-      // Calculate delivery fee: LKR 50 base + LKR 15 per km after 5km
-      const baseFee = 50.00;
-      const freeDistanceKm = 5.0;
-      const perKmFee = 15.00;
-      
-      let totalFee = baseFee;
-      if (distance > freeDistanceKm) {
-        const extraKm = Math.ceil(distance - freeDistanceKm);
-        totalFee = baseFee + (extraKm * perKmFee);
+        const distance = calculation.delivery_fee_breakdown?.factors?.distance_km || 0;
+        const totalFee = calculation.delivery_fee;
+        const estimatedTime = Math.ceil(10 + (distance * 5));
+
+        setDeliveryFeeInfo({
+          distance: parseFloat(distance.toFixed(2)),
+          baseFee: 50,
+          perKmFee: 15,
+          totalFee: parseFloat(totalFee.toFixed(2)),
+          estimatedTime,
+          nightSurcharge: calculation.delivery_fee_breakdown?.breakdown?.time_surcharge || 0,
+          weatherSurcharge: calculation.delivery_fee_breakdown?.breakdown?.weather_surcharge || 0,
+        });
+
+        const surchargeText = 
+          (calculation.delivery_fee_breakdown?.breakdown?.time_surcharge > 0 ? ' (includes night surcharge)' : '') +
+          (calculation.delivery_fee_breakdown?.breakdown?.weather_surcharge > 0 ? ' (includes rain surcharge)' : '');
+        
+        toast.success(`Delivery fee calculated: LKR ${totalFee.toFixed(2)}${surchargeText}`);
+        
+      } catch (apiError) {
+        console.error('API call failed, using fallback:', apiError);
+        
+        // Fallback to local calculation
+        const distance = calculateDistance(
+          address.latitude,
+          address.longitude,
+          firstItem.chef_latitude,
+          firstItem.chef_longitude
+        );
+
+        const baseFee = 50.00;
+        const freeDistanceKm = 5.0;
+        const perKmFee = 15.00;
+        
+        let totalFee = baseFee;
+        if (distance > freeDistanceKm) {
+          const extraKm = distance - freeDistanceKm;
+          totalFee = baseFee + (extraKm * perKmFee);
+        }
+
+        const estimatedTime = Math.ceil(10 + (distance * 5));
+
+        setDeliveryFeeInfo({
+          distance: parseFloat(distance.toFixed(2)),
+          baseFee,
+          perKmFee,
+          totalFee: parseFloat(totalFee.toFixed(2)),
+          estimatedTime
+        });
+
+        toast.success(`Delivery fee calculated: LKR ${totalFee.toFixed(2)} (fallback)`);
       }
-
-      // Estimate delivery time: 10 min base + 5 min per km
-      const estimatedTime = Math.ceil(10 + (distance * 5));
-
-      setDeliveryFeeInfo({
-        distance: parseFloat(distance.toFixed(2)),
-        baseFee,
-        perKmFee,
-        totalFee: parseFloat(totalFee.toFixed(2)),
-        estimatedTime
-      });
-
-      toast.success(`Delivery fee calculated: LKR ${totalFee.toFixed(2)}`);
     } catch (error) {
       console.error('Error calculating delivery fee:', error);
       toast.error('Failed to calculate delivery fee');
@@ -592,8 +636,25 @@ const CheckoutPopup: React.FC<CheckoutPopupProps> = ({
                     <span className="font-medium text-blue-900">{deliveryFeeInfo.distance} km</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-blue-700">Delivery Fee:</span>
-                    <span className="font-medium text-blue-900">LKR {deliveryFeeInfo.totalFee.toFixed(2)}</span>
+                    <span className="text-blue-700">Base Delivery Fee:</span>
+                    <span className="font-medium text-blue-900">LKR {(deliveryFeeInfo.totalFee - (deliveryFeeInfo.nightSurcharge || 0) - (deliveryFeeInfo.weatherSurcharge || 0)).toFixed(2)}</span>
+                  </div>
+                  {deliveryFeeInfo.nightSurcharge && deliveryFeeInfo.nightSurcharge > 0 && (
+                    <div className="flex justify-between text-amber-700">
+                      <span>🌙 Night Surcharge (+10%):</span>
+                      <span className="font-medium">+LKR {deliveryFeeInfo.nightSurcharge.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {deliveryFeeInfo.weatherSurcharge && deliveryFeeInfo.weatherSurcharge > 0 && (
+                    <div className="flex justify-between text-blue-700">
+                      <span>🌧️ Rain Surcharge (+10%):</span>
+                      <span className="font-medium">+LKR {deliveryFeeInfo.weatherSurcharge.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <Separator className="my-1" />
+                  <div className="flex justify-between font-semibold">
+                    <span className="text-blue-800">Total Delivery Fee:</span>
+                    <span className="text-blue-900">LKR {deliveryFeeInfo.totalFee.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-blue-700">Estimated Time:</span>
@@ -601,7 +662,7 @@ const CheckoutPopup: React.FC<CheckoutPopupProps> = ({
                   </div>
                 </div>
                 <p className="text-xs text-blue-600 mt-2">
-                  Base fee: LKR {deliveryFeeInfo.baseFee} + LKR {deliveryFeeInfo.perKmFee}/km after 5km
+                  Base: LKR {deliveryFeeInfo.baseFee} + LKR {deliveryFeeInfo.perKmFee}/km after 5km
                 </p>
               </div>
             </div>

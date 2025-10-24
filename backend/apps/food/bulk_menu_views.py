@@ -36,24 +36,62 @@ class BulkMenuViewSet(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
     
     def get_queryset(self):
-        """Return bulk menus based on user role"""
+        """Return bulk menus based on user role and query parameters"""
         user = self.request.user
         
         # Authenticated users - role-based filtering
         if user.is_authenticated:
             # Chefs can see their own bulk menus (including pending)
             if hasattr(user, 'role') and user.role == 'cook':
-                return BulkMenu.objects.filter(chef=user).prefetch_related('items')
+                queryset = BulkMenu.objects.filter(chef=user).prefetch_related('items')
+                return queryset
             
             # Admins can see all
             if hasattr(user, 'is_staff') and user.is_staff:
-                return BulkMenu.objects.all().prefetch_related('items')
+                queryset = BulkMenu.objects.all().prefetch_related('items')
+                # Support filtering by chef for admins and customers
+                chef_id = self.request.query_params.get('chef')
+                chef_profile_id = self.request.query_params.get('chef_profile_id')
+                if chef_id:
+                    queryset = queryset.filter(chef_id=chef_id)
+                elif chef_profile_id:
+                    queryset = queryset.filter(chef__chef_profile__id=chef_profile_id)
+                return queryset
         
         # Unauthenticated users and customers: only approved and available menus
-        return BulkMenu.objects.filter(
+        queryset = BulkMenu.objects.filter(
             approval_status='approved',
             availability_status=True
         ).prefetch_related('items').select_related('chef')
+        
+        # Support filtering by chef for customers viewing specific chef's menu
+        chef_id = self.request.query_params.get('chef')
+        chef_profile_id = self.request.query_params.get('chef_profile_id')
+        if chef_id:
+            queryset = queryset.filter(chef_id=chef_id)
+        elif chef_profile_id:
+            queryset = queryset.filter(chef__chef_profile__id=chef_profile_id)
+        
+        return queryset
+    
+    def get_serializer_context(self):
+        """Add user location to serializer context for delivery fee calculation"""
+        context = super().get_serializer_context()
+        
+        # Get user location from query parameters
+        lat = self.request.query_params.get('user_lat')
+        lng = self.request.query_params.get('user_lng')
+        
+        if lat and lng:
+            try:
+                context['user_location'] = {
+                    'latitude': float(lat),
+                    'longitude': float(lng)
+                }
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid location parameters: lat={lat}, lng={lng}")
+        
+        return context
     
     def perform_create(self, serializer):
         """Set the chef to the current user"""
@@ -152,6 +190,95 @@ class BulkMenuViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(bulk_menu)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """Approve a pending bulk menu (Admin only)"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        bulk_menu = self.get_object()
+        
+        if bulk_menu.approval_status != 'pending':
+            return Response(
+                {'error': 'Only pending bulk menus can be approved'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Approve the bulk menu
+        from django.utils import timezone
+        bulk_menu.approval_status = 'approved'
+        bulk_menu.approved_by = request.user
+        bulk_menu.approved_at = timezone.now()
+        bulk_menu.availability_status = True  # Make available when approved
+        bulk_menu.save()
+        
+        # Send notification to chef
+        try:
+            from apps.communications.models import Notification
+            Notification.objects.create(
+                user=bulk_menu.chef,
+                subject=f"Bulk Menu Approved: {bulk_menu.menu_name}",
+                message=f"Great news! Your bulk menu '{bulk_menu.menu_name}' has been approved and is now visible to customers.",
+                status="Unread"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create notification: {e}")
+        
+        serializer = self.get_serializer(bulk_menu)
+        return Response({
+            'message': f'Bulk menu "{bulk_menu.menu_name}" has been approved successfully',
+            'bulk_menu': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a pending bulk menu (Admin only)"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin access required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        bulk_menu = self.get_object()
+        
+        if bulk_menu.approval_status != 'pending':
+            return Response(
+                {'error': 'Only pending bulk menus can be rejected'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        rejection_reason = request.data.get('reason', 'No reason provided')
+        
+        # Reject the bulk menu
+        from django.utils import timezone
+        bulk_menu.approval_status = 'rejected'
+        bulk_menu.approved_by = request.user
+        bulk_menu.approved_at = timezone.now()
+        bulk_menu.rejection_reason = rejection_reason
+        bulk_menu.availability_status = False
+        bulk_menu.save()
+        
+        # Send notification to chef
+        try:
+            from apps.communications.models import Notification
+            Notification.objects.create(
+                user=bulk_menu.chef,
+                subject=f"Bulk Menu Rejected: {bulk_menu.menu_name}",
+                message=f"Your bulk menu '{bulk_menu.menu_name}' has been rejected. Reason: {rejection_reason}",
+                status="Unread"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create notification: {e}")
+        
+        serializer = self.get_serializer(bulk_menu)
+        return Response({
+            'message': f'Bulk menu "{bulk_menu.menu_name}" has been rejected',
+            'reason': rejection_reason
+        }, status=status.HTTP_200_OK)
 
 
 class BulkMenuItemViewSet(viewsets.ModelViewSet):

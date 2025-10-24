@@ -1,10 +1,13 @@
 import { createOptimizedClickHandler } from "@/utils/performanceOptimizer";
 import { motion } from "framer-motion";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, lazy, Suspense } from "react";
 
 // Import shared components
 import { AnimatedStats, DataTable, GlassCard } from "@/components/admin/shared";
 import type { Column } from "@/components/admin/shared/tables/DataTable";
+
+// Lazy load ContentApprovalPage
+const ContentApprovalPage = lazy(() => import("./ContentApprovalPage"));
 
 // Import UI components
 import {
@@ -372,8 +375,8 @@ const FoodHoverPreview: React.FC<FoodHoverPreviewProps> = ({
 const ContentManagementHub: React.FC = () => {
   // Active tab state
   const [activeTab, setActiveTab] = useState<
-    "food" | "categories" | "cuisines" | "offers" | "referrals"
-  >("food");
+    "food" | "categories" | "cuisines" | "offers" | "referrals" | "approvals"
+  >("approvals");
 
   // Food Tab States
   const [foods, setFoods] = useState<Food[]>([]);
@@ -1857,7 +1860,14 @@ const ContentManagementHub: React.FC = () => {
           value={activeTab}
           onValueChange={(value: any) => setActiveTab(value)}
         >
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 h-auto p-1">
+            <TabsTrigger
+              value="approvals"
+              className="text-xs sm:text-sm py-2 px-1 sm:px-3"
+            >
+              <span className="hidden sm:inline">✓ Approvals</span>
+              <span className="sm:hidden">✓</span>
+            </TabsTrigger>
             <TabsTrigger
               value="food"
               className="text-xs sm:text-sm py-2 px-1 sm:px-3"
@@ -1893,6 +1903,17 @@ const ContentManagementHub: React.FC = () => {
               <span className="sm:hidden">Refs</span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="approvals" className="mt-6">
+            <Suspense fallback={
+              <div className="flex items-center justify-center p-12">
+                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-3 text-lg">Loading approvals...</span>
+              </div>
+            }>
+              <ContentApprovalPage />
+            </Suspense>
+          </TabsContent>
 
           <TabsContent value="food" className="mt-6">
             {renderFoodTab()}

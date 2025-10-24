@@ -29,6 +29,7 @@ export interface MenuFood {
   optimized_image_url: string;
   chef: number;
   chef_name: string;
+  chef_profile_id?: number;
   chef_rating: number;
   prices: FoodPrice[];
   min_price: number;

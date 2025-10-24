@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import logoImage from '@/assets/2.png';
 import navbarLogo from '@/assets/images/hero/navbarlogo.png';
+import NotificationDropdown from '@/components/notifications/NotificationDropdown';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +38,6 @@ const CustomerHomeNavbar: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [notifications] = useState(3); // Mock notification count
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -126,30 +126,13 @@ const CustomerHomeNavbar: React.FC = () => {
             {user ? (
               <>
                 {/* Notifications */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`relative transition-all duration-300 ${
-                    isHomePage 
-                      ? 'hover:bg-white/20 text-white' 
-                      : theme === 'light'
-                        ? 'hover:bg-orange-50 text-gray-900'
-                        : 'hover:bg-orange-900/20 text-gray-400'
-                  }`}
-                >
-                  <Bell className={`h-5 w-5 transition-colors duration-300 ${
-                    isHomePage 
-                      ? 'text-white' 
-                      : theme === 'light'
-                        ? 'text-gray-900'
-                        : 'text-gray-400'
-                  }`} />
-                  {notifications > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                      {notifications}
-                    </span>
-                  )}
-                </Button>
+                <NotificationDropdown className={`transition-all duration-300 ${
+                  isHomePage 
+                    ? 'text-white' 
+                    : theme === 'light'
+                      ? 'text-gray-900'
+                      : 'text-gray-400'
+                }`} />
 
                 {/* Dark Mode Toggle */}
                 <Button

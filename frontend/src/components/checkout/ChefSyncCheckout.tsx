@@ -32,6 +32,8 @@ interface DeliveryFeeInfo {
   perKmFee: number;
   totalFee: number;
   estimatedTime: number;
+  nightSurcharge?: number;
+  weatherSurcharge?: number;
 }
 
 interface CartItem {
@@ -141,26 +143,72 @@ const ChefSyncCheckout: React.FC<ChefSyncCheckoutProps> = ({
 
     try {
       setCalculatingFee(true);
-      // Mock fee calculation for now
-      const lat = parseFloat(address.latitude.toString());
-      const lng = parseFloat(address.longitude.toString());
-      const distance = 3.2; // Mock distance
-      const baseFee = 50;
-      const freeDistance = 5;
-      const perKmFee = 15;
-      const totalFee = distance <= freeDistance ? baseFee : baseFee + ((distance - freeDistance) * perKmFee);
-      const estimatedTime = Math.ceil(distance * 8); // 8 mins per km
       
+      // Get chef location from first cart item
+      const firstItem = cartItems[0];
+      if (!firstItem?.kitchen_location) {
+        console.warn('No kitchen location in cart item');
+        // Fallback to mock calculation
+        const distance = 3.2;
+        setDeliveryFeeInfo({
+          distance,
+          baseFee: 50,
+          perKmFee: 15,
+          totalFee: 50,
+          estimatedTime: Math.ceil(distance * 8)
+        });
+        return;
+      }
+
+      // Call backend API for accurate delivery fee with surcharges
+      const { CartService } = await import('@/services/cartService');
+      
+      const calculation = await CartService.calculateCheckout(
+        cartItems.map(item => ({
+          price_id: item.price_id,
+          quantity: item.quantity
+        })),
+        address.id,
+        {
+          order_type: 'regular',
+          delivery_latitude: address.latitude,
+          delivery_longitude: address.longitude,
+          chef_latitude: firstItem.kitchen_location.lat,
+          chef_longitude: firstItem.kitchen_location.lng,
+        }
+      );
+
+      const distance = calculation.delivery_fee_breakdown?.factors?.distance_km || 0;
+      const totalFee = calculation.delivery_fee;
+      const estimatedTime = Math.ceil(distance * 8);
+
       setDeliveryFeeInfo({
-        distance,
-        baseFee,
-        perKmFee,
-        totalFee,
-        estimatedTime
+        distance: parseFloat(distance.toFixed(2)),
+        baseFee: 50,
+        perKmFee: 15,
+        totalFee: parseFloat(totalFee.toFixed(2)),
+        estimatedTime,
+        nightSurcharge: calculation.delivery_fee_breakdown?.breakdown?.time_surcharge || 0,
+        weatherSurcharge: calculation.delivery_fee_breakdown?.breakdown?.weather_surcharge || 0,
       });
+
+      console.log('✅ Delivery fee calculated with surcharges:', {
+        totalFee,
+        nightSurcharge: calculation.delivery_fee_breakdown?.breakdown?.time_surcharge,
+        weatherSurcharge: calculation.delivery_fee_breakdown?.breakdown?.weather_surcharge,
+      });
+      
     } catch (error) {
       console.error('Error calculating fee:', error);
       toast.error('Failed to calculate delivery fee');
+      // Fallback
+      setDeliveryFeeInfo({
+        distance: 3.2,
+        baseFee: 50,
+        perKmFee: 15,
+        totalFee: 50,
+        estimatedTime: 25
+      });
     } finally {
       setCalculatingFee(false);
     }

@@ -31,9 +31,93 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class ChefProfileSerializer(serializers.ModelSerializer):
+    # User information
+    user_id = serializers.IntegerField(source='user.user_id', read_only=True)
+    name = serializers.CharField(source='user.name', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    phone_no = serializers.CharField(source='user.phone_no', read_only=True)
+    rating = serializers.FloatField(source='rating_average', read_only=True)
+    rating_average = serializers.FloatField(read_only=True)
+    
+    # Kitchen location and availability
+    kitchen_location = serializers.SerializerMethodField()
+    operating_hours = serializers.SerializerMethodField()
+    operating_hours_readable = serializers.SerializerMethodField()
+    is_currently_open = serializers.SerializerMethodField()
+    availability_message = serializers.SerializerMethodField()
+    
     class Meta:
         model = ChefProfile
-        fields = '__all__'
+        fields = [
+            'id', 'user', 'user_id', 'name', 'username', 'email', 'phone_no',
+            'specialty_cuisines', 'experience_years', 'certifications', 'bio',
+            'approval_status', 'rating_average', 'rating', 'total_orders', 'total_reviews',
+            'is_featured', 'kitchen_location', 'operating_hours', 'operating_hours_readable',
+            'is_currently_open', 'availability_message'
+        ]
+    
+    def get_kitchen_location(self, obj):
+        """Get chef's kitchen location details"""
+        from .availability_utils import is_within_operating_hours, format_operating_hours_readable
+        
+        kitchen_address = Address.objects.filter(
+            user=obj.user,
+            address_type='kitchen',
+            is_default=True,
+            is_active=True
+        ).first()
+        
+        if kitchen_address:
+            # Get kitchen details if available
+            kitchen_details = None
+            if hasattr(kitchen_address, 'kitchen_details'):
+                kitchen_details = kitchen_address.kitchen_details
+            
+            return {
+                'address': kitchen_address.full_address,
+                'city': kitchen_address.city,
+                'state': kitchen_address.state,
+                'latitude': float(kitchen_address.latitude) if kitchen_address.latitude else None,
+                'longitude': float(kitchen_address.longitude) if kitchen_address.longitude else None,
+            }
+        return None
+    
+    def get_operating_hours(self, obj):
+        """Get chef's operating hours"""
+        kitchen_address = Address.objects.filter(
+            user=obj.user,
+            address_type='kitchen',
+            is_default=True,
+            is_active=True
+        ).first()
+        
+        if kitchen_address and hasattr(kitchen_address, 'kitchen_details'):
+            return kitchen_address.kitchen_details.operating_hours
+        return None
+    
+    def get_operating_hours_readable(self, obj):
+        """Get human-readable operating hours"""
+        from .availability_utils import format_operating_hours_readable
+        
+        operating_hours = self.get_operating_hours(obj)
+        return format_operating_hours_readable(operating_hours)
+    
+    def get_is_currently_open(self, obj):
+        """Check if chef is currently accepting orders"""
+        from .availability_utils import is_within_operating_hours
+        
+        operating_hours = self.get_operating_hours(obj)
+        is_open, _, _ = is_within_operating_hours(operating_hours)
+        return is_open
+    
+    def get_availability_message(self, obj):
+        """Get current availability status message"""
+        from .availability_utils import is_within_operating_hours
+        
+        operating_hours = self.get_operating_hours(obj)
+        _, message, _ = is_within_operating_hours(operating_hours)
+        return message
 
 
 class DeliveryProfileSerializer(serializers.ModelSerializer):

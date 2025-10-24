@@ -16,7 +16,7 @@ export interface CartItem {
   chef_id: number;
   chef_name: string;
   kitchen_address: string;
-  kitchen_location: { lat: number; lng: number };
+  kitchen_location: { lat: number; lng: number } | null;
   price_id: number;
   food_id: number;
 }
@@ -45,13 +45,40 @@ export interface CheckoutCalculation {
   subtotal: number;
   tax_amount: number;
   delivery_fee: number;
-  distance_km: number;
+  distance_km?: number;
   total_amount: number;
-  breakdown: {
-    base_delivery_fee: number;
-    extra_km: number;
-    extra_km_rate: number;
-    extra_km_fee: number;
+  tax_rate: number;
+  delivery_fee_breakdown?: {
+    total_fee: number;
+    currency: string;
+    breakdown: {
+      distance_fee: number;
+      time_surcharge: number;
+      weather_surcharge: number;
+    };
+    factors: {
+      distance_km: number;
+      order_type: string;
+      is_night_delivery: boolean;
+      is_rainy: boolean;
+      delivery_time?: string;
+    };
+    weather_details?: {
+      is_rainy: boolean;
+      checked_locations: Array<{
+        location: string;
+        lat: number;
+        lng: number;
+        condition: string;
+        is_rainy: boolean;
+      }>;
+      message: string;
+    };
+    route_info?: {
+      distance_km: number;
+      method: string;
+      success: boolean;
+    };
   };
 }
 
@@ -240,19 +267,51 @@ export class CartService {
   }
   
   /**
-   * Calculate checkout totals
+   * Calculate checkout totals with dynamic delivery fee
    */
   static async calculateCheckout(
-    chefId: number,
-    deliveryLat: number,
-    deliveryLng: number
+    cart_items: Array<{ price_id: number; quantity: number }>,
+    delivery_address_id?: number,
+    options?: {
+      order_type?: string;
+      delivery_latitude?: number;
+      delivery_longitude?: number;
+      chef_latitude?: number;
+      chef_longitude?: number;
+      delivery_time?: string;
+    }
   ): Promise<CheckoutCalculation> {
     try {
-      const response = await apiClient.post('/orders/checkout/calculate/', {
-        chef_id: chefId,
-        delivery_latitude: deliveryLat,
-        delivery_longitude: deliveryLng
-      });
+      const payload: any = {
+        cart_items,
+        order_type: options?.order_type || 'regular',
+      };
+      
+      if (delivery_address_id) {
+        payload.delivery_address_id = delivery_address_id;
+      }
+      
+      if (options?.delivery_latitude) {
+        payload.delivery_latitude = options.delivery_latitude;
+      }
+      
+      if (options?.delivery_longitude) {
+        payload.delivery_longitude = options.delivery_longitude;
+      }
+      
+      if (options?.chef_latitude) {
+        payload.chef_latitude = options.chef_latitude;
+      }
+      
+      if (options?.chef_longitude) {
+        payload.chef_longitude = options.chef_longitude;
+      }
+      
+      if (options?.delivery_time) {
+        payload.delivery_time = options.delivery_time;
+      }
+      
+      const response = await apiClient.post('/orders/checkout/calculate/', payload);
       return response.data;
     } catch (error) {
       console.error('Error calculating checkout:', error);

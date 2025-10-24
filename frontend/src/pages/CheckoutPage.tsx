@@ -4,6 +4,7 @@ import { useDatabaseCart, DatabaseCartItem } from '../context/DatabaseCartContex
 import { useAuth } from '../context/AuthContext';
 import { addressService, DeliveryAddress } from '../services/addressService';
 import { orderService } from '../services/orderService';
+import { CartService } from '../services/cartService';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -28,7 +29,9 @@ import {
   ChefHat,
   Package,
   AlertCircle,
-  Trash2
+  Trash2,
+  Moon,
+  CloudRain
 } from 'lucide-react';
 import GoogleMapsAddressPicker from '../components/checkout/GoogleMapsAddressPicker';
 
@@ -55,6 +58,8 @@ const CheckoutPage: React.FC = () => {
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash_on_delivery');
+  const [deliveryFeeBreakdown, setDeliveryFeeBreakdown] = useState<any>(null);
+  const [isCalculatingFee, setIsCalculatingFee] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState(30);
@@ -154,39 +159,77 @@ const CheckoutPage: React.FC = () => {
         
         // Cart items always have kitchen_location from backend
         if (firstItem.kitchen_location && firstItem.kitchen_location.lat && firstItem.kitchen_location.lng) {
-          // Calculate distance using kitchen location from cart item
-          calculatedDistance = addressService.calculateDistance(
-            Number(selectedAddress.latitude),
-            Number(selectedAddress.longitude),
-            Number(firstItem.kitchen_location.lat),
-            Number(firstItem.kitchen_location.lng)
-          );
+          setIsCalculatingFee(true);
           
-          // Delivery fee calculation: LKR 300 base + LKR 100 per km after 5km
-          const baseFee = 300;
-          const freeDistanceKm = 5;
-          const perKmFee = 100;
-          
-          if (calculatedDistance > freeDistanceKm) {
-            const extraKm = Math.ceil(calculatedDistance - freeDistanceKm);
-            calculatedDeliveryFee = baseFee + (extraKm * perKmFee);
-          } else {
-            calculatedDeliveryFee = baseFee;
+          try {
+            // Call backend API for accurate delivery fee with surcharges
+            const calculation = await CartService.calculateCheckout(
+              chefItems.map(item => ({
+                price_id: item.price_id,
+                quantity: item.quantity
+              })),
+              selectedAddress.id,
+              {
+                order_type: 'regular',
+                delivery_latitude: selectedAddress.latitude,
+                delivery_longitude: selectedAddress.longitude,
+                chef_latitude: firstItem.kitchen_location.lat,
+                chef_longitude: firstItem.kitchen_location.lng,
+              }
+            );
+
+            // Use API response
+            calculatedDeliveryFee = calculation.delivery_fee;
+            calculatedDistance = calculation.delivery_fee_breakdown?.factors?.distance_km || 0;
+            setDeliveryFeeBreakdown(calculation.delivery_fee_breakdown);
+
+            // Estimate delivery time: 10 min base + 5 min per km
+            const estimatedTime = Math.ceil(10 + (calculatedDistance * 5));
+            setEstimatedDeliveryTime(estimatedTime);
+
+            console.log('✅ Delivery Fee Calculation Success (API)!', {
+              '📍 From (Chef Kitchen)': `(${firstItem.kitchen_location.lat}, ${firstItem.kitchen_location.lng})`,
+              '📍 To (Customer)': `(${selectedAddress.latitude}, ${selectedAddress.longitude})`,
+              '📏 Distance': calculatedDistance.toFixed(2) + ' km',
+              '💳 Total Delivery Fee': 'LKR ' + calculatedDeliveryFee.toFixed(2),
+              '⏱️ Estimated Time': estimatedTime + ' minutes',
+              '🌙 Night Surcharge': 'LKR ' + (calculation.delivery_fee_breakdown?.breakdown?.time_surcharge || 0),
+              '🌧️ Weather Surcharge': 'LKR ' + (calculation.delivery_fee_breakdown?.breakdown?.weather_surcharge || 0),
+            });
+
+          } catch (error) {
+            console.error('❌ API call failed, using fallback calculation:', error);
+            
+            // Fallback to local calculation
+            calculatedDistance = addressService.calculateDistance(
+              Number(selectedAddress.latitude),
+              Number(selectedAddress.longitude),
+              Number(firstItem.kitchen_location.lat),
+              Number(firstItem.kitchen_location.lng)
+            );
+            
+            // Delivery fee calculation: Regular Order Formula
+            const baseFee = 50;
+            const freeDistanceKm = 5;
+            const perKmFee = 15; // 30% of base = 50 × 0.30
+            
+            if (calculatedDistance > freeDistanceKm) {
+              const extraKm = calculatedDistance - freeDistanceKm;
+              calculatedDeliveryFee = baseFee + (extraKm * perKmFee);
+            } else {
+              calculatedDeliveryFee = baseFee;
+            }
+
+            const estimatedTime = Math.ceil(10 + (calculatedDistance * 5));
+            setEstimatedDeliveryTime(estimatedTime);
+            
+            console.log('⚠️ Delivery Fee Calculation (Fallback):', {
+              '📏 Distance': calculatedDistance.toFixed(2) + ' km',
+              '💳 Total Delivery Fee': 'LKR ' + calculatedDeliveryFee.toFixed(2),
+            });
+          } finally {
+            setIsCalculatingFee(false);
           }
-
-          // Estimate delivery time: 10 min base + 5 min per km
-          const estimatedTime = Math.ceil(10 + (calculatedDistance * 5));
-          setEstimatedDeliveryTime(estimatedTime);
-
-          console.log('✅ Delivery Fee Calculation Success!', {
-            '📍 From (Chef Kitchen)': `(${firstItem.kitchen_location.lat}, ${firstItem.kitchen_location.lng})`,
-            '📍 To (Customer)': `(${selectedAddress.latitude}, ${selectedAddress.longitude})`,
-            '📏 Distance': calculatedDistance.toFixed(2) + ' km',
-            '💰 Base Fee': 'LKR ' + baseFee,
-            '➕ Extra Distance': calculatedDistance > freeDistanceKm ? Math.ceil(calculatedDistance - freeDistanceKm) + ' km' : '0 km (FREE)',
-            '💳 Total Delivery Fee': 'LKR ' + calculatedDeliveryFee.toFixed(2),
-            '⏱️ Estimated Time': estimatedTime + ' minutes'
-          });
         } else {
           console.error('❌ Kitchen location not available in cart item:', firstItem);
           toast.error('Unable to calculate delivery fee - kitchen location not available');
@@ -591,12 +634,36 @@ const CheckoutPage: React.FC = () => {
                           <p className="font-bold text-blue-900 dark:text-blue-100">~{estimatedDeliveryTime} min</p>
                         </div>
                       </div>
-                      <div className="text-xs text-blue-700 dark:text-blue-300 text-center pt-3 border-t border-blue-200 dark:border-blue-700">
-                        <p>💡 LKR 50 base fee + LKR 15 per km after first 5km</p>
-                        {distance > 5 && (
-                          <p className="mt-1 font-medium">
-                            (LKR 50 + {Math.ceil(distance - 5)} km × LKR 15 = LKR {deliveryFee.toFixed(2)})
-                          </p>
+                      <div className="text-xs text-blue-700 dark:text-blue-300 text-center pt-3 border-t border-blue-200 dark:border-blue-700 space-y-2">
+                        {/* Show breakdown if available from API */}
+                        {deliveryFeeBreakdown ? (
+                          <>
+                            <p>💡 Base: LKR {deliveryFeeBreakdown.breakdown.distance_fee.toFixed(2)}</p>
+                            {deliveryFeeBreakdown.breakdown.time_surcharge > 0 && (
+                              <p className="flex items-center justify-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                                <Moon className="h-3 w-3" />
+                                Night Surcharge (+10%): +LKR {deliveryFeeBreakdown.breakdown.time_surcharge.toFixed(2)}
+                              </p>
+                            )}
+                            {deliveryFeeBreakdown.breakdown.weather_surcharge > 0 && (
+                              <p className="flex items-center justify-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                                <CloudRain className="h-3 w-3" />
+                                Rain Surcharge (+10%): +LKR {deliveryFeeBreakdown.breakdown.weather_surcharge.toFixed(2)}
+                              </p>
+                            )}
+                            <p className="font-bold text-blue-900 dark:text-blue-100">
+                              Total: LKR {deliveryFee.toFixed(2)}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p>💡 LKR 50 base fee + LKR 15 per km after first 5km</p>
+                            {distance > 5 && (
+                              <p className="mt-1 font-medium">
+                                (LKR 50 + {(distance - 5).toFixed(2)} km × LKR 15 = LKR {deliveryFee.toFixed(2)})
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

@@ -69,3 +69,7 @@ scikit-learn==1.5.2
 # Note: Poppler utilities must be installed separately on Windows
 # Download from: https://github.com/oschwartz10612/poppler-windows/releases/
 # Extract to C:\poppler\ and add C:\poppler\bin to PATH
+
+# Delivery Fee Calculation Dependencies
+googlemaps==4.10.0  # Google Maps API for distance calculation
+pytz==2024.1  # Timezone support for time-based surcharges

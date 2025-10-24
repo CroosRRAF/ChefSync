@@ -113,7 +113,7 @@ class FoodPriceSerializer(serializers.ModelSerializer):
             except Exception:
                 profile_image_url = None
         
-        # Get cook's kitchen location
+        # Get cook's kitchen location (with fallback to food's chef)
         kitchen_location = None
         try:
             from apps.users.models import Address
@@ -126,10 +126,19 @@ class FoodPriceSerializer(serializers.ModelSerializer):
                 is_active=True
             ).first()
             
+            # If cook doesn't have kitchen location, try food's chef
+            if (not kitchen_address or not kitchen_address.latitude or not kitchen_address.longitude) and obj.food and obj.food.chef and obj.food.chef != obj.cook:
+                logger.info(f"Cook {obj.cook.user_id} has no kitchen location, falling back to food chef {obj.food.chef.user_id}")
+                kitchen_address = Address.objects.filter(
+                    user=obj.food.chef,
+                    address_type='kitchen',
+                    is_active=True
+                ).first()
+            
             if not kitchen_address:
-                logger.warning(f"No kitchen address found for cook {obj.cook.user_id}")
+                logger.warning(f"No kitchen address found for cook {obj.cook.user_id} or food chef")
             elif not kitchen_address.latitude or not kitchen_address.longitude:
-                logger.warning(f"Kitchen address found but missing coordinates for cook {obj.cook.user_id}")
+                logger.warning(f"Kitchen address found but missing coordinates")
             else:
                 # Get kitchen name from KitchenLocation object
                 kitchen_name = 'Kitchen'
@@ -142,7 +151,7 @@ class FoodPriceSerializer(serializers.ModelSerializer):
                     'address': kitchen_address.full_address,
                     'kitchen_name': kitchen_name
                 }
-                logger.info(f"Kitchen location found for cook {obj.cook.user_id}: {kitchen_location}")
+                logger.info(f"Kitchen location found: {kitchen_location}")
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
@@ -173,13 +182,9 @@ class FoodSerializer(serializers.ModelSerializer):
         source="food_category.cuisine.name", read_only=True
     )
     available_cooks_count = serializers.SerializerMethodField()
-    chef_name = serializers.CharField(source="chef.username", read_only=True)
-    chef_rating = serializers.DecimalField(
-        source="chef.chef_profile.rating_average",
-        max_digits=3,
-        decimal_places=2,
-        read_only=True,
-    )
+    chef_name = serializers.SerializerMethodField()
+    chef_profile_id = serializers.SerializerMethodField()
+    chef_rating = serializers.SerializerMethodField()
     prices = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
     optimized_image_url = serializers.SerializerMethodField()
@@ -192,6 +197,11 @@ class FoodSerializer(serializers.ModelSerializer):
     estimated_delivery_time = serializers.SerializerMethodField()
     kitchen_location = serializers.SerializerMethodField()
     
+    # Chef availability fields
+    chef_is_currently_open = serializers.SerializerMethodField()
+    chef_availability_message = serializers.SerializerMethodField()
+    chef_operating_hours_readable = serializers.SerializerMethodField()
+    
     class Meta:
         model = Food
         fields = [
@@ -200,9 +210,11 @@ class FoodSerializer(serializers.ModelSerializer):
             'allergens', 'nutritional_info', 'is_vegetarian', 'is_vegan', 'is_gluten_free', 'spice_level',
             'rating_average', 'total_reviews', 'total_orders', 'primary_image', 'available_cooks_count',
             'image_url', 'thumbnail_url', 'optimized_image_url', 'image',
-            'status', 'chef', 'chef_name', 'chef_rating', 'prices', 'created_at', 'updated_at',
+            'status', 'chef', 'chef_name', 'chef_profile_id', 'chef_rating', 'prices', 'created_at', 'updated_at',
             # New delivery fields
-            'min_price', 'max_price', 'delivery_fee', 'distance_km', 'estimated_delivery_time', 'kitchen_location'
+            'min_price', 'max_price', 'delivery_fee', 'distance_km', 'estimated_delivery_time', 'kitchen_location',
+            # Chef availability
+            'chef_is_currently_open', 'chef_availability_message', 'chef_operating_hours_readable'
         ]
         read_only_fields = [
             "food_id",
@@ -233,6 +245,31 @@ class FoodSerializer(serializers.ModelSerializer):
     def get_available_cooks_count(self, obj):
         """Get count of cooks who have prices for this food"""
         return obj.prices.values('cook').distinct().count()
+    
+    def get_chef_name(self, obj):
+        """Get chef username safely"""
+        try:
+            return obj.chef.username if obj.chef else None
+        except Exception:
+            return None
+    
+    def get_chef_profile_id(self, obj):
+        """Get chef profile ID safely"""
+        try:
+            if obj.chef and hasattr(obj.chef, 'chef_profile'):
+                return obj.chef.chef_profile.id
+            return None
+        except Exception:
+            return None
+    
+    def get_chef_rating(self, obj):
+        """Get chef rating safely"""
+        try:
+            if obj.chef and hasattr(obj.chef, 'chef_profile'):
+                return float(obj.chef.chef_profile.rating_average)
+            return None
+        except Exception:
+            return None
     
     def get_min_price(self, obj):
         """Get minimum price across all sizes"""
@@ -362,6 +399,75 @@ class FoodSerializer(serializers.ModelSerializer):
             
         except Exception:
             return None
+    
+    def get_chef_is_currently_open(self, obj):
+        """Check if chef is currently accepting orders"""
+        try:
+            from apps.users.models import Address
+            from apps.users.availability_utils import is_within_operating_hours
+            
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_default=True,
+                is_active=True
+            ).first()
+            
+            if kitchen_address and hasattr(kitchen_address, 'kitchen_details'):
+                operating_hours = kitchen_address.kitchen_details.operating_hours
+                is_open, _, _ = is_within_operating_hours(operating_hours)
+                return is_open
+            
+            # If no operating hours set, assume available
+            return True
+            
+        except Exception:
+            return True
+    
+    def get_chef_availability_message(self, obj):
+        """Get chef's current availability status message"""
+        try:
+            from apps.users.models import Address
+            from apps.users.availability_utils import is_within_operating_hours
+            
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_default=True,
+                is_active=True
+            ).first()
+            
+            if kitchen_address and hasattr(kitchen_address, 'kitchen_details'):
+                operating_hours = kitchen_address.kitchen_details.operating_hours
+                _, message, _ = is_within_operating_hours(operating_hours)
+                return message
+            
+            return "Always available"
+            
+        except Exception:
+            return "Always available"
+    
+    def get_chef_operating_hours_readable(self, obj):
+        """Get human-readable chef operating hours"""
+        try:
+            from apps.users.models import Address
+            from apps.users.availability_utils import format_operating_hours_readable
+            
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_default=True,
+                is_active=True
+            ).first()
+            
+            if kitchen_address and hasattr(kitchen_address, 'kitchen_details'):
+                operating_hours = kitchen_address.kitchen_details.operating_hours
+                return format_operating_hours_readable(operating_hours)
+            
+            return "Hours not specified"
+            
+        except Exception:
+            return "Hours not specified"
 
     def create(self, validated_data):
         # Handle image upload if provided
@@ -690,6 +796,7 @@ class OfferSerializer(serializers.ModelSerializer):
 class BulkMenuSerializer(serializers.ModelSerializer):
     """Serializer for BulkMenu model"""
     chef_name = serializers.CharField(source="chef.username", read_only=True)
+    chef_profile_id = serializers.IntegerField(source="chef.chef_profile.id", read_only=True, allow_null=True)
     approved_by_name = serializers.CharField(source="approved_by.username", read_only=True)
     meal_type_display = serializers.CharField(source="get_meal_type_display", read_only=True)
     delivery_fee = serializers.SerializerMethodField()
@@ -700,6 +807,7 @@ class BulkMenuSerializer(serializers.ModelSerializer):
             "id",
             "chef",
             "chef_name",
+            "chef_profile_id",
             "meal_type",
             "meal_type_display",
             "menu_name",
@@ -757,6 +865,7 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
     """Serializer for BulkMenu with nested items"""
     items = BulkMenuItemSerializer(many=True, read_only=True)
     chef_name = serializers.CharField(source="chef.username", read_only=True)
+    chef_profile_id = serializers.IntegerField(source="chef.chef_profile.id", read_only=True, allow_null=True)
     approved_by_name = serializers.CharField(source="approved_by.username", read_only=True, allow_null=True)
     meal_type_display = serializers.CharField(source="get_meal_type_display", read_only=True)
     # Override image field to accept file uploads
@@ -765,6 +874,14 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
     thumbnail_url = serializers.SerializerMethodField()
     items_count = serializers.SerializerMethodField()
     menu_items_summary = serializers.SerializerMethodField()
+    delivery_fee = serializers.SerializerMethodField()
+    distance_km = serializers.SerializerMethodField()
+    kitchen_location = serializers.SerializerMethodField()
+    
+    # Chef availability fields
+    chef_is_currently_open = serializers.SerializerMethodField()
+    chef_availability_message = serializers.SerializerMethodField()
+    chef_operating_hours_readable = serializers.SerializerMethodField()
     
     class Meta:
         model = BulkMenu
@@ -772,6 +889,7 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
             "id",
             "chef",
             "chef_name",
+            "chef_profile_id",
             "meal_type",
             "meal_type_display",
             "menu_name",
@@ -792,6 +910,13 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
             "items",
             "items_count",
             "menu_items_summary",
+            "delivery_fee",
+            "distance_km",
+            "kitchen_location",
+            # Chef availability
+            "chef_is_currently_open",
+            "chef_availability_message",
+            "chef_operating_hours_readable",
             "created_at",
             "updated_at",
         ]
@@ -856,6 +981,169 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
                 'optional_items': [],
                 'total_items': 0
             }
+    
+    def get_kitchen_location(self, obj):
+        """Get chef's kitchen location"""
+        try:
+            from apps.users.models import Address
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_active=True
+            ).first()
+            
+            if kitchen_address and kitchen_address.latitude and kitchen_address.longitude:
+                return {
+                    'lat': float(kitchen_address.latitude),
+                    'lng': float(kitchen_address.longitude),
+                    'address': kitchen_address.full_address,
+                    'city': kitchen_address.city,
+                    'state': kitchen_address.state
+                }
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting kitchen location: {e}")
+        return None
+    
+    def get_delivery_fee(self, obj):
+        """Calculate delivery fee if user location is provided"""
+        user_location = self.context.get('user_location')
+        if not user_location:
+            return 300  # Return base fee if no location
+            
+        try:
+            from apps.users.models import Address
+            from .utils import calculate_delivery_fee
+            
+            # Get chef's kitchen location
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_active=True
+            ).first()
+            
+            if not kitchen_address or not kitchen_address.latitude or not kitchen_address.longitude:
+                return 300  # Return base fee if no kitchen location
+            
+            fee_data = calculate_delivery_fee(
+                user_location['latitude'],
+                user_location['longitude'],
+                float(kitchen_address.latitude),
+                float(kitchen_address.longitude)
+            )
+            
+            return fee_data['total_delivery_fee']
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error calculating delivery fee: {e}")
+            return 300  # Return base fee on error
+    
+    def get_distance_km(self, obj):
+        """Calculate distance from user to kitchen"""
+        user_location = self.context.get('user_location')
+        if not user_location:
+            return None
+            
+        try:
+            from apps.users.models import Address
+            from .utils import calculate_distance
+            
+            # Get chef's kitchen location
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_active=True
+            ).first()
+            
+            if not kitchen_address or not kitchen_address.latitude or not kitchen_address.longitude:
+                return None
+            
+            distance = calculate_distance(
+                user_location['latitude'],
+                user_location['longitude'],
+                float(kitchen_address.latitude),
+                float(kitchen_address.longitude)
+            )
+            
+            return round(distance, 2)
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error calculating distance: {e}")
+            return None
+    
+    def get_chef_is_currently_open(self, obj):
+        """Check if chef is currently accepting orders"""
+        try:
+            from apps.users.models import Address
+            from apps.users.availability_utils import is_within_operating_hours
+            
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_default=True,
+                is_active=True
+            ).first()
+            
+            if kitchen_address and hasattr(kitchen_address, 'kitchen_details'):
+                operating_hours = kitchen_address.kitchen_details.operating_hours
+                is_open, _, _ = is_within_operating_hours(operating_hours)
+                return is_open
+            
+            # If no operating hours set, assume available
+            return True
+            
+        except Exception:
+            return True
+    
+    def get_chef_availability_message(self, obj):
+        """Get chef's current availability status message"""
+        try:
+            from apps.users.models import Address
+            from apps.users.availability_utils import is_within_operating_hours
+            
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_default=True,
+                is_active=True
+            ).first()
+            
+            if kitchen_address and hasattr(kitchen_address, 'kitchen_details'):
+                operating_hours = kitchen_address.kitchen_details.operating_hours
+                _, message, _ = is_within_operating_hours(operating_hours)
+                return message
+            
+            return "Always available"
+            
+        except Exception:
+            return "Always available"
+    
+    def get_chef_operating_hours_readable(self, obj):
+        """Get human-readable chef operating hours"""
+        try:
+            from apps.users.models import Address
+            from apps.users.availability_utils import format_operating_hours_readable
+            
+            kitchen_address = Address.objects.filter(
+                user=obj.chef,
+                address_type='kitchen',
+                is_default=True,
+                is_active=True
+            ).first()
+            
+            if kitchen_address and hasattr(kitchen_address, 'kitchen_details'):
+                operating_hours = kitchen_address.kitchen_details.operating_hours
+                return format_operating_hours_readable(operating_hours)
+            
+            return "Hours not specified"
+            
+        except Exception:
+            return "Hours not specified"
     
     def create(self, validated_data):
         """Create bulk menu with items from request data"""

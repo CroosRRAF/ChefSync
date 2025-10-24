@@ -37,8 +37,12 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
   const { addItem } = useDatabaseCart();
 
   // Handle chef profile navigation
-  const handleChefProfileClick = (cookId: number) => {
-    navigate(`/chef-profile/${cookId}`);
+  const handleChefProfileClick = (food: MenuFood, userCookId?: number) => {
+    // Use chef_profile_id if available, otherwise fall back to user ID
+    const profileId = food.chef_profile_id || userCookId || food.chef;
+    if (profileId) {
+      navigate(`/chef-profile/${profileId}`);
+    }
   };
   
   // State management
@@ -126,7 +130,6 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
       await loadFoods();
     } catch (error) {
       console.error('Error loading initial data:', error);
-      toast.error('Failed to load menu data');
     } finally {
       setLoading(false);
     }
@@ -158,7 +161,6 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
       setTotalPages(response.num_pages);
     } catch (error) {
       console.error('Error loading foods:', error);
-      toast.error('Failed to load menu items');
     } finally {
       if (isFilterChange) {
         setIsFiltering(false);
@@ -180,7 +182,6 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
       longitude: location.lng,
       address: location.address
     });
-    toast.success('Location updated! Delivery fees recalculated.');
   };
 
   const handleSearch = useCallback((query: string) => {
@@ -211,19 +212,16 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
   const handleAddToCart = () => {
     // Check if user is authenticated
     if (!isAuthenticated) {
-      toast.error('Please login to add items to cart');
       navigate('/auth/login');
       return;
     }
 
     if (!selectedFood || !selectedPriceId) {
-      toast.error('Please select a cook and size');
       return;
     }
 
     const selectedPrice = selectedFood.prices.find(p => p.price_id === selectedPriceId);
     if (!selectedPrice) {
-      toast.error('Selected option not found');
       return;
     }
 
@@ -238,7 +236,6 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
     // Add to cart using the cart context
     addItem(selectedPrice.price_id, 1, '');
 
-    toast.success(`Added ${quantity} × ${selectedFood.name} (${selectedPrice.size}) to cart!`);
     setShowFoodDetail(false);
     setSelectedPriceId(null);
     setQuantity(1);
@@ -258,10 +255,8 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
       const newSet = new Set(prev);
       if (newSet.has(foodId)) {
         newSet.delete(foodId);
-        toast.success('Removed from favorites');
       } else {
         newSet.add(foodId);
-        toast.success('Added to favorites');
       }
       return newSet;
     });
@@ -683,7 +678,6 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                           className="border-orange-500 text-orange-600 hover:bg-orange-50 text-xs"
                           onClick={(e) => {
                             e.stopPropagation();
-                            toast.error('Please login to add items to cart');
                             navigate('/auth/login');
                           }}
                         >
@@ -990,7 +984,7 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                               <div className="flex items-center justify-between mb-6">
                                 <div 
                                   className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={() => handleChefProfileClick(cookId)}
+                                  onClick={() => handleChefProfileClick(selectedFood, cookId)}
                                 >
                                   {/* Cook Avatar */}
                                   <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 hover:bg-orange-600 transition-colors">

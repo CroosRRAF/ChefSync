@@ -19,6 +19,8 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import GoogleMapsAddressPicker from '@/components/checkout/GoogleMapsAddressPicker';
+import DeliveryFeeBreakdown from '@/components/checkout/DeliveryFeeBreakdown';
+import { DeliveryAddress, addressService } from '@/services/addressService';
 import { 
   ArrowLeft,
   CreditCard,
@@ -34,13 +36,15 @@ import {
   LayoutDashboard,
   AlertCircle,
   Navigation,
-  Edit2
+  Edit2,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CartItem } from '@/services/menuService';
 import { orderService } from '@/services/orderService';
 import { paymentService } from '@/services/paymentService';
 import { getFoodPlaceholder } from '@/utils/placeholderUtils';
+import { CheckoutCalculation, CartService } from '@/services/cartService';
 
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
@@ -59,7 +63,8 @@ const Checkout: React.FC = () => {
     instructions: ''
   });
 
-  const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [selectedAddress, setSelectedAddress] = useState<DeliveryAddress | null>(null);
+  const [existingAddresses, setExistingAddresses] = useState<DeliveryAddress[]>([]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [orderNotes, setOrderNotes] = useState('');
   
@@ -73,6 +78,10 @@ const Checkout: React.FC = () => {
   });
   const [savePaymentMethod, setSavePaymentMethod] = useState(false);
   const [availablePaymentMethods, setAvailablePaymentMethods] = useState<any[]>([]);
+  
+  // Checkout calculation states
+  const [checkoutCalculation, setCheckoutCalculation] = useState<CheckoutCalculation | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   // Redirect if not authenticated or no cart items
   useEffect(() => {
@@ -108,15 +117,79 @@ const Checkout: React.FC = () => {
     }
   }, [isAuthenticated]);
 
+  // Load addresses
+  useEffect(() => {
+    const loadAddresses = async () => {
+      try {
+        const addresses = await addressService.getAddresses();
+        setExistingAddresses(addresses || []);
+        if (addresses && addresses.length > 0) {
+          const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
+          setSelectedAddress(defaultAddress);
+        }
+      } catch (error) {
+        console.error('Error loading addresses:', error);
+        setExistingAddresses([]);
+      }
+    };
+
+    if (isAuthenticated) {
+      loadAddresses();
+    }
+  }, [isAuthenticated]);
+
   const cart = cartSummary?.cart_items || [];
   
   const subtotal = cart.reduce((sum, item) => {
     return sum + (parseFloat((item.unit_price || 0).toString()) * item.quantity);
   }, 0);
 
-  const deliveryFee = subtotal > 300 ? 0 : 40;
-  const taxAmount = subtotal * 0.10; // 10% tax
-  const total = subtotal + deliveryFee + taxAmount;
+  // Use calculated values from backend or fallback to basic calculation
+  const deliveryFee = checkoutCalculation?.delivery_fee || 50;
+  const taxAmount = checkoutCalculation?.tax_amount || (subtotal * 0.10);
+  const total = checkoutCalculation?.total_amount || (subtotal + deliveryFee + taxAmount);
+  
+  // Calculate checkout when address changes
+  const calculateCheckout = async () => {
+    if (!selectedAddress || cart.length === 0) return;
+    
+    setIsCalculating(true);
+    try {
+      // Get chef location from first cart item (assuming all items from same chef)
+      const firstItem = cart[0];
+      const chefLocation = firstItem?.kitchen_location;
+      
+      const calculation = await CartService.calculateCheckout(
+        cart.map(item => ({
+          price_id: item.price_id,
+          quantity: item.quantity
+        })),
+        selectedAddress.id,
+        {
+          order_type: 'regular', // Can be changed based on order type
+          delivery_latitude: selectedAddress.latitude,
+          delivery_longitude: selectedAddress.longitude,
+          chef_latitude: chefLocation?.lat,
+          chef_longitude: chefLocation?.lng,
+        }
+      );
+      
+      setCheckoutCalculation(calculation);
+      console.log('Checkout calculation:', calculation);
+    } catch (error) {
+      console.error('Failed to calculate checkout:', error);
+      toast.error('Failed to calculate delivery fee. Using default values.');
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+  
+  // Recalculate when address changes
+  useEffect(() => {
+    if (selectedAddress && cart.length > 0) {
+      calculateCheckout();
+    }
+  }, [selectedAddress?.id, cart.length]);
 
   const handleInputChange = (field: string, value: string) => {
     setDeliveryInfo(prev => ({
@@ -733,7 +806,16 @@ const Checkout: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Delivery Fee</span>
-                    <span>{deliveryFee === 0 ? 'Free' : `LKR ${deliveryFee.toFixed(2)}`}</span>
+                    <span className={isCalculating ? 'text-muted-foreground' : ''}>
+                      {isCalculating ? (
+                        <span className="flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Calculating...
+                        </span>
+                      ) : (
+                        deliveryFee === 0 ? 'Free' : `LKR ${deliveryFee.toFixed(2)}`
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Taxes & Fees</span>
@@ -745,6 +827,13 @@ const Checkout: React.FC = () => {
                     <span className="text-orange-600">LKR {total.toFixed(2)}</span>
                   </div>
                 </div>
+                
+                {/* Delivery Fee Breakdown - Show detailed breakdown when available */}
+                {checkoutCalculation?.delivery_fee_breakdown && (
+                  <div className="mt-4">
+                    <DeliveryFeeBreakdown breakdown={checkoutCalculation.delivery_fee_breakdown} />
+                  </div>
+                )}
 
                 {/* Security Notice */}
                 <div className="flex items-center gap-2 mt-4 text-sm text-gray-500">
@@ -761,12 +850,20 @@ const Checkout: React.FC = () => {
       <GoogleMapsAddressPicker
         isOpen={showAddressPicker}
         onClose={() => setShowAddressPicker(false)}
-        onAddressSelect={(address) => {
+        onAddressSaved={async (address) => {
           setSelectedAddress(address);
           setShowAddressPicker(false);
           toast.success(`Selected ${address.label} address`);
+          // Refresh addresses list
+          try {
+            const addresses = await addressService.getAddresses();
+            setExistingAddresses(addresses || []);
+          } catch (error) {
+            console.error('Error refreshing addresses:', error);
+          }
         }}
-        selectedAddress={selectedAddress}
+        editingAddress={null}
+        existingAddresses={existingAddresses}
       />
     </div>
   );

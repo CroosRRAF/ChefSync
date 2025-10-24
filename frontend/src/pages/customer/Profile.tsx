@@ -138,7 +138,6 @@ const CustomerProfileNew = () => {
         ]);
       } catch (error) {
         console.error("Failed to fetch profile data", error);
-        toast.error("Could not load your profile. Please try again later.");
       } finally {
         setLoading(false);
       }
@@ -163,7 +162,6 @@ const CustomerProfileNew = () => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      toast.error('Failed to load profile data');
     }
   };
 
@@ -216,11 +214,9 @@ const CustomerProfileNew = () => {
     try {
       setLoading(true);
       await userService.updateUserProfile(profileData);
-      toast.success('Profile updated successfully!');
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -234,11 +230,9 @@ const CustomerProfileNew = () => {
   const handleDeleteAccount = async () => {
     try {
       await userService.deleteUserAccount();
-      toast.success('Account deleted successfully');
       logout();
     } catch (error) {
       console.error('Error deleting account:', error);
-      toast.error('Failed to delete account');
     }
   };
 

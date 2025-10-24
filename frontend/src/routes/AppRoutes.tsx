@@ -67,6 +67,7 @@ const AnalyticsHub = React.lazy(() => import("@/pages/admin/AnalyticsHub"));
 const UserManagementHub = React.lazy(() => import("@/pages/admin/UserManagementHub"));
 const OrderManagementHub = React.lazy(() => import("@/pages/admin/OrderManagementHub"));
 const ContentManagementHub = React.lazy(() => import("@/pages/admin/ContentManagementHub"));
+const ContentApprovalPage = React.lazy(() => import("@/pages/admin/ContentApprovalPage"));
 const CommunicationCenter = React.lazy(() => import("@/pages/admin/CommunicationCenter"));
 const PaymentManagementHub = React.lazy(() => import("@/pages/admin/PaymentManagementHub"));
 const SystemHub = React.lazy(() => import("@/pages/admin/SystemHub"));
@@ -707,6 +708,18 @@ const InnerRoutes: React.FC = () => {
               <AdminLayout>
                 <Suspense fallback={<LazyLoadingFallback />}>
                   <ContentManagementHub />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/content-approval"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <ContentApprovalPage />
                 </Suspense>
               </AdminLayout>
             </ProtectedRoute>

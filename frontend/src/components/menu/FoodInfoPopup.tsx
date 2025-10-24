@@ -48,7 +48,6 @@ const FoodInfoPopup: React.FC<FoodInfoPopupProps> = ({
       if (response.error) {
         console.error('⚠️ FoodInfoPopup: AI returned error:', response.error);
         setError(response.error);
-        toast.error(response.error);
       } else {
         console.log('✅ FoodInfoPopup: Successfully loaded food info');
         setError(null);
@@ -65,7 +64,6 @@ const FoodInfoPopup: React.FC<FoodInfoPopupProps> = ({
       console.error('❌ FoodInfoPopup: Error loading food info:', error);
       const errorMsg = `Failed to load food information: ${error.message}`;
       setError(errorMsg);
-      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }

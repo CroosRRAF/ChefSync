@@ -28,7 +28,7 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
   onClose,
   onAddressSaved,
   editingAddress,
-  existingAddresses,
+  existingAddresses = []
 }) => {
   const [loading, setLoading] = useState(false);
   const [mapsLoaded, setMapsLoaded] = useState(false);
@@ -292,13 +292,10 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
       suggestedLabel = baseLabel;
 
       let counter = 1;
-      while (
-        existingAddresses.some(
-          (addr) =>
-            addr.label.toLowerCase() === suggestedLabel.toLowerCase() &&
-            (!editingAddress || addr.id !== editingAddress.id)
-        )
-      ) {
+      while (existingAddresses && existingAddresses.some(addr => 
+        addr.label.toLowerCase() === suggestedLabel.toLowerCase() && 
+        (!editingAddress || addr.id !== editingAddress.id)
+      )) {
         counter++;
         suggestedLabel = `${baseLabel} ${counter}`;
       }
@@ -383,12 +380,9 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
     }
 
     // Check for duplicate label
-    if (
-      !editingAddress ||
-      editingAddress.label.toLowerCase() !== formData.label.toLowerCase()
-    ) {
-      const duplicateLabel = existingAddresses.find(
-        (addr) => addr.label.toLowerCase() === formData.label.toLowerCase()
+    if (!editingAddress || editingAddress.label.toLowerCase() !== formData.label.toLowerCase()) {
+      const duplicateLabel = existingAddresses && existingAddresses.find(
+        addr => addr.label.toLowerCase() === formData.label.toLowerCase()
       );
       if (duplicateLabel) {
         toast.error("Duplicate Label", {
@@ -576,7 +570,7 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
                       }))
                     }
                   />
-                  {existingAddresses.length > 0 && (
+                  {existingAddresses && existingAddresses.length > 0 && (
                     <p className="text-xs text-gray-500 mt-1">
                       Existing labels:{" "}
                       {existingAddresses.map((a) => a.label).join(", ")}

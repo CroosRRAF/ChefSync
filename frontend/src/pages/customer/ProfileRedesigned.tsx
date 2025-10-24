@@ -122,7 +122,6 @@ const CustomerProfileRedesigned = () => {
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
-        toast.error('Failed to load profile data');
       } finally {
         setLoading(false);
       }
@@ -137,7 +136,6 @@ const CustomerProfileRedesigned = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
-    toast.info("You have been logged out.");
   }
 
   return (
@@ -234,10 +232,9 @@ const ProfileTab: FC<{ profileData: UserData, setProfileData: (data: UserData) =
     setLoading(true);
     try {
       await userService.updateUserProfile(profileData);
-      toast.success("Profile updated successfully!");
       setIsEditing(false);
     } catch (error) {
-      toast.error("Failed to update profile.");
+      console.error("Failed to update profile:", error);
     } finally {
       setLoading(false);
     }
@@ -297,7 +294,7 @@ const AddressesTab: FC = () => {
       const data = await addressService.getAddresses();
       setAddresses(data);
     } catch (error) {
-      toast.error("Failed to load addresses.");
+      console.error("Failed to load addresses:", error);
     } finally {
       setLoading(false);
     }
@@ -367,7 +364,7 @@ const BulkOrdersTab: FC = () => {
         });
         if (response.ok) setOrders(await response.json());
       } catch (error) {
-        toast.error("Failed to load bulk orders.");
+        console.error("Failed to load bulk orders:", error);
       } finally {
         setLoading(false);
       }
@@ -418,10 +415,9 @@ const SecurityTab: FC = () => {
   const handleDeleteAccount = async () => {
     try {
       await userService.deleteUserAccount();
-      toast.success('Account deleted successfully');
       logout();
     } catch (error) {
-      toast.error('Failed to delete account');
+      console.error('Failed to delete account:', error);
     }
   };
 
