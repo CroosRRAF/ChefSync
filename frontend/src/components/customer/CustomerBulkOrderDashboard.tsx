@@ -24,14 +24,18 @@ import {
   Sparkles,
   Package,
   MapPin,
-  Navigation
+  Navigation,
+  Plus,
+  Edit2,
+  Trash2,
+  User
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import DeliveryAddressSelector from '@/components/delivery/DeliveryAddressSelector';
-import { DeliveryAddress } from '@/services/addressService';
+import GoogleMapsAddressPicker from '@/components/checkout/GoogleMapsAddressPicker';
+import { DeliveryAddress, addressService } from '@/services/addressService';
 import FoodInfoPopup from '@/components/menu/FoodInfoPopup';
 
 // Types
@@ -77,9 +81,76 @@ interface OrderFormData {
   num_persons: number;
   event_date: Date | undefined;
   event_time: string;
+  order_type: 'delivery' | 'pickup';
   delivery_address: string;
   special_instructions: string;
   selected_optional_items: number[];
+  delivery_fee: number;
+  distance_km?: number;
+}
+
+interface UserBulkOrder {
+  bulk_order_id: string;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  num_persons: number;
+  event_date: string;
+  event_time: string;
+  menu_name?: string;
+  created_at: string;
+  
+  // Customer info
+  customer_id: number;
+  customer: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  
+  // Chef info
+  chef_id?: number;
+  chef?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  
+  // Delivery agent info
+  delivery_partner_id?: number;
+  delivery_partner?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  
+  // Delivery location
+  delivery_address?: string;
+  delivery_latitude?: number;
+  delivery_longitude?: number;
+  distance_km?: number;
+  
+  // Order details
+  order_type: string;
+  delivery_fee: number;
+  
+  // Full order details (kept for backward compatibility)
+  order_details?: {
+    id: number;
+    order_number: string;
+    delivery_address: string;
+    delivery_fee: number;
+    order_type: string;
+    customer: {
+      id: number;
+      name: string;
+      email: string;
+    };
+    chef: {
+      id: number;
+      name: string;
+    };
+  };
 }
 
 const CustomerBulkOrderDashboard: React.FC = () => {
@@ -98,6 +169,13 @@ const CustomerBulkOrderDashboard: React.FC = () => {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isAddressPickerOpen, setIsAddressPickerOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<DeliveryAddress | null>(null);
+  const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
+  const [editingAddress, setEditingAddress] = useState<DeliveryAddress | null>(null);
+  
+  // User's bulk orders state
+  const [userBulkOrders, setUserBulkOrders] = useState<UserBulkOrder[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [activeTab, setActiveTab] = useState('browse');
   
   // AI Food Info popup state
   const [showAIFoodInfo, setShowAIFoodInfo] = useState(false);
@@ -111,9 +189,12 @@ const CustomerBulkOrderDashboard: React.FC = () => {
     num_persons: 10,
     event_date: undefined,
     event_time: '',
+    order_type: 'delivery',
     delivery_address: '',
     special_instructions: '',
     selected_optional_items: [],
+    delivery_fee: 0,
+    distance_km: 0,
   });
 
   const mealTypes = [
@@ -126,7 +207,50 @@ const CustomerBulkOrderDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchBulkMenus();
+    loadAddresses();
+    fetchUserBulkOrders();
   }, []);
+
+  const fetchUserBulkOrders = async () => {
+    try {
+      setLoadingOrders(true);
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('/api/orders/customer-bulk-orders/', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserBulkOrders(data);
+        console.log('User bulk orders loaded:', data);
+      } else {
+        console.error('Failed to fetch user bulk orders');
+      }
+    } catch (error) {
+      console.error('Error fetching user bulk orders:', error);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const loadAddresses = async () => {
+    try {
+      const fetchedAddresses = await addressService.getAddresses();
+      setAddresses(fetchedAddresses);
+      
+      // Set default address if available
+      const defaultAddr = fetchedAddresses.find(addr => addr.is_default) || fetchedAddresses[0] || null;
+      if (defaultAddr) {
+        setSelectedAddress(defaultAddr);
+      }
+    } catch (error) {
+      console.error('Error loading addresses:', error);
+      toast.error('Failed to load saved addresses');
+    }
+  };
 
   const fetchBulkMenus = async () => {
     try {
@@ -231,9 +355,12 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       num_persons: menu.min_persons,
       event_date: undefined,
       event_time: '',
+      order_type: 'delivery',
       delivery_address: addressText,
       special_instructions: '',
       selected_optional_items: [],
+      delivery_fee: address ? 300 : 0, // Default base fee if address selected
+      distance_km: address ? 5 : 0,
     });
     setIsOrderDialogOpen(true);
   };
@@ -255,7 +382,10 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       .filter(item => orderForm.selected_optional_items.includes(item.id))
       .reduce((sum, item) => sum + (item.extra_cost * orderForm.num_persons), 0);
     
-    return baseTotal + optionalCosts;
+    // Add delivery fee if delivery order
+    const deliveryFee = orderForm.order_type === 'delivery' ? orderForm.delivery_fee : 0;
+    
+    return baseTotal + optionalCosts + deliveryFee;
   };
 
   const handleSubmitOrder = async () => {
@@ -269,13 +399,15 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       return;
     }
 
-    // Check if we have either a selected address or manual entry
-    const hasAddress = (selectedAddress && selectedAddress.address_line1) || 
-                       (orderForm.delivery_address && orderForm.delivery_address.trim().length > 0);
-    
-    if (!hasAddress) {
-      toast.error('Please select an address from the map or enter a delivery address manually');
-      return;
+    // Check if we have either a selected address or manual entry (only for delivery)
+    if (orderForm.order_type === 'delivery') {
+      const hasAddress = (selectedAddress && selectedAddress.address_line1) || 
+                         (orderForm.delivery_address && orderForm.delivery_address.trim().length > 0);
+      
+      if (!hasAddress) {
+        toast.error('Please select an address from the map or enter a delivery address manually');
+        return;
+      }
     }
 
     // Use selected address if available, otherwise use manual entry
@@ -318,7 +450,13 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         num_persons: orderForm.num_persons,
         event_date: format(orderForm.event_date, 'yyyy-MM-dd'),
         event_time: orderForm.event_time,
-        delivery_address: finalAddress, // Use the validated final address
+        order_type: orderForm.order_type,
+        delivery_address: orderForm.order_type === 'delivery' ? finalAddress : 'Pickup', // Use the validated final address
+        delivery_address_id: selectedAddress?.id,
+        delivery_latitude: selectedAddress?.latitude,
+        delivery_longitude: selectedAddress?.longitude,
+        delivery_fee: orderForm.order_type === 'delivery' ? orderForm.delivery_fee : 0,
+        distance_km: orderForm.distance_km,
         special_instructions: orderForm.special_instructions || '',
         selected_optional_items: orderForm.selected_optional_items,
         total_amount: calculateTotalCost(),
@@ -386,9 +524,32 @@ const CustomerBulkOrderDashboard: React.FC = () => {
     }));
   };
 
-  const handleAddressSelect = (address: DeliveryAddress) => {
-    console.log('📍 Address selected:', address);
+  const handleAddressSaved = async (address: DeliveryAddress) => {
+    console.log('📍 Address saved/updated:', address);
+    
+    // Reload addresses to get the updated list
+    await loadAddresses();
+    
+    // Set the newly saved/edited address as selected
     setSelectedAddress(address);
+    
+    // Calculate delivery fee based on distance if we have chef's location
+    let deliveryFee = 0;
+    let distanceKm = 0;
+    
+    if (selectedMenu && address.latitude && address.longitude) {
+      // For bulk orders, we need chef's kitchen location
+      // This would need to be fetched from the menu/chef data
+      // For now, we'll use a default calculation
+      // You may need to update this based on where chef location is stored
+      
+      // Simple calculation: LKR 300 within 5 km, LKR 100 per km after
+      // Since we don't have chef location here, we'll calculate when backend processes
+      // For now, set a default
+      deliveryFee = 300; // Base fee
+      distanceKm = 5; // Assume within 5 km for now
+    }
+    
     // Format address for the order form
     const fullAddress = [
       address.address_line1,
@@ -398,10 +559,52 @@ const CustomerBulkOrderDashboard: React.FC = () => {
     
     setOrderForm(prev => ({
       ...prev,
-      delivery_address: fullAddress
+      delivery_address: fullAddress,
+      delivery_fee: deliveryFee,
+      distance_km: distanceKm
     }));
+    
     setIsAddressPickerOpen(false);
-    toast.success(`Address selected: ${address.label}`);
+    setEditingAddress(null);
+    toast.success(`Address ${editingAddress ? 'updated' : 'added'} successfully!`);
+  };
+
+  const handleSelectExistingAddress = (address: DeliveryAddress) => {
+    setSelectedAddress(address);
+    
+    // Calculate delivery fee
+    const deliveryFee = 300; // Base fee
+    const distanceKm = 5; // Default
+    
+    const fullAddress = [
+      address.address_line1,
+      address.address_line2,
+      `${address.city}, ${address.pincode}`
+    ].filter(Boolean).join(', ');
+    
+    setOrderForm(prev => ({
+      ...prev,
+      delivery_address: fullAddress,
+      delivery_fee: deliveryFee,
+      distance_km: distanceKm
+    }));
+    
+    toast.success(`Selected: ${address.label}`);
+  };
+
+  const handleDeleteAddress = async (addressId: number) => {
+    try {
+      await addressService.deleteAddress(addressId);
+      await loadAddresses();
+      if (selectedAddress?.id === addressId) {
+        setSelectedAddress(null);
+        setOrderForm(prev => ({ ...prev, delivery_address: '', delivery_fee: 0, distance_km: 0 }));
+      }
+      toast.success('Address deleted successfully');
+    } catch (error) {
+      console.error('Error deleting address:', error);
+      toast.error('Failed to delete address');
+    }
   };
 
   // AI-powered search function
@@ -468,14 +671,29 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Package className="h-8 w-8 text-orange-500" />
-            Bulk Order Menus
+            Bulk Orders
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Perfect for events, parties, and large gatherings
+            Browse menus or view your bulk order history
           </p>
         </div>
       </div>
 
+      {/* Main Tabs: Browse Menus vs My Orders */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="browse" className="flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4" />
+            Browse Menus
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            My Orders ({userBulkOrders.length})
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Browse Menus Tab */}
+        <TabsContent value="browse" className="space-y-4">
       {/* Search and Filter Bar */}
       <div className="space-y-4">
         {/* AI Search Section */}
@@ -795,89 +1013,144 @@ const CustomerBulkOrderDashboard: React.FC = () => {
                 />
               </div>
 
-              {/* Delivery Address */}
+              {/* Order Type Toggle */}
               <div className="space-y-2">
-                <Label>Delivery Address *</Label>
-                {selectedAddress ? (
-                  <Card className="p-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <MapPin className="h-4 w-4 text-green-600" />
-                          <span className="font-semibold text-green-900 dark:text-green-100">
-                            {selectedAddress.label}
-                          </span>
-                          {selectedAddress.is_default && (
-                            <Badge variant="secondary" className="text-xs">Default</Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                          {selectedAddress.address_line1}
-                        </p>
-                        {selectedAddress.address_line2 && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {selectedAddress.address_line2}
-                          </p>
-                        )}
-                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                          {selectedAddress.city}, {selectedAddress.pincode}
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-2 flex-shrink-0">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setIsAddressPickerOpen(true)}
-                          className="whitespace-nowrap"
-                        >
-                          Change
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedAddress(null);
-                            setOrderForm(prev => ({ ...prev, delivery_address: '' }));
-                            toast.info('Address cleared. You can enter manually below.');
-                          }}
-                          className="whitespace-nowrap text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <X className="h-3 w-3 mr-1" />
-                          Clear
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
+                <Label>Order Type *</Label>
+                <div className="flex items-center space-x-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setOrderForm({ ...orderForm, order_type: 'delivery', delivery_fee: selectedAddress ? 300 : 0 })}
+                    className={`flex-1 px-4 py-2 rounded-md font-medium transition-all ${
+                      orderForm.order_type === 'delivery'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border'
+                    }`}
+                  >
+                    🚚 Delivery
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOrderForm({ ...orderForm, order_type: 'pickup', delivery_fee: 0, delivery_address: '' })}
+                    className={`flex-1 px-4 py-2 rounded-md font-medium transition-all ${
+                      orderForm.order_type === 'pickup'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border'
+                    }`}
+                  >
+                    📦 Pickup
+                  </button>
+                </div>
+              </div>
+
+              {/* Delivery Address - Only show for delivery orders */}
+              {orderForm.order_type === 'delivery' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Delivery Address *</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingAddress(null);
+                      setIsAddressPickerOpen(true);
+                    }}
+                    className="text-xs"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add New Address
+                  </Button>
+                </div>
+
+                {/* Saved Addresses List */}
+                {addresses.length > 0 ? (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {addresses.map((address) => (
+                      <Card 
+                        key={address.id}
+                        className={`cursor-pointer transition-all ${
+                          selectedAddress?.id === address.id
+                            ? 'ring-2 ring-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                        onClick={() => handleSelectExistingAddress(address)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <MapPin className="h-4 w-4 text-orange-500" />
+                                <span className="font-medium text-sm">{address.label}</span>
+                                {address.is_default && (
+                                  <Badge variant="secondary" className="text-xs">Default</Badge>
+                                )}
+                                {selectedAddress?.id === address.id && (
+                                  <Check className="h-4 w-4 text-green-600 ml-auto" />
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-300">
+                                {address.address_line1}
+                              </p>
+                              {address.address_line2 && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {address.address_line2}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-500 mt-1">
+                                {address.city}, {address.pincode}
+                              </p>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingAddress(address);
+                                  setIsAddressPickerOpen(true);
+                                }}
+                                className="h-7 w-7 p-0"
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Delete this address?')) {
+                                    handleDeleteAddress(address.id);
+                                  }
+                                }}
+                                className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="text-center py-6 border-2 border-dashed rounded-lg">
+                    <MapPin className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500 mb-3">No saved addresses yet</p>
                     <Button
                       type="button"
-                      variant="outline"
-                      className="w-full justify-start h-auto py-4"
-                      onClick={() => setIsAddressPickerOpen(true)}
+                      size="sm"
+                      onClick={() => {
+                        setEditingAddress(null);
+                        setIsAddressPickerOpen(true);
+                      }}
                     >
-                      <MapPin className="h-5 w-5 mr-2 text-orange-500" />
-                      <div className="text-left">
-                        <div className="font-medium">Select Delivery Address</div>
-                        <div className="text-xs text-gray-500">
-                          Choose from saved addresses or add new with map
-                        </div>
-                      </div>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Your First Address
                     </Button>
-                    <p className="text-xs text-gray-500">
-                      Or enter manual address below
-                    </p>
-                    <Textarea
-                      id="delivery_address"
-                      value={orderForm.delivery_address}
-                      onChange={(e) => setOrderForm({ ...orderForm, delivery_address: e.target.value })}
-                      placeholder="Enter event venue address"
-                      className="mt-1"
-                      rows={3}
-                    />
                   </div>
                 )}
               </div>
+              )}
 
               {/* Optional Items */}
               {selectedMenu.items.some(item => item.is_optional) && (
@@ -939,6 +1212,16 @@ const CustomerBulkOrderDashboard: React.FC = () => {
                     </span>
                   </div>
                 )}
+                {orderForm.order_type === 'delivery' && orderForm.delivery_fee > 0 && (
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Delivery Fee {orderForm.distance_km ? `(~${orderForm.distance_km.toFixed(1)} km)` : ''}:
+                    </span>
+                    <span className="font-semibold">
+                      Rs.{orderForm.delivery_fee.toFixed(2)}
+                    </span>
+                  </div>
+                )}
                 <div className="border-t pt-2 flex justify-between items-center">
                   <span className="text-lg font-bold">Total:</span>
                   <span className="text-2xl font-bold text-orange-600">
@@ -963,13 +1246,16 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Address Picker Dialog */}
-      <DeliveryAddressSelector
+      {/* Address Picker Dialog - Google Maps */}
+      <GoogleMapsAddressPicker
         isOpen={isAddressPickerOpen}
-        onClose={() => setIsAddressPickerOpen(false)}
-        onAddressSelect={handleAddressSelect}
-        selectedAddress={selectedAddress}
-        showHeader={true}
+        onClose={() => {
+          setIsAddressPickerOpen(false);
+          setEditingAddress(null);
+        }}
+        onAddressSaved={handleAddressSaved}
+        editingAddress={editingAddress}
+        existingAddresses={addresses}
       />
 
       {/* AI Food Info Popup */}
@@ -985,6 +1271,176 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         foodDescription={aiFoodDescription}
         foodImage={aiFoodImage}
       />
+        </TabsContent>
+
+        {/* My Orders Tab */}
+        <TabsContent value="orders" className="space-y-4">
+          {loadingOrders ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+            </div>
+          ) : userBulkOrders.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Package className="h-16 w-16 text-gray-400 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  No Bulk Orders Yet
+                </h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-6 text-center max-w-md">
+                  You haven't placed any bulk orders yet. Browse our menus to get started!
+                </p>
+                <Button 
+                  onClick={() => setActiveTab('browse')}
+                  className="bg-orange-500 hover:bg-orange-600"
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Browse Bulk Menus
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {userBulkOrders.map((order) => (
+                <Card key={order.bulk_order_id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Package className="h-5 w-5 text-orange-500" />
+                          <h3 className="font-bold text-lg">Order #{order.order_number}</h3>
+                          <Badge 
+                            className={
+                              order.status === 'completed' ? 'bg-green-500' :
+                              order.status === 'pending' ? 'bg-yellow-500' :
+                              order.status === 'confirmed' ? 'bg-blue-500' :
+                              order.status === 'preparing' ? 'bg-purple-500' :
+                              order.status === 'cancelled' ? 'bg-red-500' :
+                              'bg-gray-500'
+                            }
+                          >
+                            {order.status.toUpperCase()}
+                          </Badge>
+                        </div>
+                        {order.menu_name && (
+                          <p className="text-gray-600 dark:text-gray-300 mb-2">
+                            Menu: <span className="font-medium">{order.menu_name}</span>
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-orange-600">
+                          LKR {order.total_amount.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 border-t border-b">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-500">Persons</p>
+                          <p className="font-semibold">{order.num_persons}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-500">Event Date</p>
+                          <p className="font-semibold">
+                            {order.event_date ? new Date(order.event_date).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-500">Event Time</p>
+                          <p className="font-semibold">{order.event_time || 'N/A'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-500">Delivery Type</p>
+                          <p className="font-semibold">
+                            {order.order_type === 'pickup' ? 'Pickup' : 'Delivery'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      {/* Delivery Address */}
+                      {order.delivery_address && order.order_type !== 'pickup' && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-xs text-gray-500">Delivery Address</p>
+                            <p className="text-sm font-medium">{order.delivery_address}</p>
+                            {order.distance_km && (
+                              <p className="text-xs text-gray-400">
+                                Distance: {order.distance_km.toFixed(1)} km • Fee: LKR {order.delivery_fee.toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Chef Info */}
+                      {order.chef && (
+                        <div className="flex items-start gap-2">
+                          <ChefHat className="h-4 w-4 text-gray-500 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-gray-500">Chef</p>
+                            <p className="text-sm font-medium">{order.chef.name}</p>
+                            <p className="text-xs text-gray-400">{order.chef.email}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Delivery Agent Info */}
+                      {order.delivery_partner && (
+                        <div className="flex items-start gap-2">
+                          <User className="h-4 w-4 text-gray-500 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-gray-500">Delivery Agent</p>
+                            <p className="text-sm font-medium">{order.delivery_partner.name}</p>
+                            <p className="text-xs text-gray-400">{order.delivery_partner.email}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Customer Info */}
+                      {order.customer && (
+                        <div className="flex items-start gap-2">
+                          <User className="h-4 w-4 text-gray-500 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-gray-500">Ordered By</p>
+                            <p className="text-sm font-medium">{order.customer.name}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between">
+                      <p className="text-xs text-gray-500">
+                        Ordered on {new Date(order.created_at).toLocaleDateString()} at {new Date(order.created_at).toLocaleTimeString()}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/customer/orders`)}
+                      >
+                        View Details
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

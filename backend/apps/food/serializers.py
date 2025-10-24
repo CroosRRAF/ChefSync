@@ -721,10 +721,13 @@ class BulkMenuSerializer(serializers.ModelSerializer):
         read_only_fields = ["chef", "approved_by", "approved_at", "created_at", "updated_at"]
 
     def get_delivery_fee(self, obj):
-        """Calculate delivery fee based on service area and group size"""
-        # Basic delivery fee calculation
-        base_fee = 100  # Base delivery fee in rupees
-        # You can customize this logic based on your business requirements
+        """Calculate delivery fee based on service area and group size
+        
+        Returns base delivery fee (actual fee calculated based on distance during order)
+        """
+        # Base delivery fee - actual fee calculated when order is placed based on distance
+        # Within 5 km: LKR 300, After 5 km: LKR 100 per km
+        base_fee = 300  # Base delivery fee in rupees
         return base_fee
 
 

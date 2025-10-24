@@ -77,6 +77,16 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
                 event_datetime = timezone.make_aware(event_datetime)
                 estimated_delivery = event_datetime - timedelta(hours=2)
                 
+                # Get order type and delivery details
+                order_type = validated_data.get('order_type', 'delivery')
+                delivery_fee = Decimal(str(validated_data.get('delivery_fee', 0)))
+                distance_km = validated_data.get('distance_km')
+                
+                # Build delivery address string
+                delivery_address = validated_data.get('delivery_address', '')
+                if not delivery_address and order_type == 'pickup':
+                    delivery_address = "Pickup - No delivery address"
+                
                 # Create the main order
                 order = Order.objects.create(
                     customer=request.user,
@@ -84,23 +94,73 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
                     status='pending',
                     payment_status='pending',
                     payment_method='cash',  # Can be updated later
-                    delivery_address=validated_data['delivery_address'],
+                    order_type=order_type,
+                    delivery_address=delivery_address,
+                    delivery_latitude=validated_data.get('delivery_latitude'),
+                    delivery_longitude=validated_data.get('delivery_longitude'),
+                    delivery_fee=delivery_fee,
+                    distance_km=distance_km,
                     customer_notes=validated_data.get('special_instructions', ''),
                     estimated_delivery_time=estimated_delivery,
-                    subtotal=validated_data['total_amount'],
+                    subtotal=validated_data['total_amount'] - delivery_fee,
                     total_amount=validated_data['total_amount'],
                     # Store event info in admin_notes
-                    admin_notes=f"Bulk Order - Event Date: {validated_data['event_date']} {validated_data['event_time']}, Persons: {validated_data['num_persons']}"
+                    admin_notes=f"Bulk Order - Type: {order_type.upper()} - Event Date: {validated_data['event_date']} {validated_data['event_time']}, Persons: {validated_data['num_persons']}, Distance: {distance_km}km"
                 )
                 
-                # Create BulkOrder record
-                bulk_order = BulkOrder.objects.create(
-                    order=order,
-                    created_by=request.user,
-                    status='pending',
-                    total_amount=validated_data['total_amount'],
-                    notes=f"Bulk order for {validated_data['num_persons']} persons. Menu: {bulk_menu.menu_name}. {validated_data.get('special_instructions', '')}"
-                )
+                # Create BulkOrder record with all fields
+                bulk_order_data = {
+                    'order': order,
+                    'created_by': request.user,
+                    'status': 'pending',
+                    'total_amount': validated_data['total_amount'],
+                    'notes': f"Bulk order for {validated_data['num_persons']} persons. Menu: {bulk_menu.menu_name}. {validated_data.get('special_instructions', '')}"
+                }
+                
+                # Add new separate fields if they exist in the model
+                try:
+                    from django.db import models
+                    bulk_order_fields = [f.name for f in BulkOrder._meta.get_fields() if isinstance(f, models.Field)]
+                    
+                    if 'customer' in bulk_order_fields:
+                        bulk_order_data['customer'] = request.user
+                    if 'chef' in bulk_order_fields:
+                        bulk_order_data['chef'] = bulk_menu.chef
+                    if 'order_number' in bulk_order_fields:
+                        import uuid
+                        bulk_order_data['order_number'] = f"BULK-{uuid.uuid4().hex[:8].upper()}"
+                    if 'order_type' in bulk_order_fields:
+                        bulk_order_data['order_type'] = order_type
+                    if 'delivery_address' in bulk_order_fields:
+                        bulk_order_data['delivery_address'] = delivery_address
+                    if 'delivery_latitude' in bulk_order_fields:
+                        bulk_order_data['delivery_latitude'] = validated_data.get('delivery_latitude')
+                    if 'delivery_longitude' in bulk_order_fields:
+                        bulk_order_data['delivery_longitude'] = validated_data.get('delivery_longitude')
+                    if 'distance_km' in bulk_order_fields:
+                        bulk_order_data['distance_km'] = distance_km
+                    if 'delivery_fee' in bulk_order_fields:
+                        bulk_order_data['delivery_fee'] = delivery_fee
+                    if 'subtotal' in bulk_order_fields:
+                        bulk_order_data['subtotal'] = validated_data['total_amount'] - delivery_fee
+                    if 'payment_status' in bulk_order_fields:
+                        bulk_order_data['payment_status'] = 'pending'
+                    if 'event_date' in bulk_order_fields:
+                        bulk_order_data['event_date'] = validated_data['event_date']
+                    if 'event_time' in bulk_order_fields:
+                        bulk_order_data['event_time'] = validated_data['event_time']
+                    if 'num_persons' in bulk_order_fields:
+                        bulk_order_data['num_persons'] = validated_data['num_persons']
+                    if 'menu_name' in bulk_order_fields:
+                        bulk_order_data['menu_name'] = bulk_menu.menu_name
+                    if 'customer_notes' in bulk_order_fields:
+                        bulk_order_data['customer_notes'] = validated_data.get('special_instructions', '')
+                    if 'estimated_delivery_time' in bulk_order_fields:
+                        bulk_order_data['estimated_delivery_time'] = estimated_delivery
+                except Exception as field_check_error:
+                    logger.warning(f"Could not check/set new bulk order fields: {str(field_check_error)}")
+                
+                bulk_order = BulkOrder.objects.create(**bulk_order_data)
                 
                 # Get all menu items (mandatory + selected optional)
                 mandatory_items = BulkMenuItem.objects.filter(

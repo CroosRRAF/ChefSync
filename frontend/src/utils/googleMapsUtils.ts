@@ -14,12 +14,13 @@ export const calculateDistance = (point1: LatLng, point2: LatLng): number => {
 };
 
 // Calculate delivery fee based on distance
+// Fee Structure: LKR 300 within 5 km, LKR 100 per km after 5 km
 export const calculateDeliveryFee = (distanceKm: number): number => {
   if (distanceKm <= 5) {
-    return 50; // LKR 50 for first 5 km
+    return 300; // LKR 300 for first 5 km
   }
   const extraKm = distanceKm - 5;
-  return 50 + (Math.ceil(extraKm) * 15); // LKR 15 per km after 5 km
+  return 300 + (Math.ceil(extraKm) * 100); // LKR 100 per km after 5 km
 };
 
 // Get current location using browser geolocation

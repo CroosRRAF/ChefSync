@@ -283,13 +283,16 @@ class OrderService {
 
   /**
    * Calculate delivery fee based on distance
+   * Fee Structure:
+   * - First 5 km: LKR 300
+   * - After 5 km: LKR 100 per km
    */
   calculateDeliveryFee(distanceKm: number): number {
     if (distanceKm <= 5.0) {
-      return 50.00;
+      return 300.00;
     } else {
       const extraKm = Math.ceil(distanceKm - 5.0);
-      return 50.00 + (extraKm * 15.00);
+      return 300.00 + (extraKm * 100.00);
     }
   }
 

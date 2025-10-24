@@ -66,8 +66,19 @@ class Order(models.Model):
         # ('wallet', 'Digital Wallet'),
     ]
 
+    ORDER_TYPE_CHOICES = [
+        ("delivery", "Delivery"),
+        ("pickup", "Pickup"),
+    ]
+
     # Order Identification
     order_number = models.CharField(max_length=50, unique=True, db_index=True)
+    order_type = models.CharField(
+        max_length=20, 
+        choices=ORDER_TYPE_CHOICES, 
+        default="delivery",
+        help_text="Whether this is a delivery or pickup order"
+    )
 
     # User Relations
     customer = models.ForeignKey(
@@ -201,12 +212,17 @@ class Order(models.Model):
         return self.status in ["cart", "pending", "confirmed"]
 
     def calculate_delivery_fee(self, distance_km):
-        """Calculate delivery fee based on distance"""
+        """Calculate delivery fee based on distance
+        
+        Fee Structure:
+        - First 5 km: LKR 300
+        - After 5 km: LKR 100 per km
+        """
         if distance_km <= 5.0:
-            return Decimal("50.00")
+            return Decimal("300.00")
         else:
             extra_km = math.ceil(distance_km - 5.0)
-            return Decimal("50.00") + Decimal(str(extra_km)) * Decimal("15.00")
+            return Decimal("300.00") + Decimal(str(extra_km)) * Decimal("100.00")
 
     def calculate_tax(self, subtotal):
         """Calculate 10% tax on subtotal"""
@@ -389,7 +405,7 @@ class DeliveryReview(models.Model):
 
 
 class BulkOrder(models.Model):
-    """Bulk order model for large-scale catering and events"""
+    """Bulk order model for large-scale catering and events - Separate from regular orders"""
 
     STATUS_CHOICES = [
         ("pending", "Pending"),
@@ -400,29 +416,154 @@ class BulkOrder(models.Model):
         ("cancelled", "Cancelled"),
     ]
 
+    PAYMENT_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("paid", "Paid"),
+        ("failed", "Failed"),
+        ("refunded", "Refunded"),
+    ]
+
+    ORDER_TYPE_CHOICES = [
+        ("delivery", "Delivery"),
+        ("pickup", "Pickup"),
+    ]
+
+    # Primary Fields
     bulk_order_id = models.AutoField(primary_key=True)
+    order_number = models.CharField(max_length=50, unique=True, db_index=True, null=True, blank=True)
+    
+    # Optional link to regular Order (for backward compatibility, will be nullable)
     order = models.ForeignKey(
-        Order, on_delete=models.CASCADE, related_name="bulk_orders"
+        Order, 
+        on_delete=models.SET_NULL, 
+        null=True,
+        blank=True,
+        related_name="bulk_orders"
+    )
+    
+    # User Relations - Direct fields instead of through Order
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="bulk_orders_as_customer",
+        help_text="Customer who placed the bulk order"
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="created_bulk_orders",
+        help_text="User who created this bulk order (usually same as customer)"
     )
+    chef = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="bulk_orders_as_chef",
+        help_text="Chef assigned to this bulk order"
+    )
+    delivery_partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bulk_delivery_orders",
+        help_text="Delivery agent assigned to this bulk order"
+    )
+    
+    # Status Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    total_amount = models.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal("0.00")
+    payment_status = models.CharField(
+        max_length=20, 
+        choices=PAYMENT_STATUS_CHOICES, 
+        default="pending"
     )
-    notes = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Financial Information
+    subtotal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00")
+    )
+    delivery_fee = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00")
+    )
+    total_amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal("0.00")
+    )
+    
+    # Delivery/Pickup Information
+    order_type = models.CharField(
+        max_length=20,
+        choices=ORDER_TYPE_CHOICES,
+        default="delivery",
+        help_text="Whether this is a delivery or pickup order"
+    )
+    delivery_address = models.TextField(blank=True, null=True)
+    delivery_latitude = models.DecimalField(
+        max_digits=10, 
+        decimal_places=8, 
+        null=True, 
+        blank=True
+    )
+    delivery_longitude = models.DecimalField(
+        max_digits=11, 
+        decimal_places=8, 
+        null=True, 
+        blank=True
+    )
+    distance_km = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Distance from kitchen to delivery address in km"
+    )
+    
+    # Event Details
+    event_date = models.DateField(null=True, blank=True, help_text="Date of the event")
+    event_time = models.TimeField(null=True, blank=True, help_text="Time of the event")
+    num_persons = models.PositiveIntegerField(default=0, help_text="Number of persons for the event")
+    menu_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the bulk menu")
+    
+    # Notes
+    notes = models.TextField(blank=True, null=True, help_text="Internal notes about the bulk order")
+    customer_notes = models.TextField(blank=True, null=True, help_text="Special instructions from customer")
+    chef_notes = models.TextField(blank=True, null=True, help_text="Notes from chef")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    estimated_delivery_time = models.DateTimeField(null=True, blank=True)
+    actual_delivery_time = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.order_number:
+            self.order_number = self.generate_order_number()
+        super().save(*args, **kwargs)
+
+    def generate_order_number(self):
+        """Generate unique bulk order number"""
+        import uuid
+        return f"BULK-{uuid.uuid4().hex[:8].upper()}"
 
     def __str__(self):
-        return f"Bulk Order {self.bulk_order_id} - {self.status}"
+        return f"Bulk Order {self.order_number} - {self.status}"
 
     class Meta:
         db_table = "BulkOrder"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["customer", "status"]),
+            models.Index(fields=["chef", "status"]),
+        ]
 
 
 class BulkOrderAssignment(models.Model):

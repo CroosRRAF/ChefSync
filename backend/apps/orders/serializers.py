@@ -703,40 +703,229 @@ class BulkOrderListSerializer(serializers.ModelSerializer):
 class BulkOrderDetailSerializer(serializers.ModelSerializer):
     """Detailed serializer for bulk order with all related data"""
 
-    id = serializers.IntegerField(source="bulk_order_id", read_only=True)
+    bulk_order_id = serializers.IntegerField(read_only=True)
     order_number = serializers.SerializerMethodField()
-    customer = CustomerSerializer(source="created_by", read_only=True)
+    
+    # Customer info - Handle both direct customer field and created_by
+    customer = serializers.SerializerMethodField()
+    customer_id = serializers.SerializerMethodField()
+    
+    # Chef info
+    chef = serializers.SerializerMethodField()
+    chef_id = serializers.SerializerMethodField()
+    
+    # Delivery agent info
+    delivery_partner = serializers.SerializerMethodField()
+    delivery_partner_id = serializers.SerializerMethodField()
+    
+    # Delivery location
+    delivery_address = serializers.SerializerMethodField()
+    delivery_latitude = serializers.SerializerMethodField()
+    delivery_longitude = serializers.SerializerMethodField()
+    distance_km = serializers.SerializerMethodField()
+    
+    # Order details
+    order_type = serializers.SerializerMethodField()
+    delivery_fee = serializers.SerializerMethodField()
     event_type = serializers.SerializerMethodField()
     total_amount = serializers.SerializerMethodField()
-    event_date = serializers.DateTimeField(source="deadline", read_only=True)
+    event_date = serializers.SerializerMethodField()
+    event_time = serializers.SerializerMethodField()
+    num_persons = serializers.SerializerMethodField()
+    menu_name = serializers.SerializerMethodField()
+    
     assignments = BulkOrderAssignmentSerializer(many=True, read_only=True)
     order_details = OrderDetailSerializer(source="order", read_only=True)
 
     class Meta:
         model = BulkOrder
         fields = [
-            "id",
+            "bulk_order_id",
             "order_number",
+            
+            # Customer
             "customer",
+            "customer_id",
+            
+            # Chef
+            "chef",
+            "chef_id",
+            
+            # Delivery agent
+            "delivery_partner",
+            "delivery_partner_id",
+            
+            # Delivery location
+            "delivery_address",
+            "delivery_latitude",
+            "delivery_longitude",
+            "distance_km",
+            
+            # Order details
+            "order_type",
+            "delivery_fee",
             "event_type",
             "event_date",
+            "event_time",
+            "num_persons",
+            "menu_name",
             "status",
             "total_amount",
-            "total_quantity",
-            "description",
+            "notes",
+            
+            # Relations
             "assignments",
             "order_details",
+            
+            # Timestamps
             "created_at",
             "updated_at",
         ]
 
     def get_order_number(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'order_number') and obj.order_number:
+            return obj.order_number
+        # Fallback to order relationship
+        if obj.order:
+            return obj.order.order_number
         return f"BULK-{obj.bulk_order_id:06d}"
+    
+    # Customer getters - Handle both direct field and created_by
+    def get_customer(self, obj):
+        # Try direct customer field first (new structure)
+        if hasattr(obj, 'customer') and obj.customer:
+            try:
+                return {
+                    'id': obj.customer.id,
+                    'name': obj.customer.name,
+                    'email': obj.customer.email
+                }
+            except AttributeError:
+                pass
+        
+        # Fallback to created_by (current structure)
+        if obj.created_by:
+            return {
+                'id': obj.created_by.id,
+                'name': obj.created_by.name,
+                'email': obj.created_by.email
+            }
+        return None
+    
+    def get_customer_id(self, obj):
+        # Try direct customer_id first
+        if hasattr(obj, 'customer_id') and obj.customer_id:
+            return obj.customer_id
+        # Fallback to created_by
+        return obj.created_by.id if obj.created_by else None
+    
+    # Chef getters - Handle both direct field and order relationship
+    def get_chef(self, obj):
+        # Try direct field first (new structure)
+        if hasattr(obj, 'chef') and obj.chef:
+            try:
+                return {
+                    'id': obj.chef.id,
+                    'name': obj.chef.name,
+                    'email': obj.chef.email
+                }
+            except AttributeError:
+                pass
+        
+        # Fallback to order relationship (old structure)
+        if obj.order and obj.order.chef:
+            return {
+                'id': obj.order.chef.id,
+                'name': obj.order.chef.name,
+                'email': obj.order.chef.email
+            }
+        return None
+    
+    def get_chef_id(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'chef_id') and obj.chef_id:
+            return obj.chef_id
+        # Fallback to order
+        return obj.order.chef.id if obj.order and obj.order.chef else None
+    
+    # Delivery agent getters - Handle both structures
+    def get_delivery_partner(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'delivery_partner') and obj.delivery_partner:
+            try:
+                return {
+                    'id': obj.delivery_partner.id,
+                    'name': obj.delivery_partner.name,
+                    'email': obj.delivery_partner.email
+                }
+            except AttributeError:
+                pass
+        
+        # Fallback to order
+        if obj.order and obj.order.delivery_partner:
+            return {
+                'id': obj.order.delivery_partner.id,
+                'name': obj.order.delivery_partner.name,
+                'email': obj.order.delivery_partner.email
+            }
+        return None
+    
+    def get_delivery_partner_id(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'delivery_partner_id') and obj.delivery_partner_id:
+            return obj.delivery_partner_id
+        # Fallback to order
+        return obj.order.delivery_partner.id if obj.order and obj.order.delivery_partner else None
+    
+    # Delivery location getters - Handle both structures
+    def get_delivery_address(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'delivery_address') and obj.delivery_address:
+            return obj.delivery_address
+        # Fallback to order
+        return obj.order.delivery_address if obj.order else None
+    
+    def get_delivery_latitude(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'delivery_latitude') and obj.delivery_latitude:
+            return float(obj.delivery_latitude)
+        # Fallback to order
+        return float(obj.order.delivery_latitude) if obj.order and obj.order.delivery_latitude else None
+    
+    def get_delivery_longitude(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'delivery_longitude') and obj.delivery_longitude:
+            return float(obj.delivery_longitude)
+        # Fallback to order
+        return float(obj.order.delivery_longitude) if obj.order and obj.order.delivery_longitude else None
+    
+    def get_distance_km(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'distance_km') and obj.distance_km:
+            return float(obj.distance_km)
+        # Fallback to order
+        return float(obj.order.distance_km) if obj.order and obj.order.distance_km else None
+    
+    # Order details getters - Handle both structures
+    def get_order_type(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'order_type') and obj.order_type:
+            return obj.order_type
+        # Fallback to order
+        return obj.order.order_type if obj.order else "delivery"
+    
+    def get_delivery_fee(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'delivery_fee') and obj.delivery_fee is not None:
+            return float(obj.delivery_fee)
+        # Fallback to order
+        return float(obj.order.delivery_fee) if obj.order else 0.0
 
     def get_event_type(self, obj):
         # Extract event type from description or default
-        if obj.description:
-            description_lower = obj.description.lower()
+        if obj.notes:
+            description_lower = obj.notes.lower()
             if "wedding" in description_lower:
                 return "wedding"
             elif "corporate" in description_lower:
@@ -749,8 +938,76 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
 
     def get_total_amount(self, obj):
         if obj.order:
-            return str(obj.order.total_amount)
-        return "0.00"
+            return float(obj.order.total_amount)
+        return float(obj.total_amount)
+    
+    def get_event_date(self, obj):
+        """Get event date - try direct field first, then extract from order admin_notes"""
+        # Try direct field first
+        if hasattr(obj, 'event_date') and obj.event_date:
+            return str(obj.event_date)
+        
+        # Fallback to extracting from order admin_notes
+        import re
+        if obj.order and obj.order.admin_notes:
+            # Pattern: "Event Date: 2024-12-25 18:00:00"
+            match = re.search(r'Event Date:\s*(\d{4}-\d{2}-\d{2})', obj.order.admin_notes)
+            if match:
+                return match.group(1)
+        return None
+    
+    def get_event_time(self, obj):
+        """Get event time - try direct field first, then extract from order admin_notes"""
+        # Try direct field first
+        if hasattr(obj, 'event_time') and obj.event_time:
+            time_str = str(obj.event_time)
+            # Return only HH:MM format
+            if len(time_str) > 5:
+                return time_str[:5]
+            return time_str
+        
+        # Fallback to extracting from order admin_notes
+        import re
+        if obj.order and obj.order.admin_notes:
+            # Pattern: "Event Date: 2024-12-25 18:00:00"
+            match = re.search(r'Event Date:\s*\d{4}-\d{2}-\d{2}\s+(\d{2}:\d{2}(?::\d{2})?)', obj.order.admin_notes)
+            if match:
+                time_str = match.group(1)
+                # Return only HH:MM format
+                if len(time_str) > 5:
+                    return time_str[:5]
+                return time_str
+        return None
+    
+    def get_num_persons(self, obj):
+        """Get number of persons - try direct field first, then extract from order admin_notes"""
+        # Try direct field first
+        if hasattr(obj, 'num_persons') and obj.num_persons:
+            return int(obj.num_persons)
+        
+        # Fallback to extracting from order admin_notes
+        import re
+        if obj.order and obj.order.admin_notes:
+            # Pattern: "Persons: 50"
+            match = re.search(r'Persons:\s*(\d+)', obj.order.admin_notes)
+            if match:
+                return int(match.group(1))
+        return 0
+    
+    def get_menu_name(self, obj):
+        """Get menu name - try direct field first, then extract from notes"""
+        # Try direct field first
+        if hasattr(obj, 'menu_name') and obj.menu_name:
+            return obj.menu_name
+        
+        # Fallback to extracting from notes
+        if obj.notes:
+            # Pattern: "Menu: <menu_name>"
+            import re
+            match = re.search(r'Menu:\s*([^.]+)', obj.notes)
+            if match:
+                return match.group(1).strip()
+        return None
 
 
 # Duplicate definitions removed - using earlier complete implementations above
@@ -765,7 +1022,37 @@ class CustomerBulkOrderSerializer(serializers.Serializer):
     num_persons = serializers.IntegerField(required=True, min_value=1)
     event_date = serializers.DateField(required=True)
     event_time = serializers.TimeField(required=True)
-    delivery_address = serializers.CharField(required=True, max_length=500)
+    order_type = serializers.ChoiceField(
+        choices=['delivery', 'pickup'],
+        default='delivery',
+        required=False
+    )
+    delivery_address = serializers.CharField(required=False, max_length=500, allow_blank=True)
+    delivery_address_id = serializers.IntegerField(required=False, allow_null=True)
+    delivery_latitude = serializers.DecimalField(
+        max_digits=10, 
+        decimal_places=8, 
+        required=False, 
+        allow_null=True
+    )
+    delivery_longitude = serializers.DecimalField(
+        max_digits=11, 
+        decimal_places=8, 
+        required=False, 
+        allow_null=True
+    )
+    delivery_fee = serializers.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        required=False
+    )
+    distance_km = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        required=False,
+        allow_null=True
+    )
     special_instructions = serializers.CharField(required=False, allow_blank=True)
     selected_optional_items = serializers.ListField(
         child=serializers.IntegerField(),
@@ -826,5 +1113,13 @@ class CustomerBulkOrderSerializer(serializers.Serializer):
             raise serializers.ValidationError({
                 'event_date': f"This menu requires {menu.advance_notice_hours} hours advance notice"
             })
+        
+        # Validate delivery address for delivery orders
+        order_type = data.get('order_type', 'delivery')
+        if order_type == 'delivery':
+            if not data.get('delivery_address') and not data.get('delivery_address_id'):
+                raise serializers.ValidationError({
+                    'delivery_address': 'Delivery address is required for delivery orders'
+                })
         
         return data

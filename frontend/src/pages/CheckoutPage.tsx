@@ -162,10 +162,10 @@ const CheckoutPage: React.FC = () => {
             Number(firstItem.kitchen_location.lng)
           );
           
-          // Delivery fee calculation: LKR 50 base + LKR 15 per km after 5km
-          const baseFee = 50;
+          // Delivery fee calculation: LKR 300 base + LKR 100 per km after 5km
+          const baseFee = 300;
           const freeDistanceKm = 5;
-          const perKmFee = 15;
+          const perKmFee = 100;
           
           if (calculatedDistance > freeDistanceKm) {
             const extraKm = Math.ceil(calculatedDistance - freeDistanceKm);

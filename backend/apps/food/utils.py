@@ -31,8 +31,8 @@ def calculate_delivery_fee(user_lat: float, user_lng: float, kitchen_lat: float,
     Calculate delivery fee based on distance between user and kitchen location
     
     Fee Structure:
-    - First 5 km: ₹50 (base fee)
-    - After 5 km: ₹15 per additional km
+    - First 5 km: LKR 300 (base fee)
+    - After 5 km: LKR 100 per additional km
     
     Args:
         user_lat: User's latitude
@@ -45,8 +45,8 @@ def calculate_delivery_fee(user_lat: float, user_lng: float, kitchen_lat: float,
     """
     distance = calculate_distance(user_lat, user_lng, kitchen_lat, kitchen_lng)
     
-    BASE_FEE = Decimal('50.00')
-    ADDITIONAL_FEE_PER_KM = Decimal('15.00')
+    BASE_FEE = Decimal('300.00')
+    ADDITIONAL_FEE_PER_KM = Decimal('100.00')
     FREE_DISTANCE_KM = 5
     
     if distance <= FREE_DISTANCE_KM:

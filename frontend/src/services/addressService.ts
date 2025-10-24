@@ -192,14 +192,22 @@ class AddressService {
   }
 
   /**
-   * Delete an address
+   * Delete an address (supports both old and new systems)
    */
   async deleteAddress(id: number): Promise<void> {
     try {
+      // Try new system first
       await apiClient.delete(`${this.baseUrl}${id}/`);
-    } catch (error) {
-      console.error('Error deleting address:', error);
-      throw new Error('Failed to delete address');
+    } catch (newSystemError) {
+      console.warn('New system failed, trying old system...');
+      try {
+        // Fallback to old system
+        await apiClient.delete(`/orders/addresses/${id}/`);
+        console.log('✅ Address deleted from old system');
+      } catch (oldSystemError) {
+        console.error('Error deleting address from both systems:', oldSystemError);
+        throw new Error('Failed to delete address');
+      }
     }
   }
 
