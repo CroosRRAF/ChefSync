@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from .models import (CartItem, DeliveryChat, DeliveryIssue, DeliveryLog,
                      LocationUpdate, Order, OrderItem, OrderStatusHistory,
                      UserAddress)
-from .serializers import CartItemSerializer, UserAddressSerializer
+from .serializers import CartItemSerializer, UserAddressSerializer, DeliveryChatSerializer
 
 User = get_user_model()
 
@@ -160,6 +160,49 @@ def _resolve_chef_location(chef, request_data):
 
     # Not available
     return None, None
+
+
+def _get_chef_address(chef):
+    """Get the chef's kitchen address as a formatted string"""
+    # Try to get Kitchen address first
+    kitchen_addr = UserAddress.objects.filter(
+        user=chef, label="Kitchen"
+    ).first()
+    
+    if kitchen_addr:
+        # Format the full address
+        parts = []
+        if kitchen_addr.address_line1:
+            parts.append(kitchen_addr.address_line1)
+        if kitchen_addr.address_line2:
+            parts.append(kitchen_addr.address_line2)
+        if kitchen_addr.city:
+            parts.append(kitchen_addr.city)
+        if kitchen_addr.pincode and kitchen_addr.pincode != "000000":
+            parts.append(kitchen_addr.pincode)
+        
+        if parts:
+            return ", ".join(parts)
+    
+    # Try any address with coordinates
+    any_addr = UserAddress.objects.filter(
+        user=chef,
+        latitude__isnull=False,
+        longitude__isnull=False
+    ).order_by("-is_default", "-created_at").first()
+    
+    if any_addr:
+        parts = []
+        if any_addr.address_line1:
+            parts.append(any_addr.address_line1)
+        if any_addr.city:
+            parts.append(any_addr.city)
+        if parts:
+            return ", ".join(parts)
+    
+    # Fallback to chef name
+    chef_name = chef.get_full_name() or chef.name or chef.username
+    return f"{chef_name}'s Kitchen"
 
 
 # Temporary simple serializer to fix the 500 error
@@ -913,6 +956,302 @@ class OrderViewSet(viewsets.ModelViewSet):
                 or chef_location.get("service_location", "Address not available"),
             }
         )
+
+    @action(detail=True, methods=["get"])
+    def tracking(self, request, pk=None):
+        """Get comprehensive real-time tracking information for an order"""
+        order = self.get_object()
+        
+        # Check authorization: customer, chef, delivery partner, or admin
+        if not (order.customer == request.user or 
+                order.chef == request.user or 
+                order.delivery_partner == request.user or
+                request.user.is_staff):
+            return Response(
+                {"error": "You are not authorized to track this order"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get order with related data (skip location_updates if table doesn't exist)
+        try:
+            order = Order.objects.select_related('customer', 'chef', 'delivery_partner').prefetch_related(
+                'status_history', 'items__price__food', 'location_updates'
+            ).get(pk=pk)
+        except Exception as e:
+            # Fallback without location_updates if table doesn't exist
+            order = Order.objects.select_related('customer', 'chef', 'delivery_partner').prefetch_related(
+                'status_history', 'items__price__food'
+            ).get(pk=pk)
+        
+        # Build timeline from status_timestamps
+        timeline = []
+        status_order = ['cart', 'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled']
+        
+        # Handle case where status_timestamps might not exist or be None
+        status_timestamps = order.status_timestamps if order.status_timestamps else {}
+        
+        for status_key in status_order:
+            status_display = dict(Order.ORDER_STATUS_CHOICES).get(status_key, status_key)
+            timestamp = status_timestamps.get(status_key)
+            
+            timeline.append({
+                'status': status_key,
+                'status_display': status_display,
+                'timestamp': timestamp,
+                'completed': timestamp is not None,
+                'current': order.status == status_key,
+            })
+        
+        # Get chef location for map
+        chef_location = None
+        if order.chef:
+            chef_lat, chef_lng = _resolve_chef_location(order.chef, {})
+            if chef_lat and chef_lng:
+                chef_address = _get_chef_address(order.chef)
+                chef_location = {
+                    'latitude': chef_lat,
+                    'longitude': chef_lng,
+                    'address': chef_address
+                }
+        
+        # Get delivery location
+        delivery_location = None
+        if order.delivery_latitude and order.delivery_longitude:
+            delivery_location = {
+                'latitude': float(order.delivery_latitude),
+                'longitude': float(order.delivery_longitude),
+                'address': order.delivery_address
+            }
+        
+        # Get latest delivery agent location (if table exists)
+        agent_location = None
+        if order.delivery_partner:
+            try:
+                latest_location = LocationUpdate.objects.filter(
+                    delivery_agent=order.delivery_partner,
+                    order=order
+                ).first()
+                
+                if latest_location:
+                    agent_location = {
+                        'latitude': float(latest_location.latitude),
+                        'longitude': float(latest_location.longitude),
+                        'timestamp': latest_location.timestamp.isoformat(),
+                        'address': latest_location.address
+                    }
+            except Exception:
+                # LocationUpdate table doesn't exist yet
+                pass
+        
+        # Get order items summary
+        items_summary = []
+        for item in order.items.all():
+            items_summary.append({
+                'id': item.order_item_id,
+                'food_name': item.food_name,
+                'quantity': item.quantity,
+                'price': float(item.unit_price) if item.unit_price else 0,
+            })
+        
+        # Calculate ETA if out for delivery
+        estimated_time_remaining = None
+        if order.status == 'out_for_delivery' and order.estimated_delivery_time:
+            time_remaining = order.estimated_delivery_time - timezone.now()
+            estimated_time_remaining = max(0, int(time_remaining.total_seconds() / 60))
+        
+        # Build response
+        tracking_data = {
+            'id': order.id,
+            'order_number': order.order_number,
+            'status': order.status,
+            'status_display': order.get_status_display(),
+            'order_type': getattr(order, 'order_type', 'delivery'),  # 'delivery' or 'pickup'
+            'created_at': order.created_at.isoformat(),
+            'updated_at': order.updated_at.isoformat(),
+            
+            # Timeline
+            'timeline': timeline,
+            'status_timestamps': status_timestamps,
+            
+            # Locations
+            'chef_location': chef_location,
+            'delivery_location': delivery_location,
+            'agent_location': agent_location,
+            'distance_km': float(order.distance_km) if order.distance_km else None,
+            
+            # Order details
+            'total_amount': float(order.total_amount),
+            'delivery_fee': float(order.delivery_fee) if order.delivery_fee else 0,
+            'items': items_summary,
+            'total_items': sum(item['quantity'] for item in items_summary),
+            
+            # Time estimates
+            'estimated_delivery_time': order.estimated_delivery_time.isoformat() if order.estimated_delivery_time else None,
+            'estimated_time_remaining_minutes': estimated_time_remaining,
+            'actual_delivery_time': order.actual_delivery_time.isoformat() if order.actual_delivery_time else None,
+            
+            # People
+            'customer': {
+                'name': order.customer.name or order.customer.username,
+                'phone': getattr(order.customer, 'phone_no', None)
+            } if order.customer else None,
+            
+            'chef': {
+                'name': order.chef.name or order.chef.username,
+                'phone': getattr(order.chef, 'phone_no', None),
+                'specialty': getattr(order.chef, 'specialty', None) if hasattr(order.chef, 'cook') else None
+            } if order.chef else None,
+            
+            'delivery_partner': {
+                'name': order.delivery_partner.name or order.delivery_partner.username,
+                'phone': getattr(order.delivery_partner, 'phone_no', None)
+            } if order.delivery_partner else None,
+            
+            # Cancellation info
+            'can_cancel': order.can_be_cancelled,
+            'cancellation_time_remaining_seconds': order.cancellation_time_remaining,
+        }
+        
+        return Response(tracking_data)
+    
+    @action(detail=True, methods=['get'], url_path='chat/messages')
+    def get_chat_messages(self, request, pk=None):
+        """Get all chat messages for an order between customer and delivery agent"""
+        order = self.get_object()
+        
+        # Check authorization: customer or delivery partner
+        if not (order.customer == request.user or order.delivery_partner == request.user):
+            return Response(
+                {"error": "You are not authorized to view these messages"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get all messages for this order
+        messages = DeliveryChat.objects.filter(order=order).order_by('created_at')
+        
+        # Mark messages as read if user is the receiver
+        messages.filter(receiver=request.user, is_read=False).update(is_read=True)
+        
+        serializer = DeliveryChatSerializer(messages, many=True, context={'request': request})
+        
+        return Response({
+            'order_number': order.order_number,
+            'messages': serializer.data,
+            'unread_count': messages.filter(receiver=request.user, is_read=False).count()
+        })
+    
+    @action(detail=True, methods=['post'], url_path='chat/send')
+    def send_chat_message(self, request, pk=None):
+        """Send a chat message to delivery agent or customer"""
+        order = self.get_object()
+        
+        # Check authorization: customer or delivery partner
+        if not (order.customer == request.user or order.delivery_partner == request.user):
+            return Response(
+                {"error": "You are not authorized to send messages for this order"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if delivery partner is assigned
+        if not order.delivery_partner:
+            return Response(
+                {"error": "No delivery partner assigned yet"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        message_text = request.data.get('message', '').strip()
+        message_type = request.data.get('message_type', 'text')
+        
+        if not message_text:
+            return Response(
+                {"error": "Message cannot be empty"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Determine receiver (if sender is customer, receiver is delivery partner and vice versa)
+        sender = request.user
+        receiver = order.delivery_partner if sender == order.customer else order.customer
+        
+        # Create message
+        chat_message = DeliveryChat.objects.create(
+            order=order,
+            sender=sender,
+            receiver=receiver,
+            message=message_text,
+            message_type=message_type
+        )
+        
+        serializer = DeliveryChatSerializer(chat_message, context={'request': request})
+        
+        return Response({
+            'success': True,
+            'message': serializer.data
+        }, status=status.HTTP_201_CREATED)
+    
+    @action(detail=True, methods=['get'], url_path='chat/quick-messages')
+    def get_quick_messages(self, request, pk=None):
+        """Get suggested quick messages based on order status"""
+        order = self.get_object()
+        
+        # Check authorization
+        if not (order.customer == request.user or order.delivery_partner == request.user):
+            return Response(
+                {"error": "You are not authorized"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Quick messages for customers
+        customer_messages = [
+            "Where are you right now?",
+            "How long will it take?",
+            "Can you call me when you arrive?",
+            "I'm waiting outside",
+            "Please ring the doorbell",
+            "Leave it at the door, thanks!",
+        ]
+        
+        # Quick messages for delivery agents
+        delivery_agent_messages = [
+            "I'm on my way!",
+            "Arriving in 5 minutes",
+            "I'm at your location",
+            "Please come down, I'm outside",
+            "Order delivered successfully!",
+            "Having trouble finding your address",
+        ]
+        
+        # Determine which messages to show
+        if request.user == order.customer:
+            quick_messages = customer_messages
+        else:
+            quick_messages = delivery_agent_messages
+        
+        return Response({
+            'quick_messages': quick_messages
+        })
+    
+    @action(detail=False, methods=['get'], url_path='delivery/available')
+    def available_for_delivery(self, request):
+        """Get orders available for delivery agents to accept"""
+        # Orders that are ready and don't have a delivery partner yet
+        available_orders = Order.objects.filter(
+            Q(status__in=['confirmed', 'preparing', 'ready']) & Q(delivery_partner__isnull=True)
+        ).select_related('customer', 'chef').prefetch_related('items__price__food').order_by('-created_at')
+        
+        serializer = self.get_serializer(available_orders, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path='delivery/assigned')
+    def my_assigned_deliveries(self, request):
+        """Get orders assigned to the current delivery agent"""
+        # Orders assigned to this delivery agent
+        assigned_orders = Order.objects.filter(
+            delivery_partner=request.user,
+            status__in=['ready', 'out_for_delivery', 'in_transit']
+        ).select_related('customer', 'chef').prefetch_related('items__price__food').order_by('-created_at')
+        
+        serializer = self.get_serializer(assigned_orders, many=True)
+        return Response(serializer.data)
 
 
 # Temporarily disabled other ViewSets to fix 500 error

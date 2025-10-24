@@ -103,10 +103,14 @@ const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
       return;
     }
 
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    
-    if (!apiKey) {
-      toast.error('Google Maps API key not configured');
+    let apiKey: string;
+    try {
+      const { getGoogleMapsKey } = require('@/config/apiKeys');
+      apiKey = getGoogleMapsKey();
+    } catch (error: any) {
+      toast.error('Google Maps API key not configured', {
+        description: 'Please set VITE_GOOGLE_MAPS_API_KEY in your .env file'
+      });
       return;
     }
 

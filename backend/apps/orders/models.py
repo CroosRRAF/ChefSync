@@ -189,10 +189,34 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     confirmed_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    
+    # Status tracking - JSON field to store timestamps for each stage
+    status_timestamps = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Timestamps for each order status transition"
+    )
 
     def save(self, *args, **kwargs):
+        from django.utils import timezone
+        
         if not self.order_number:
             self.order_number = self.generate_order_number()
+        
+        # Track status changes with timestamps
+        if self.pk:  # Only for existing orders
+            old_order = Order.objects.filter(pk=self.pk).first()
+            if old_order and old_order.status != self.status:
+                # Status changed, record timestamp
+                if not self.status_timestamps:
+                    self.status_timestamps = {}
+                self.status_timestamps[self.status] = timezone.now().isoformat()
+        else:
+            # New order, initialize with current status
+            if not self.status_timestamps:
+                self.status_timestamps = {}
+            self.status_timestamps[self.status] = timezone.now().isoformat()
+        
         super().save(*args, **kwargs)
 
     def generate_order_number(self):
@@ -209,7 +233,30 @@ class Order(models.Model):
 
     @property
     def can_be_cancelled(self):
-        return self.status in ["cart", "pending", "confirmed"]
+        """Check if order can be cancelled based on status and time"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Only allow cancellation for these statuses
+        if self.status not in ["pending", "confirmed"]:
+            return False
+        
+        # Check 10-minute window
+        time_since_order = timezone.now() - self.created_at
+        return time_since_order <= timedelta(minutes=10)
+    
+    @property
+    def cancellation_time_remaining(self):
+        """Get remaining time for cancellation in seconds"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        if not self.can_be_cancelled:
+            return 0
+        
+        time_since_order = timezone.now() - self.created_at
+        time_remaining = timedelta(minutes=10) - time_since_order
+        return max(0, int(time_remaining.total_seconds()))
 
     def calculate_delivery_fee(self, distance_km):
         """Calculate delivery fee based on distance

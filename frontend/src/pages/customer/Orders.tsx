@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 import { customerService, Order } from '@/services/customerService';
+import { openOrderTracking } from '@/components/tracking/OrderTrackingWrapper';
 import { 
   Package, 
   Clock, 
@@ -25,7 +26,8 @@ import {
   ArrowLeft,
   Home,
   LayoutDashboard,
-  Loader2
+  Loader2,
+  Navigation
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -116,6 +118,15 @@ const CustomerOrders: React.FC = () => {
         toast.error('Failed to cancel order');
       }
     }
+  };
+
+  const handleTrackOrder = (orderId: number) => {
+    // Use global event to open tracking panel
+    openOrderTracking(orderId);
+  };
+
+  const isActiveOrder = (status: string) => {
+    return !['delivered', 'cancelled', 'refunded', 'cart'].includes(status);
   };
 
   if (loading) {
@@ -266,6 +277,19 @@ const CustomerOrders: React.FC = () => {
                       </div>
                       
                       <div className="flex space-x-2">
+                        {/* Track button for active orders */}
+                        {isActiveOrder(order.status) && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleTrackOrder(order.id)}
+                            className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                          >
+                            <Navigation className="h-4 w-4 mr-1" />
+                            Track
+                          </Button>
+                        )}
+                        
                         <Button
                           variant="outline"
                           size="sm"

@@ -19,14 +19,20 @@
     /* Primary - Warm Orange */
     --primary: 27 100% 63%;       /* #FF8C42 */
     --primary-foreground: 0 0% 100%;
+    --primary-light: 27 100% 73%;
+    --primary-dark: 27 100% 53%;
     
     /* Secondary - Deep Blue */
     --secondary: 210 29% 24%;     /* #2C3E50 */
     --secondary-foreground: 0 0% 100%;
+    --secondary-light: 210 29% 34%;
+    --secondary-dark: 210 29% 14%;
     
     /* Accent - Vibrant Green (for CTAs) */
     --accent: 145 58% 49%;        /* #2ECC71 */
     --accent-foreground: 0 0% 100%;
+    --accent-light: 145 58% 59%;
+    --accent-dark: 145 58% 39%;
     
     /* Success - Green (Matches Accent) */
     --success: 145 58% 49%;       /* #2ECC71 */
@@ -145,6 +151,16 @@
     --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-light)));
     --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.8), hsl(var(--secondary) / 0.7));
     --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(var(--muted) / 0.3));
+    
+    /* Sidebar Dark Mode */
+    --sidebar-background: 20 14.3% 4.1%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 20 14.3% 4.1%;
+    --sidebar-accent: 20 14.3% 10%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 20 14.3% 15%;
+    --sidebar-ring: 24 100% 55%;
   }
 }
 

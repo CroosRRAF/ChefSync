@@ -71,13 +71,19 @@ If asked about specific orders, menus, or account details you don't have access 
 
   private initialize() {
     try {
-      // Get API key from environment
-      const apiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY || 
-                     import.meta.env.VITE_GOOGLE_GEMINI_API_KEY || 
-                     import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      // Get API key from centralized config
+      let apiKey: string | undefined;
+      try {
+        const { getGoogleAIKey } = require('@/config/apiKeys');
+        apiKey = getGoogleAIKey();
+      } catch (error) {
+        // Fallback to environment variables if config not available
+        apiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY;
+      }
       
       if (!apiKey) {
-        console.error('Google AI API key not found');
+        console.warn('🤖 Google AI API key not configured - using fallback responses');
+        console.info('💡 To enable AI features, add VITE_GOOGLE_AI_API_KEY to your .env file');
         return;
       }
 

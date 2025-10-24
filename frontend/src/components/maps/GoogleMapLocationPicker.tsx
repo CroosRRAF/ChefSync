@@ -44,13 +44,19 @@ const GoogleMapLocationPicker: React.FC<GoogleMapLocationPickerProps> = ({
 
   // Load Google Maps Script
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    let apiKey: string;
     
-    console.log("🗺️ Google Maps API Key check:", apiKey ? "✓ Present" : "✗ Missing");
-    
-    if (!apiKey) {
-      console.error("❌ Google Maps API key not found in environment variables");
-      toast.error("Google Maps API key is missing. Please add VITE_GOOGLE_MAPS_API_KEY to your .env file");
+    try {
+      const { getGoogleMapsKey } = require('@/config/apiKeys');
+      apiKey = getGoogleMapsKey();
+      console.log("🗺️ Google Maps API Key check: ✓ Present");
+    } catch (error: any) {
+      console.error("❌ Google Maps API key not found:", error.message);
+      toast.error("Google Maps API key is missing", {
+        description: "Please add VITE_GOOGLE_MAPS_API_KEY to your .env file"
+      });
+      setHasError(true);
+      setErrorMessage(error.message || "Google Maps API key not configured");
       return;
     }
 

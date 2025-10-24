@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db.models import Sum, Count
-from .models import Order, OrderItem, OrderStatusHistory, CartItem, BulkOrder, BulkOrderAssignment, UserAddress
+from .models import Order, OrderItem, OrderStatusHistory, CartItem, BulkOrder, BulkOrderAssignment, UserAddress, DeliveryChat
 from apps.food.models import Food, FoodPrice
 from apps.users.models import ChefProfile
 from django.contrib.auth import get_user_model
@@ -1123,3 +1123,45 @@ class CustomerBulkOrderSerializer(serializers.Serializer):
                 })
         
         return data
+
+
+class DeliveryChatSerializer(serializers.ModelSerializer):
+    """Serializer for delivery chat messages"""
+    
+    sender_name = serializers.SerializerMethodField()
+    sender_role = serializers.SerializerMethodField()
+    is_own_message = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = DeliveryChat
+        fields = [
+            'message_id',
+            'order',
+            'sender',
+            'receiver',
+            'sender_name',
+            'sender_role',
+            'message',
+            'message_type',
+            'is_read',
+            'is_own_message',
+            'created_at',
+        ]
+        read_only_fields = ['message_id', 'sender', 'created_at']
+    
+    def get_sender_name(self, obj):
+        """Get sender's display name"""
+        return obj.sender.name or obj.sender.username
+    
+    def get_sender_role(self, obj):
+        """Get sender's role (customer or delivery_agent)"""
+        if hasattr(obj.sender, 'deliveryagent'):
+            return 'delivery_agent'
+        return 'customer'
+    
+    def get_is_own_message(self, obj):
+        """Check if message was sent by the current user"""
+        request = self.context.get('request')
+        if request and request.user:
+            return obj.sender == request.user
+        return False

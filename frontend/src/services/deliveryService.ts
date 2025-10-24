@@ -58,23 +58,15 @@ export interface DeliveryNotification {
 
 // 🚚 Get orders assigned to current delivery agent
 export const getMyAssignedOrders = async (): Promise<Order[]> => {
-  // Since there's no specific backend endpoint for "my assigned orders",
-  // we'll use the general orders endpoint and rely on backend filtering
-  // The backend should filter orders based on the authenticated user
-  const res = await apiClient.get("/orders/orders/");
-  const allOrders = res.data.results || res.data;
-
-  // Filter for orders that are assigned and in active delivery states
-  return allOrders.filter((order: Order) =>
-    ["assigned", "out_for_delivery", "picked_up", "in_transit"].includes(
-      order.status
-    )
-  );
+  // Use dedicated endpoint for assigned deliveries
+  const res = await apiClient.get("/orders/orders/delivery/assigned/");
+  return res.data.results || res.data;
 };
 
 // 🚚 Fetch available orders
 export const getAvailableOrders = async (): Promise<Order[]> => {
-  const res = await apiClient.get("/orders/orders/");
+  // Use dedicated endpoint for available orders
+  const res = await apiClient.get("/orders/orders/delivery/available/");
   return res.data.results || res.data;
 };
 
@@ -301,9 +293,17 @@ export const getDeliveryLogs = async (dateRange?: {
   start: string;
   end: string;
 }): Promise<DeliveryLog[]> => {
-  const params = dateRange ? `?start=${dateRange.start}&end=${dateRange.end}` : '';
-  const res = await apiClient.get(`/delivery/logs/${params}`);
-  return res.data.results || res.data;
+  try {
+    const params = dateRange ? `?start=${dateRange.start}&end=${dateRange.end}` : '';
+    const res = await apiClient.get(`/delivery/logs/${params}`);
+    return res.data.results || res.data;
+  } catch (error: any) {
+    // Return empty array if endpoint doesn't exist (404)
+    if (error.response?.status === 404) {
+      return [];
+    }
+    throw error;
+  }
 };
 
 // 🗺️ Route optimization

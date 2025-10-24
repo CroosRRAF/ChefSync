@@ -148,11 +148,18 @@ class GoogleMapsLoader {
    * Get the Google Maps API key from environment variables
    */
   static getApiKey(): string {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
-      throw new Error('Google Maps API key not found. Please set VITE_GOOGLE_MAPS_API_KEY in your environment variables.');
+    // Import centralized API key manager
+    try {
+      const { getGoogleMapsKey } = require('@/config/apiKeys');
+      return getGoogleMapsKey();
+    } catch (error) {
+      // Fallback to direct environment variable access
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        throw new Error('Google Maps API key not found. Please set VITE_GOOGLE_MAPS_API_KEY in your environment variables.');
+      }
+      return apiKey;
     }
-    return apiKey;
   }
 }
 

@@ -21,6 +21,7 @@ import DeliveryAddressTest from "@/pages/DeliveryAddressTest";
 import Home from "@/pages/Home";
 import MenuPage from "@/pages/MenuPage";
 import NotFound from "@/pages/NotFound";
+import SetupPage from "@/pages/SetupPage";
 
 // Authentication pages
 import ApprovalStatusPage from "@/pages/auth/ApprovalStatus";
@@ -308,6 +309,12 @@ const InnerRoutes: React.FC = () => {
               <DeliveryAddressTest />
             </>
           }
+        />
+        
+        {/* Setup Page - Public route for API configuration */}
+        <Route
+          path="/setup"
+          element={<SetupPage />}
         />
 
         {/* Authentication Routes */}

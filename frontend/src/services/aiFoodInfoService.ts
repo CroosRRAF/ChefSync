@@ -33,17 +33,22 @@ class AIFoodInfoService {
 
   private initialize() {
     try {
-      // Get API key from environment
-      const apiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY || 
-                     import.meta.env.VITE_GOOGLE_GEMINI_API_KEY || 
-                     import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      // Get API key from centralized config
+      let apiKey: string | undefined;
+      try {
+        const { getGoogleAIKey } = require('@/config/apiKeys');
+        apiKey = getGoogleAIKey();
+      } catch (error) {
+        // Fallback to environment variables if config not available
+        apiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY;
+      }
       
       console.log('🔑 Initializing AI Food Info Service...');
       console.log('API Key available:', !!apiKey);
       
       if (!apiKey) {
-        console.error('❌ Google AI API key not found in environment variables');
-        console.error('Please set VITE_GOOGLE_AI_API_KEY in your .env file');
+        console.warn('⚠️ Google AI API key not configured - using smart fallback responses');
+        console.info('💡 To enable AI-powered food info, add VITE_GOOGLE_AI_API_KEY to your .env file');
         return;
       }
 

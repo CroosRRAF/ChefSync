@@ -35,6 +35,7 @@ import {
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import AIChatBox from '@/components/ai/AIChatBox';
+import OrderTrackingWrapper from '@/components/tracking/OrderTrackingWrapper';
 
 interface CustomerDashboardLayoutProps {
   children: React.ReactNode;
@@ -339,6 +340,9 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
 
       {/* AI ChatBox - Floating in bottom-right corner */}
       <AIChatBox />
+
+      {/* Order Tracking - Persistent status bar and tracking panel */}
+      <OrderTrackingWrapper />
     </div>
   );
 };

@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { customerService, CustomerStats } from '@/services/customerService';
 import DashboardErrorBoundary from '@/components/dashboard/DashboardErrorBoundary';
+import { openOrderTracking } from '@/components/tracking/OrderTrackingWrapper';
 import { 
   ShoppingCart, 
   Clock, 
@@ -23,7 +24,8 @@ import {
   Loader2,
   AlertCircle,
   Users,
-  Calendar
+  Calendar,
+  Navigation
 } from 'lucide-react';
 
 interface BulkOrder {
@@ -126,6 +128,14 @@ const CustomerDashboardContent: React.FC = () => {
   };
 
   const customerLevel = stats ? getCustomerLevel(stats.completed_orders) : { level: 'Bronze', color: 'bg-orange-500', progress: 0 };
+
+  const handleTrackOrder = (orderId: number) => {
+    openOrderTracking(orderId);
+  };
+
+  const isActiveOrder = (status: string) => {
+    return !['delivered', 'cancelled', 'refunded', 'cart'].includes(status);
+  };
 
   if (loading) {
     return (
@@ -318,11 +328,23 @@ const CustomerDashboardContent: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900 dark:text-white">LKR {Math.round(order.total_amount)}</p>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status.replace('_', ' ')}
-                    </Badge>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900 dark:text-white">LKR {Math.round(order.total_amount)}</p>
+                      <Badge className={getStatusColor(order.status)}>
+                        {order.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    {isActiveOrder(order.status) && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleTrackOrder(order.id)}
+                        className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                      >
+                        <Navigation className="h-4 w-4 mr-1" />
+                        Track
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))
