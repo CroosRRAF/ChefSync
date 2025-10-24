@@ -38,6 +38,7 @@ import {
   updateDeliveryProgress,
   markOrderPickedUp,
   getChefLocation,
+  type UnifiedOrder,
 } from "@/services/service";
 import {
   calculateDistanceHaversine,
@@ -65,9 +66,13 @@ interface CookDetails {
 }
 
 interface PickupDeliveryFlowProps {
-  order: Order;
+  order: UnifiedOrder;
   currentLocation: { lat: number; lng: number } | null;
-  onStatusUpdate: (orderId: number, newStatus: Order["status"]) => void;
+  onStatusUpdate: (
+    orderId: number,
+    newStatus: UnifiedOrder["status"],
+    orderType?: "normal" | "bulk"
+  ) => void;
   onOrderComplete: (orderId: number) => void;
 }
 
@@ -249,7 +254,8 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
               lng: currentLocation.lng,
               address: cookDetails?.address,
             }
-          : undefined
+          : undefined,
+        order.order_type_category || "normal"
       );
 
       setTracking((prev) => ({
@@ -257,18 +263,19 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
         pickup: { started: true, completed: true },
       }));
       setCurrentPhase("delivery");
-      onStatusUpdate(order.id, "in_transit");
+      onStatusUpdate(order.id, "in_transit", order.order_type_category);
 
       toast({
         title: "Order Picked Up",
         description: "Order has been collected. Now proceed to delivery.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Pickup completion error:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to update pickup status. Please try again.",
+        title: "Pickup Error",
+        description:
+          error.message || "Failed to update pickup status. Please try again.",
       });
     }
   };
@@ -287,24 +294,26 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
       await updateOrderStatus(
         order.id,
         "in_transit",
-        currentLocation || undefined
+        currentLocation || undefined,
+        order.order_type_category || "normal"
       );
 
       setTracking((prev) => ({
         ...prev,
         delivery: { ...prev.delivery, started: true },
       }));
-      onStatusUpdate(order.id, "in_transit");
+      onStatusUpdate(order.id, "in_transit", order.order_type_category);
 
       toast({
         title: "Delivery Started",
         description: "Navigation to customer has begun.",
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Delivery start error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to start delivery tracking.",
+        description: error.message || "Failed to start delivery tracking.",
       });
     }
   };
@@ -314,25 +323,27 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
       await updateOrderStatus(
         order.id,
         "delivered",
-        currentLocation || undefined
+        currentLocation || undefined,
+        order.order_type_category || "normal"
       );
 
       setTracking((prev) => ({
         ...prev,
         delivery: { started: true, completed: true },
       }));
-      onStatusUpdate(order.id, "delivered");
+      onStatusUpdate(order.id, "delivered", order.order_type_category);
       onOrderComplete(order.id);
 
       toast({
         title: "Delivery Completed",
         description: "Order has been successfully delivered!",
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Delivery completion error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to complete delivery.",
+        description: error.message || "Failed to complete delivery.",
       });
     }
   };
@@ -414,7 +425,9 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
       title = `Chef ${order.chef?.name || "Kitchen"}`;
     } else {
       location = order.delivery_address || "";
-      title = `Customer ${order.customer?.name || "Location"}`;
+      title = `Customer ${
+        order.customer?.name || order.customer_name || "Location"
+      }`;
     }
 
     if (location && location !== "Location not available") {
@@ -753,8 +766,16 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h4 className="font-semibold text-lg">
-                    {order.customer?.name || "Customer"}
+                    {order.customer?.name || order.customer_name || "Customer"}
                   </h4>
+                  {order.order_type_category === "bulk" && (
+                    <div className="flex items-center mt-1">
+                      <Package className="h-4 w-4 mr-1 text-blue-600" />
+                      <span className="text-sm text-blue-600 font-medium">
+                        Bulk Order - {order.event_type || "Event"}
+                      </span>
+                    </div>
+                  )}
                   <div className="space-y-2 mt-2">
                     <div className="flex items-center">
                       <Phone className="h-4 w-4 mr-2 text-gray-500" />
@@ -786,6 +807,7 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
                       window.open(`tel:${order.customer.phone}`, "_self");
                     }
                   }}
+                  disabled={!order.customer?.phone}
                 >
                   <Phone className="h-4 w-4" />
                 </Button>
@@ -851,7 +873,9 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
                         <IntegratedMapView
                           location={order.delivery_address}
                           title={`Customer ${
-                            order.customer?.name || "Location"
+                            order.customer?.name ||
+                            order.customer_name ||
+                            "Location"
                           }`}
                           userLocation={currentLocation}
                           onNavigate={() => handleGoogleNavigation("delivery")}

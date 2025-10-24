@@ -734,11 +734,12 @@ class OrderViewSet(viewsets.ModelViewSet):
         new_status = request.data.get("status")
 
         # Define valid status transitions for delivery agents
-        valid_delivery_statuses = ["picked_up", "delivered"]
+        valid_delivery_statuses = ["picked_up", "in_transit", "delivered"]
 
         if new_status not in valid_delivery_statuses:
             return Response(
-                {"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": f"Invalid status '{new_status}'. Valid statuses: {valid_delivery_statuses}"}, 
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         # Check if user is authorized to update this order
@@ -758,8 +759,18 @@ class OrderViewSet(viewsets.ModelViewSet):
                 {"error": f"Cannot mark picked_up from {current_status}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        elif new_status == "in_transit" and current_status not in [
+            "picked_up",
+            "out_for_delivery",
+            "ready",
+        ]:
+            return Response(
+                {"error": f"Cannot mark in_transit from {current_status}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         elif new_status == "delivered" and current_status not in [
             "picked_up",
+            "in_transit",
             "out_for_delivery",
             "ready",
         ]:

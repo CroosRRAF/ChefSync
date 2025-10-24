@@ -47,32 +47,184 @@ export interface DeliveryNotification {
   orderId?: number;
 }
 
-// 🚚 Get orders assigned to current delivery agent
-export const getMyAssignedOrders = async (): Promise<Order[]> => {
-  // Since there's no specific backend endpoint for "my assigned orders",
-  // we'll use the general orders endpoint and rely on backend filtering
-  // The backend should filter orders based on the authenticated user
-  const res = await apiClient.get('/orders/orders/');
-  const allOrders = res.data.results || res.data;
-  
-  // Filter for orders that are assigned and in active delivery states
-  return allOrders.filter((order: Order) => 
-    ['assigned', 'out_for_delivery', 'picked_up', 'in_transit'].includes(order.status)
-  );
+// Interface for bulk orders from the backend
+export interface BulkOrder {
+  bulk_order_id: number;
+  order_number: string;
+  customer?: any;
+  customer_name?: string;
+  chef?: any;
+  delivery_partner?: any;
+  status: 'pending' | 'confirmed' | 'collaborating' | 'preparing' | 'completed' | 'cancelled';
+  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  subtotal: number;
+  delivery_fee: number;
+  total_amount: number;
+  order_type: 'delivery' | 'pickup';
+  delivery_address?: string;
+  pickup_address?: string;
+  event_date: string;
+  event_type?: string;
+  event_time?: string;
+  description?: string;
+  total_quantity?: number;
+  created_at: string;
+  updated_at: string;
+  // Additional fields for display
+  customer_phone?: string;
+  special_instructions?: string;
+}
+
+// Combined interface for unified handling
+export interface UnifiedOrder extends Order {
+  order_type_category?: 'normal' | 'bulk';
+  bulk_order_id?: number;
+  event_date?: string;
+  event_type?: string;
+  total_quantity?: number;
+}
+
+// 🚚 Get orders assigned to current delivery agent (both normal and bulk)
+export const getMyAssignedOrders = async (): Promise<UnifiedOrder[]> => {
+  try {
+    // Fetch normal orders
+    const normalRes = await apiClient.get('/orders/orders/');
+    const normalOrders = (normalRes.data.results || normalRes.data) as Order[];
+    
+    // Fetch bulk orders
+    const bulkRes = await apiClient.get('/orders/bulk/');
+    const bulkOrders = (bulkRes.data.results || bulkRes.data) as BulkOrder[];
+    
+    // Filter normal orders for assigned and active delivery states
+    const assignedNormalOrders = normalOrders
+      .filter((order: Order) => 
+        ['assigned', 'out_for_delivery', 'picked_up', 'in_transit'].includes(order.status)
+      )
+      .map((order: Order): UnifiedOrder => ({
+        ...order,
+        order_type_category: 'normal'
+      }));
+    
+    // Filter bulk orders for delivery-assigned states and convert to unified format
+    const assignedBulkOrders = bulkOrders
+      .filter((bulkOrder: BulkOrder) => 
+        bulkOrder.delivery_partner && 
+        ['confirmed', 'preparing', 'completed'].includes(bulkOrder.status) &&
+        bulkOrder.order_type === 'delivery'
+      )
+      .map((bulkOrder: BulkOrder): UnifiedOrder => ({
+        id: bulkOrder.bulk_order_id,
+        order_number: bulkOrder.order_number,
+        customer: bulkOrder.customer,
+        customer_name: bulkOrder.customer_name,
+        chef: bulkOrder.chef,
+        delivery_partner: bulkOrder.delivery_partner,
+        status: mapBulkStatusToNormalStatus(bulkOrder.status),
+        total_amount: bulkOrder.total_amount,
+        created_at: bulkOrder.created_at,
+        updated_at: bulkOrder.updated_at,
+        delivery_address: bulkOrder.delivery_address || '',
+        pickup_location: bulkOrder.pickup_address,
+        order_type_category: 'bulk',
+        bulk_order_id: bulkOrder.bulk_order_id,
+        event_date: bulkOrder.event_date,
+        event_type: bulkOrder.event_type,
+        total_quantity: bulkOrder.total_quantity,
+        delivery_fee: bulkOrder.delivery_fee,
+        special_instructions: bulkOrder.description
+      }));
+    
+    return [...assignedNormalOrders, ...assignedBulkOrders];
+  } catch (error) {
+    console.error('Error fetching assigned orders:', error);
+    return [];
+  }
 };
 
-// 🚚 Fetch available orders
-export const getAvailableOrders = async (): Promise<Order[]> => {
-  const res = await apiClient.get('/orders/orders/');
-  return res.data.results || res.data;
+// 🚚 Fetch available orders (both normal and bulk)
+export const getAvailableOrders = async (): Promise<UnifiedOrder[]> => {
+  try {
+    // Fetch normal orders
+    const normalRes = await apiClient.get('/orders/orders/');
+    const normalOrders = (normalRes.data.results || normalRes.data) as Order[];
+    
+    // Fetch bulk orders
+    const bulkRes = await apiClient.get('/orders/bulk/');
+    const bulkOrders = (bulkRes.data.results || bulkRes.data) as BulkOrder[];
+    
+    // Filter normal orders for available states (ready for pickup/delivery)
+    const availableNormalOrders = normalOrders
+      .filter((order: Order) => 
+        ['ready', 'confirmed'].includes(order.status) && !order.delivery_partner
+      )
+      .map((order: Order): UnifiedOrder => ({
+        ...order,
+        order_type_category: 'normal'
+      }));
+    
+    // Filter bulk orders for available delivery
+    const availableBulkOrders = bulkOrders
+      .filter((bulkOrder: BulkOrder) => 
+        !bulkOrder.delivery_partner && 
+        ['confirmed', 'preparing'].includes(bulkOrder.status) &&
+        bulkOrder.order_type === 'delivery'
+      )
+      .map((bulkOrder: BulkOrder): UnifiedOrder => ({
+        id: bulkOrder.bulk_order_id,
+        order_number: bulkOrder.order_number,
+        customer: bulkOrder.customer,
+        customer_name: bulkOrder.customer_name,
+        chef: bulkOrder.chef,
+        delivery_partner: bulkOrder.delivery_partner,
+        status: mapBulkStatusToNormalStatus(bulkOrder.status),
+        total_amount: bulkOrder.total_amount,
+        created_at: bulkOrder.created_at,
+        updated_at: bulkOrder.updated_at,
+        delivery_address: bulkOrder.delivery_address || '',
+        pickup_location: bulkOrder.pickup_address,
+        order_type_category: 'bulk',
+        bulk_order_id: bulkOrder.bulk_order_id,
+        event_date: bulkOrder.event_date,
+        event_type: bulkOrder.event_type,
+        total_quantity: bulkOrder.total_quantity,
+        delivery_fee: bulkOrder.delivery_fee,
+        special_instructions: bulkOrder.description
+      }));
+    
+    return [...availableNormalOrders, ...availableBulkOrders];
+  } catch (error) {
+    console.error('Error fetching available orders:', error);
+    return [];
+  }
 };
 
-// 🚚 Accept an order for delivery with distance checking
+// Helper function to map bulk order status to normal order status
+const mapBulkStatusToNormalStatus = (bulkStatus: string): Order['status'] => {
+  switch (bulkStatus) {
+    case 'pending':
+      return 'pending';
+    case 'confirmed':
+      return 'confirmed';
+    case 'collaborating':
+      return 'confirmed';
+    case 'preparing':
+      return 'preparing';
+    case 'completed':
+      return 'delivered';
+    case 'cancelled':
+      return 'cancelled';
+    default:
+      return 'pending';
+  }
+}
+
+// 🚚 Accept an order for delivery with distance checking (supports both normal and bulk orders)
 export const acceptOrder = async (
   orderId: number, 
   agentLocation?: { lat: number; lng: number },
-  chefLocation?: { lat: number; lng: number }
-): Promise<Order | { warning: string; distance: number; message: string; allow_accept: boolean }> => {
+  chefLocation?: { lat: number; lng: number },
+  orderType: 'normal' | 'bulk' = 'normal'
+): Promise<UnifiedOrder | { warning: string; distance: number; message: string; allow_accept: boolean }> => {
   const requestData: any = {};
   
   if (agentLocation) {
@@ -85,7 +237,15 @@ export const acceptOrder = async (
     requestData.chef_longitude = chefLocation.lng;
   }
   
-  const res = await apiClient.post(`/orders/orders/${orderId}/accept/`, requestData);
+  let res;
+  if (orderType === 'bulk') {
+    // For bulk orders, use the bulk management endpoint
+    res = await apiClient.post(`/orders/bulk/${orderId}/assign_delivery/`, requestData);
+  } else {
+    // For normal orders, use the existing endpoint
+    res = await apiClient.post(`/orders/orders/${orderId}/accept/`, requestData);
+  }
+  
   return res.data;
 };
 
@@ -95,16 +255,16 @@ export const getCookDetails = async (cookId: number): Promise<any> => {
   return res.data;
 }
 
-// 🚚 Get pickup location from order (NEW FEATURE)
-export const getPickupLocation = (order: Order): string | null => {
+// 🚚 Get pickup location from order (NEW FEATURE - supports both normal and bulk orders)
+export const getPickupLocation = (order: UnifiedOrder): string | null => {
   // Try to get pickup location from multiple sources
   return order.pickup_location || 
          order.chef?.kitchen_location || 
          null;
 }
 
-// 🚚 Navigate to pickup location (NEW FEATURE)
-export const navigateToPickupLocation = (order: Order): boolean => {
+// 🚚 Navigate to pickup location (NEW FEATURE - supports both normal and bulk orders)
+export const navigateToPickupLocation = (order: UnifiedOrder): boolean => {
   const pickupLocation = getPickupLocation(order);
   if (pickupLocation) {
     const encodedLocation = encodeURIComponent(pickupLocation);
@@ -115,8 +275,8 @@ export const navigateToPickupLocation = (order: Order): boolean => {
   return false;
 }
 
-// 🚚 Navigate to delivery location
-export const navigateToDeliveryLocation = (order: Order): boolean => {
+// 🚚 Navigate to delivery location (supports both normal and bulk orders)
+export const navigateToDeliveryLocation = (order: UnifiedOrder): boolean => {
   if (order.delivery_address) {
     const encodedAddress = encodeURIComponent(order.delivery_address);
     const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
@@ -126,24 +286,119 @@ export const navigateToDeliveryLocation = (order: Order): boolean => {
   return false;
 }
 
-// 🚚 Update order status with enhanced tracking
+// 🚚 Update order status with enhanced tracking (supports both normal and bulk orders)
 export const updateOrderStatus = async (
   orderId: number,
   status: 'picked_up' | 'out_for_delivery' | 'in_transit' | 'delivered',
-  location?: { lat: number; lng: number; address?: string }
+  location?: { lat: number; lng: number; address?: string },
+  orderType: 'normal' | 'bulk' = 'normal'
 ) => {
-  const res = await apiClient.patch(`/orders/orders/${orderId}/status/`, { 
+  const requestData = { 
     status,
     location,
     timestamp: new Date().toISOString()
-  });
-  return res.data.results || res.data;
+  };
+  
+  try {
+    let res;
+    if (orderType === 'bulk') {
+      // Map delivery status to bulk order status
+      const bulkStatus = mapDeliveryStatusToBulkStatus(status);
+      res = await apiClient.patch(`/orders/bulk/${orderId}/`, { 
+        status: bulkStatus,
+        ...requestData
+      });
+    } else {
+      res = await apiClient.patch(`/orders/orders/${orderId}/status/`, requestData);
+    }
+    
+    return res.data.results || res.data;
+  } catch (error: any) {
+    console.error('Error updating order status:', error);
+    
+    // Provide more specific error information
+    if (error.response?.status === 400) {
+      const errorMessage = error.response?.data?.error || 'Invalid status update request';
+      throw new Error(`Status update failed: ${errorMessage}`);
+    } else if (error.response?.status === 403) {
+      throw new Error('You are not authorized to update this order status');
+    } else if (error.response?.status === 404) {
+      throw new Error('Order not found');
+    } else {
+      throw new Error('Failed to update order status. Please try again.');
+    }
+  }
 };
 
-// 🚚 Get delivery history for the current delivery agent
-export const getDeliveryHistory = async (): Promise<Order[]> => {
-  const res = await apiClient.get('/orders/orders/history/');
-  return res.data.results || res.data;
+// Helper function to map delivery status to bulk order status
+const mapDeliveryStatusToBulkStatus = (deliveryStatus: string): string => {
+  switch (deliveryStatus) {
+    case 'picked_up':
+      return 'preparing';
+    case 'out_for_delivery':
+    case 'in_transit':
+      return 'preparing'; // Keep as preparing until delivered
+    case 'delivered':
+      return 'completed';
+    default:
+      return 'preparing';
+  }
+};
+
+// 🚚 Get delivery history for the current delivery agent (includes both normal and bulk orders)
+export const getDeliveryHistory = async (): Promise<UnifiedOrder[]> => {
+  try {
+    // Fetch normal order history
+    const normalRes = await apiClient.get('/orders/orders/history/');
+    const normalHistory = (normalRes.data.results || normalRes.data) as Order[];
+    
+    // Fetch bulk order history
+    const bulkRes = await apiClient.get('/orders/bulk/');
+    const allBulkOrders = (bulkRes.data.results || bulkRes.data) as BulkOrder[];
+    
+    // Filter bulk orders for delivered/completed ones assigned to current agent
+    const bulkHistory = allBulkOrders
+      .filter((bulkOrder: BulkOrder) => 
+        bulkOrder.delivery_partner && 
+        ['completed', 'cancelled'].includes(bulkOrder.status)
+      )
+      .map((bulkOrder: BulkOrder): UnifiedOrder => ({
+        id: bulkOrder.bulk_order_id,
+        order_number: bulkOrder.order_number,
+        customer: bulkOrder.customer,
+        customer_name: bulkOrder.customer_name,
+        chef: bulkOrder.chef,
+        delivery_partner: bulkOrder.delivery_partner,
+        status: mapBulkStatusToNormalStatus(bulkOrder.status),
+        total_amount: bulkOrder.total_amount,
+        created_at: bulkOrder.created_at,
+        updated_at: bulkOrder.updated_at,
+        delivery_address: bulkOrder.delivery_address || '',
+        pickup_location: bulkOrder.pickup_address,
+        order_type_category: 'bulk',
+        bulk_order_id: bulkOrder.bulk_order_id,
+        event_date: bulkOrder.event_date,
+        event_type: bulkOrder.event_type,
+        total_quantity: bulkOrder.total_quantity,
+        delivery_fee: bulkOrder.delivery_fee,
+        special_instructions: bulkOrder.description
+      }));
+    
+    // Convert normal orders to unified format
+    const normalHistoryUnified = normalHistory.map((order: Order): UnifiedOrder => ({
+      ...order,
+      order_type_category: 'normal'
+    }));
+    
+    // Combine and sort by created date (newest first)
+    const combinedHistory = [...normalHistoryUnified, ...bulkHistory];
+    return combinedHistory.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  } catch (error) {
+    console.error('Error fetching delivery history:', error);
+    return [];
+  }
 };
 
 // 🚚 Get dashboard summary
@@ -518,17 +773,45 @@ export const getChefLocation = async (orderId: number): Promise<{
   return res.data;
 };
 
-// 🚚 Mark order as picked up
+// 🚚 Mark order as picked up (supports both normal and bulk orders)
 export const markOrderPickedUp = async (
   orderId: number,
   notes?: string,
-  pickupLocation?: { lat: number; lng: number; address?: string }
+  pickupLocation?: { lat: number; lng: number; address?: string },
+  orderType: 'normal' | 'bulk' = 'normal'
 ): Promise<any> => {
-  const res = await apiClient.post(`/orders/orders/${orderId}/mark_picked_up/`, {
-    notes: notes || 'Order picked up from chef',
-    pickup_location: pickupLocation
-  });
-  return res.data;
+  try {
+    let res;
+    if (orderType === 'bulk') {
+      // For bulk orders, we'll use the status update endpoint since mark_picked_up might not exist
+      // This updates the bulk order status to 'preparing' which indicates pickup
+      res = await apiClient.patch(`/orders/bulk/${orderId}/`, {
+        status: 'preparing',
+        notes: notes || 'Bulk order picked up from chef',
+        pickup_location: pickupLocation
+      });
+    } else {
+      res = await apiClient.post(`/orders/orders/${orderId}/mark_picked_up/`, {
+        notes: notes || 'Order picked up from chef',
+        pickup_location: pickupLocation
+      });
+    }
+    return res.data;
+  } catch (error: any) {
+    console.error('Error marking order as picked up:', error);
+    
+    // Provide specific error information
+    if (error.response?.status === 400) {
+      const errorMessage = error.response?.data?.error || 'Invalid pickup request';
+      throw new Error(`Pickup failed: ${errorMessage}`);
+    } else if (error.response?.status === 403) {
+      throw new Error('You are not authorized to mark this order as picked up');
+    } else if (error.response?.status === 404) {
+      throw new Error('Order not found');
+    } else {
+      throw new Error('Failed to mark order as picked up. Please try again.');
+    }
+  }
 };
 
 // Helper function to get current location
