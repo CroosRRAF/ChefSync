@@ -1204,4 +1204,4 @@ class FoodReviewSerializer(serializers.ModelSerializer):
         """Get order number"""
         if obj.order:
             return obj.order.order_number
-        return "N/A"
+        return data

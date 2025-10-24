@@ -19,9 +19,7 @@ import {
   Loader2,
   AlertCircle,
   Users,
-  Calendar,
-  ArrowRight,
-  Settings
+  Calendar
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -32,56 +30,26 @@ interface BulkOrder {
   total_amount: number;
   num_persons: number;
   event_date: string;
+  event_time: string;
   created_at: string;
+  
+  // Additional fields
+  customer_id: number;
+  chef_id?: number;
+  delivery_partner_id?: number;
+  delivery_address?: string;
+  order_type: string;
+  delivery_fee: number;
+  distance_km?: number;
 }
 
-// Skeleton Loader
-const DashboardSkeleton: FC = () => (
-  <div className="min-h-screen bg-background p-4 md:p-8">
-    <div className="max-w-7xl mx-auto space-y-8">
-      <Card className="border-0 shadow-none bg-transparent p-6 md:p-8">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-20 w-20 rounded-full" />
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-5 w-64" />
-          </div>
-        </div>
-      </Card>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => <Card key={i} className="p-6"><Skeleton className="h-20 w-full" /></Card>)}
-      </div>
-      <Card className="p-6"><Skeleton className="h-24 w-full" /></Card>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 p-6"><Skeleton className="h-64 w-full" /></Card>
-        <Card className="p-6"><Skeleton className="h-64 w-full" /></Card>
-      </div>
-    </div>
-  </div>
-);
-
-// Main Component
-const CustomerDashboardNew: React.FC = () => {
+const CustomerDashboardContent: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<CustomerStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [bulkOrders, setBulkOrders] = useState<BulkOrder[]>([]);
   const [loadingBulkOrders, setLoadingBulkOrders] = useState(false);
-
-  const fetchCustomerStats = async () => {
-    try {
-      const stats = await customerService.getCustomerStats();
-      setStats(stats);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      // Set mock data on error for UI development
-      setStats({
-        total_orders: 8, completed_orders: 6, pending_orders: 2, total_spent: 12500,
-        average_order_value: 1562.5, favorite_cuisines: [], recent_orders: []
-      });
-    }
-  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -106,22 +74,40 @@ const CustomerDashboardNew: React.FC = () => {
     fetchData();
   }, [user]);
 
-  const fetchBulkOrders = async () => {
-    try {
-      setLoadingBulkOrders(true);
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/orders/customer-bulk-orders/', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setBulkOrders(data.slice(0, 3));
+  useEffect(() => {
+    const fetchBulkOrders = async () => {
+      try {
+        setLoadingBulkOrders(true);
+        const token = localStorage.getItem('access_token');
+        const response = await fetch('/api/orders/customer-bulk-orders/', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Show only the 3 most recent bulk orders
+          setBulkOrders(data.slice(0, 3));
+        }
+      } catch (error) {
+        console.error('Error fetching bulk orders:', error);
+      } finally {
+        setLoadingBulkOrders(false);
       }
-    } catch (error) {
-      console.error('Error fetching bulk orders:', error);
-    } finally {
-      setLoadingBulkOrders(false);
+    };
+
+    if (user) {
+      fetchBulkOrders();
     }
+  }, [user]);
+
+  const getCustomerLevel = (orderCount: number) => {
+    if (orderCount >= 50) return { level: 'Diamond', color: 'bg-purple-500', progress: 100 };
+    if (orderCount >= 25) return { level: 'Gold', color: 'bg-yellow-500', progress: (orderCount - 25) / 25 * 100 };
+    if (orderCount >= 10) return { level: 'Silver', color: 'bg-gray-400', progress: (orderCount - 10) / 15 * 100 };
+    return { level: 'Bronze', color: 'bg-orange-400', progress: orderCount / 10 * 100 };
   };
 
   const getGreeting = () => {
@@ -210,44 +196,104 @@ const CustomerDashboardNew: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Orders */}
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-primary" />Recent Orders</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/customer/orders')}>
-                View All <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {stats?.recent_orders && stats.recent_orders.length > 0 ? (
-                stats.recent_orders.map((order) => <OrderRow key={order.id} order={order} />)
-              ) : (
-                <EmptyState icon={Package} title="No Recent Orders" description="Your recent orders will appear here." buttonText="Browse Menu" onClick={() => navigate('/menu')} />
-              )}
-            </CardContent>
-          </Card>
+        <Card className="border-none shadow-md dark:bg-gray-800">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-white">
+              <Users className="h-5 w-5 text-purple-500" />
+              <span>Bulk Orders</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loadingBulkOrders ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-orange-500 mx-auto" />
+              </div>
+            ) : bulkOrders.length > 0 ? (
+              <>
+                {bulkOrders.map((bulkOrder) => (
+                  <div key={bulkOrder.bulk_order_id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                        <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-white">#{bulkOrder.order_number}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {bulkOrder.num_persons} persons
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(bulkOrder.event_date).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900 dark:text-white text-sm">LKR {Math.round(bulkOrder.total_amount)}</p>
+                      <Badge className={getStatusColor(bulkOrder.status)}>
+                        {bulkOrder.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+                <Button 
+                  variant="outline" 
+                  className="w-full mt-2"
+                  onClick={() => navigate('/customer/profile')}
+                >
+                  View All Bulk Orders
+                </Button>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400 text-sm">No bulk orders</p>
+                <Button 
+                  className="mt-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                  onClick={() => navigate('/menu')}
+                >
+                  Browse Bulk Menus
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-          {/* Bulk Orders */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-purple-500" />Bulk Orders</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/customer/profile', { state: { tab: 'orders' } })}>
-                View All <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loadingBulkOrders ? (
-                <div className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /></div>
-              ) : bulkOrders.length > 0 ? (
-                bulkOrders.map((order) => <BulkOrderRow key={order.bulk_order_id} order={order} />)
-              ) : (
-                <EmptyState icon={Users} title="No Bulk Orders" description="Your event orders will be shown here." buttonText="Plan an Event" onClick={() => navigate('/menu')} />
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-4 md:gap-6">
+        <Card className="border-none shadow-md dark:bg-gray-800">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-white">
+              <Target className="h-5 w-5 text-blue-500" />
+              <span>Quick Actions</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Button 
+              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+              onClick={() => navigate('/menu')}
+            >
+              <ChefHat className="h-5 w-5 mr-2" />
+              Order Food
+            </Button>
+            <Button 
+              variant="outline" 
+              className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              onClick={() => navigate('/customer/orders')}
+            >
+              <Package className="h-5 w-5 mr-2" />
+              Track Orders
+            </Button>
+            <Button 
+              variant="outline" 
+              className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              onClick={() => navigate('/customer/profile')}
+            >
+              <User className="h-5 w-5 mr-2" />
+              Edit Profile
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

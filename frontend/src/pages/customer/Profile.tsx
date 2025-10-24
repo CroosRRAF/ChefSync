@@ -33,14 +33,9 @@ import {
   Home,
   Camera,
   Plus,
-  Shield,
-  Key,
-  Lock,
-  Eye,
-  EyeOff,
-  Loader2,
-  Building,
-  ChevronRight
+  Package,
+  Clock,
+  Users
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { userService } from "@/services/userService";
@@ -75,33 +70,42 @@ interface BulkOrder {
   created_at: string;
 }
 
-const ProfileSkeleton: FC = () => (
-  <div className="min-h-screen bg-background p-4 md:p-8">
-    <div className="max-w-7xl mx-auto space-y-8">
-      <Card className="overflow-hidden">
-        <Skeleton className="h-48 w-full bg-muted" />
-        <CardContent className="p-6 pt-0">
-          <div className="flex items-end -mt-16">
-            <Skeleton className="h-32 w-32 rounded-full border-4 border-background" />
-            <div className="ml-4 mb-4 space-y-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-5 w-64" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => <Card key={i} className="p-6"><Skeleton className="h-20 w-full" /></Card>)}
-      </div>
-      <Card className="p-6">
-        <Skeleton className="h-10 w-1/3 mb-6" />
-        <Skeleton className="h-64 w-full" />
-      </Card>
-    </div>
-  </div>
-);
+interface BulkOrder {
+  bulk_order_id: string;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  num_persons: number;
+  event_date: string;
+  event_time: string;
+  menu_name?: string;
+  created_at: string;
+  
+  // Additional fields from backend
+  customer_id: number;
+  chef_id?: number;
+  delivery_partner_id?: number;
+  delivery_address?: string;
+  delivery_latitude?: number;
+  delivery_longitude?: number;
+  distance_km?: number;
+  order_type: string;
+  delivery_fee: number;
+  
+  chef?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  
+  delivery_partner?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+}
 
-const CustomerProfileNew = () => {
+const CustomerProfile = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
@@ -109,11 +113,14 @@ const CustomerProfileNew = () => {
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
   const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
   const [bulkOrders, setBulkOrders] = useState<BulkOrder[]>([]);
-  const [regularOrders, setRegularOrders] = useState<Order[]>([]);
   const [loadingBulkOrders, setLoadingBulkOrders] = useState(false);
-  const [loadingRegularOrders, setLoadingRegularOrders] = useState(false);
-  const [stats, setStats] = useState<CustomerStats | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
+  const [stats, setStats] = useState<CustomerStats>({
+    total_orders: 0,
+    completed_orders: 0,
+    pending_orders: 0,
+    total_spent: 0,
+    favorite_count: 0
+  });
   
   const [profileData, setProfileData] = useState<UserData>({
     name: user?.name || '',
@@ -126,24 +133,10 @@ const CustomerProfileNew = () => {
   });
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        await Promise.all([
-          fetchProfileData(),
-          fetchCustomerStats(),
-          fetchAddresses(),
-          fetchBulkOrders(),
-          fetchRegularOrders(),
-        ]);
-      } catch (error) {
-        console.error("Failed to fetch profile data", error);
-        toast.error("Could not load your profile. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    fetchProfileData();
+    fetchCustomerStats();
+    fetchAddresses();
+    fetchBulkOrders();
   }, []);
 
   const fetchProfileData = async () => {
@@ -200,6 +193,30 @@ const CustomerProfileNew = () => {
       console.error('Error fetching regular orders:', error);
     } finally {
       setLoadingRegularOrders(false);
+    }
+  };
+
+  const fetchBulkOrders = async () => {
+    try {
+      setLoadingBulkOrders(true);
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('/api/orders/customer-bulk-orders/', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setBulkOrders(data);
+      } else {
+        console.error('Failed to fetch bulk orders');
+      }
+    } catch (error) {
+      console.error('Error fetching bulk orders:', error);
+    } finally {
+      setLoadingBulkOrders(false);
     }
   };
 
@@ -434,15 +451,106 @@ const CustomerProfileNew = () => {
               </CardContent>
             </Card>
 
-            <Card className="border-destructive/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <Trash2 className="h-5 w-5" />
-                  Delete Account
-                </CardTitle>
-                <CardDescription>Permanently delete your account and all associated data. This action cannot be undone.</CardDescription>
-              </CardHeader>
-              <CardContent>
+          {/* Bulk Orders History Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-orange-500" />
+                My Bulk Orders
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingBulkOrders ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+                  <p className="text-gray-500 mt-4">Loading bulk orders...</p>
+                </div>
+              ) : bulkOrders.length === 0 ? (
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500 mb-2">No bulk orders yet</p>
+                  <p className="text-sm text-gray-400 mb-4">Place bulk orders for events and large gatherings</p>
+                  <Button 
+                    onClick={() => window.location.href = '/menu'}
+                    variant="outline"
+                  >
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    Browse Bulk Menus
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {bulkOrders.map((bulkOrder) => (
+                    <Card key={bulkOrder.bulk_order_id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Package className="h-4 w-4 text-orange-500" />
+                              <h4 className="font-semibold">Order #{bulkOrder.order_number}</h4>
+                              <Badge 
+                                className={
+                                  bulkOrder.status === 'completed' ? 'bg-green-500' :
+                                  bulkOrder.status === 'pending' ? 'bg-yellow-500' :
+                                  bulkOrder.status === 'confirmed' ? 'bg-blue-500' :
+                                  bulkOrder.status === 'cancelled' ? 'bg-red-500' :
+                                  'bg-gray-500'
+                                }
+                              >
+                                {bulkOrder.status.replace('_', ' ').toUpperCase()}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 dark:text-gray-300">
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                <span>{bulkOrder.num_persons} persons</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                <span>{new Date(bulkOrder.event_date).toLocaleDateString()}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                <span>{bulkOrder.event_time}</span>
+                              </div>
+                              <div className="font-semibold text-orange-600">
+                                LKR {bulkOrder.total_amount.toLocaleString()}
+                              </div>
+                            </div>
+                            {bulkOrder.menu_name && (
+                              <p className="text-xs text-gray-500 mt-2">
+                                Menu: {bulkOrder.menu_name}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-400 mt-1">
+                              Ordered: {new Date(bulkOrder.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Danger Zone Card */}
+          <Card className="border-red-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                Danger Zone
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
+                <div>
+                  <h3 className="font-semibold text-gray-900">Delete Account</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Permanently delete your account and all associated data
+                  </p>
+                </div>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive">Delete My Account</Button>
