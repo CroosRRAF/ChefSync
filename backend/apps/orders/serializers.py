@@ -662,14 +662,19 @@ class BulkOrderListSerializer(serializers.ModelSerializer):
         return "other"
 
     def get_total_amount(self, obj):
-        # Calculate from related order or return default
-        if obj.order:
+        # Prefer the BulkOrder.total_amount field. Fall back to related order when present.
+        try:
+            if obj.total_amount is not None:
+                return str(obj.total_amount)
+        except Exception:
+            pass
+        if getattr(obj, 'order', None):
             return str(obj.order.total_amount)
         return "0.00"
 
     def get_items(self, obj):
-        # Get items from the related order
-        if obj.order:
+        # Get items from the related order when available. Otherwise return empty list.
+        if getattr(obj, 'order', None):
             order_items = obj.order.items.all()[:3]  # Limit to first 3
             return [
                 {
@@ -748,7 +753,13 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
         return "other"
 
     def get_total_amount(self, obj):
-        if obj.order:
+        # Prefer the BulkOrder.total_amount value; otherwise fall back to related order.
+        try:
+            if obj.total_amount is not None:
+                return str(obj.total_amount)
+        except Exception:
+            pass
+        if getattr(obj, 'order', None):
             return str(obj.order.total_amount)
         return "0.00"
 

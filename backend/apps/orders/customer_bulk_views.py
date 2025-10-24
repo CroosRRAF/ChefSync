@@ -77,29 +77,18 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
                 event_datetime = timezone.make_aware(event_datetime)
                 estimated_delivery = event_datetime - timedelta(hours=2)
                 
-                # Create the main order
-                order = Order.objects.create(
-                    customer=request.user,
-                    chef=bulk_menu.chef,
-                    status='pending',
-                    payment_status='pending',
-                    payment_method='cash',  # Can be updated later
-                    delivery_address=validated_data['delivery_address'],
-                    customer_notes=validated_data.get('special_instructions', ''),
-                    estimated_delivery_time=estimated_delivery,
-                    subtotal=validated_data['total_amount'],
-                    total_amount=validated_data['total_amount'],
-                    # Store event info in admin_notes
-                    admin_notes=f"Bulk Order - Event Date: {validated_data['event_date']} {validated_data['event_time']}, Persons: {validated_data['num_persons']}"
-                )
-                
-                # Create BulkOrder record
+                # Create a BulkOrder only (do not create a regular Order for bulk orders).
+                # Bulk orders live primarily in the BulkOrder table. Keep the 'order' FK null
+                # unless downstream systems explicitly need an Order instance.
                 bulk_order = BulkOrder.objects.create(
-                    order=order,
+                    order=None,
                     created_by=request.user,
                     status='pending',
                     total_amount=validated_data['total_amount'],
-                    notes=f"Bulk order for {validated_data['num_persons']} persons. Menu: {bulk_menu.menu_name}. {validated_data.get('special_instructions', '')}"
+                    notes=(
+                        f"Bulk order for {validated_data['num_persons']} persons. "
+                        f"Menu: {bulk_menu.menu_name}. {validated_data.get('special_instructions', '')}"
+                    ),
                 )
                 
                 # Get all menu items (mandatory + selected optional)
@@ -123,26 +112,34 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
                 
                 num_persons = validated_data['num_persons']
                 
-                # Add base price as an order item (summary item)
-                Order.objects.filter(id=order.id).update(
-                    chef_notes=f"Bulk Menu: {bulk_menu.menu_name}\n"
-                               f"Meal Type: {bulk_menu.get_meal_type_display()}\n"
-                               f"Persons: {num_persons}\n"
-                               f"\nIncluded Items:\n" + 
-                               "\n".join([f"- {item.item_name}" for item in mandatory_items]) +
-                               (f"\n\nOptional Items:\n" + 
-                                "\n".join([f"- {item.item_name} (+Rs.{item.extra_cost}/person)" 
-                                          for item in optional_items]) if optional_items else "")
-                )
+                # We don't have order items stored on a regular Order for bulk orders in this flow.
+                # Keep a chef_notes-like summary in the BulkOrder.notes for easy reference.
+                try:
+                    summary = (
+                        f"Bulk Menu: {bulk_menu.menu_name}\n"
+                        f"Meal Type: {bulk_menu.get_meal_type_display()}\n"
+                        f"Persons: {num_persons}\n\nIncluded Items:\n"
+                        + "\n".join([f"- {item.item_name}" for item in mandatory_items])
+                    )
+                    if optional_items:
+                        summary += (
+                            "\n\nOptional Items:\n"
+                            + "\n".join([f"- {item.item_name} (+Rs.{item.extra_cost}/person)" for item in optional_items])
+                        )
+                    # Append to notes
+                    bulk_order.notes = (bulk_order.notes or "") + "\n\n" + summary
+                    bulk_order.save()
+                except Exception:
+                    # non-critical; continue
+                    pass
                 
                 # Return success response
-                logger.info(f"✅ Bulk order created successfully: Order #{order.order_number}, BulkOrder #{bulk_order.bulk_order_id}")
+                logger.info(f"✅ Bulk order created successfully: BulkOrder #{bulk_order.bulk_order_id}")
                 return Response({
                     'message': 'Bulk order placed successfully',
-                    'order_id': order.id,
-                    'order_number': order.order_number,
                     'bulk_order_id': bulk_order.bulk_order_id,
-                    'total_amount': str(order.total_amount),
+                    'bulk_order_number': f"BULK-{bulk_order.bulk_order_id:06d}",
+                    'total_amount': str(bulk_order.total_amount),
                     'event_datetime': event_datetime.isoformat(),
                     'estimated_delivery_time': estimated_delivery.isoformat(),
                 }, status=status.HTTP_201_CREATED)
