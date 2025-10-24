@@ -662,14 +662,19 @@ class BulkOrderListSerializer(serializers.ModelSerializer):
         return "other"
 
     def get_total_amount(self, obj):
-        # Calculate from related order or return default
-        if obj.order:
+        # Prefer the BulkOrder.total_amount field. Fall back to related order when present.
+        try:
+            if obj.total_amount is not None:
+                return str(obj.total_amount)
+        except Exception:
+            pass
+        if getattr(obj, 'order', None):
             return str(obj.order.total_amount)
         return "0.00"
 
     def get_items(self, obj):
-        # Get items from the related order
-        if obj.order:
+        # Get items from the related order when available. Otherwise return empty list.
+        if getattr(obj, 'order', None):
             order_items = obj.order.items.all()[:3]  # Limit to first 3
             return [
                 {
@@ -937,77 +942,15 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
         return "other"
 
     def get_total_amount(self, obj):
-        if obj.order:
-            return float(obj.order.total_amount)
-        return float(obj.total_amount)
-    
-    def get_event_date(self, obj):
-        """Get event date - try direct field first, then extract from order admin_notes"""
-        # Try direct field first
-        if hasattr(obj, 'event_date') and obj.event_date:
-            return str(obj.event_date)
-        
-        # Fallback to extracting from order admin_notes
-        import re
-        if obj.order and obj.order.admin_notes:
-            # Pattern: "Event Date: 2024-12-25 18:00:00"
-            match = re.search(r'Event Date:\s*(\d{4}-\d{2}-\d{2})', obj.order.admin_notes)
-            if match:
-                return match.group(1)
-        return None
-    
-    def get_event_time(self, obj):
-        """Get event time - try direct field first, then extract from order admin_notes"""
-        # Try direct field first
-        if hasattr(obj, 'event_time') and obj.event_time:
-            time_str = str(obj.event_time)
-            # Return only HH:MM format
-            if len(time_str) > 5:
-                return time_str[:5]
-            return time_str
-        
-        # Fallback to extracting from order admin_notes
-        import re
-        if obj.order and obj.order.admin_notes:
-            # Pattern: "Event Date: 2024-12-25 18:00:00"
-            match = re.search(r'Event Date:\s*\d{4}-\d{2}-\d{2}\s+(\d{2}:\d{2}(?::\d{2})?)', obj.order.admin_notes)
-            if match:
-                time_str = match.group(1)
-                # Return only HH:MM format
-                if len(time_str) > 5:
-                    return time_str[:5]
-                return time_str
-        return None
-    
-    def get_num_persons(self, obj):
-        """Get number of persons - try direct field first, then extract from order admin_notes"""
-        # Try direct field first
-        if hasattr(obj, 'num_persons') and obj.num_persons:
-            return int(obj.num_persons)
-        
-        # Fallback to extracting from order admin_notes
-        import re
-        if obj.order and obj.order.admin_notes:
-            # Pattern: "Persons: 50"
-            match = re.search(r'Persons:\s*(\d+)', obj.order.admin_notes)
-            if match:
-                return int(match.group(1))
-        return 0
-    
-    def get_menu_name(self, obj):
-        """Get menu name - try direct field first, then extract from notes"""
-        # Try direct field first
-        if hasattr(obj, 'menu_name') and obj.menu_name:
-            return obj.menu_name
-        
-        # Fallback to extracting from notes
-        if obj.notes:
-            # Pattern: "Menu: <menu_name>"
-            import re
-            match = re.search(r'Menu:\s*([^.]+)', obj.notes)
-            if match:
-                return match.group(1).strip()
-        return None
+        # Prefer the BulkOrder.total_amount value; otherwise fall back to related order.
+        try:
+            if obj.total_amount is not None:
+                return str(obj.total_amount)
+        except Exception:
+            pass
+        if getattr(obj, 'order', None):
+            return str(obj.order.total_amount)
+        return "0.00"
 
 
 # Duplicate definitions removed - using earlier complete implementations above

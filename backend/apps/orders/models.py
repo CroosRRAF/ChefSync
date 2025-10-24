@@ -477,25 +477,14 @@ class BulkOrder(models.Model):
 
     # Primary Fields
     bulk_order_id = models.AutoField(primary_key=True)
-    order_number = models.CharField(max_length=50, unique=True, db_index=True, null=True, blank=True)
-    
-    # Optional link to regular Order (for backward compatibility, will be nullable)
+    # Make the order reference optional: bulk orders live primarily in the BulkOrder table.
+    # Keep a nullable link for backward compatibility when an underlying Order exists.
     order = models.ForeignKey(
-        Order, 
-        on_delete=models.SET_NULL, 
+        Order,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="bulk_orders"
-    )
-    
-    # User Relations - Direct fields instead of through Order
-    customer = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="bulk_orders_as_customer",
-        help_text="Customer who placed the bulk order"
+        related_name="bulk_orders",
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
