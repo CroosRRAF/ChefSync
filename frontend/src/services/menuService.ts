@@ -197,7 +197,7 @@ export const menuService = {
     if (lat !== undefined) params.append('lat', lat.toString());
     if (lng !== undefined) params.append('lng', lng.toString());
 
-    const response = await apiClient.get(`/api/food/customer/foods/${foodId}/?${params}`);
+    const response = await apiClient.get(`/food/customer/foods/${foodId}/?${params}`);
     return response.data;
   },
 

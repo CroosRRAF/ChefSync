@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.db.models import Sum, Count
-from .models import Order, OrderItem, OrderStatusHistory, CartItem, BulkOrder, BulkOrderAssignment, UserAddress, DeliveryChat
-from apps.food.models import Food, FoodPrice
+from .models import Order, OrderItem, OrderStatusHistory, CartItem, BulkOrder, BulkOrderAssignment, UserAddress, DeliveryChat, Delivery, DeliveryReview
+from apps.food.models import Food, FoodPrice, FoodReview
 from apps.users.models import ChefProfile
 from django.contrib.auth import get_user_model
 
@@ -1165,3 +1165,100 @@ class DeliveryChatSerializer(serializers.ModelSerializer):
         if request and request.user:
             return obj.sender == request.user
         return False
+
+
+class DeliveryReviewSerializer(serializers.ModelSerializer):
+    """Serializer for delivery reviews"""
+    
+    customer_name = serializers.SerializerMethodField()
+    delivery_agent_name = serializers.SerializerMethodField()
+    order_number = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = DeliveryReview
+        fields = [
+            'review_id',
+            'rating',
+            'comment',
+            'delivery',
+            'customer',
+            'customer_name',
+            'delivery_agent_name',
+            'order_number',
+            'created_at',
+        ]
+        read_only_fields = ['review_id', 'customer', 'customer_name', 'delivery_agent_name', 'order_number', 'created_at']
+    
+    def get_customer_name(self, obj):
+        """Get customer's display name"""
+        if obj.customer:
+            return obj.customer.name or obj.customer.username
+        return "Unknown Customer"
+    
+    def get_delivery_agent_name(self, obj):
+        """Get delivery agent's display name"""
+        if obj.delivery and obj.delivery.agent:
+            return obj.delivery.agent.name or obj.delivery.agent.username
+        return "Unknown Agent"
+    
+    def get_order_number(self, obj):
+        """Get order number"""
+        if obj.delivery and obj.delivery.order:
+            return obj.delivery.order.order_number
+        return "N/A"
+
+
+class FoodReviewSerializer(serializers.ModelSerializer):
+    """Serializer for food/cook reviews"""
+    
+    customer_name = serializers.SerializerMethodField()
+    cook_name = serializers.SerializerMethodField()
+    food_name = serializers.SerializerMethodField()
+    order_number = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = FoodReview
+        fields = [
+            'review_id',
+            'rating',
+            'comment',
+            'price',
+            'order',
+            'customer',
+            'customer_name',
+            'cook_name',
+            'food_name',
+            'order_number',
+            'taste_rating',
+            'presentation_rating',
+            'value_rating',
+            'is_verified_purchase',
+            'helpful_votes',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['review_id', 'customer', 'customer_name', 'cook_name', 'food_name', 'order_number', 'is_verified_purchase', 'helpful_votes', 'created_at', 'updated_at']
+    
+    def get_customer_name(self, obj):
+        """Get customer's display name"""
+        if obj.customer:
+            return obj.customer.name or obj.customer.username
+        return "Unknown Customer"
+    
+    def get_cook_name(self, obj):
+        """Get cook's display name"""
+        if obj.price and obj.price.cook:
+            return obj.price.cook.name or obj.price.cook.username
+        return "Unknown Cook"
+    
+    def get_food_name(self, obj):
+        """Get food name"""
+        if obj.price and obj.price.food:
+            return obj.price.food.name
+        return "Unknown Food"
+    
+    def get_order_number(self, obj):
+        """Get order number"""
+        if obj.order:
+            return obj.order.order_number
+        return "N/A"

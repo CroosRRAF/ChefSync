@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useDatabaseCart } from '@/context/DatabaseCartContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { notificationService } from '@/services/notificationService';
 import logoImage from '@/assets/2.png';
 import navbarLogo from '@/assets/images/hero/navbarlogo.png';
 import {
@@ -23,19 +25,21 @@ import {
   ChefHat,
   Info,
   Phone,
-  Bell,
   Moon,
   Sun,
   LogOut,
   Menu,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Bell,
+  ShoppingCart
 } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import AIChatBox from '@/components/ai/AIChatBox';
 import OrderTrackingWrapper from '@/components/tracking/OrderTrackingWrapper';
+import NotificationDropdown from '@/components/notifications/NotificationDropdown';
 
 interface CustomerDashboardLayoutProps {
   children: React.ReactNode;
@@ -44,10 +48,11 @@ interface CustomerDashboardLayoutProps {
 const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { getItemCount } = useDatabaseCart();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [notifications] = useState(3);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -57,6 +62,25 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fetch unread notifications count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const count = await notificationService.getUnreadCount();
+        setUnreadNotifications(count);
+      } catch (error) {
+        console.error('Error fetching unread count:', error);
+      }
+    };
+
+    fetchUnreadCount();
+    
+    // Poll for unread count every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const handleLogout = async () => {
@@ -78,12 +102,20 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
   const sidebarItems = [
     { name: 'Dashboard', path: '/customer/dashboard', icon: LayoutDashboard },
     { name: 'Orders', path: '/customer/orders', icon: Package },
-    { name: 'Bulk Orders', path: '/customer/bulk-orders', icon: Package },
+    { name: 'Notifications', path: '/customer/notifications', icon: Bell },
+    { name: 'Cart', path: '/customer/cart', icon: ShoppingCart },
     { name: 'Profile', path: '/customer/profile', icon: User },
     { name: 'Settings', path: '/customer/settings', icon: Settings },
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Get badge count for sidebar items
+  const getBadgeCount = (itemName: string): number => {
+    if (itemName === 'Notifications') return unreadNotifications;
+    if (itemName === 'Cart') return getItemCount();
+    return 0;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -134,18 +166,7 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
             {/* Right Section */}
             <div className="flex items-center space-x-2 md:space-x-4">
               {/* Notifications */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="relative hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all duration-200"
-              >
-                <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                {notifications > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                    {notifications}
-                  </span>
-                )}
-              </Button>
+              <NotificationDropdown />
 
               {/* Dark Mode Toggle */}
               <Button
@@ -239,29 +260,47 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
 
           {/* Sidebar Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-2">
-            {sidebarItems.map((item) => (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={cn(
-                  "flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 group",
-                  isActive(item.path)
-                    ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600"
-                )}
-              >
-                <item.icon className={cn(
-                  "h-5 w-5 flex-shrink-0",
-                  isSidebarCollapsed ? "mx-auto" : "mr-3"
-                )} />
-                {!isSidebarCollapsed && (
-                  <span className="truncate">{item.name}</span>
-                )}
-                {isActive(item.path) && !isSidebarCollapsed && (
-                  <div className="ml-auto w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                )}
-              </Link>
-            ))}
+            {sidebarItems.map((item) => {
+              const badgeCount = getBadgeCount(item.name);
+              return (
+                <Link
+                  key={item.name}
+                  to={item.path}
+                  className={cn(
+                    "flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 group relative",
+                    isActive(item.path)
+                      ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg"
+                      : "text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600"
+                  )}
+                >
+                  <div className="relative">
+                    <item.icon className={cn(
+                      "h-5 w-5 flex-shrink-0",
+                      isSidebarCollapsed ? "mx-auto" : "mr-3"
+                    )} />
+                    {/* Badge for collapsed sidebar */}
+                    {isSidebarCollapsed && badgeCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-semibold">
+                        {badgeCount > 9 ? '9+' : badgeCount}
+                      </span>
+                    )}
+                  </div>
+                  {!isSidebarCollapsed && (
+                    <>
+                      <span className="truncate flex-1">{item.name}</span>
+                      {badgeCount > 0 && (
+                        <Badge className="ml-2 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 px-2 py-0.5 text-xs font-semibold">
+                          {badgeCount > 99 ? '99+' : badgeCount}
+                        </Badge>
+                      )}
+                      {isActive(item.path) && !badgeCount && (
+                        <div className="ml-auto w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                      )}
+                    </>
+                  )}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* User Info in Sidebar */}
@@ -306,22 +345,30 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
               </div>
               
               <nav className="flex-1 px-4 py-6 space-y-2">
-                {sidebarItems.map((item) => (
-                  <Link
-                    key={item.name}
-                    to={item.path}
-                    onClick={() => setIsMobileSidebarOpen(false)}
-                    className={cn(
-                      "flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200",
-                      isActive(item.path)
-                        ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg"
-                        : "text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600"
-                    )}
-                  >
-                    <item.icon className="h-5 w-5 mr-3 flex-shrink-0" />
-                    <span>{item.name}</span>
-                  </Link>
-                ))}
+                {sidebarItems.map((item) => {
+                  const badgeCount = getBadgeCount(item.name);
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.path}
+                      onClick={() => setIsMobileSidebarOpen(false)}
+                      className={cn(
+                        "flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200",
+                        isActive(item.path)
+                          ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg"
+                          : "text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600"
+                      )}
+                    >
+                      <item.icon className="h-5 w-5 mr-3 flex-shrink-0" />
+                      <span className="flex-1">{item.name}</span>
+                      {badgeCount > 0 && (
+                        <Badge className="ml-2 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 px-2 py-0.5 text-xs font-semibold">
+                          {badgeCount > 99 ? '99+' : badgeCount}
+                        </Badge>
+                      )}
+                    </Link>
+                  );
+                })}
               </nav>
             </div>
           </aside>

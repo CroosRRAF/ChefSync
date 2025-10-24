@@ -90,9 +90,9 @@ export const OrderStatusBar: React.FC<OrderStatusBarProps> = ({
       >
         <div
           className={cn(
-            'relative overflow-hidden rounded-lg shadow-2xl backdrop-blur-md',
-            'bg-white/95 dark:bg-gray-900/95 border border-gray-200 dark:border-gray-700',
-            isPulsing && 'ring-2 ring-orange-500/50 animate-pulse'
+            'relative overflow-hidden rounded-lg shadow-2xl',
+            'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700',
+            isPulsing && 'ring-2 ring-orange-500/50'
           )}
         >
           {/* Status progress bar */}
@@ -169,9 +169,10 @@ export const OrderStatusBar: React.FC<OrderStatusBarProps> = ({
                 onClick={onExpand}
                 className={cn(
                   'flex items-center gap-2 px-4 py-2 rounded-lg',
-                  'bg-orange-500 hover:bg-orange-600 text-white',
-                  'transition-colors duration-200',
-                  'text-sm font-medium shadow-sm'
+                  'bg-orange-500 text-white',
+                  'text-sm font-medium shadow-sm',
+                  'hover:bg-orange-600 focus:bg-orange-600',
+                  'transition-colors duration-200'
                 )}
               >
                 <span>Track Order</span>

@@ -1084,7 +1084,14 @@ class AdminService {
     format: "csv" | "excel" | "pdf" = "csv"
   ): Promise<Blob> {
     try {
-      const response = await apiClient.get(`${this.baseUrl}/export/${type}/`, {
+      // Map type to correct endpoint
+      const endpointMap = {
+        users: `${this.baseUrl}/users/export_users/`,
+        orders: `${this.baseUrl}/orders/export_orders/`,
+        activity_logs: `${this.baseUrl}/activity-logs/export_activity_logs/`,
+      };
+
+      const response = await apiClient.get(endpointMap[type], {
         params: { format },
         responseType: "blob",
       });
@@ -1165,7 +1172,7 @@ class AdminService {
   }> {
     try {
       const response = await apiClient.get(
-        `/api/admin-management/dashboard/orders_distribution/?days=7`
+        `/admin-management/dashboard/orders_distribution/?days=7`
       );
       return {
         data: response.data.data,
@@ -1187,7 +1194,7 @@ class AdminService {
     try {
       // Try the new endpoint first
       const response = await apiClient.get(
-        `/api/admin-management/dashboard/orders_distribution/?days=${days}`
+        `/admin-management/dashboard/orders_distribution/?days=${days}`
       );
       return response.data;
     } catch (error) {
@@ -1205,7 +1212,7 @@ class AdminService {
   }> {
     try {
       const response = await apiClient.get(
-        `/api/admin-management/dashboard/new_users/?days=${days}`
+        `/admin-management/dashboard/new_users/?days=${days}`
       );
       return response.data;
     } catch (error) {
@@ -1233,7 +1240,7 @@ class AdminService {
       );
       // Try the new endpoint first
       const response = await apiClient.get(
-        `/api/admin-management/dashboard/recent_deliveries/?limit=${limit}`
+        `/admin-management/dashboard/recent_deliveries/?limit=${limit}`
       );
       console.log(
         `[AdminService] getRecentDeliveries response:`,

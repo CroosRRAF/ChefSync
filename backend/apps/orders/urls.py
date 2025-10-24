@@ -4,6 +4,12 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .bulk_views import BulkOrderManagementViewSet
 from .customer_bulk_views import CustomerBulkOrderViewSet
+from .customer_views import (
+    customer_dashboard_stats,
+    submit_food_review,
+    submit_delivery_review,
+    get_order_review_status,
+)
 
 router = DefaultRouter()
 router.register(r"orders", views.OrderViewSet, basename="orders")
@@ -18,14 +24,32 @@ router.register(r"bulk", BulkOrderManagementViewSet, basename="bulk-orders")
 # Customer bulk orders (for customers to place bulk orders)
 router.register(r"customer-bulk-orders", CustomerBulkOrderViewSet, basename="customer-bulk-orders")
 
-# Delivery tracking
-router.register(
-    r"delivery", views.DeliveryTrackingViewSet, basename="delivery-tracking"
-)
 
 urlpatterns = [
     path("", include(router.urls)),
-    # Chef Dashboard API endpoints
+    # Customer-specific views
+    path(
+        "customer/stats/",
+        customer_dashboard_stats,
+        name="customer-dashboard-stats",
+    ),
+    # Review endpoints
+    path(
+        "reviews/food/submit/",
+        submit_food_review,
+        name="submit-food-review",
+    ),
+    path(
+        "reviews/delivery/submit/",
+        submit_delivery_review,
+        name="submit-delivery-review",
+    ),
+    path(
+        "reviews/status/<int:order_id>/",
+        get_order_review_status,
+        name="order-review-status",
+    ),
+    # Chef-specific views
     path(
         "chef/dashboard/stats/", views.chef_dashboard_stats, name="chef-dashboard-stats"
     ),

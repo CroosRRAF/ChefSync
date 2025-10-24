@@ -39,7 +39,8 @@ import CustomerDashboard from "@/pages/customer/Dashboard";
 import CustomerOrders from "@/pages/customer/Orders";
 import CustomerProfile from "@/pages/customer/Profile";
 import CustomerSettings from "@/pages/customer/Settings";
-import CustomerBulkOrderDashboard from "@/components/customer/CustomerBulkOrderDashboard";
+import CustomerNotifications from "@/pages/customer/Notifications";
+import OrderReview from "@/pages/customer/OrderReview";
 import ChefProfilePage from "@/pages/ChefProfilePage";
 
 import AllOrders from "@/pages/delivery/AllOrders";
@@ -439,21 +440,29 @@ const InnerRoutes: React.FC = () => {
           }
         />
         <Route
-          path="/customer/bulk-orders"
-          element={
-            <ProtectedRoute allowedRoles={["customer"]}>
-              <CustomerDashboardLayout>
-                <CustomerBulkOrderDashboard />
-              </CustomerDashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/customer/orders"
           element={
             <ProtectedRoute allowedRoles={["customer"]}>
               <CustomerDashboardLayout>
                 <CustomerOrders />
+              </CustomerDashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customer/orders/:orderId/review"
+          element={
+            <ProtectedRoute allowedRoles={["customer"]}>
+              <OrderReview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customer/notifications"
+          element={
+            <ProtectedRoute allowedRoles={["customer"]}>
+              <CustomerDashboardLayout>
+                <CustomerNotifications />
               </CustomerDashboardLayout>
             </ProtectedRoute>
           }

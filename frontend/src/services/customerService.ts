@@ -78,13 +78,13 @@ export interface CustomerStats {
 export const customerService = {
   // Get customer profile
   getProfile: async (): Promise<CustomerProfile> => {
-  const response = await apiClient.get('/auth/profile/');
+    const response = await apiClient.get('/auth/profile/');
     return response.data;
   },
 
   // Update customer profile
   updateProfile: async (data: Partial<CustomerProfile>): Promise<CustomerProfile> => {
-  const response = await apiClient.patch('/auth/profile/update/', data);
+    const response = await apiClient.patch('/auth/profile/update/', data);
     return response.data;
   },
 
@@ -113,51 +113,10 @@ export const customerService = {
     return response.data;
   },
 
-  // Get customer statistics
+  // Get customer stats
   getCustomerStats: async (): Promise<CustomerStats> => {
-    try {
-      // Get orders for statistics
-      const ordersResponse = await apiClient.get('/orders/orders/');
-      const orders = ordersResponse.data.results || ordersResponse.data;
-
-      const totalOrders = orders.length;
-      const completedOrders = orders.filter((order: Order) => order.status === 'delivered').length;
-      const pendingOrders = orders.filter((order: Order) => 
-        ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
-      ).length;
-      
-      const totalSpent = orders.reduce((sum: number, order: Order) => sum + (order.total_amount || 0), 0);
-      const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
-
-      // Get recent orders (last 5)
-      const recentOrders = orders
-        .sort((a: Order, b: Order) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 5);
-
-      // Extract favorite cuisines from orders (simplified)
-      const favoriteCuisines = ['Italian', 'Chinese', 'Indian', 'Mexican', 'Thai'];
-
-      return {
-        total_orders: totalOrders,
-        completed_orders: completedOrders,
-        pending_orders: pendingOrders,
-        total_spent: totalSpent,
-        average_order_value: averageOrderValue,
-        favorite_cuisines: favoriteCuisines,
-        recent_orders: recentOrders
-      };
-    } catch (error) {
-      console.error('Error fetching customer stats:', error);
-      return {
-        total_orders: 0,
-        completed_orders: 0,
-        pending_orders: 0,
-        total_spent: 0,
-        average_order_value: 0,
-        favorite_cuisines: [],
-        recent_orders: []
-      };
-    }
+        const response = await apiClient.get<CustomerStats>('/orders/customer/stats/');
+    return response.data;
   },
 
   // Cancel order
@@ -172,7 +131,13 @@ export const customerService = {
   getOrderHistory: async (orderId: number): Promise<any[]> => {
     const response = await apiClient.get(`/orders/order-history/?order=${orderId}`);
     return response.data.results || response.data;
-  }
+  },
+
+  // Get customer orders
+  getCustomerOrders: async (): Promise<Order[]> => {
+    const response = await apiClient.get<Order[]>('/orders/customer/orders/');
+    return response.data;
+  },
 };
 
 export default customerService;

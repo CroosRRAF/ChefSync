@@ -1,5 +1,6 @@
 // Analytics service for admin dashboard - enhanced with advanced AI analytics
 import { type DashboardStats } from "./adminService";
+import apiClient from "./apiClient";
 
 // Enhanced types for advanced analytics
 export interface RevenueAnalytics {
@@ -991,57 +992,45 @@ class AnalyticsService {
   // Export functionality
   async exportData(format: "csv" | "pdf" | "excel", filters: any = {}) {
     try {
-      const response = await fetch(`${this.baseUrl}/analytics/export/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: JSON.stringify({
+      const response = await apiClient.post(
+        `/analytics/export/`,
+        {
           format,
           filters,
-        }),
+        },
+        {
+          responseType: "blob",
+        }
+      );
+
+      // Convert to Response-like object for compatibility with existing code
+      return new Response(response.data, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: new Headers(response.headers as any),
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return response;
     } catch (error) {
       console.error("Failed to export data:", error);
       // Return mock data for development
-      return {
-        data: "Mock export data",
+      return new Response("Mock export data", {
         status: 200,
         statusText: "OK",
-      };
+      });
     }
   }
 
   // Schedule report functionality
   async scheduleReport(templateId: string, schedule: any) {
     try {
-      const response = await fetch(
-        `${this.baseUrl}/analytics/reports/schedule/`,
+      const response = await apiClient.post(
+        `/analytics/reports/schedule/`,
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-          body: JSON.stringify({
-            templateId,
-            schedule,
-          }),
+          templateId,
+          schedule,
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error("Failed to schedule report:", error);
       return { success: true, message: "Report scheduled successfully" };

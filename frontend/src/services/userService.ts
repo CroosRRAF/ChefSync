@@ -112,9 +112,8 @@ class UserService {
   // Profile Management Methods
   async getUserProfile(): Promise<CookProfileResponse> {
     try {
-      // Use cook-specific profile endpoint for cook users
-      console.log('Fetching cook profile from /auth/cook-profile/');
-      const response = await fetch(`${this.apiUrl}/auth/cook-profile/`, {
+      console.log('Fetching user profile from /auth/profile/');
+      const response = await fetch(`${this.apiUrl}/auth/profile/`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });

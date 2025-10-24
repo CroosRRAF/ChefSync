@@ -186,25 +186,21 @@ What would you like to know?`,
       )}>
         {!isOpen && (
           <div className="relative group">
-            {/* Pulsing ring effect */}
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-orange-500 to-red-500 opacity-75 animate-ping"></div>
-            
             <Button
               onClick={() => setIsOpen(true)}
               className={cn(
-                "relative h-14 w-14 sm:h-15 sm:w-15 md:h-16 md:w-16 rounded-full shadow-2xl transition-all duration-300",
+                "relative h-14 w-14 sm:h-15 sm:w-15 md:h-16 md:w-16 rounded-full shadow-2xl",
                 "bg-gradient-to-br from-orange-500 via-red-500 to-pink-500",
-                "hover:scale-110 hover:shadow-orange-500/50",
+                "hover:bg-gradient-to-br hover:from-orange-600 hover:via-red-600 hover:to-pink-600",
+                "focus:bg-gradient-to-br focus:from-orange-600 focus:via-red-600 focus:to-pink-600",
                 "flex items-center justify-center",
-                "border-2 border-white/20",
-                "group-hover:from-orange-600 group-hover:via-red-600 group-hover:to-pink-600"
+                "border-2 border-white/30",
+                "transition-all duration-200",
+                "hover:scale-105 focus:scale-105"
               )}
             >
-              <MessageCircle className="h-6 w-6 sm:h-7 sm:w-7 text-white animate-pulse" />
-              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-300 absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 animate-bounce" />
-              
-              {/* Glow effect */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-orange-400 to-pink-400 opacity-50 blur-xl group-hover:opacity-75 transition-opacity"></div>
+              <MessageCircle className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-300 absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1" />
             </Button>
 
             {/* Tooltip - Position adjusts based on side */}

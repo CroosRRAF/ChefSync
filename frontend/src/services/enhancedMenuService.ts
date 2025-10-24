@@ -261,7 +261,7 @@ class EnhancedMenuService {
    * Add item to cart
    */
   async addToCart(priceId: number, quantity: number = 1, specialInstructions: string = ''): Promise<any> {
-    const response = await apiClient.post(`/api/orders/cart/add_to_cart/`, {
+    const response = await apiClient.post(`/orders/cart/add_to_cart/`, {
       price_id: priceId,
       quantity: quantity,
       special_instructions: specialInstructions,
@@ -273,7 +273,7 @@ class EnhancedMenuService {
    * Get cart summary
    */
   async getCartSummary(): Promise<any> {
-    const response = await apiClient.get(`/api/orders/cart/cart_summary/`);
+    const response = await apiClient.get(`/orders/cart/cart_summary/`);
     return response.data;
   }
 
@@ -281,7 +281,7 @@ class EnhancedMenuService {
    * Update cart item
    */
   async updateCartItem(itemId: number, quantity: number): Promise<any> {
-    const response = await apiClient.patch(`/api/orders/cart/${itemId}/`, {
+    const response = await apiClient.patch(`/orders/cart/${itemId}/`, {
       quantity: quantity,
     });
     return response.data;
@@ -291,7 +291,7 @@ class EnhancedMenuService {
    * Remove item from cart
    */
   async removeFromCart(itemId: number): Promise<any> {
-    const response = await apiClient.delete(`/api/orders/cart/${itemId}/`);
+    const response = await apiClient.delete(`/orders/cart/${itemId}/`);
     return response.data;
   }
 
@@ -299,7 +299,7 @@ class EnhancedMenuService {
    * Clear cart
    */
   async clearCart(): Promise<any> {
-    const response = await apiClient.delete(`/api/orders/cart/clear_cart/`);
+    const response = await apiClient.delete(`/orders/cart/clear_cart/`);
     return response.data;
   }
 }

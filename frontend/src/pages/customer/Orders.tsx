@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
 import { customerService, Order } from '@/services/customerService';
 import { openOrderTracking } from '@/components/tracking/OrderTrackingWrapper';
@@ -27,19 +28,49 @@ import {
   Home,
   LayoutDashboard,
   Loader2,
-  Navigation
+  Navigation,
+  Users,
+  Calendar,
+  DollarSign
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Bulk Order interface 
+interface BulkOrder {
+  bulk_order_id: number;
+  order_number: string;
+  status: string;
+  payment_status: string;
+  total_amount: number;
+  delivery_address: string;
+  created_at: string;
+  updated_at: string;
+  chef?: {
+    id: number;
+    name: string;
+    profile_image: string | null;
+  };
+  num_persons?: number;
+  event_date?: string;
+  menu_name?: string;
+}
 
 const CustomerOrders: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [bulkOrders, setBulkOrders] = useState<BulkOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bulkLoading, setBulkLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [bulkSearchTerm, setBulkSearchTerm] = useState('');
+  const [bulkStatusFilter, setBulkStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedBulkOrder, setSelectedBulkOrder] = useState<BulkOrder | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [showBulkOrderDetails, setShowBulkOrderDetails] = useState(false);
+  const [activeTab, setActiveTab] = useState('regular');
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -55,7 +86,8 @@ const CustomerOrders: React.FC = () => {
       try {
         setLoading(true);
         const response = await customerService.getOrders({ page_size: 50 });
-        setOrders(response.results || response);
+        const ordersData = Array.isArray(response) ? response : response.results || [];
+        setOrders(ordersData);
       } catch (error) {
         console.error('Error fetching orders:', error);
         toast.error('Failed to load orders');
@@ -66,6 +98,38 @@ const CustomerOrders: React.FC = () => {
 
     if (isAuthenticated && user?.role === 'customer') {
       fetchOrders();
+    }
+  }, [isAuthenticated, user]);
+
+  // Fetch bulk orders
+  useEffect(() => {
+    const fetchBulkOrders = async () => {
+      try {
+        setBulkLoading(true);
+        const response = await fetch('/api/orders/customer-bulk-orders/', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          const bulkOrdersData = await response.json();
+          setBulkOrders(Array.isArray(bulkOrdersData) ? bulkOrdersData : bulkOrdersData.results || []);
+        } else {
+          throw new Error('Failed to fetch bulk orders');
+        }
+      } catch (error) {
+        console.error('Error fetching bulk orders:', error);
+        toast.error('Failed to load bulk orders');
+        setBulkOrders([]);
+      } finally {
+        setBulkLoading(false);
+      }
+    };
+
+    if (isAuthenticated && user?.role === 'customer') {
+      fetchBulkOrders();
     }
   }, [isAuthenticated, user]);
 
@@ -100,9 +164,22 @@ const CustomerOrders: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const filteredBulkOrders = bulkOrders.filter(order => {
+    const matchesSearch = order.order_number?.toLowerCase().includes(bulkSearchTerm.toLowerCase()) ||
+                         (order.chef?.name || '').toLowerCase().includes(bulkSearchTerm.toLowerCase()) ||
+                         (order.menu_name || '').toLowerCase().includes(bulkSearchTerm.toLowerCase());
+    const matchesStatus = bulkStatusFilter === 'all' || order.status === bulkStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
     setShowOrderDetails(true);
+  };
+
+  const handleViewBulkOrder = (order: BulkOrder) => {
+    setSelectedBulkOrder(order);
+    setShowBulkOrderDetails(true);
   };
 
   const handleCancelOrder = async (orderId: number) => {
@@ -112,7 +189,8 @@ const CustomerOrders: React.FC = () => {
         toast.success('Order cancelled successfully');
         // Refresh orders
         const response = await customerService.getOrders({ page_size: 50 });
-        setOrders(response.results || response);
+        const ordersData = Array.isArray(response) ? response : response.results || [];
+        setOrders(ordersData);
       } catch (error) {
         console.error('Error cancelling order:', error);
         toast.error('Failed to cancel order');
@@ -126,10 +204,10 @@ const CustomerOrders: React.FC = () => {
   };
 
   const isActiveOrder = (status: string) => {
-    return !['delivered', 'cancelled', 'refunded', 'cart'].includes(status);
+    return !['delivered', 'cancelled', 'refunded', 'cart', 'completed'].includes(status);
   };
 
-  if (loading) {
+  if (loading && bulkLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-16">
         <div className="container mx-auto px-4 py-8">
@@ -175,67 +253,87 @@ const CustomerOrders: React.FC = () => {
           </p>
         </div>
 
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search orders by number or chef name..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <div className="md:w-48">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Orders</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                    <SelectItem value="preparing">Preparing</SelectItem>
-                    <SelectItem value="ready">Ready</SelectItem>
-                    <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-                    <SelectItem value="delivered">Delivered</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Tabs for Regular vs Bulk Orders */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="regular" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Regular Orders ({orders.length})
+            </TabsTrigger>
+            <TabsTrigger value="bulk" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Bulk Orders ({bulkOrders.length})
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Orders List */}
-        {filteredOrders.length === 0 ? (
-          <Card className="text-center py-12">
-            <CardContent>
-              <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No orders found</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                {searchTerm || statusFilter !== 'all' 
-                  ? 'No orders match your current filters' 
-                  : 'You haven\'t placed any orders yet'
-                }
-              </p>
-              {!searchTerm && statusFilter === 'all' && (
-                <Button
-                  onClick={() => navigate('/menu')}
-                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                >
-                  Browse Menu
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {filteredOrders.map((order) => (
+          {/* Regular Orders Tab */}
+          <TabsContent value="regular" className="mt-6">
+            {/* Regular Orders Filters */}
+            <Card className="mb-6">
+              <CardContent className="p-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search orders by number or chef name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="md:w-48">
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Orders</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="preparing">Preparing</SelectItem>
+                        <SelectItem value="ready">Ready</SelectItem>
+                        <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                        <SelectItem value="delivered">Delivered</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Regular Orders List */}
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+                <span className="ml-2 text-gray-600">Loading regular orders...</span>
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No regular orders found</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6">
+                    {searchTerm || statusFilter !== 'all' 
+                      ? 'No orders match your current filters' 
+                      : 'You haven\'t placed any regular orders yet'
+                    }
+                  </p>
+                  {!searchTerm && statusFilter === 'all' && (
+                    <Button
+                      onClick={() => navigate('/menu')}
+                      className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                    >
+                      Browse Menu
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {filteredOrders.map((order) => (
               <Card key={order.id} className="hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -277,6 +375,19 @@ const CustomerOrders: React.FC = () => {
                       </div>
                       
                       <div className="flex space-x-2">
+                        {/* Review button for delivered orders */}
+                        {order.status === 'delivered' && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => navigate(`/customer/orders/${order.id}/review`)}
+                            className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white"
+                          >
+                            <Star className="h-4 w-4 mr-1" />
+                            Review
+                          </Button>
+                        )}
+                        
                         {/* Track button for active orders */}
                         {isActiveOrder(order.status) && (
                           <Button
@@ -318,6 +429,141 @@ const CustomerOrders: React.FC = () => {
             ))}
           </div>
         )}
+          </TabsContent>
+
+          {/* Bulk Orders Tab */}
+          <TabsContent value="bulk" className="mt-6">
+            {/* Bulk Orders Filters */}
+            <Card className="mb-6">
+              <CardContent className="p-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search bulk orders by number, chef, or menu name..."
+                        value={bulkSearchTerm}
+                        onChange={(e) => setBulkSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="md:w-48">
+                    <Select value={bulkStatusFilter} onValueChange={setBulkStatusFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Orders</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="preparing">Preparing</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Bulk Orders List */}
+            {bulkLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+                <span className="ml-2 text-gray-600">Loading bulk orders...</span>
+              </div>
+            ) : filteredBulkOrders.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No bulk orders found</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6">
+                    {bulkSearchTerm || bulkStatusFilter !== 'all' 
+                      ? 'No bulk orders match your current filters' 
+                      : 'You haven\'t placed any bulk orders yet'
+                    }
+                  </p>
+                  {!bulkSearchTerm && bulkStatusFilter === 'all' && (
+                    <Button
+                      onClick={() => navigate('/menu')}
+                      className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                    >
+                      Browse Bulk Menus
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {filteredBulkOrders.map((order) => (
+                  <Card key={order.bulk_order_id} className="hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                            <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900 dark:text-white">
+                              Bulk Order #{order.order_number || `BULK-${order.bulk_order_id}`}
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              by {order.chef?.name || 'Unknown Chef'} • {new Date(order.created_at).toLocaleDateString()}
+                            </p>
+                            <div className="flex items-center space-x-4 mt-1">
+                              <div className="flex items-center space-x-1 text-sm text-gray-500">
+                                <Users className="h-3 w-3" />
+                                <span>{order.num_persons || 'N/A'} persons</span>
+                              </div>
+                              {order.event_date && (
+                                <div className="flex items-center space-x-1 text-sm text-gray-500">
+                                  <Calendar className="h-3 w-3" />
+                                  <span>{new Date(order.event_date).toLocaleDateString()}</span>
+                                </div>
+                              )}
+                              {order.menu_name && (
+                                <div className="flex items-center space-x-1 text-sm text-gray-500">
+                                  <ChefHat className="h-3 w-3" />
+                                  <span>{order.menu_name}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4">
+                          <div className="text-right">
+                            <p className="font-semibold text-gray-900 dark:text-white">
+                              LKR {Math.round(order.total_amount)}
+                            </p>
+                            <Badge className={getStatusColor(order.status)}>
+                              <span className="flex items-center space-x-1">
+                                {getStatusIcon(order.status)}
+                                <span>{order.status.replace('_', ' ')}</span>
+                              </span>
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewBulkOrder(order)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
         {/* Order Details Modal */}
         {showOrderDetails && selectedOrder && (
@@ -425,6 +671,117 @@ const CustomerOrders: React.FC = () => {
                       <div className="flex justify-between font-semibold text-lg border-t pt-2">
                         <span>Total</span>
                         <span>LKR {Math.round(selectedOrder.total_amount)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Bulk Order Details Modal */}
+        {showBulkOrderDetails && selectedBulkOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowBulkOrderDetails(false)} />
+            <Card className="relative w-full max-w-2xl mx-4 max-h-[80vh] bg-white dark:bg-gray-900">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Bulk Order #{selectedBulkOrder.order_number || `BULK-${selectedBulkOrder.bulk_order_id}`}</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowBulkOrderDetails(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="max-h-96">
+                  <div className="space-y-4">
+                    {/* Order Status */}
+                    <div className="flex items-center space-x-2">
+                      <Badge className={getStatusColor(selectedBulkOrder.status)}>
+                        <span className="flex items-center space-x-1">
+                          {getStatusIcon(selectedBulkOrder.status)}
+                          <span>{selectedBulkOrder.status.replace('_', ' ')}</span>
+                        </span>
+                      </Badge>
+                    </div>
+
+                    {/* Chef Info */}
+                    {selectedBulkOrder.chef && (
+                      <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
+                          <ChefHat className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{selectedBulkOrder.chef.name}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Chef</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Event Details */}
+                    <div className="space-y-2">
+                      <h4 className="font-semibold">Event Details</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600 dark:text-gray-400">Persons</p>
+                          <p className="font-semibold">{selectedBulkOrder.num_persons || 'N/A'}</p>
+                        </div>
+                        {selectedBulkOrder.event_date && (
+                          <div>
+                            <p className="text-gray-600 dark:text-gray-400">Event Date</p>
+                            <p className="font-semibold">{new Date(selectedBulkOrder.event_date).toLocaleDateString()}</p>
+                          </div>
+                        )}
+                        {selectedBulkOrder.menu_name && (
+                          <div className="col-span-2">
+                            <p className="text-gray-600 dark:text-gray-400">Menu</p>
+                            <p className="font-semibold">{selectedBulkOrder.menu_name}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Delivery Address */}
+                    {selectedBulkOrder.delivery_address && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Delivery Address</h4>
+                        <div className="flex items-start space-x-2 text-sm">
+                          <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                          <p>{selectedBulkOrder.delivery_address}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Financial Summary */}
+                    <div className="border-t pt-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-semibold">Total Amount</span>
+                        <span className="text-lg font-bold text-green-600">
+                          LKR {Math.round(selectedBulkOrder.total_amount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                        <span>Payment Status</span>
+                        <Badge className={selectedBulkOrder.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                          {selectedBulkOrder.payment_status}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Timestamps */}
+                    <div className="border-t pt-4 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex justify-between">
+                        <span>Ordered On</span>
+                        <span>{new Date(selectedBulkOrder.created_at).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Last Updated</span>
+                        <span>{new Date(selectedBulkOrder.updated_at).toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
