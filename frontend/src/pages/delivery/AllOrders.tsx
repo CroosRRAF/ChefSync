@@ -36,6 +36,7 @@ import {
   getDeliveryHistory,
   acceptOrder,
   updateOrderStatus,
+  type UnifiedOrder,
 } from "@/services/service";
 import {
   Package,
@@ -68,12 +69,12 @@ const AllOrdersPage: React.FC = () => {
   const navigate = useNavigate();
 
   // State management
-  const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
-  const [assignedOrders, setAssignedOrders] = useState<Order[]>([]);
-  const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
+  const [availableOrders, setAvailableOrders] = useState<UnifiedOrder[]>([]);
+  const [assignedOrders, setAssignedOrders] = useState<UnifiedOrder[]>([]);
+  const [completedOrders, setCompletedOrders] = useState<UnifiedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [acceptingOrder, setAcceptingOrder] = useState<number | null>(null);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<UnifiedOrder | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
 
@@ -134,7 +135,7 @@ const AllOrdersPage: React.FC = () => {
     }
   };
 
-  const handleAcceptOrder = async (orderId: number, order: Order) => {
+  const handleAcceptOrder = async (orderId: number, order: UnifiedOrder) => {
     setAcceptingOrder(orderId);
 
     // Get current location for distance checking
@@ -168,7 +169,9 @@ const AllOrdersPage: React.FC = () => {
 
       const acceptResult = await acceptOrder(
         orderId,
-        agentLocation || undefined
+        agentLocation || undefined,
+        undefined,
+        order.order_type_category || "normal"
       );
 
       // Check if there's a distance warning
@@ -187,19 +190,26 @@ const AllOrdersPage: React.FC = () => {
         }
 
         // If user confirms, accept again
-        await acceptOrder(orderId, agentLocation || undefined);
+        await acceptOrder(
+          orderId,
+          agentLocation || undefined,
+          undefined,
+          order.order_type_category || "normal"
+        );
       }
 
       // Move order from available to assigned
       setAvailableOrders((prev) => prev.filter((o) => o.id !== orderId));
       setAssignedOrders((prev) => [
         ...prev,
-        { ...order, status: "out_for_delivery" as Order["status"] },
+        { ...order, status: "out_for_delivery" as UnifiedOrder["status"] },
       ]);
 
       toast({
         title: "Order Accepted",
-        description: `Order #${orderId} has been assigned to you.`,
+        description: `${
+          order.order_type_category === "bulk" ? "Bulk Order" : "Order"
+        } #${orderId} has been assigned to you.`,
       });
 
       // Navigate to map with order details
@@ -208,7 +218,7 @@ const AllOrdersPage: React.FC = () => {
           selectedOrderId: orderId,
           orderDetails: {
             ...order,
-            status: "out_for_delivery" as Order["status"],
+            status: "out_for_delivery" as UnifiedOrder["status"],
           },
         },
       });
@@ -223,7 +233,11 @@ const AllOrdersPage: React.FC = () => {
     }
   };
 
-  const handleStatusUpdate = (orderId: number, newStatus: Order["status"]) => {
+  const handleStatusUpdate = (
+    orderId: number,
+    newStatus: UnifiedOrder["status"],
+    orderType?: "normal" | "bulk"
+  ) => {
     setAssignedOrders((prev) =>
       prev.map((order) =>
         order.id === orderId ? { ...order, status: newStatus } : order
@@ -250,7 +264,7 @@ const AllOrdersPage: React.FC = () => {
     }
   };
 
-  const handleNavigateToOrder = (order: Order) => {
+  const handleNavigateToOrder = (order: UnifiedOrder) => {
     navigate("/delivery/map", {
       state: {
         selectedOrderId: order.id,
@@ -259,17 +273,24 @@ const AllOrdersPage: React.FC = () => {
     });
   };
 
-  const filterOrders = (orders: Order[]) => {
+  const filterOrders = (orders: UnifiedOrder[]) => {
     return orders
       .filter((order) => {
         const matchesSearch =
           order.id.toString().includes(searchTerm) ||
+          order.order_number
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
           order.customer?.name
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          order.customer_name
             ?.toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
           order.delivery_address
             ?.toLowerCase()
-            .includes(searchTerm.toLowerCase());
+            .includes(searchTerm.toLowerCase()) ||
+          order.event_type?.toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesStatus =
           statusFilter === "all" || order.status === statusFilter;
@@ -314,7 +335,7 @@ const AllOrdersPage: React.FC = () => {
   };
 
   const OrderCard: React.FC<{
-    order: Order;
+    order: UnifiedOrder;
     showActions: boolean;
     isAssigned?: boolean;
   }> = ({ order, showActions, isAssigned = false }) => (
@@ -322,11 +343,31 @@ const AllOrdersPage: React.FC = () => {
       <CardContent className="p-6">
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h3 className="font-semibold text-lg">Order #{order.id}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-lg">
+                {order.order_type_category === "bulk" ? "Bulk Order" : "Order"}{" "}
+                #{order.id}
+              </h3>
+              {order.order_type_category === "bulk" && (
+                <Badge variant="outline" className="text-xs">
+                  {order.event_type || "Bulk"}
+                </Badge>
+              )}
+            </div>
             <div className="flex items-center mt-1 text-sm text-gray-600">
               <User className="h-4 w-4 mr-1" />
-              <span>{order.customer?.name || "Unknown Customer"}</span>
+              <span>
+                {order.customer?.name ||
+                  order.customer_name ||
+                  "Unknown Customer"}
+              </span>
             </div>
+            {order.order_type_category === "bulk" && order.total_quantity && (
+              <div className="flex items-center mt-1 text-sm text-gray-600">
+                <Package className="h-4 w-4 mr-1" />
+                <span>{order.total_quantity} items</span>
+              </div>
+            )}
           </div>
           {getStatusBadge(order.status)}
         </div>
@@ -342,13 +383,24 @@ const AllOrdersPage: React.FC = () => {
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center text-gray-600">
               <Clock className="h-4 w-4 mr-1" />
-              <span>{new Date(order.created_at).toLocaleTimeString()}</span>
+              <span>
+                {order.order_type_category === "bulk" && order.event_date
+                  ? new Date(order.event_date).toLocaleDateString()
+                  : new Date(order.created_at).toLocaleTimeString()}
+              </span>
             </div>
             <div className="flex items-center font-semibold text-green-600">
               <DollarSign className="h-4 w-4 mr-1" />
               <span>${order.total_amount}</span>
             </div>
           </div>
+
+          {order.order_type_category === "bulk" &&
+            order.special_instructions && (
+              <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                <strong>Event Details:</strong> {order.special_instructions}
+              </div>
+            )}
         </div>
 
         {showActions && (

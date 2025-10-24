@@ -26,6 +26,7 @@ import {
   updateDeliveryLocation,
   getRouteDirections,
   optimizeDeliveryRoute,
+  type UnifiedOrder,
 } from "@/services/service";
 import {
   MapPin,
@@ -69,11 +70,11 @@ const DeliveryMap: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [assignedOrders, setAssignedOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<UnifiedOrder[]>([]);
+  const [assignedOrders, setAssignedOrders] = useState<UnifiedOrder[]>([]);
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<UnifiedOrder | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [loading, setLoading] = useState(false);
   const [routeOptimization, setRouteOptimization] =

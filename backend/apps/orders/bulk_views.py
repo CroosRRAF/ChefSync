@@ -295,3 +295,55 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
         chef_list.sort(key=lambda x: (x['availability_status'] == 'busy', x['active_assignments']))
         
         return Response(chef_list)
+    
+    @action(detail=True, methods=['post'], url_path='assign_delivery')
+    def assign_delivery(self, request, pk=None):
+        """Assign a delivery agent to a bulk order"""
+        try:
+            bulk_order = self.get_object()
+            
+            # Check if bulk order is eligible for delivery assignment
+            if bulk_order.order_type != 'delivery':
+                return Response(
+                    {'error': 'This bulk order is not for delivery'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if bulk_order.delivery_partner:
+                return Response(
+                    {'error': 'Delivery agent already assigned to this bulk order'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if bulk_order.status not in ['confirmed', 'preparing']:
+                return Response(
+                    {'error': 'Bulk order is not ready for delivery assignment'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Assign current user as delivery partner
+            bulk_order.delivery_partner = request.user
+            bulk_order.save()
+            
+            # Optional: Log the assignment
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Delivery agent {request.user.username} assigned to bulk order {bulk_order.bulk_order_id}")
+            
+            # Return the updated bulk order
+            serializer = self.get_serializer(bulk_order)
+            return Response(serializer.data)
+            
+        except BulkOrder.DoesNotExist:
+            return Response(
+                {'error': 'Bulk order not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error assigning delivery agent to bulk order {pk}: {str(e)}")
+            return Response(
+                {'error': 'Failed to assign delivery agent'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
