@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useTheme } from '@/context/ThemeContext';
-import { useDatabaseCart } from '@/context/DatabaseCartContext';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { notificationService } from '@/services/notificationService';
-import logoImage from '@/assets/2.png';
-import navbarLogo from '@/assets/images/hero/navbarlogo.png';
+import navbarLogo from "@/assets/images/hero/navbarlogo.png";
+import AIChatBox from "@/components/ai/AIChatBox";
+import Footer from "@/components/layout/Footer";
+import NotificationDropdown from "@/components/notifications/NotificationDropdown";
+import OrderTrackingWrapper from "@/components/tracking/OrderTrackingWrapper";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,37 +13,41 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { 
-  LayoutDashboard,
-  Package,
-  User,
-  Settings,
-  Home,
+} from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/context/AuthContext";
+import { useDatabaseCart } from "@/context/DatabaseCartContext";
+import { useTheme } from "@/context/ThemeContext";
+import { cn } from "@/lib/utils";
+import { notificationService } from "@/services/notificationService";
+import {
+  Bell,
   ChefHat,
-  Info,
-  Phone,
-  Moon,
-  Sun,
-  LogOut,
-  Menu,
-  X,
   ChevronLeft,
   ChevronRight,
-  Bell,
-  ShoppingCart
-} from 'lucide-react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { cn } from '@/lib/utils';
-import AIChatBox from '@/components/ai/AIChatBox';
-import OrderTrackingWrapper from '@/components/tracking/OrderTrackingWrapper';
-import NotificationDropdown from '@/components/notifications/NotificationDropdown';
+  Home,
+  Info,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Moon,
+  Package,
+  Phone,
+  Settings,
+  ShoppingCart,
+  Sun,
+  User,
+  X,
+} from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 interface CustomerDashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ children }) => {
+const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({
+  children,
+}) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { getItemCount } = useDatabaseCart();
@@ -60,8 +62,27 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Fetch unread notifications count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const count = await notificationService.getUnreadCount();
+        setUnreadNotifications(count);
+      } catch (error) {
+        console.error("Error fetching unread count:", error);
+      }
+    };
+
+    fetchUnreadCount();
+
+    // Poll for unread count every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch unread notifications count
@@ -76,63 +97,66 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
     };
 
     fetchUnreadCount();
-    
+
     // Poll for unread count every 30 seconds
     const interval = setInterval(fetchUnreadCount, 30000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/');
+      navigate("/");
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
     }
   };
 
   const topNavItems = [
-    { name: 'Home', path: '/', icon: Home },
-    { name: 'Menu', path: '/menu', icon: ChefHat },
-    { name: 'About', path: '/about', icon: Info },
-    { name: 'Contact', path: '/contact', icon: Phone },
+    { name: "Home", path: "/", icon: Home },
+    { name: "Menu", path: "/menu", icon: ChefHat },
+    { name: "About", path: "/about", icon: Info },
+    { name: "Contact", path: "/contact", icon: Phone },
   ];
 
   const sidebarItems = [
-    { name: 'Dashboard', path: '/customer/dashboard', icon: LayoutDashboard },
-    { name: 'Orders', path: '/customer/orders', icon: Package },
-    { name: 'Notifications', path: '/customer/notifications', icon: Bell },
-    { name: 'Cart', path: '/customer/cart', icon: ShoppingCart },
-    { name: 'Profile', path: '/customer/profile', icon: User },
-    { name: 'Settings', path: '/customer/settings', icon: Settings },
+    { name: "Dashboard", path: "/customer/dashboard", icon: LayoutDashboard },
+    { name: "Orders", path: "/customer/orders", icon: Package },
+    { name: "Bulk Orders", path: "/customer/bulk-orders", icon: Package },
+    { name: "Notifications", path: "/customer/notifications", icon: Bell },
+    { name: "Cart", path: "/customer/cart", icon: ShoppingCart },
+    { name: "Profile", path: "/customer/profile", icon: User },
+    { name: "Settings", path: "/customer/settings", icon: Settings },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   // Get badge count for sidebar items
   const getBadgeCount = (itemName: string): number => {
-    if (itemName === 'Notifications') return unreadNotifications;
-    if (itemName === 'Cart') return getItemCount();
+    if (itemName === "Notifications") return unreadNotifications;
+    if (itemName === "Cart") return getItemCount();
     return 0;
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Top Navbar */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled 
-          ? 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg shadow-xl border-b border-gray-200/40 dark:border-gray-700/40' 
-          : 'bg-white/40 dark:bg-gray-900/40 backdrop-blur-md border-b border-gray-200/20 dark:border-gray-700/20'
-      }`}>
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          isScrolled
+            ? "bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg shadow-xl border-b border-gray-200/40 dark:border-gray-700/40"
+            : "bg-white/40 dark:bg-gray-900/40 backdrop-blur-md border-b border-gray-200/20 dark:border-gray-700/20"
+        }`}
+      >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center cursor-pointer group">
               <div className="relative">
-                <img 
-                  src={navbarLogo} 
-                  alt="ChefSync" 
+                <img
+                  src={navbarLogo}
+                  alt="ChefSync"
                   className="h-16 w-auto object-contain transform group-hover:scale-105 transition-all duration-300"
                 />
               </div>
@@ -149,8 +173,8 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
                   to={item.path}
                   className={`flex items-center space-x-1 xl:space-x-2 text-sm font-medium transition-all duration-200 hover:text-orange-500 relative group ${
                     isActive(item.path)
-                      ? 'text-orange-500'
-                      : 'text-gray-700 dark:text-gray-300'
+                      ? "text-orange-500"
+                      : "text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   <item.icon className="h-4 w-4" />
@@ -175,7 +199,7 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
                 onClick={toggleTheme}
                 className="hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all duration-200"
               >
-                {theme === 'dark' ? (
+                {theme === "dark" ? (
                   <Sun className="h-5 w-5 text-yellow-500" />
                 ) : (
                   <Moon className="h-5 w-5 text-gray-600" />
@@ -185,7 +209,10 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
               {/* Profile Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:ring-2 hover:ring-orange-200 transition-all duration-200">
+                  <Button
+                    variant="ghost"
+                    className="relative h-10 w-10 rounded-full hover:ring-2 hover:ring-orange-200 transition-all duration-200"
+                  >
                     <Avatar className="h-10 w-10 border-2 border-orange-200">
                       <AvatarImage src={user?.avatar} alt={user?.name} />
                       <AvatarFallback className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold">
@@ -197,24 +224,37 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user?.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                      <p className="text-sm font-medium leading-none">
+                        {user?.name}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user?.email}
+                      </p>
                       <Badge className="bg-orange-100 text-orange-800 text-xs w-fit mt-1">
                         Customer
                       </Badge>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/customer/profile')} className="cursor-pointer">
+                  <DropdownMenuItem
+                    onClick={() => navigate("/customer/profile")}
+                    className="cursor-pointer"
+                  >
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/customer/settings')} className="cursor-pointer">
+                  <DropdownMenuItem
+                    onClick={() => navigate("/customer/settings")}
+                    className="cursor-pointer"
+                  >
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400">
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="cursor-pointer text-red-600 dark:text-red-400"
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Logout</span>
                   </DropdownMenuItem>
@@ -229,7 +269,11 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
                 onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
                 aria-label="Toggle menu"
               >
-                {isMobileSidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                {isMobileSidebarOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
               </Button>
             </div>
           </div>
@@ -237,16 +281,20 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
       </nav>
 
       {/* Sidebar */}
-      <aside className={cn(
-        "fixed top-16 left-0 z-40 h-[calc(100vh-4rem)] bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 shadow-lg overflow-hidden",
-        isSidebarCollapsed ? "w-16" : "w-64",
-        "hidden lg:block"
-      )}>
+      <aside
+        className={cn(
+          "fixed top-16 left-0 z-40 h-[calc(100vh-4rem)] bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 shadow-lg overflow-hidden",
+          isSidebarCollapsed ? "w-16" : "w-64",
+          "hidden lg:block"
+        )}
+      >
         <div className="flex flex-col h-full">
           {/* Sidebar Toggle */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             {!isSidebarCollapsed && (
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Navigation</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Navigation
+              </h2>
             )}
             <Button
               variant="ghost"
@@ -254,7 +302,11 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               className="hover:bg-gray-100 dark:hover:bg-gray-800"
             >
-              {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              {isSidebarCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
             </Button>
           </div>
 
@@ -274,14 +326,16 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
                   )}
                 >
                   <div className="relative">
-                    <item.icon className={cn(
-                      "h-5 w-5 flex-shrink-0",
-                      isSidebarCollapsed ? "mx-auto" : "mr-3"
-                    )} />
+                    <item.icon
+                      className={cn(
+                        "h-5 w-5 flex-shrink-0",
+                        isSidebarCollapsed ? "mx-auto" : "mr-3"
+                      )}
+                    />
                     {/* Badge for collapsed sidebar */}
                     {isSidebarCollapsed && badgeCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-semibold">
-                        {badgeCount > 9 ? '9+' : badgeCount}
+                        {badgeCount > 9 ? "9+" : badgeCount}
                       </span>
                     )}
                   </div>
@@ -290,7 +344,7 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
                       <span className="truncate flex-1">{item.name}</span>
                       {badgeCount > 0 && (
                         <Badge className="ml-2 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 px-2 py-0.5 text-xs font-semibold">
-                          {badgeCount > 99 ? '99+' : badgeCount}
+                          {badgeCount > 99 ? "99+" : badgeCount}
                         </Badge>
                       )}
                       {isActive(item.path) && !badgeCount && (
@@ -314,8 +368,12 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user?.name}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {user?.name}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {user?.email}
+                  </p>
                 </div>
               </div>
             </div>
@@ -326,15 +384,17 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
       {/* Mobile Sidebar Overlay */}
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm" 
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
             onClick={() => setIsMobileSidebarOpen(false)}
             aria-hidden="true"
           ></div>
           <aside className="fixed top-16 left-0 z-50 w-64 h-[calc(100vh-4rem)] bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-lg overflow-y-auto">
             <div className="flex flex-col h-full">
               <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Navigation</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Navigation
+                </h2>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -343,7 +403,7 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              
+
               <nav className="flex-1 px-4 py-6 space-y-2">
                 {sidebarItems.map((item) => {
                   const badgeCount = getBadgeCount(item.name);
@@ -363,7 +423,7 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
                       <span className="flex-1">{item.name}</span>
                       {badgeCount > 0 && (
                         <Badge className="ml-2 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 px-2 py-0.5 text-xs font-semibold">
-                          {badgeCount > 99 ? '99+' : badgeCount}
+                          {badgeCount > 99 ? "99+" : badgeCount}
                         </Badge>
                       )}
                     </Link>
@@ -376,13 +436,24 @@ const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = ({ child
       )}
 
       {/* Main Content */}
-      <main className={cn(
-        "pt-16 transition-all duration-300 min-h-screen",
-        isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
-      )}>
-        <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      <main
+        className={cn(
+          "pt-16 transition-all duration-300",
+          isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
+        )}
+      >
+        <div className="p-4 md:p-6 max-w-7xl mx-auto min-h-[calc(100vh-4rem)]">
           {children}
         </div>
+
+        {/* Dashboard Footer */}
+        <Footer
+          variant="dashboard"
+          className={cn(
+            "transition-all duration-300",
+            isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
+          )}
+        />
       </main>
 
       {/* AI ChatBox - Floating in bottom-right corner */}

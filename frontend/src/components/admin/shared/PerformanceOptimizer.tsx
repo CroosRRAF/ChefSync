@@ -1,9 +1,9 @@
-import React, { memo, useMemo, useCallback, Suspense, lazy } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from "@/components/ui/skeleton";
+import React, { Suspense, lazy, memo, useCallback, useMemo } from "react";
+import DataTable from "./tables/DataTable";
 
-// Lazy load heavy components
-const LazyDataTable = lazy(() => import('./tables/DataTable'));
-const LazyCharts = lazy(() => import('./charts/BarChart'));
+// For better performance, we'll use regular imports for commonly used components
+// and reserve lazy loading for truly heavy components
 
 // Memoized wrapper for expensive components
 export const MemoizedDataTable = memo(({ data, columns, ...props }: any) => {
@@ -11,11 +11,7 @@ export const MemoizedDataTable = memo(({ data, columns, ...props }: any) => {
   const memoizedData = useMemo(() => data, [data]);
   const memoizedColumns = useMemo(() => columns, [columns]);
 
-  return (
-    <Suspense fallback={<DataTableSkeleton />}>
-      <LazyDataTable data={memoizedData} columns={memoizedColumns} {...props} />
-    </Suspense>
-  );
+  return <DataTable data={memoizedData} columns={memoizedColumns} {...props} />;
 });
 
 // Skeleton loader for data tables
@@ -51,33 +47,43 @@ export const usePerformanceMonitor = () => {
     return () => {
       const end = performance.now();
       const renderTime = end - start;
-      setMetrics(prev => ({ ...prev, renderTime }));
-      
+      setMetrics((prev) => ({ ...prev, renderTime }));
+
       if (renderTime > 100) {
-        console.warn(`Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`);
+        console.warn(
+          `Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`
+        );
       }
     };
   }, []);
 
-  const measureApiCall = useCallback(async (apiCall: () => Promise<any>, endpoint: string) => {
-    const start = performance.now();
-    try {
-      const result = await apiCall();
-      const end = performance.now();
-      const apiTime = end - start;
-      setMetrics(prev => ({ ...prev, apiCallTime: apiTime }));
-      
-      if (apiTime > 2000) {
-        console.warn(`Slow API call detected for ${endpoint}: ${apiTime.toFixed(2)}ms`);
+  const measureApiCall = useCallback(
+    async (apiCall: () => Promise<any>, endpoint: string) => {
+      const start = performance.now();
+      try {
+        const result = await apiCall();
+        const end = performance.now();
+        const apiTime = end - start;
+        setMetrics((prev) => ({ ...prev, apiCallTime: apiTime }));
+
+        if (apiTime > 2000) {
+          console.warn(
+            `Slow API call detected for ${endpoint}: ${apiTime.toFixed(2)}ms`
+          );
+        }
+        return result;
+      } catch (error) {
+        const end = performance.now();
+        const apiTime = end - start;
+        console.error(
+          `API call failed for ${endpoint} after ${apiTime.toFixed(2)}ms:`,
+          error
+        );
+        throw error;
       }
-      return result;
-    } catch (error) {
-      const end = performance.now();
-      const apiTime = end - start;
-      console.error(`API call failed for ${endpoint} after ${apiTime.toFixed(2)}ms:`, error);
-      throw error;
-    }
-  }, []);
+    },
+    []
+  );
 
   return { metrics, measureRenderTime, measureApiCall };
 };
@@ -100,7 +106,11 @@ export const useDebouncedSearch = (value: string, delay: number = 300) => {
 };
 
 // Virtual scrolling hook for large datasets
-export const useVirtualScrolling = (items: any[], itemHeight: number, containerHeight: number) => {
+export const useVirtualScrolling = (
+  items: any[],
+  itemHeight: number,
+  containerHeight: number
+) => {
   const [scrollTop, setScrollTop] = React.useState(0);
 
   const visibleItems = useMemo(() => {
@@ -133,9 +143,17 @@ export const withCodeSplitting = (
   fallback?: React.ComponentType<any>
 ) => {
   const LazyComponent = lazy(importFunc);
-  
+
   return memo((props: any) => (
-    <Suspense fallback={fallback ? React.createElement(fallback, props) : <Skeleton className="h-32 w-full" />}>
+    <Suspense
+      fallback={
+        fallback ? (
+          React.createElement(fallback, props)
+        ) : (
+          <Skeleton className="h-32 w-full" />
+        )
+      }
+    >
       <LazyComponent {...props} />
     </Suspense>
   ));
@@ -154,20 +172,23 @@ export const useBatchedUpdates = () => {
   const [updates, setUpdates] = React.useState<(() => void)[]>([]);
   const [isBatching, setIsBatching] = React.useState(false);
 
-  const batchUpdate = useCallback((update: () => void) => {
-    if (isBatching) {
-      setUpdates(prev => [...prev, update]);
-    } else {
-      update();
-    }
-  }, [isBatching]);
+  const batchUpdate = useCallback(
+    (update: () => void) => {
+      if (isBatching) {
+        setUpdates((prev) => [...prev, update]);
+      } else {
+        update();
+      }
+    },
+    [isBatching]
+  );
 
   const startBatch = useCallback(() => {
     setIsBatching(true);
   }, []);
 
   const flushBatch = useCallback(() => {
-    updates.forEach(update => update());
+    updates.forEach((update) => update());
     setUpdates([]);
     setIsBatching(false);
   }, [updates]);

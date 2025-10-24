@@ -7,6 +7,7 @@ from .models import (
     CommunicationResponse,
     CommunicationTag,
     CommunicationTemplate,
+    Contact,
     Notification,
 )
 
@@ -107,10 +108,10 @@ class CommunicationSerializer(serializers.ModelSerializer):
     def get_user(self, obj):
         if obj.user:
             return {
-                'id': obj.user.user_id,
-                'name': obj.user.name,
-                'email': obj.user.email,
-                'role': obj.user.role
+                "id": obj.user.user_id,
+                "name": obj.user.name,
+                "email": obj.user.email,
+                "role": obj.user.role,
             }
         return None
 
@@ -152,10 +153,10 @@ class CommunicationListSerializer(serializers.ModelSerializer):
     def get_user(self, obj):
         if obj.user:
             return {
-                'id': obj.user.user_id,
-                'name': obj.user.name,
-                'email': obj.user.email,
-                'role': obj.user.role
+                "id": obj.user.user_id,
+                "name": obj.user.name,
+                "email": obj.user.email,
+                "role": obj.user.role,
             }
         return None
 
@@ -175,49 +176,122 @@ class CommunicationListSerializer(serializers.ModelSerializer):
 
 class NotificationSerializer(serializers.ModelSerializer):
     """Serializer for user notifications"""
-    
+
     user_name = serializers.SerializerMethodField()
     time_ago = serializers.SerializerMethodField()
     is_unread = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Notification
         fields = [
-            'notification_id',
-            'subject',
-            'message',
-            'time',
-            'status',
-            'user',
-            'user_name',
-            'time_ago',
-            'is_unread'
+            "notification_id",
+            "subject",
+            "message",
+            "time",
+            "status",
+            "user",
+            "user_name",
+            "time_ago",
+            "is_unread",
         ]
-        read_only_fields = ['notification_id', 'time', 'user']
-    
+        read_only_fields = ["notification_id", "time", "user"]
+
     def get_user_name(self, obj):
-        return obj.user.name if obj.user and obj.user.name else (obj.user.username if obj.user else 'Unknown')
-    
+        return (
+            obj.user.name
+            if obj.user and obj.user.name
+            else (obj.user.username if obj.user else "Unknown")
+        )
+
     def get_time_ago(self, obj):
-        from django.utils import timezone
         from datetime import timedelta
-        
+
+        from django.utils import timezone
+
         now = timezone.now()
         diff = now - obj.time
-        
+
         if diff < timedelta(minutes=1):
-            return 'Just now'
+            return "Just now"
         elif diff < timedelta(hours=1):
             minutes = int(diff.total_seconds() / 60)
-            return f'{minutes}m ago'
+            return f"{minutes}m ago"
         elif diff < timedelta(days=1):
             hours = int(diff.total_seconds() / 3600)
-            return f'{hours}h ago'
+            return f"{hours}h ago"
         elif diff < timedelta(days=7):
             days = diff.days
-            return f'{days}d ago'
+            return f"{days}d ago"
         else:
-            return obj.time.strftime('%b %d, %Y')
-    
+            return obj.time.strftime("%b %d, %Y")
+
     def get_is_unread(self, obj):
-        return obj.status == 'Unread'
+        return obj.status == "Unread"
+
+
+class ContactSerializer(serializers.ModelSerializer):
+    """Serializer for contact form submissions"""
+
+    user_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Contact
+        fields = [
+            "contact_id",
+            "name",
+            "email",
+            "phone",
+            "subject",
+            "message",
+            "status",
+            "user",
+            "user_name",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "contact_id",
+            "created_at",
+            "updated_at",
+            "user",
+            "user_name",
+        ]
+
+    def get_user_name(self, obj):
+        """Get the user's name if associated"""
+        return obj.user.name if obj.user and hasattr(obj.user, "name") else None
+
+    def validate_name(self, value):
+        """Validate name field"""
+        if len(value.strip()) < 2:
+            raise serializers.ValidationError(
+                "Name must be at least 2 characters long."
+            )
+        return value.strip()
+
+    def validate_email(self, value):
+        """Validate email field"""
+        if not value:
+            raise serializers.ValidationError("Email is required.")
+        return value.lower().strip()
+
+    def validate_message(self, value):
+        """Validate message field"""
+        if len(value.strip()) < 10:
+            raise serializers.ValidationError(
+                "Message must be at least 10 characters long."
+            )
+        if len(value.strip()) > 1000:
+            raise serializers.ValidationError(
+                "Message must be less than 1000 characters."
+            )
+        return value.strip()
+
+    def create(self, validated_data):
+        """Create contact with optional user association"""
+        # If user is authenticated, associate the contact with the user
+        request = self.context.get("request")
+        if request and request.user and request.user.is_authenticated:
+            validated_data["user"] = request.user
+
+        return super().create(validated_data)

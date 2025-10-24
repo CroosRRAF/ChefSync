@@ -44,63 +44,68 @@ class BrowserCompatibilityChecker {
 
   // Detect browser information
   private detectBrowser(): void {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     const ua = navigator.userAgent;
     const warnings: string[] = [];
 
-    let name = 'Unknown';
-    let version = '0';
-    let engine = 'Unknown';
+    let name = "Unknown";
+    let version = "0";
+    let engine = "Unknown";
 
     // Chrome
-    if (ua.includes('Chrome') && !ua.includes('Edg')) {
-      name = 'Chrome';
+    if (ua.includes("Chrome") && !ua.includes("Edg")) {
+      name = "Chrome";
       const match = ua.match(/Chrome\/(\d+)/);
-      version = match ? match[1] : '0';
-      engine = 'Blink';
+      version = match ? match[1] : "0";
+      engine = "Blink";
     }
     // Firefox
-    else if (ua.includes('Firefox')) {
-      name = 'Firefox';
+    else if (ua.includes("Firefox")) {
+      name = "Firefox";
       const match = ua.match(/Firefox\/(\d+)/);
-      version = match ? match[1] : '0';
-      engine = 'Gecko';
+      version = match ? match[1] : "0";
+      engine = "Gecko";
     }
     // Safari
-    else if (ua.includes('Safari') && !ua.includes('Chrome')) {
-      name = 'Safari';
+    else if (ua.includes("Safari") && !ua.includes("Chrome")) {
+      name = "Safari";
       const match = ua.match(/Version\/(\d+)/);
-      version = match ? match[1] : '0';
-      engine = 'WebKit';
+      version = match ? match[1] : "0";
+      engine = "WebKit";
     }
     // Edge
-    else if (ua.includes('Edg')) {
-      name = 'Edge';
+    else if (ua.includes("Edg")) {
+      name = "Edge";
       const match = ua.match(/Edg\/(\d+)/);
-      version = match ? match[1] : '0';
-      engine = 'Blink';
+      version = match ? match[1] : "0";
+      engine = "Blink";
     }
     // Opera
-    else if (ua.includes('OPR')) {
-      name = 'Opera';
+    else if (ua.includes("OPR")) {
+      name = "Opera";
       const match = ua.match(/OPR\/(\d+)/);
-      version = match ? match[1] : '0';
-      engine = 'Blink';
+      version = match ? match[1] : "0";
+      engine = "Blink";
     }
 
     // Check if browser version is supported
     const versionNum = parseInt(version);
-    const minVersion = this.minVersions[name.toLowerCase() as keyof typeof this.minVersions];
+    const minVersion =
+      this.minVersions[name.toLowerCase() as keyof typeof this.minVersions];
     const supported = minVersion ? versionNum >= minVersion : false;
 
     if (!supported && minVersion) {
-      warnings.push(`Your ${name} version (${version}) is outdated. Please update to version ${minVersion} or higher for the best experience.`);
+      warnings.push(
+        `Your ${name} version (${version}) is outdated. Please update to version ${minVersion} or higher for the best experience.`
+      );
     }
 
     // Check for mobile browsers
-    if (ua.includes('Mobile') || ua.includes('Android')) {
-      warnings.push('Mobile browser detected. Some features may have limited functionality.');
+    if (ua.includes("Mobile") || ua.includes("Android")) {
+      warnings.push(
+        "Mobile browser detected. Some features may have limited functionality."
+      );
     }
 
     this.browserInfo = {
@@ -115,7 +120,7 @@ class BrowserCompatibilityChecker {
 
   // Check feature support
   private checkFeatureSupport(): BrowserFeatureSupport {
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       return {
         serviceWorker: false,
         webGL: false,
@@ -135,38 +140,40 @@ class BrowserCompatibilityChecker {
     }
 
     return {
-      serviceWorker: 'serviceWorker' in navigator,
+      serviceWorker: "serviceWorker" in navigator,
       webGL: this.checkWebGL(),
-      localStorage: this.checkStorage('localStorage'),
-      sessionStorage: this.checkStorage('sessionStorage'),
-      indexedDB: 'indexedDB' in window,
-      webWorkers: 'Worker' in window,
+      localStorage: this.checkStorage("localStorage"),
+      sessionStorage: this.checkStorage("sessionStorage"),
+      indexedDB: "indexedDB" in window,
+      webWorkers: "Worker" in window,
       css3: this.checkCSS3Support(),
       es6: this.checkES6Support(),
-      fetch: 'fetch' in window,
-      promises: 'Promise' in window,
-      modules: 'noModule' in HTMLScriptElement.prototype,
-      intersectionObserver: 'IntersectionObserver' in window,
-      resizeObserver: 'ResizeObserver' in window,
-      performanceObserver: 'PerformanceObserver' in window,
+      fetch: "fetch" in window,
+      promises: "Promise" in window,
+      modules: "noModule" in HTMLScriptElement.prototype,
+      intersectionObserver: "IntersectionObserver" in window,
+      resizeObserver: "ResizeObserver" in window,
+      performanceObserver: "PerformanceObserver" in window,
     };
   }
 
   // Check WebGL support
   private checkWebGL(): boolean {
     try {
-      const canvas = document.createElement('canvas');
-      return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+      const canvas = document.createElement("canvas");
+      return !!(
+        canvas.getContext("webgl") || canvas.getContext("experimental-webgl")
+      );
     } catch {
       return false;
     }
   }
 
   // Check storage support
-  private checkStorage(type: 'localStorage' | 'sessionStorage'): boolean {
+  private checkStorage(type: "localStorage" | "sessionStorage"): boolean {
     try {
       const storage = window[type];
-      const test = '__storage_test__';
+      const test = "__storage_test__";
       storage.setItem(test, test);
       storage.removeItem(test);
       return true;
@@ -177,29 +184,38 @@ class BrowserCompatibilityChecker {
 
   // Check CSS3 support
   private checkCSS3Support(): boolean {
-    const element = document.createElement('div');
+    const element = document.createElement("div");
     const properties = [
-      'transform',
-      'transition',
-      'borderRadius',
-      'boxShadow',
-      'flexbox',
-      'grid',
+      "transform",
+      "transition",
+      "borderRadius",
+      "boxShadow",
+      "flexbox",
+      "grid",
     ];
 
-    return properties.some(prop => {
-      return prop in element.style || 
-             `webkit${prop.charAt(0).toUpperCase() + prop.slice(1)}` in element.style ||
-             `moz${prop.charAt(0).toUpperCase() + prop.slice(1)}` in element.style;
+    return properties.some((prop) => {
+      return (
+        prop in element.style ||
+        `webkit${prop.charAt(0).toUpperCase() + prop.slice(1)}` in
+          element.style ||
+        `moz${prop.charAt(0).toUpperCase() + prop.slice(1)}` in element.style
+      );
     });
   }
 
   // Check ES6 support
   private checkES6Support(): boolean {
     try {
-      // Test arrow functions, const/let, template literals
-      eval('const test = () => `ES6 ${true}`;');
-      return true;
+      // Test arrow functions, const/let, template literals without eval
+      // Check for Symbol and other ES6 features
+      return (
+        typeof Symbol !== "undefined" &&
+        typeof Promise !== "undefined" &&
+        typeof Map !== "undefined" &&
+        typeof Set !== "undefined" &&
+        typeof Array.from !== "undefined"
+      );
     } catch {
       return false;
     }
@@ -210,27 +226,24 @@ class BrowserCompatibilityChecker {
     if (!this.browserInfo) return;
 
     const { features, warnings } = this.browserInfo;
-    const criticalFeatures = [
-      'localStorage',
-      'fetch',
-      'promises',
-      'es6',
-    ];
+    const criticalFeatures = ["localStorage", "fetch", "promises", "es6"];
 
-    const missingCritical = criticalFeatures.filter(feature => 
-      !features[feature as keyof BrowserFeatureSupport]
+    const missingCritical = criticalFeatures.filter(
+      (feature) => !features[feature as keyof BrowserFeatureSupport]
     );
 
     if (missingCritical.length > 0) {
-      warnings.push(`Critical features not supported: ${missingCritical.join(', ')}`);
+      warnings.push(
+        `Critical features not supported: ${missingCritical.join(", ")}`
+      );
       this.browserInfo.supported = false;
     }
 
     // Log compatibility status
     if (this.browserInfo.supported) {
-      console.log('✅ Browser compatibility check passed');
+      console.log("✅ Browser compatibility check passed");
     } else {
-      console.warn('⚠️ Browser compatibility issues detected:', warnings);
+      console.warn("⚠️ Browser compatibility issues detected:", warnings);
     }
   }
 
@@ -262,8 +275,9 @@ class BrowserCompatibilityChecker {
     if (warnings.length === 0) return;
 
     // Create warning modal
-    const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    const modal = document.createElement("div");
+    modal.className =
+      "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50";
     modal.innerHTML = `
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md mx-4 p-6">
         <div class="flex items-center mb-4">
@@ -283,7 +297,7 @@ class BrowserCompatibilityChecker {
             Your browser may not fully support all features of ChefSync Admin:
           </p>
           <ul class="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-            ${warnings.map(warning => `<li>• ${warning}</li>`).join('')}
+            ${warnings.map((warning) => `<li>• ${warning}</li>`).join("")}
           </ul>
         </div>
         <div class="flex justify-end space-x-3">
@@ -300,29 +314,36 @@ class BrowserCompatibilityChecker {
     document.body.appendChild(modal);
 
     // Handle button clicks
-    modal.querySelector('#dismiss-warning')?.addEventListener('click', () => {
+    modal.querySelector("#dismiss-warning")?.addEventListener("click", () => {
       document.body.removeChild(modal);
     });
 
-    modal.querySelector('#update-browser')?.addEventListener('click', () => {
-      window.open('https://browsehappy.com/', '_blank');
+    modal.querySelector("#update-browser")?.addEventListener("click", () => {
+      window.open("https://browsehappy.com/", "_blank");
     });
   }
 
   // Run comprehensive browser tests
-  runBrowserTests(): Promise<{ passed: number; failed: number; results: any[] }> {
+  runBrowserTests(): Promise<{
+    passed: number;
+    failed: number;
+    results: any[];
+  }> {
     return new Promise((resolve) => {
       const tests = [
-        { name: 'Local Storage', test: () => this.testLocalStorage() },
-        { name: 'Session Storage', test: () => this.testSessionStorage() },
-        { name: 'Fetch API', test: () => this.testFetchAPI() },
-        { name: 'Service Workers', test: () => this.testServiceWorkers() },
-        { name: 'CSS Grid', test: () => this.testCSSGrid() },
-        { name: 'CSS Flexbox', test: () => this.testCSSFlexbox() },
-        { name: 'ES6 Features', test: () => this.testES6Features() },
-        { name: 'Performance API', test: () => this.testPerformanceAPI() },
-        { name: 'Intersection Observer', test: () => this.testIntersectionObserver() },
-        { name: 'Resize Observer', test: () => this.testResizeObserver() },
+        { name: "Local Storage", test: () => this.testLocalStorage() },
+        { name: "Session Storage", test: () => this.testSessionStorage() },
+        { name: "Fetch API", test: () => this.testFetchAPI() },
+        { name: "Service Workers", test: () => this.testServiceWorkers() },
+        { name: "CSS Grid", test: () => this.testCSSGrid() },
+        { name: "CSS Flexbox", test: () => this.testCSSFlexbox() },
+        { name: "ES6 Features", test: () => this.testES6Features() },
+        { name: "Performance API", test: () => this.testPerformanceAPI() },
+        {
+          name: "Intersection Observer",
+          test: () => this.testIntersectionObserver(),
+        },
+        { name: "Resize Observer", test: () => this.testResizeObserver() },
       ];
 
       const results: any[] = [];
@@ -334,14 +355,18 @@ class BrowserCompatibilityChecker {
           const result = test();
           if (result) {
             passed++;
-            results.push({ name, status: 'passed', error: null });
+            results.push({ name, status: "passed", error: null });
           } else {
             failed++;
-            results.push({ name, status: 'failed', error: 'Test returned false' });
+            results.push({
+              name,
+              status: "failed",
+              error: "Test returned false",
+            });
           }
         } catch (error) {
           failed++;
-          results.push({ name, status: 'failed', error: error.message });
+          results.push({ name, status: "failed", error: error.message });
         }
       });
 
@@ -351,27 +376,27 @@ class BrowserCompatibilityChecker {
 
   // Individual test methods
   private testLocalStorage(): boolean {
-    return this.checkStorage('localStorage');
+    return this.checkStorage("localStorage");
   }
 
   private testSessionStorage(): boolean {
-    return this.checkStorage('sessionStorage');
+    return this.checkStorage("sessionStorage");
   }
 
   private testFetchAPI(): boolean {
-    return 'fetch' in window;
+    return "fetch" in window;
   }
 
   private testServiceWorkers(): boolean {
-    return 'serviceWorker' in navigator;
+    return "serviceWorker" in navigator;
   }
 
   private testCSSGrid(): boolean {
-    return CSS.supports('display', 'grid');
+    return CSS.supports("display", "grid");
   }
 
   private testCSSFlexbox(): boolean {
-    return CSS.supports('display', 'flex');
+    return CSS.supports("display", "flex");
   }
 
   private testES6Features(): boolean {
@@ -379,15 +404,15 @@ class BrowserCompatibilityChecker {
   }
 
   private testPerformanceAPI(): boolean {
-    return 'performance' in window && 'now' in performance;
+    return "performance" in window && "now" in performance;
   }
 
   private testIntersectionObserver(): boolean {
-    return 'IntersectionObserver' in window;
+    return "IntersectionObserver" in window;
   }
 
   private testResizeObserver(): boolean {
-    return 'ResizeObserver' in window;
+    return "ResizeObserver" in window;
   }
 }
 
@@ -395,13 +420,13 @@ class BrowserCompatibilityChecker {
 export const browserCompatibility = new BrowserCompatibilityChecker();
 
 // Export for debugging
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   (window as any).browserCompatibility = browserCompatibility;
 }
 
 // Auto-show warning for unsupported browsers
-if (typeof window !== 'undefined') {
-  window.addEventListener('load', () => {
+if (typeof window !== "undefined") {
+  window.addEventListener("load", () => {
     setTimeout(() => {
       browserCompatibility.showCompatibilityWarning();
     }, 1000);
