@@ -432,34 +432,77 @@ const RejectionModal: React.FC<{
   );
 };
 
-// Status Counts Component
-const StatusCounts: React.FC<{ statusCounts: any; onStatusClick?: (status: string) => void }> = ({ 
-  statusCounts, 
+// Status Counts Component - Using Real API Stats
+const StatusCounts: React.FC<{ 
+  stats: ChefDashboardStats | null; 
+  clientCounts: any; 
+  onStatusClick?: (status: string) => void 
+}> = ({ 
+  stats, 
+  clientCounts, 
   onStatusClick = () => {} 
 }) => {
   const statuses = [
-    { key: 'pending_orders', label: 'Pending', color: 'text-yellow-600', icon: Clock },
-    { key: 'preparing_orders', label: 'Preparing', color: 'text-orange-600', icon: Package },
-    { key: 'ready_orders', label: 'Ready', color: 'text-green-600', icon: CheckCircle },
-    { key: 'completed_orders', label: 'Completed', color: 'text-blue-600', icon: Users }
+    { 
+      key: 'pending', 
+      label: 'Pending', 
+      color: 'text-yellow-600', 
+      icon: Clock,
+      getValue: () => stats?.pending_orders || clientCounts?.pending_orders || 0
+    },
+    { 
+      key: 'preparing', 
+      label: 'Preparing', 
+      color: 'text-orange-600', 
+      icon: Package,
+      // Note: Backend doesn't have preparing_orders, so we use client calculation as fallback
+      getValue: () => clientCounts?.preparing_orders || 0
+    },
+    { 
+      key: 'ready', 
+      label: 'Ready', 
+      color: 'text-green-600', 
+      icon: CheckCircle,
+      // Note: Backend doesn't have ready_orders, so we use client calculation as fallback
+      getValue: () => clientCounts?.ready_orders || 0
+    },
+    { 
+      key: 'completed', 
+      label: 'Completed', 
+      color: 'text-blue-600', 
+      icon: Users,
+      getValue: () => stats?.orders_completed || stats?.completed_orders || clientCounts?.completed_orders || 0
+    }
   ];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
       {statuses.map((status) => {
         const Icon = status.icon;
-        const count = statusCounts?.[status.key] || 0;
+        const count = status.getValue();
+        const isRealTime = stats !== null && (status.key === 'pending' || status.key === 'completed');
         
         return (
           <div
             key={status.key}
             className="bg-white dark:bg-gray-800 rounded-lg p-4 border cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => onStatusClick(status.key.replace('_orders', ''))}
+            onClick={() => onStatusClick(status.key)}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{status.label}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{status.label}</p>
+                  {isRealTime && (
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Real-time data from API"></div>
+                  )}
+                  {!isRealTime && stats && (
+                    <div className="w-2 h-2 bg-orange-500 rounded-full" title="Calculated from loaded orders"></div>
+                  )}
+                </div>
                 <p className={`text-2xl font-bold ${status.color}`}>{count}</p>
+                {!stats && (
+                  <p className="text-xs text-gray-400">Loading...</p>
+                )}
               </div>
               <Icon className={`h-8 w-8 ${status.color}`} />
             </div>
@@ -494,7 +537,7 @@ const DashboardStats: React.FC<{ stats: ChefDashboardStats | null }> = ({ stats 
   const dashboardCards = [
     {
       title: 'Completed Orders',
-      value: stats.completed_orders,
+      value: stats.orders_completed || stats.completed_orders,
       icon: Package,
       color: 'text-blue-600'
     },
@@ -782,7 +825,7 @@ const Order: React.FC = () => {
   const ordersPerPage = 10;
 
   // Calculate total preparation time for an order
-  const calculateOrderPrepTime = useCallback((order: ChefOrder): number => {
+  const calculateOrderPrepTime = useCallback((order: Order): number => {
     if (!order.items || order.items.length === 0) return 900; // Default 15 minutes
     
     // Calculate preparation time based on items
@@ -865,7 +908,7 @@ const Order: React.FC = () => {
   }, []);
 
   // Create timer for an order
-  const createOrderTimer = useCallback((order: ChefOrder): OrderTimer => {
+  const createOrderTimer = useCallback((order: Order): OrderTimer => {
     const totalTime = calculateOrderPrepTime(order);
     return {
       orderId: order.id,
@@ -1015,6 +1058,9 @@ const Order: React.FC = () => {
         total_revenue: 0,
         pending_orders: 0,
         completed_orders: 0,
+        orders_completed: 0,
+        orders_active: 0,
+        today_revenue: 0,
         average_rating: 0,
         recent_orders: []
       });
@@ -1063,7 +1109,7 @@ const Order: React.FC = () => {
           if (order.id === orderId) {
             const updatedOrder = { 
               ...order, 
-              status: newStatus as ChefOrder['status'], 
+              status: newStatus as Order['status'], 
               status_display: newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ')
             };
             
@@ -1098,7 +1144,7 @@ const Order: React.FC = () => {
       setOrders(prevOrders => 
         prevOrders.map(order => {
           if (order.id === orderId) {
-            const updatedOrder = { ...order, status: 'confirmed', status_display: 'Confirmed' };
+            const updatedOrder = { ...order, status: 'confirmed' as Order['status'], status_display: 'Confirmed' };
             
             // Create timer for the accepted order (ready to be started when preparation begins)
             if (!orderTimers.has(orderId)) {
@@ -1143,7 +1189,7 @@ const Order: React.FC = () => {
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderToReject.id 
-            ? { ...order, status: 'cancelled', status_display: 'Cancelled' }
+            ? { ...order, status: 'cancelled' as Order['status'], status_display: 'Cancelled' }
             : order
         )
       );
@@ -1232,7 +1278,7 @@ const Order: React.FC = () => {
       <DashboardStats stats={stats} />
       
       {/* Status Counts */}
-      <StatusCounts statusCounts={statusCounts} onStatusClick={handleStatusCountClick} />
+      <StatusCounts stats={stats} clientCounts={statusCounts} onStatusClick={handleStatusCountClick} />
       
       {/* Active Timers */}
       {Array.from(orderTimers.values()).filter(timer => timer.isActive).length > 0 && (

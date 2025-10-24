@@ -64,6 +64,8 @@ urlpatterns = [
     path(
         "chef/activity/recent/", views.chef_recent_activity, name="chef-recent-activity"
     ),
+    path("chef/income/", views.chef_income_data, name="chef-income-data"),
+    path("chef/income/breakdown/", views.chef_income_breakdown, name="chef-income-breakdown"),
     # Checkout and order placement endpoints
     path("checkout/calculate/", views.calculate_checkout, name="calculate-checkout"),
     path("place/", views.place_order, name="place-order"),

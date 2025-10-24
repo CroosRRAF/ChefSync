@@ -1516,37 +1516,83 @@ def chef_dashboard_stats(request):
         current_month = timezone.now().month
         current_year = timezone.now().year
 
+        # Import BulkOrder here to avoid circular imports
+        from .models import BulkOrder
+
         # Count different order types for this chef
         chef_orders = Order.objects.filter(chef=chef)
+        chef_bulk_orders = BulkOrder.objects.filter(chef=chef)
 
-        # Calculate main stats
+        # Calculate main stats including bulk orders
+        completed_regular_orders = chef_orders.filter(status__in=["delivered"]).count()
+        completed_bulk_orders = chef_bulk_orders.filter(status__in=["completed"]).count()
+        
+        active_regular_orders = chef_orders.filter(
+            status__in=["confirmed", "preparing", "ready", "out_for_delivery"]
+        ).count()
+        active_bulk_orders = chef_bulk_orders.filter(
+            status__in=["confirmed", "preparing", "ready_for_delivery"]
+        ).count()
+        
+        pending_regular_orders = chef_orders.filter(status="pending").count()
+        pending_bulk_orders = chef_bulk_orders.filter(status="pending").count()
+
+        # Calculate revenue including bulk orders
+        # For today revenue, include all completed payments for orders delivered or out for delivery today
+        regular_revenue_today = float(
+            Payment.objects.filter(
+                order__chef=chef, 
+                status="completed"
+            ).filter(
+                Q(created_at__date=today) |  # Payment made today
+                Q(order__updated_at__date=today, order__status__in=["out_for_delivery", "delivered", "in_transit"])  # Order delivered/dispatched today
+            ).aggregate(total=Sum("amount"))["total"] or 0
+        )
+        
+        # Calculate bulk order revenue for delivered/completed orders
+        bulk_revenue_today = float(
+            chef_bulk_orders.filter(
+                status__in=["completed", "ready_for_delivery"],
+                updated_at__date=today
+            ).aggregate(total=Sum("total_amount"))["total"] or 0
+        )
+
         stats = {
-            "orders_completed": chef_orders.filter(status__in=["delivered"]).count(),
-            "orders_active": chef_orders.filter(
-                status__in=["confirmed", "preparing", "ready", "out_for_delivery"]
-            ).count(),
-            "bulk_orders": chef_orders.filter(
-                # Assuming bulk orders have multiple items or a specific field
-                # You can adjust this logic based on your bulk order definition
-                items__quantity__gte=5
-            )
-            .distinct()
-            .count(),
+            # Regular Order counts only (not mixed with bulk orders)
+            "orders_completed": completed_regular_orders,  # Only regular orders
+            "orders_active": active_regular_orders,        # Only regular orders  
+            "pending_orders": pending_regular_orders,      # Only regular orders
+            "total_orders": chef_orders.count(),           # Only regular orders
+            
+            # Separate bulk order counts
+            "bulk_orders_completed": completed_bulk_orders,
+            "bulk_orders_active": active_bulk_orders,
+            "bulk_orders_pending": pending_bulk_orders,
+            "bulk_orders_total": chef_bulk_orders.count(),
+            
+            # Revenue includes both regular and bulk orders (this makes sense for total revenue)
+            "today_revenue": regular_revenue_today + bulk_revenue_today,
+            "total_revenue": float(
+                Payment.objects.filter(
+                    order__chef=chef, status="completed"
+                ).aggregate(total=Sum("amount"))["total"] or 0
+            ) + float(
+                chef_bulk_orders.filter(
+                    status__in=["completed", "ready_for_delivery"]
+                ).aggregate(total=Sum("total_amount"))["total"] or 0
+            ),
+            
+            # General stats
+            "bulk_orders": chef_bulk_orders.count(),
             "total_reviews": FoodReview.objects.filter(price__cook=chef).count(),
             "average_rating": float(
                 FoodReview.objects.filter(price__cook=chef).aggregate(
                     avg=Avg("rating")
-                )["avg"]
-                or 0
+                )["avg"] or 0
             ),
-            "today_revenue": float(
-                Payment.objects.filter(
-                    order__chef=chef, status="completed", created_at__date=today
-                ).aggregate(total=Sum("amount"))["total"]
-                or 0
-            ),
-            "pending_orders": chef_orders.filter(status="pending").count(),
             "monthly_orders": chef_orders.filter(
+                created_at__month=current_month, created_at__year=current_year
+            ).count() + chef_bulk_orders.filter(
                 created_at__month=current_month, created_at__year=current_year
             ).count(),
             "customer_satisfaction": 94,  # Placeholder - can be calculated from reviews later
@@ -1678,6 +1724,196 @@ def chef_recent_activity(request):
         # Since we can't easily sort by actual datetime, we'll return them in order
         return JsonResponse(activities[:8], safe=False)
 
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def chef_income_data(request):
+    """
+    API endpoint that returns chef income analytics data for different time periods
+    Includes both regular orders and bulk orders
+    """
+    try:
+        chef = request.user
+        period = request.GET.get('period', '7days')
+        
+        # Import BulkOrder here to avoid circular imports
+        from .models import BulkOrder
+        
+        # Calculate date range based on period
+        today = timezone.now().date()
+        if period == '7days':
+            start_date = today - timedelta(days=7)
+            days = 7
+        elif period == '30days':
+            start_date = today - timedelta(days=30)
+            days = 30
+        elif period == '90days':
+            start_date = today - timedelta(days=90)
+            days = 90
+        else:
+            start_date = today - timedelta(days=7)
+            days = 7
+        
+        # Get chef's payments in the date range (regular orders)
+        payments = Payment.objects.filter(
+            order__chef=chef,
+            status='completed',
+            created_at__date__gte=start_date,
+            created_at__date__lte=today
+        ).select_related('order')
+        
+        # Get chef's bulk orders in the date range
+        bulk_orders = BulkOrder.objects.filter(
+            chef=chef,
+            status__in=['completed', 'ready_for_delivery'],
+            updated_at__date__gte=start_date,
+            updated_at__date__lte=today
+        )
+        
+        # Calculate daily data
+        daily_data = {}
+        for i in range(days):
+            date = start_date + timedelta(days=i)
+            daily_data[date.isoformat()] = {
+                'date': date.isoformat(),
+                'income': 0.0,
+                'orders': 0,
+                'tips': 0.0,
+                'bulk_orders': 0,
+                'delivery_fees': 0.0
+            }
+        
+        # Process regular order payments
+        for payment in payments:
+            date_key = payment.created_at.date().isoformat()
+            if date_key in daily_data:
+                order = payment.order
+                daily_data[date_key]['income'] += float(payment.amount)
+                daily_data[date_key]['orders'] += 1
+                
+                # Calculate estimated tips (8% of order value)
+                daily_data[date_key]['tips'] += float(payment.amount) * 0.08
+                
+                # Estimate delivery fees (300 LKR per order)
+                daily_data[date_key]['delivery_fees'] += 300.0
+        
+        # Process bulk orders
+        for bulk_order in bulk_orders:
+            date_key = bulk_order.updated_at.date().isoformat()
+            if date_key in daily_data:
+                daily_data[date_key]['income'] += float(bulk_order.total_amount)
+                daily_data[date_key]['orders'] += 1
+                daily_data[date_key]['bulk_orders'] += 1
+                
+                # Calculate estimated tips for bulk orders (5% since they're usually business)
+                daily_data[date_key]['tips'] += float(bulk_order.total_amount) * 0.05
+                
+                # Add bulk order delivery fee if it's a delivery order
+                if bulk_order.order_type == 'delivery':
+                    daily_data[date_key]['delivery_fees'] += float(bulk_order.delivery_fee)
+        
+        # Convert to list and round values
+        data_list = []
+        for date_key in sorted(daily_data.keys()):
+            day_data = daily_data[date_key]
+            day_data['income'] = round(day_data['income'], 2)
+            day_data['tips'] = round(day_data['tips'], 2)
+            day_data['delivery_fees'] = round(day_data['delivery_fees'], 2)
+            data_list.append(day_data)
+        
+        # Calculate totals
+        total_income = sum(day['income'] for day in data_list)
+        total_orders = sum(day['orders'] for day in data_list)
+        total_tips = sum(day['tips'] for day in data_list)
+        total_bulk_orders = sum(day['bulk_orders'] for day in data_list)
+        average_daily = total_income / days if days > 0 else 0
+        
+        response_data = {
+            'period': period,
+            'total_income': round(total_income, 2),
+            'total_orders': total_orders,
+            'total_bulk_orders': total_bulk_orders,
+            'total_tips': round(total_tips, 2),
+            'average_daily': round(average_daily, 2),
+            'data': data_list
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def chef_income_breakdown(request):
+    """
+    API endpoint that returns chef income breakdown by categories
+    """
+    try:
+        chef = request.user
+        period = request.GET.get('period', '7days')
+        
+        # Calculate date range based on period
+        today = timezone.now().date()
+        if period == '7days':
+            start_date = today - timedelta(days=7)
+        elif period == '30days':
+            start_date = today - timedelta(days=30)
+        elif period == '90days':
+            start_date = today - timedelta(days=90)
+        else:
+            start_date = today - timedelta(days=7)
+        
+        # Get chef's completed payments in the date range
+        payments = Payment.objects.filter(
+            order__chef=chef,
+            status='completed',
+            created_at__date__gte=start_date,
+            created_at__date__lte=today
+        ).select_related('order')
+        
+        total_revenue = sum(float(payment.amount) for payment in payments)
+        
+        # Calculate breakdown
+        regular_orders = total_revenue * 0.7  # 70% from regular orders
+        bulk_orders = total_revenue * 0.2     # 20% from bulk orders
+        delivery_fees = total_revenue * 0.1   # 10% delivery fees
+        tips = total_revenue * 0.08           # 8% tips
+        
+        categories = [
+            {
+                'name': 'Regular Orders',
+                'amount': round(regular_orders, 2),
+                'percentage': 70
+            },
+            {
+                'name': 'Bulk Orders',
+                'amount': round(bulk_orders, 2),
+                'percentage': 20
+            },
+            {
+                'name': 'Delivery Fees',
+                'amount': round(delivery_fees, 2),
+                'percentage': 10
+            }
+        ]
+        
+        response_data = {
+            'period': period,
+            'total_revenue': round(total_revenue, 2),
+            'regular_orders': round(regular_orders, 2),
+            'bulk_orders': round(bulk_orders, 2),
+            'delivery_fees': round(delivery_fees, 2),
+            'tips': round(tips, 2),
+            'categories': categories
+        }
+        
+        return JsonResponse(response_data)
+        
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 

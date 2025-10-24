@@ -518,6 +518,86 @@
   background: rgb(75, 85, 99);
 }
 
+/* Enhanced Sidebar Animations */
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px hsl(var(--primary) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.6);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply animations */
+.sidebar-item {
+  animation: slideInFromLeft 0.3s ease-out;
+}
+
+.sidebar-item:nth-child(1) { animation-delay: 0.1s; }
+.sidebar-item:nth-child(2) { animation-delay: 0.15s; }
+.sidebar-item:nth-child(3) { animation-delay: 0.2s; }
+.sidebar-item:nth-child(4) { animation-delay: 0.25s; }
+.sidebar-item:nth-child(5) { animation-delay: 0.3s; }
+.sidebar-item:nth-child(6) { animation-delay: 0.35s; }
+
+.active-indicator {
+  animation: pulseGlow 2s infinite;
+}
+
+.quick-action {
+  animation: fadeInUp 0.2s ease-out;
+}
+
+.user-profile {
+  animation: scaleIn 0.3s ease-out;
+}
+
+/* Hover effects */
+.sidebar-nav-item {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-nav-item:hover {
+  transform: translateX(4px);
+}
+
+/* Smooth transitions for collapsible state */
+.sidebar-content {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced tooltip animations */
+.tooltip-content {
+  animation: fadeInUp 0.15s ease-out;
+}
+
+/* Status indicator pulse */
+.status-online {
+  animation: pulseGlow 3s infinite;
+}
+
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgb(107, 114, 128);
 }
