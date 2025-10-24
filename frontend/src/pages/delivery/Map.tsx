@@ -26,7 +26,7 @@ import {
   updateDeliveryLocation,
   getRouteDirections,
   optimizeDeliveryRoute,
-} from "@/services/deliveryService";
+} from "@/services/service";
 import {
   MapPin,
   Navigation,
@@ -862,5 +862,3 @@ const DeliveryMap: React.FC = () => {
 };
 
 export default DeliveryMap;
-
-

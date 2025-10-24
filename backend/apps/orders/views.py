@@ -417,11 +417,29 @@ class OrderViewSet(viewsets.ModelViewSet):
         agent_lat = request.data.get("agent_latitude")
         agent_lng = request.data.get("agent_longitude")
 
-        if agent_lat is None or agent_lng is None:
+        if agent_lat is None or agent_lng is None or agent_lat == '' or agent_lng == '':
             return Response(
                 {
                     "error": "Location required",
                     "message": "Please enable location access to accept orders",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Validate that coordinates are valid numbers
+        try:
+            agent_lat = float(agent_lat)
+            agent_lng = float(agent_lng)
+            
+            # Basic sanity check for coordinates
+            if not (-90 <= agent_lat <= 90) or not (-180 <= agent_lng <= 180):
+                raise ValueError("Invalid coordinates")
+                
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    "error": "Invalid location data",
+                    "message": "The location coordinates are invalid. Please try again.",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -450,7 +468,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 return distance
 
             distance_km = calculate_distance(
-                float(agent_lat), float(agent_lng), float(chef_lat), float(chef_lng)
+                agent_lat, agent_lng, float(chef_lat), float(chef_lng)
             )
             # Validate distance to avoid DB out-of-range and unrealistic deliveries
             MAX_DELIVERY_KM = 50.0  # business rule: serviceable radius

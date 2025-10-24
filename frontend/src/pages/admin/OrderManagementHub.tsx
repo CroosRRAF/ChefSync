@@ -67,7 +67,7 @@ import {
   type AdminOrder,
   type OrderListResponse,
 } from "@/services/adminService";
-import * as deliveryService from "@/services/deliveryService";
+import * as service from "@/services/service";
 import {
   paymentService,
   type PaymentStats,
@@ -381,14 +381,14 @@ const OrderManagementHub: React.FC = () => {
 
       const [deliveries, stats] = await Promise.all([
         measureApiCall(
-          () => deliveryService.getActiveDeliveries(),
+          () => service.getActiveDeliveries(),
           "active-deliveries"
         ).catch((error) => {
           console.error("Failed to load active deliveries:", error);
           return { success: false, count: 0, active_deliveries: [] };
         }),
         measureApiCall(
-          () => deliveryService.getDeliveryStats(),
+          () => service.getDeliveryStats(),
           "delivery-stats"
         ).catch((error) => {
           console.error("Failed to load delivery stats:", error);

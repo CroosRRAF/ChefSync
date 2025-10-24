@@ -36,7 +36,7 @@ import {
   getDeliveryHistory,
   acceptOrder,
   updateOrderStatus,
-} from "@/services/deliveryService";
+} from "@/services/service";
 import {
   Package,
   MapPin,

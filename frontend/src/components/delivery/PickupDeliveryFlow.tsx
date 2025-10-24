@@ -38,7 +38,7 @@ import {
   updateDeliveryProgress,
   markOrderPickedUp,
   getChefLocation,
-} from "@/services/deliveryService";
+} from "@/services/service";
 import {
   calculateDistanceHaversine,
   estimateTravelTime,
@@ -203,15 +203,18 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
 
       // Automatically start navigation to chef's kitchen location
       const pickupLocationValue = getPickupLocation(order);
-      if (pickupLocationValue && pickupLocationValue !== "Location not available") {
+      if (
+        pickupLocationValue &&
+        pickupLocationValue !== "Location not available"
+      ) {
         // Start external navigation to pickup location
         handleGoogleNavigation("pickup");
-        
+
         // Also show integrated navigation dialog for quick reference
         setTimeout(() => {
           setShowNavigationDialog(true);
         }, 1000); // Small delay to allow external navigation to open first
-        
+
         toast({
           title: "Pickup Navigation Started",
           description: `External navigation opened to ${
@@ -927,7 +930,10 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
         </Card>
       )}
       {/* Auto-opened Navigation Dialog after pickup tracking starts */}
-      <Dialog open={showNavigationDialog} onOpenChange={setShowNavigationDialog}>
+      <Dialog
+        open={showNavigationDialog}
+        onOpenChange={setShowNavigationDialog}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -938,18 +944,20 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-700">
-                External navigation to <strong>{order.chef?.name || "Chef"}'s kitchen</strong> has been opened. 
-                Use the integrated map below for quick reference or to re-open navigation.
+                External navigation to{" "}
+                <strong>{order.chef?.name || "Chef"}'s kitchen</strong> has been
+                opened. Use the integrated map below for quick reference or to
+                re-open navigation.
               </p>
             </div>
-            
+
             <IntegratedMapView
               location={getPickupLocation(order)}
               title={`Chef ${order.chef?.name || "Kitchen"}`}
               userLocation={currentLocation}
               onNavigate={() => handleGoogleNavigation("pickup")}
             />
-            
+
             <div className="flex gap-2">
               <Button
                 onClick={() => handleGoogleNavigation("pickup")}
@@ -965,10 +973,10 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
                 </Button>
               )}
             </div>
-            
+
             <div className="text-center">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => setShowNavigationDialog(false)}
               >
