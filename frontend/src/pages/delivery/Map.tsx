@@ -48,6 +48,7 @@ import OrderStatusTracker from "@/components/delivery/OrderStatusTracker";
 import DeliveryTracker from "@/components/delivery/DeliveryTracker";
 import PickupDeliveryFlow from "@/components/delivery/PickupDeliveryFlow";
 import DeliveryPhaseCard from "@/components/delivery/DeliveryPhaseCard";
+import DeliveryContacts from "@/components/delivery/DeliveryContacts";
 
 interface Location {
   lat: number;
@@ -656,40 +657,25 @@ const DeliveryMap: React.FC = () => {
             </DialogHeader>
             {selectedOrder && (
               <div className="space-y-6">
-                {/* Two-Stage Pickup & Delivery Flow */}
+                {/* Two-Stage Pickup & Delivery Flow */}{" "}
                 <PickupDeliveryFlow
                   order={selectedOrder}
                   currentLocation={currentLocation}
                   onStatusUpdate={handleStatusUpdate}
                   onOrderComplete={handleDeliveryComplete}
                 />
-
+                {/* Contact Information */}
+                <DeliveryContacts order={selectedOrder} currentPhase="both" />
                 {/* Order Information */}
                 <Card>
                   <CardContent className="p-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">
-                          Customer
-                        </label>
-                        <p className="font-medium">
-                          {selectedOrder.customer?.name || "Unknown"}
-                        </p>
-                        {selectedOrder.customer?.phone && (
-                          <p className="text-sm text-gray-500">
-                            {selectedOrder.customer.phone}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">
-                          Order Total
-                        </label>
-                        <p className="font-medium text-lg text-green-600">
-                          ${selectedOrder.total_amount}
-                        </p>
-                      </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">
+                        Order Total
+                      </label>
+                      <p className="font-medium text-lg text-green-600">
+                        ${selectedOrder.total_amount}
+                      </p>
                     </div>
 
                     <div>
@@ -723,7 +709,6 @@ const DeliveryMap: React.FC = () => {
                     </div>
                   </CardContent>
                 </Card>
-
                 {/* Enhanced Navigation Buttons */}
                 <div className="mt-3 space-y-2">
                   <div className="grid grid-cols-2 gap-2">

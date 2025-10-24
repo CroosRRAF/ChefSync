@@ -30,6 +30,8 @@ from .models import (
 )
 from .serializers import (
     CartItemSerializer,
+    CustomerSerializer,
+    ChefSerializer,
     DeliveryChatSerializer,
     DeliveryReviewSerializer,
     UserAddressSerializer,
@@ -228,7 +230,9 @@ def _get_chef_address(chef):
 # Temporary simple serializer to fix the 500 error
 class SimpleOrderSerializer(serializers.ModelSerializer):
     """Simple order serializer that works"""
-
+    
+    customer = CustomerSerializer(read_only=True)
+    chef = ChefSerializer(read_only=True)
     customer_name = serializers.SerializerMethodField()
     chef_name = serializers.SerializerMethodField()
     time_since_order = serializers.SerializerMethodField()
@@ -247,6 +251,8 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
             "delivery_fee",
             "created_at",
             "updated_at",
+            "customer",
+            "chef",
             "customer_name",
             "chef_name",
             "time_since_order",

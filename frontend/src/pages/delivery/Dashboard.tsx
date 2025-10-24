@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import DeliveryLayout from "@/components/delivery/DeliveryLayout";
 import { DistanceWarningDialog } from "@/components/delivery/DistanceWarningDialog";
+import ContactCard from "@/components/delivery/ContactCard";
 import {
   getAvailableOrders,
   getMyAssignedOrders,
@@ -618,6 +619,88 @@ const DeliveryDashboard: React.FC = () => {
                               </>
                             )}
                           </Button>
+                        </div>
+
+                        {/* Contact Information - Show contextually based on order status */}
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
+                            Contact Details
+                          </div>
+
+                          {/* Before pickup - Show only chef contact */}
+                          {[
+                            "pending",
+                            "confirmed",
+                            "preparing",
+                            "ready",
+                          ].includes(order.status) && (
+                            <div className="space-y-2">
+                              {order.chef && (
+                                <ContactCard
+                                  type="chef"
+                                  contact={order.chef}
+                                  showLocation={true}
+                                  className="ring-2 ring-orange-300 shadow-md"
+                                />
+                              )}
+                              <div className="text-xs text-orange-700 bg-orange-50 p-2 rounded border border-orange-200 text-center">
+                                <span className="font-medium">
+                                  Pickup Phase:
+                                </span>{" "}
+                                Contact chef for order collection
+                              </div>
+                            </div>
+                          )}
+
+                          {/* After pickup - Show only customer contact */}
+                          {[
+                            "out_for_delivery",
+                            "in_transit",
+                            "picked_up",
+                          ].includes(order.status) && (
+                            <div className="space-y-2">
+                              {order.customer && (
+                                <ContactCard
+                                  type="customer"
+                                  contact={order.customer}
+                                  className="ring-2 ring-blue-300 shadow-md"
+                                />
+                              )}
+                              <div className="text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-200 text-center">
+                                <span className="font-medium">
+                                  Delivery Phase:
+                                </span>{" "}
+                                Contact customer for delivery coordination
+                              </div>
+                            </div>
+                          )}
+
+                          {/* For other statuses or fallback - Show both */}
+                          {![
+                            "pending",
+                            "confirmed",
+                            "preparing",
+                            "ready",
+                            "out_for_delivery",
+                            "in_transit",
+                            "picked_up",
+                          ].includes(order.status) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {order.chef && (
+                                <ContactCard
+                                  type="chef"
+                                  contact={order.chef}
+                                  showLocation={true}
+                                />
+                              )}
+                              {order.customer && (
+                                <ContactCard
+                                  type="customer"
+                                  contact={order.customer}
+                                />
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

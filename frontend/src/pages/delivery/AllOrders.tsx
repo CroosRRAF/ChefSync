@@ -30,6 +30,8 @@ import { useNavigate } from "react-router-dom";
 import DeliveryLayout from "@/components/delivery/DeliveryLayout";
 import OrderStatusTracker from "@/components/delivery/OrderStatusTracker";
 import PickupDeliveryFlow from "@/components/delivery/PickupDeliveryFlow";
+import DeliveryContacts from "@/components/delivery/DeliveryContacts";
+import QuickContact from "@/components/delivery/QuickContact";
 import {
   getAvailableOrders,
   getMyAssignedOrders,
@@ -401,6 +403,11 @@ const AllOrdersPage: React.FC = () => {
                 <strong>Event Details:</strong> {order.special_instructions}
               </div>
             )}
+
+          {/* Quick Contact Access */}
+          <div className="pt-2 border-t border-gray-100">
+            <QuickContact order={order} compact={true} />
+          </div>
         </div>
 
         {showActions && (
@@ -708,37 +715,25 @@ const AllOrdersPage: React.FC = () => {
                     <CardTitle>Order Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">
-                          Customer
-                        </label>
-                        <p className="font-medium">
-                          {selectedOrder.customer?.name || "Unknown"}
-                        </p>
-                        {selectedOrder.customer?.phone && (
-                          <div className="flex items-center mt-1">
-                            <Phone className="h-3 w-3 mr-1 text-gray-400" />
-                            <span className="text-sm text-gray-600">
-                              {selectedOrder.customer.phone}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                    {/* Contact Information */}
+                    <DeliveryContacts
+                      order={selectedOrder}
+                      currentPhase="both"
+                      showTitle={false}
+                    />
 
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">
-                          Order Value
-                        </label>
-                        <p className="font-medium text-lg text-green-600">
-                          ${selectedOrder.total_amount}
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">
+                        Order Value
+                      </label>
+                      <p className="font-medium text-lg text-green-600">
+                        ${selectedOrder.total_amount}
+                      </p>
+                      {selectedOrder.delivery_fee && (
+                        <p className="text-sm text-gray-500">
+                          Delivery: ${selectedOrder.delivery_fee}
                         </p>
-                        {selectedOrder.delivery_fee && (
-                          <p className="text-sm text-gray-500">
-                            Delivery: ${selectedOrder.delivery_fee}
-                          </p>
-                        )}
-                      </div>
+                      )}
                     </div>
 
                     <div>

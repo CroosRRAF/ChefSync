@@ -11,9 +11,12 @@ import {
   Navigation,
   CheckCircle,
   Package,
+  Phone,
+  User,
 } from "lucide-react";
 import type { Order } from "../../types/orderType";
 import TwoPhaseDeliveryDialog from "./TwoPhaseDeliveryDialog";
+import ContactCard from "./ContactCard";
 
 interface DeliveryPhaseCardProps {
   order: Order;
@@ -181,6 +184,67 @@ const DeliveryPhaseCard: React.FC<DeliveryPhaseCardProps> = ({
               {new Date(order.created_at).toLocaleTimeString()}
             </span>
           </div>
+        </div>
+
+        {/* Contact Information */}
+        <div className="space-y-3 pt-4 border-t border-gray-200">
+          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
+            Contact Details
+          </div>
+
+          {/* Show contextually relevant contact information */}
+
+          {/* Pickup Phase - Show only chef contact */}
+          {phaseInfo.phase === "pickup" && (
+            <div className="space-y-2">
+              {order.chef && (
+                <ContactCard
+                  type="chef"
+                  contact={order.chef}
+                  showLocation={true}
+                  className="ring-2 ring-orange-300 shadow-md"
+                />
+              )}
+              <div className="text-xs text-orange-700 bg-orange-50 p-2 rounded border border-orange-200 text-center">
+                <span className="font-medium">Pickup Phase:</span> Contact chef
+                for order collection
+              </div>
+            </div>
+          )}
+
+          {/* Transit/Delivery Phase - Show only customer contact */}
+          {(phaseInfo.phase === "transit" ||
+            phaseInfo.phase === "delivery") && (
+            <div className="space-y-2">
+              {order.customer && (
+                <ContactCard
+                  type="customer"
+                  contact={order.customer}
+                  className="ring-2 ring-blue-300 shadow-md"
+                />
+              )}
+              <div className="text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-200 text-center">
+                <span className="font-medium">Delivery Phase:</span> Contact
+                customer for delivery coordination
+              </div>
+            </div>
+          )}
+
+          {/* Unknown/Other phases - Show both contacts */}
+          {phaseInfo.phase === "unknown" && (
+            <div className="grid grid-cols-1 gap-3">
+              {order.chef && (
+                <ContactCard
+                  type="chef"
+                  contact={order.chef}
+                  showLocation={true}
+                />
+              )}
+              {order.customer && (
+                <ContactCard type="customer" contact={order.customer} />
+              )}
+            </div>
+          )}
         </div>
 
         {/* Action Button */}
