@@ -50,8 +50,6 @@ interface BulkMenuItem {
   extra_cost: number;
   sort_order: number;
   is_vegetarian: boolean;
-  is_vegan: boolean;
-  is_gluten_free: boolean;
   spice_level: string;
   allergens: string[];
 }
@@ -469,9 +467,7 @@ const BulkMenuManagement: React.FC = () => {
       is_optional: false,
       extra_cost: 0,
       sort_order: menuItems.length + 1,
-      is_vegetarian: false,
-      is_vegan: false,
-      is_gluten_free: false,
+      is_vegetarian: true, // Default to vegetarian
       spice_level: '',
       allergens: [],
     };
@@ -750,27 +746,44 @@ const BulkMenuManagement: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="mt-4 flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            checked={item.is_vegetarian}
-                            onCheckedChange={(checked) => updateMenuItem(index, 'is_vegetarian', checked)}
-                          />
-                          <Label className="text-sm">Vegetarian</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            checked={item.is_vegan}
-                            onCheckedChange={(checked) => updateMenuItem(index, 'is_vegan', checked)}
-                          />
-                          <Label className="text-sm">Vegan</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            checked={item.is_gluten_free}
-                            onCheckedChange={(checked) => updateMenuItem(index, 'is_gluten_free', checked)}
-                          />
-                          <Label className="text-sm">Gluten Free</Label>
+                      <div className="mt-4 space-y-3">
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">Dietary Type</Label>
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="radio"
+                                id={`vegetarian-${index}`}
+                                name={`dietary_type_${index}`}
+                                value="vegetarian"
+                                checked={item.is_vegetarian === true}
+                                onChange={() => {
+                                  updateMenuItem(index, 'is_vegetarian', true);
+                                }}
+                                className="h-4 w-4 text-green-600"
+                              />
+                              <Label htmlFor={`vegetarian-${index}`} className="text-sm font-medium flex items-center">
+                                🥗 Vegetarian
+                              </Label>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="radio"
+                                id={`non-vegetarian-${index}`}
+                                name={`dietary_type_${index}`}
+                                value="non-vegetarian"
+                                checked={item.is_vegetarian === false}
+                                onChange={() => {
+                                  updateMenuItem(index, 'is_vegetarian', false);
+                                }}
+                                className="h-4 w-4 text-red-600"
+                              />
+                              <Label htmlFor={`non-vegetarian-${index}`} className="text-sm font-medium flex items-center">
+                                🍖 Non-Vegetarian
+                              </Label>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -987,27 +1000,44 @@ const BulkMenuManagement: React.FC = () => {
                           </div>
 
                           <div className="md:col-span-2">
-                            <div className="flex items-center space-x-4">
-                              <div className="flex items-center space-x-2">
-                                <Switch
-                                  checked={item.is_vegetarian}
-                                  onCheckedChange={(checked) => updateMenuItem(index, 'is_vegetarian', checked)}
-                                />
-                                <Label className="text-sm">Vegetarian</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Switch
-                                  checked={item.is_vegan}
-                                  onCheckedChange={(checked) => updateMenuItem(index, 'is_vegan', checked)}
-                                />
-                                <Label className="text-sm">Vegan</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Switch
-                                  checked={item.is_gluten_free}
-                                  onCheckedChange={(checked) => updateMenuItem(index, 'is_gluten_free', checked)}
-                                />
-                                <Label className="text-sm">Gluten Free</Label>
+                            <div className="space-y-3">
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Dietary Type</Label>
+                                <div className="flex items-center space-x-4">
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="radio"
+                                      id={`edit-vegetarian-${index}`}
+                                      name={`edit_dietary_type_${index}`}
+                                      value="vegetarian"
+                                      checked={item.is_vegetarian === true}
+                                      onChange={() => {
+                                        updateMenuItem(index, 'is_vegetarian', true);
+                                      }}
+                                      className="h-4 w-4 text-green-600"
+                                    />
+                                    <Label htmlFor={`edit-vegetarian-${index}`} className="text-sm font-medium flex items-center">
+                                      🥗 Vegetarian
+                                    </Label>
+                                  </div>
+                                  
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="radio"
+                                      id={`edit-non-vegetarian-${index}`}
+                                      name={`edit_dietary_type_${index}`}
+                                      value="non-vegetarian"
+                                      checked={item.is_vegetarian === false}
+                                      onChange={() => {
+                                        updateMenuItem(index, 'is_vegetarian', false);
+                                      }}
+                                      className="h-4 w-4 text-red-600"
+                                    />
+                                    <Label htmlFor={`edit-non-vegetarian-${index}`} className="text-sm font-medium flex items-center">
+                                      🍖 Non-Vegetarian
+                                    </Label>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>

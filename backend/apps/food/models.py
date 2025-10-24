@@ -380,8 +380,6 @@ class BulkMenuItem(models.Model):
     
     # Nutritional and dietary information
     is_vegetarian = models.BooleanField(default=False)
-    is_vegan = models.BooleanField(default=False)
-    is_gluten_free = models.BooleanField(default=False)
     spice_level = models.CharField(
         max_length=20, 
         choices=[

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   DropdownMenu,
@@ -10,14 +11,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { CookSidebar } from "./CookSidebar";
-import { User, Settings, LogOut, Sun, Moon } from "lucide-react";
+import { User, Settings, LogOut, Sun, Moon, Bell } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 
 export default function CookLayout() {
   const [chefStatus, setChefStatus] = useState<"free" | "busy">("free");
   const { logout, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { unreadCount } = useUnreadNotifications();
   const navigate = useNavigate();
 
   const toggleStatus = () => {
@@ -67,6 +70,27 @@ export default function CookLayout() {
                   <span className="capitalize font-medium">{chefStatus}</span>
                 </Button>
               </div>
+
+              {/* Notifications Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/cook/notifications')}
+                className={`p-2 relative transition-all duration-200 ${
+                  unreadCount > 0 ? 'hover:bg-red-50 dark:hover:bg-red-950' : ''
+                }`}
+                title={unreadCount > 0 ? `${unreadCount} unread notifications` : "View notifications"}
+              >
+                <Bell className={`w-4 h-4 ${unreadCount > 0 ? 'animate-pulse text-red-600' : ''}`} />
+                {unreadCount > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 h-5 w-5 p-0 text-[10px] flex items-center justify-center bg-red-500 hover:bg-red-500 text-white border-2 border-white shadow-lg animate-bounce font-bold"
+                  >
+                    {unreadCount > 99 ? "!" : unreadCount}
+                  </Badge>
+                )}
+              </Button>
 
               {/* Theme Toggle */}
               <Button
