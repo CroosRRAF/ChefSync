@@ -3,13 +3,13 @@
  * Allows chefs to set their kitchen location using Google Maps
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { toast } from '@/hooks/use-toast';
+import React, { useState, useEffect, useRef } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
 import {
   MapPin,
   Search,
@@ -17,8 +17,8 @@ import {
   Navigation,
   CheckCircle,
   AlertCircle,
-  Loader2
-} from 'lucide-react';
+  Loader2,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 
 // Location coordinates interface (local definition to avoid import issues)
 interface LocationCoordinates {
@@ -49,17 +49,18 @@ interface KitchenLocationPickerProps {
 
 export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
   currentLocation,
-  currentAddress = '',
+  currentAddress = "",
   onLocationSelect,
   disabled = false,
-  placeholder = "Click to set kitchen location"
+  placeholder = "Click to set kitchen location",
 }) => {
   // State
   const [isOpen, setIsOpen] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState<LocationCoordinates | null>(currentLocation || null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLocation, setSelectedLocation] =
+    useState<LocationCoordinates | null>(currentLocation || null);
   const [selectedAddress, setSelectedAddress] = useState(currentAddress);
 
   // Refs
@@ -88,7 +89,7 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
       return;
     }
 
-    const script = document.createElement('script');
+    const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGoogleMaps`;
     script.async = true;
     script.defer = true;
@@ -124,7 +125,7 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
     try {
       // Default center (Colombo, Sri Lanka)
       const defaultCenter = { lat: 6.9271, lng: 79.8612 };
-      const center = selectedLocation 
+      const center = selectedLocation
         ? { lat: selectedLocation.latitude, lng: selectedLocation.longitude }
         : defaultCenter;
 
@@ -134,17 +135,18 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
+        mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID,
         styles: [
           {
-            featureType: 'poi',
-            elementType: 'labels',
-            stylers: [{ visibility: 'off' }]
-          }
-        ]
+            featureType: "poi",
+            elementType: "labels",
+            stylers: [{ visibility: "off" }],
+          },
+        ],
       });
 
       // Add click listener
-      googleMapRef.current.addListener('click', handleMapClick);
+      googleMapRef.current.addListener("click", handleMapClick);
 
       // Initialize autocomplete
       initializeAutocomplete();
@@ -156,7 +158,7 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
 
       setIsMapLoaded(true);
     } catch (error) {
-      console.error('Failed to initialize map:', error);
+      console.error("Failed to initialize map:", error);
       toast({
         variant: "destructive",
         title: "Map Error",
@@ -174,12 +176,12 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
     autocompleteRef.current = new google.maps.places.Autocomplete(
       searchInputRef.current,
       {
-        types: ['establishment', 'geocode'],
-        componentRestrictions: { country: 'lk' }, // Restrict to Sri Lanka
+        types: ["establishment", "geocode"],
+        componentRestrictions: { country: "lk" }, // Restrict to Sri Lanka
       }
     );
 
-    autocompleteRef.current.addListener('place_changed', handlePlaceSelect);
+    autocompleteRef.current.addListener("place_changed", handlePlaceSelect);
   };
 
   /**
@@ -193,10 +195,10 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
 
     const location: LocationCoordinates = {
       latitude: place.geometry.location.lat(),
-      longitude: place.geometry.location.lng()
+      longitude: place.geometry.location.lng(),
     };
 
-    const address = place.formatted_address || place.name || '';
+    const address = place.formatted_address || place.name || "";
 
     updateLocation(location, address);
   };
@@ -209,7 +211,7 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
 
     const location: LocationCoordinates = {
       latitude: event.latLng.lat(),
-      longitude: event.latLng.lng()
+      longitude: event.latLng.lng(),
     };
 
     // Reverse geocode to get address
@@ -223,35 +225,41 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
     if (!window.google?.maps) return;
 
     setIsLoading(true);
-    
-    const geocoder = new google.maps.Geocoder();
-    
-    try {
-      const response = await new Promise<google.maps.GeocoderResponse>((resolve, reject) => {
-        geocoder.geocode(
-          { location: { lat: location.latitude, lng: location.longitude } },
-          (results, status) => {
-            if (status === google.maps.GeocoderStatus.OK && results) {
-              resolve({ results } as google.maps.GeocoderResponse);
-            } else {
-              reject(new Error(`Geocoding failed: ${status}`));
-            }
-          }
-        );
-      });
 
-      const address = response.results[0]?.formatted_address || 'Unknown location';
-      console.log('Reverse geocoded address:', address);
+    const geocoder = new google.maps.Geocoder();
+
+    try {
+      const response = await new Promise<google.maps.GeocoderResponse>(
+        (resolve, reject) => {
+          geocoder.geocode(
+            { location: { lat: location.latitude, lng: location.longitude } },
+            (results, status) => {
+              if (status === google.maps.GeocoderStatus.OK && results) {
+                resolve({ results } as google.maps.GeocoderResponse);
+              } else {
+                reject(new Error(`Geocoding failed: ${status}`));
+              }
+            }
+          );
+        }
+      );
+
+      const address =
+        response.results[0]?.formatted_address || "Unknown location";
+      console.log("Reverse geocoded address:", address);
       updateLocation(location, address);
     } catch (error) {
-      console.error('Reverse geocoding failed:', error);
-      const fallbackAddress = `Location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
+      console.error("Reverse geocoding failed:", error);
+      const fallbackAddress = `Location: ${location.latitude.toFixed(
+        6
+      )}, ${location.longitude.toFixed(6)}`;
       updateLocation(location, fallbackAddress);
-      
+
       toast({
         variant: "destructive",
         title: "Address Lookup Failed",
-        description: "Could not get address for location, but coordinates have been saved.",
+        description:
+          "Could not get address for location, but coordinates have been saved.",
       });
     } finally {
       setIsLoading(false);
@@ -270,7 +278,7 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
     if (googleMapRef.current) {
       googleMapRef.current.setCenter({
         lat: location.latitude,
-        lng: location.longitude
+        lng: location.longitude,
       });
       googleMapRef.current.setZoom(16);
     }
@@ -298,18 +306,20 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
     markerRef.current = new google.maps.Marker({
       position: { lat: location.latitude, lng: location.longitude },
       map: googleMapRef.current,
-      title: 'Kitchen Location',
+      title: "Kitchen Location",
       animation: google.maps.Animation.DROP,
       icon: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+        url:
+          "data:image/svg+xml;charset=UTF-8," +
+          encodeURIComponent(`
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="16" cy="16" r="12" fill="#EF4444" stroke="#FFFFFF" stroke-width="2"/>
             <path d="M16 8c-1.1 0-2 .9-2 2v6h4v-6c0-1.1-.9-2-2-2zm-4 8v4c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-4h-8z" fill="#FFFFFF"/>
           </svg>
         `),
         scaledSize: new google.maps.Size(32, 32),
-        anchor: new google.maps.Point(16, 16)
-      }
+        anchor: new google.maps.Point(16, 16),
+      },
     });
   };
 
@@ -322,27 +332,31 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
     }
 
     try {
-      const permission = await navigator.permissions.query({ name: 'geolocation' });
-      
-      if (permission.state === 'denied') {
+      const permission = await navigator.permissions.query({
+        name: "geolocation",
+      });
+
+      if (permission.state === "denied") {
         toast({
           variant: "destructive",
           title: "Location Permission Required",
-          description: "Please enable location permission in your browser settings. Click the location icon in the address bar to allow access.",
+          description:
+            "Please enable location permission in your browser settings. Click the location icon in the address bar to allow access.",
         });
         return false;
       }
-      
-      if (permission.state === 'prompt') {
+
+      if (permission.state === "prompt") {
         toast({
           title: "Location Permission Needed",
-          description: "We'll ask for your location permission to find your current position.",
+          description:
+            "We'll ask for your location permission to find your current position.",
         });
       }
-      
+
       return true;
     } catch (error) {
-      console.error('Permission check failed:', error);
+      console.error("Permission check failed:", error);
       return true; // Proceed with geolocation request if permission check fails
     }
   };
@@ -367,7 +381,7 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
     }
 
     setIsLoading(true);
-    
+
     toast({
       title: "Getting Your Location",
       description: "Please wait while we find your current position...",
@@ -377,43 +391,49 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
       (position) => {
         const location: LocationCoordinates = {
           latitude: position.coords.latitude,
-          longitude: position.coords.longitude
+          longitude: position.coords.longitude,
         };
 
-        console.log('Current location found:', location);
-        console.log('Accuracy:', position.coords.accuracy, 'meters');
-        
+        console.log("Current location found:", location);
+        console.log("Accuracy:", position.coords.accuracy, "meters");
+
         reverseGeocode(location);
-        
+
         toast({
           title: "Location Found",
-          description: `Successfully got your current location! (Accuracy: ${Math.round(position.coords.accuracy)}m)`,
+          description: `Successfully got your current location! (Accuracy: ${Math.round(
+            position.coords.accuracy
+          )}m)`,
         });
       },
       (error) => {
-        console.error('Geolocation error:', error);
+        console.error("Geolocation error:", error);
         setIsLoading(false);
-        
+
         let title = "Location Error";
         let description = "Could not get your current location";
-        
+
         switch (error.code) {
           case error.PERMISSION_DENIED:
             title = "Location Permission Denied";
-            description = "To use your current location: 1) Click the location icon in your browser's address bar, 2) Select 'Allow', 3) Try again. Or search for your address manually below.";
+            description =
+              "To use your current location: 1) Click the location icon in your browser's address bar, 2) Select 'Allow', 3) Try again. Or search for your address manually below.";
             break;
           case error.POSITION_UNAVAILABLE:
             title = "Location Unavailable";
-            description = "Your location is currently unavailable. Please try searching for your address manually.";
+            description =
+              "Your location is currently unavailable. Please try searching for your address manually.";
             break;
           case error.TIMEOUT:
             title = "Location Timeout";
-            description = "Location request timed out. Please try again or search for your address manually.";
+            description =
+              "Location request timed out. Please try again or search for your address manually.";
             break;
           default:
-            description = "Unable to get your location. Please search for your address manually.";
+            description =
+              "Unable to get your location. Please search for your address manually.";
         }
-        
+
         toast({
           variant: "destructive",
           title,
@@ -422,8 +442,8 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
       },
       {
         enableHighAccuracy: true,
-        timeout: 20000,  // Increased timeout
-        maximumAge: 60000  // Reduced cache age for fresher location
+        timeout: 20000, // Increased timeout
+        maximumAge: 60000, // Reduced cache age for fresher location
       }
     );
   };
@@ -471,13 +491,13 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
   return (
     <div className="space-y-2">
       <Label>Kitchen Location 📍</Label>
-      
+
       {/* Current Location Display */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">
           <MapPin className="h-4 w-4 text-muted-foreground" />
           <span className="flex-1 text-sm">
-            {currentAddress || 'No location set'}
+            {currentAddress || "No location set"}
           </span>
           {currentLocation && (
             <Badge variant="outline" className="text-xs">
@@ -490,13 +510,11 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
         {/* Set Location Button */}
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              disabled={disabled}
-              className="w-full"
-            >
+            <Button variant="outline" disabled={disabled} className="w-full">
               <MapPin className="h-4 w-4 mr-2" />
-              {currentLocation ? 'Update Kitchen Location' : 'Set Kitchen Location'}
+              {currentLocation
+                ? "Update Kitchen Location"
+                : "Set Kitchen Location"}
             </Button>
           </DialogTrigger>
 
@@ -507,7 +525,8 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
                 Set Kitchen Location
               </DialogTitle>
               <DialogDescription>
-                Choose your kitchen location so customers can find you easily. Click on the map or search for your address.
+                Choose your kitchen location so customers can find you easily.
+                Click on the map or search for your address.
               </DialogDescription>
             </DialogHeader>
 
@@ -543,7 +562,10 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-3 w-3 text-blue-500 mt-0.5 flex-shrink-0" />
                   <div>
-                    <strong>To use your current location:</strong> Click the location button above. If blocked, enable location permission by clicking the location icon in your browser's address bar, or search manually.
+                    <strong>To use your current location:</strong> Click the
+                    location button above. If blocked, enable location
+                    permission by clicking the location icon in your browser's
+                    address bar, or search manually.
                   </div>
                 </div>
               </div>
@@ -554,7 +576,9 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
                   <div className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <strong>Selected:</strong> {selectedLocation.latitude.toFixed(6)}, {selectedLocation.longitude.toFixed(6)}
+                      <strong>Selected:</strong>{" "}
+                      {selectedLocation.latitude.toFixed(6)},{" "}
+                      {selectedLocation.longitude.toFixed(6)}
                       <br />
                       <strong>Address:</strong> {selectedAddress}
                     </div>
@@ -574,7 +598,9 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
                   <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
                     <div className="text-center">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">Loading map...</p>
+                      <p className="text-sm text-muted-foreground">
+                        Loading map...
+                      </p>
                     </div>
                   </div>
                 )}
@@ -585,7 +611,9 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
                     <div className="bg-background/90 border rounded-lg p-3">
                       <div className="flex items-center gap-2 text-sm">
                         <AlertCircle className="h-4 w-4 text-blue-500" />
-                        <span>Click on the map to select your kitchen location</span>
+                        <span>
+                          Click on the map to select your kitchen location
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -598,9 +626,12 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <p className="font-medium text-sm">Selected Location:</p>
-                      <p className="text-sm text-muted-foreground">{selectedAddress}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedAddress}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Coordinates: {selectedLocation.latitude.toFixed(6)}, {selectedLocation.longitude.toFixed(6)}
+                        Coordinates: {selectedLocation.latitude.toFixed(6)},{" "}
+                        {selectedLocation.longitude.toFixed(6)}
                       </p>
                     </div>
                     <CheckCircle className="h-5 w-5 text-green-500" />
@@ -639,7 +670,7 @@ export const KitchenLocationPicker: React.FC<KitchenLocationPickerProps> = ({
             variant="ghost"
             onClick={() => {
               const url = `https://www.google.com/maps/search/?api=1&query=${currentLocation.latitude},${currentLocation.longitude}`;
-              window.open(url, '_blank');
+              window.open(url, "_blank");
             }}
             className="flex-1 h-8"
           >

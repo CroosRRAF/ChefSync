@@ -1,47 +1,73 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { MapPin, LocateFixed, Search, Star } from 'lucide-react';
-import { GoogleMap, useJsApiLoader, Marker, Autocomplete } from '@react-google-maps/api';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { MapPin, LocateFixed, Search, Star } from "lucide-react";
+import {
+  GoogleMap,
+  useJsApiLoader,
+  Marker,
+  Autocomplete,
+} from "@react-google-maps/api";
 
 interface LocationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLocationSelect: (location: { address: string; latitude: number; longitude: number; }) => void;
+  onLocationSelect: (location: {
+    address: string;
+    latitude: number;
+    longitude: number;
+  }) => void;
 }
 
 const containerStyle = {
-  width: '100%',
-  height: '100%',
+  width: "100%",
+  height: "100%",
 };
 
 const center = {
   lat: 40.7128,
-  lng: -74.0060
+  lng: -74.006,
 };
 
 const savedAddresses = [
-    { id: 'home', name: 'Home', address: '123 Main St, New York, NY', lat: 40.7128, lng: -74.0060 },
-    { id: 'work', name: 'Work', address: '456 Market St, San Francisco, CA', lat: 37.7937, lng: -122.3965 },
+  {
+    id: "home",
+    name: "Home",
+    address: "123 Main St, New York, NY",
+    lat: 40.7128,
+    lng: -74.006,
+  },
+  {
+    id: "work",
+    name: "Work",
+    address: "456 Market St, San Francisco, CA",
+    lat: 37.7937,
+    lng: -122.3965,
+  },
 ];
 
-const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, onLocationSelect }) => {
+const LocationModal: React.FC<LocationModalProps> = ({
+  isOpen,
+  onClose,
+  onLocationSelect,
+}) => {
   const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
+    id: "google-map-script",
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries: ['places'],
+    libraries: ["places"],
   });
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markerPosition, setMarkerPosition] = useState(center);
-  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const [autocomplete, setAutocomplete] =
+    useState<google.maps.places.Autocomplete | null>(null);
 
   const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
     setMap(mapInstance);
@@ -57,7 +83,11 @@ const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, onLocati
       const lng = e.latLng.lng();
       setMarkerPosition({ lat, lng });
       // In a real app, you'd use a reverse geocoding service here.
-      onLocationSelect({ address: `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`, latitude: lat, longitude: lng });
+      onLocationSelect({
+        address: `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`,
+        latitude: lat,
+        longitude: lng,
+      });
     }
   };
 
@@ -70,7 +100,11 @@ const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, onLocati
         const newPos = { lat, lng };
         map?.panTo(newPos);
         setMarkerPosition(newPos);
-        onLocationSelect({ address: place.formatted_address || 'Selected Location', latitude: lat, longitude: lng });
+        onLocationSelect({
+          address: place.formatted_address || "Selected Location",
+          latitude: lat,
+          longitude: lng,
+        });
       }
     }
   };
@@ -84,7 +118,11 @@ const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, onLocati
         map?.panTo(newPos);
         setMarkerPosition(newPos);
         // In a real app, you'd use a reverse geocoding service here.
-        onLocationSelect({ address: 'Current Location', latitude: lat, longitude: lng });
+        onLocationSelect({
+          address: "Current Location",
+          latitude: lat,
+          longitude: lng,
+        });
       });
     }
   };
@@ -93,12 +131,14 @@ const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, onLocati
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[900px] h-[90vh] flex flex-col p-0">
         <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="text-2xl font-bold">Select Your Delivery Location</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">
+            Select Your Delivery Location
+          </DialogTitle>
           <DialogDescription>
             Search for an address or pin your location on the map.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="flex-grow flex flex-col md:flex-row gap-4 p-6">
           {/* Controls Area */}
           <div className="md:w-1/3 flex flex-col space-y-4">
@@ -109,28 +149,43 @@ const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, onLocati
               >
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="Search for an address..." className="pl-10" />
+                  <Input
+                    placeholder="Search for an address..."
+                    className="pl-10"
+                  />
                 </div>
               </Autocomplete>
             )}
-            
-            <Button variant="outline" className="w-full flex items-center justify-center" onClick={handleUseCurrentLocation}>
+
+            <Button
+              variant="outline"
+              className="w-full flex items-center justify-center"
+              onClick={handleUseCurrentLocation}
+            >
               <LocateFixed className="h-5 w-5 mr-2" />
               Use My Current Location
             </Button>
 
             <div className="flex-grow overflow-y-auto border border-border rounded-lg p-2 space-y-2">
               <h4 className="font-semibold mb-2 px-2">Saved Addresses</h4>
-              {savedAddresses.map(addr => (
-                <div 
-                  key={addr.id} 
+              {savedAddresses.map((addr) => (
+                <div
+                  key={addr.id}
                   className="flex items-start p-2 rounded-md hover:bg-muted cursor-pointer"
-                  onClick={() => onLocationSelect({ address: addr.address, latitude: addr.lat, longitude: addr.lng })}
+                  onClick={() =>
+                    onLocationSelect({
+                      address: addr.address,
+                      latitude: addr.lat,
+                      longitude: addr.lng,
+                    })
+                  }
                 >
                   <Star className="h-5 w-5 text-yellow-400 mr-3 mt-1" />
                   <div>
                     <p className="font-semibold">{addr.name}</p>
-                    <p className="text-sm text-muted-foreground">{addr.address}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {addr.address}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -150,6 +205,7 @@ const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, onLocati
                 options={{
                   disableDefaultUI: true,
                   zoomControl: true,
+                  mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID,
                 }}
               >
                 <Marker position={markerPosition} />

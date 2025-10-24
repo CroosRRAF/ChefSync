@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   Package,
 } from "lucide-react";
 import type { Order } from "../../types/orderType";
+import TwoPhaseDeliveryDialog from "./TwoPhaseDeliveryDialog";
 
 interface DeliveryPhaseCardProps {
   order: Order;
@@ -27,6 +28,8 @@ const DeliveryPhaseCard: React.FC<DeliveryPhaseCardProps> = ({
   className,
   style,
 }) => {
+  const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
+
   const getPhaseInfo = (status: Order["status"]) => {
     switch (status) {
       case "ready":
@@ -78,6 +81,24 @@ const DeliveryPhaseCard: React.FC<DeliveryPhaseCardProps> = ({
 
   const phaseInfo = getPhaseInfo(order.status);
   const Icon = phaseInfo.icon;
+
+  const handleStartDelivery = () => {
+    setShowDeliveryDialog(true);
+  };
+
+  const handleStartPickup = (order: Order) => {
+    // Navigate to map for pickup
+    if (onNavigateToMap) {
+      onNavigateToMap(order);
+    }
+  };
+
+  const handleStartDeliveryPhase = (order: Order) => {
+    // Navigate to map for delivery
+    if (onNavigateToMap) {
+      onNavigateToMap(order);
+    }
+  };
 
   return (
     <Card
@@ -164,14 +185,10 @@ const DeliveryPhaseCard: React.FC<DeliveryPhaseCardProps> = ({
 
         {/* Action Button */}
         {onNavigateToMap && (
-          <Button
-            onClick={() => onNavigateToMap(order)}
-            className="w-full"
-            size="sm"
-          >
+          <Button onClick={handleStartDelivery} className="w-full" size="sm">
             <Navigation className="h-4 w-4 mr-2" />
             {phaseInfo.phase === "pickup"
-              ? "Go to Pickup"
+              ? "Start Delivery Process"
               : phaseInfo.phase === "transit"
               ? "Start Delivery"
               : "Continue Delivery"}
@@ -183,6 +200,15 @@ const DeliveryPhaseCard: React.FC<DeliveryPhaseCardProps> = ({
           {phaseInfo.description}
         </p>
       </CardContent>
+
+      {/* Two Phase Delivery Dialog */}
+      <TwoPhaseDeliveryDialog
+        isOpen={showDeliveryDialog}
+        onClose={() => setShowDeliveryDialog(false)}
+        order={order}
+        onStartPickup={handleStartPickup}
+        onStartDelivery={handleStartDeliveryPhase}
+      />
     </Card>
   );
 };

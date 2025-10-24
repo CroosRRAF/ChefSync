@@ -9,10 +9,18 @@ export interface Chef {
   rating_avg?: number;
 }
 
+export interface Customer {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  phone_no?: string;
+}
+
 export interface Order {
   id: number;
   order_number: string;
-  customer: any;
+  customer: Customer;
   customer_name?: string;
   chef: Chef; // Enhanced chef interface with pickup location
   delivery_partner?: any;

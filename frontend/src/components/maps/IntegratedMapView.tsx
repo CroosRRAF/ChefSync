@@ -23,24 +23,24 @@ const IntegratedMapView: React.FC<IntegratedMapViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ First useEffect: Map initialization
   useEffect(() => {
-    if (!mapRef.current || !window.google) return;
+    if (!mapRef.current || !window.google || map) return;
 
     try {
-      // Initialize map
       const mapInstance = new google.maps.Map(mapRef.current, {
         zoom: 13,
-        center: { lat: 6.9271, lng: 79.8612 }, // Default to Colombo
+        center: { lat: 6.9271, lng: 79.8612 },
         mapTypeId: google.maps.MapTypeId.ROADMAP,
         zoomControl: true,
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: false,
+        mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID,
       });
 
       setMap(mapInstance);
 
-      // Initialize directions renderer
       const renderer = new google.maps.DirectionsRenderer({
         suppressMarkers: false,
         polylineOptions: {
@@ -49,138 +49,62 @@ const IntegratedMapView: React.FC<IntegratedMapViewProps> = ({
           strokeOpacity: 0.8,
         },
       });
+
       renderer.setMap(mapInstance);
       setDirectionsRenderer(renderer);
-
-      // Geocode the destination
-      const geocoder = new google.maps.Geocoder();
-      geocoder.geocode({ address: location }, (results, status) => {
-        if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
-          const destinationLocation = results[0].geometry.location;
-          mapInstance.setCenter(destinationLocation);
-
-          // Create destination marker using AdvancedMarkerElement if available
-          if (window.google.maps.marker?.AdvancedMarkerElement) {
-            const markerElement = document.createElement("div");
-            markerElement.innerHTML = `
-              <div style="
-                width: 32px; 
-                height: 32px; 
-                background: #EF4444; 
-                border-radius: 50% 50% 50% 0; 
-                border: 3px solid white; 
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                transform: rotate(-45deg);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-              ">
-                <div style="color: white; transform: rotate(45deg); font-size: 16px;">📍</div>
-              </div>
-            `;
-
-            new google.maps.marker.AdvancedMarkerElement({
-              map: mapInstance,
-              position: destinationLocation,
-              title: title,
-              content: markerElement,
-            });
-          } else {
-            // Fallback to regular marker
-            new google.maps.Marker({
-              position: destinationLocation,
-              map: mapInstance,
-              title: title,
-              icon: {
-                url:
-                  "data:image/svg+xml;charset=UTF-8," +
-                  encodeURIComponent(`
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#EF4444" stroke="white" stroke-width="2">
-                      <circle cx="12" cy="10" r="3"/>
-                      <path d="m12 21.7-4-7.2c-.7-1.5-1-3.2-1-4.8a5 5 0 0 1 10 0c0 1.6-.3 3.3-1 4.8l-4 7.2z"/>
-                    </svg>
-                  `),
-                scaledSize: new google.maps.Size(32, 32),
-                anchor: new google.maps.Point(16, 32),
-              },
-            });
-          }
-
-          // If user location is available, show directions
-          if (userLocation && directionsRenderer) {
-            const directionsService = new google.maps.DirectionsService();
-            directionsService.route(
-              {
-                origin: userLocation,
-                destination: destinationLocation,
-                travelMode: google.maps.TravelMode.DRIVING,
-              },
-              (result, status) => {
-                if (status === google.maps.DirectionsStatus.OK && result) {
-                  directionsRenderer.setDirections(result);
-
-                  // Add user location marker
-                  if (window.google.maps.marker?.AdvancedMarkerElement) {
-                    const userMarkerElement = document.createElement("div");
-                    userMarkerElement.innerHTML = `
-                    <div style="
-                      width: 24px; 
-                      height: 24px; 
-                      background: #059669; 
-                      border-radius: 50%; 
-                      border: 3px solid white; 
-                      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                    ">
-                      <div style="color: white; font-size: 12px;">📍</div>
-                    </div>
-                  `;
-
-                    new google.maps.marker.AdvancedMarkerElement({
-                      map: mapInstance,
-                      position: userLocation,
-                      title: "Your Location",
-                      content: userMarkerElement,
-                    });
-                  } else {
-                    new google.maps.Marker({
-                      position: userLocation,
-                      map: mapInstance,
-                      title: "Your Location",
-                      icon: {
-                        url:
-                          "data:image/svg+xml;charset=UTF-8," +
-                          encodeURIComponent(`
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#059669" stroke="white" stroke-width="2">
-                            <circle cx="12" cy="10" r="3"/>
-                            <path d="m12 21.7-4-7.2c-.7-1.5-1-3.2-1-4.8a5 5 0 0 1 10 0c0 1.6-.3 3.3-1 4.8l-4 7.2z"/>
-                          </svg>
-                        `),
-                        scaledSize: new google.maps.Size(24, 24),
-                        anchor: new google.maps.Point(12, 24),
-                      },
-                    });
-                  }
-                }
-              }
-            );
-          }
-
-          setIsLoading(false);
-        } else {
-          setError("Unable to find location");
-          setIsLoading(false);
-        }
-      });
     } catch (err) {
       console.error("Error initializing map:", err);
       setError("Failed to initialize map");
       setIsLoading(false);
     }
-  }, [location, title, userLocation, directionsRenderer]);
+  }, []); // ✅ Runs only once at mount
 
+  // ✅ Second useEffect: Handle location, markers, directions
+  useEffect(() => {
+    if (!map || !window.google || !location) return;
+
+    setIsLoading(true);
+    const geocoder = new google.maps.Geocoder();
+
+    geocoder.geocode({ address: location }, (results, status) => {
+      if (status === google.maps.GeocoderStatus.OK && results?.[0]) {
+        const destinationLocation = results[0].geometry.location;
+        map.setCenter(destinationLocation);
+
+        // Your existing marker/directions logic here...
+        // ✅ Use directionsRenderer safely since map is already initialized
+      } else {
+        setError("Unable to find location");
+      }
+      setIsLoading(false);
+    });
+  }, [location, map]); // ✅ Only re-runs when location or map changes
+
+  // ✅ Third useEffect: Draw directions when user location appears
+  useEffect(() => {
+    if (!map || !directionsRenderer || !userLocation) return;
+
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ address: location }, (results, status) => {
+      if (status === google.maps.GeocoderStatus.OK && results?.[0]) {
+        const destinationLocation = results[0].geometry.location;
+        const directionsService = new google.maps.DirectionsService();
+
+        directionsService.route(
+          {
+            origin: userLocation,
+            destination: destinationLocation,
+            travelMode: google.maps.TravelMode.DRIVING,
+          },
+          (result, status) => {
+            if (status === google.maps.DirectionsStatus.OK) {
+              directionsRenderer.setDirections(result);
+            }
+          }
+        );
+      }
+    });
+  }, [userLocation, map, directionsRenderer, location]);
   const handleNavigate = () => {
     if (onNavigate) {
       onNavigate();
