@@ -610,7 +610,9 @@ class BulkOrderListSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
     event_type = serializers.SerializerMethodField()
     total_amount = serializers.SerializerMethodField()
-    event_date = serializers.DateTimeField(source="deadline", read_only=True)
+    event_date = serializers.DateField(read_only=True)  # Use actual event_date field
+    total_quantity = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
 
     # Menu items as expected by frontend
     items = serializers.SerializerMethodField()
@@ -645,12 +647,32 @@ class BulkOrderListSerializer(serializers.ModelSerializer):
 
     def get_order_number(self, obj):
         return f"BULK-{obj.bulk_order_id:06d}"
+    
+    def get_total_quantity(self, obj):
+        """Get total quantity - use num_persons or calculate from order items"""
+        if obj.num_persons:
+            return obj.num_persons
+        # Fallback: calculate from order items if available
+        if getattr(obj, 'order', None):
+            return sum(item.quantity for item in obj.order.items.all())
+        return 0
+    
+    def get_description(self, obj):
+        """Get description from notes or customer_notes"""
+        if obj.notes:
+            return obj.notes
+        elif obj.customer_notes:
+            return obj.customer_notes
+        elif obj.menu_name:
+            return f"Bulk order for {obj.num_persons} persons - {obj.menu_name}"
+        return f"Bulk order for {obj.num_persons} persons"
 
     def get_event_type(self, obj):
-        # Extract event type from description or default
-        if obj.description:
+        # Extract event type from notes/customer_notes or default
+        description_text = obj.notes or obj.customer_notes or ""
+        if description_text:
             # Try to extract event type from description
-            description_lower = obj.description.lower()
+            description_lower = description_text.lower()
             if "wedding" in description_lower:
                 return "wedding"
             elif "corporate" in description_lower:
@@ -951,6 +973,42 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
         if getattr(obj, 'order', None):
             return str(obj.order.total_amount)
         return "0.00"
+
+    def get_event_date(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'event_date') and obj.event_date:
+            return obj.event_date.isoformat()
+        # Fallback to order
+        if obj.order and hasattr(obj.order, 'event_date') and obj.order.event_date:
+            return obj.order.event_date.isoformat()
+        return None
+
+    def get_event_time(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'event_time') and obj.event_time:
+            return obj.event_time.strftime('%H:%M:%S')
+        # Fallback to order
+        if obj.order and hasattr(obj.order, 'event_time') and obj.order.event_time:
+            return obj.order.event_time.strftime('%H:%M:%S')
+        return None
+
+    def get_num_persons(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'num_persons') and obj.num_persons:
+            return obj.num_persons
+        # Fallback to order
+        if obj.order and hasattr(obj.order, 'num_persons') and obj.order.num_persons:
+            return obj.order.num_persons
+        return 0
+
+    def get_menu_name(self, obj):
+        # Try direct field first
+        if hasattr(obj, 'menu_name') and obj.menu_name:
+            return obj.menu_name
+        # Fallback to order notes or default
+        if obj.notes:
+            return obj.notes[:50] + "..." if len(obj.notes) > 50 else obj.notes
+        return "Bulk Order"
 
 
 # Duplicate definitions removed - using earlier complete implementations above

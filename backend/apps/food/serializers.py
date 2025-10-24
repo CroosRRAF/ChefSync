@@ -759,6 +759,8 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
     chef_name = serializers.CharField(source="chef.username", read_only=True)
     approved_by_name = serializers.CharField(source="approved_by.username", read_only=True, allow_null=True)
     meal_type_display = serializers.CharField(source="get_meal_type_display", read_only=True)
+    # Override image field to accept file uploads
+    image = serializers.ImageField(required=False, allow_null=True)
     image_url = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
     items_count = serializers.SerializerMethodField()
@@ -794,6 +796,22 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["chef", "approved_by", "approved_at", "created_at", "updated_at"]
+    
+    def validate_image(self, value):
+        """Validate and prepare image for upload"""
+        if value is None:
+            return None
+        
+        # If it's already a string (URL), return it
+        if isinstance(value, str):
+            return value
+        
+        # If it's a file object, it will be handled in create/update
+        # Just validate file size here (max 10MB)
+        if hasattr(value, 'size') and value.size > 10 * 1024 * 1024:
+            raise serializers.ValidationError("Image file size must be less than 10MB")
+        
+        return value
     
     def get_image_url(self, obj):
         """Get optimized image URL"""
@@ -870,20 +888,39 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
         
         # Handle image upload
         image_data = validated_data.get('image')
-        if image_data:
+        if image_data and not isinstance(image_data, str):
             try:
-                # Upload to Cloudinary
-                folder = "chefsync/bulk_menus"
-                result = upload_image_to_cloudinary(
-                    image_data=image_data,
-                    folder=folder,
-                    public_id=f"bulk_menu_{uuid.uuid4().hex[:8]}",
-                    tags=["bulk_menu", "chefsync"],
-                )
-                if result and result.get("secure_url"):
-                    validated_data["image"] = result["secure_url"]
+                # If it's a file object, read it and upload to Cloudinary
+                if hasattr(image_data, 'read'):
+                    # It's a file object
+                    file_content = image_data.read()
+                    
+                    # Upload to Cloudinary
+                    folder = "chefsync/bulk_menus"
+                    result = upload_image_to_cloudinary(
+                        image_data=file_content,
+                        folder=folder,
+                        public_id=f"bulk_menu_{uuid.uuid4().hex[:8]}",
+                        tags=["bulk_menu", "chefsync"],
+                    )
+                    if result and result.get("secure_url"):
+                        validated_data["image"] = result["secure_url"]
+                        logger.info(f"Uploaded bulk menu image to Cloudinary: {result['secure_url']}")
+                    else:
+                        # If upload fails, remove image from validated_data
+                        validated_data.pop('image', None)
+                        logger.warning("Failed to upload image to Cloudinary, creating menu without image")
+                else:
+                    # Unknown format, remove from validated_data
+                    validated_data.pop('image', None)
+                    logger.warning("Unknown image format, creating menu without image")
             except Exception as e:
                 logger.error(f"Error uploading bulk menu image: {e}")
+                # Remove image from validated_data on error
+                validated_data.pop('image', None)
+        elif isinstance(image_data, str):
+            # If it's already a URL string, keep it as is
+            logger.info(f"Using existing image URL: {image_data}")
         
         # Create the bulk menu
         bulk_menu = super().create(validated_data)
@@ -932,22 +969,34 @@ class BulkMenuWithItemsSerializer(serializers.ModelSerializer):
             elif isinstance(items_raw, list):
                 items_data = items_raw
         
-        # Handle image upload
+        # Handle image upload (same logic as create)
         image_data = validated_data.get('image')
         if image_data and not isinstance(image_data, str):
             try:
-                # Upload to Cloudinary
-                folder = "chefsync/bulk_menus"
-                result = upload_image_to_cloudinary(
-                    image_data=image_data,
-                    folder=folder,
-                    public_id=f"bulk_menu_{uuid.uuid4().hex[:8]}",
-                    tags=["bulk_menu", "chefsync"],
-                )
-                if result and result.get("secure_url"):
-                    validated_data["image"] = result["secure_url"]
+                # If it's a file object, read it and upload to Cloudinary
+                if hasattr(image_data, 'read'):
+                    file_content = image_data.read()
+                    
+                    # Upload to Cloudinary
+                    folder = "chefsync/bulk_menus"
+                    result = upload_image_to_cloudinary(
+                        image_data=file_content,
+                        folder=folder,
+                        public_id=f"bulk_menu_{uuid.uuid4().hex[:8]}",
+                        tags=["bulk_menu", "chefsync"],
+                    )
+                    if result and result.get("secure_url"):
+                        validated_data["image"] = result["secure_url"]
+                        logger.info(f"Uploaded updated bulk menu image to Cloudinary: {result['secure_url']}")
+                    else:
+                        validated_data.pop('image', None)
+                        logger.warning("Failed to upload image to Cloudinary")
+                else:
+                    validated_data.pop('image', None)
+                    logger.warning("Unknown image format")
             except Exception as e:
                 logger.error(f"Error uploading bulk menu image: {e}")
+                validated_data.pop('image', None)
         
         # Update the bulk menu
         bulk_menu = super().update(instance, validated_data)

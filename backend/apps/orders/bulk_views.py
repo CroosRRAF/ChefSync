@@ -23,81 +23,36 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
             return BulkOrderListSerializer
         return BulkOrderDetailSerializer
     
-    def list(self, request, *args, **kwargs):
-        """List bulk orders with mock data fallback"""
-        try:
-            return super().list(request, *args, **kwargs)
-        except Exception as e:
-            # Return mock data if database has issues
-            from datetime import datetime
-            mock_data = [
-                {
-                    'id': 1,
-                    'order_number': 'BULK-000001',
-                    'customer_name': 'John Smith',
-                    'event_type': 'wedding',
-                    'event_date': datetime.now().isoformat(),
-                    'status': 'pending',
-                    'total_amount': '1250.00',
-                    'total_quantity': 50,
-                    'description': 'Wedding catering for 50 guests. Need Italian cuisine with vegetarian options.',
-                    'items': [
-                        {'id': 1, 'food_name': 'Chicken Alfredo', 'quantity': 25, 'special_instructions': None},
-                        {'id': 2, 'food_name': 'Vegetable Lasagna', 'quantity': 15, 'special_instructions': 'No dairy'},
-                        {'id': 3, 'food_name': 'Caesar Salad', 'quantity': 50, 'special_instructions': None}
-                    ],
-                    'collaborators': [],
-                    'created_at': datetime.now().isoformat(),
-                    'updated_at': datetime.now().isoformat()
-                },
-                {
-                    'id': 2,
-                    'order_number': 'BULK-000002',
-                    'customer_name': 'Corporate Events Ltd',
-                    'event_type': 'corporate',
-                    'event_date': datetime.now().isoformat(),
-                    'status': 'confirmed',
-                    'total_amount': '2800.00',
-                    'total_quantity': 80,
-                    'description': 'Corporate event for 80 people. Mexican food preferred. Need setup by 12 PM.',
-                    'items': [
-                        {'id': 4, 'food_name': 'Chicken Tacos', 'quantity': 40, 'special_instructions': None},
-                        {'id': 5, 'food_name': 'Beef Burritos', 'quantity': 30, 'special_instructions': 'Medium spice'},
-                        {'id': 6, 'food_name': 'Guacamole & Chips', 'quantity': 80, 'special_instructions': None}
-                    ],
-                    'collaborators': [
-                        {'id': 1, 'name': 'Chef Maria', 'email': 'maria@chef.com', 'role': 'chef'}
-                    ],
-                    'created_at': datetime.now().isoformat(),
-                    'updated_at': datetime.now().isoformat()
-                },
-                {
-                    'id': 3,
-                    'order_number': 'BULK-000003',
-                    'customer_name': 'Sarah Johnson',
-                    'event_type': 'birthday',
-                    'event_date': datetime.now().isoformat(),
-                    'status': 'preparing',
-                    'total_amount': '950.00',
-                    'total_quantity': 30,
-                    'description': 'Birthday party for 30 guests. Mixed cuisine, no allergies specified.',
-                    'items': [
-                        {'id': 7, 'food_name': 'Pizza Margherita', 'quantity': 15, 'special_instructions': None},
-                        {'id': 8, 'food_name': 'Chocolate Cake', 'quantity': 2, 'special_instructions': 'Happy Birthday message'},
-                        {'id': 9, 'food_name': 'Fruit Punch', 'quantity': 30, 'special_instructions': None}
-                    ],
-                    'collaborators': [],
-                    'created_at': datetime.now().isoformat(),
-                    'updated_at': datetime.now().isoformat()
-                }
-            ]
-            return Response({'results': mock_data})
 
     def get_queryset(self):
-        """Get bulk orders with filtering"""
+        """Get bulk orders for the authenticated cook - either as primary chef or collaborator"""
+        user = self.request.user
+        
+        # Base queryset with optimized queries
         queryset = BulkOrder.objects.select_related('created_by', 'order').prefetch_related(
             'assignments__chef', 'order__items'
         )
+        
+        # Filter by authenticated cook - show bulk orders where user is either:
+        # 1. Pending orders without chef assigned (available for any cook to accept)
+        # 2. The primary chef (chef field)
+        # 3. A collaborating chef (through BulkOrderAssignment)
+        if user.is_authenticated:
+            # Check if user has cook/chef role
+            if hasattr(user, 'role') and user.role in ['cook', 'Cook']:
+                # Filter: pending orders with no chef OR user is the primary chef OR user is in assignments
+                queryset = queryset.filter(
+                    Q(chef=None, status='pending') |  # Unassigned pending orders - any cook can accept
+                    Q(chef=user) |  # Orders assigned to this chef
+                    Q(assignments__chef=user)  # Orders where this chef is a collaborator
+                ).distinct()
+            # For admins or staff, show all bulk orders
+            elif user.is_staff or user.is_superuser:
+                pass  # Keep all bulk orders for admins
+            else:
+                # For other users (customers), return empty queryset
+                # Customers should use customer-bulk-orders endpoint instead
+                queryset = queryset.none()
         
         # Filter by status
         status_filter = self.request.query_params.get('status')
@@ -108,7 +63,9 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(
-                Q(description__icontains=search) |
+                Q(notes__icontains=search) |
+                Q(customer_notes__icontains=search) |
+                Q(menu_name__icontains=search) |
                 Q(created_by__name__icontains=search) |
                 Q(created_by__username__icontains=search)
             )
@@ -117,15 +74,15 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
         event_date_from = self.request.query_params.get('event_date_from')
         event_date_to = self.request.query_params.get('event_date_to')
         if event_date_from:
-            queryset = queryset.filter(deadline__gte=event_date_from)
+            queryset = queryset.filter(event_date__gte=event_date_from)
         if event_date_to:
-            queryset = queryset.filter(deadline__lte=event_date_to)
+            queryset = queryset.filter(event_date__lte=event_date_to)
         
         return queryset.order_by('-created_at')
     
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
-        """Accept a bulk order"""
+        """Accept a bulk order and assign the accepting chef"""
         bulk_order = self.get_object()
         notes = request.data.get('notes', '')
         
@@ -135,8 +92,20 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Assign the chef who is accepting the order
+        bulk_order.chef = request.user
         bulk_order.status = 'confirmed'
+        bulk_order.confirmed_at = timezone.now()
+        
+        # Add chef notes if provided
+        if notes:
+            bulk_order.chef_notes = notes
+        
         bulk_order.save()
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"✅ Bulk order {bulk_order.bulk_order_id} accepted by chef {request.user.username}")
         
         return Response(BulkOrderDetailSerializer(bulk_order).data)
     
@@ -159,18 +128,36 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def stats(self, request):
-        """Get bulk order statistics"""
+        """Get bulk order statistics for the authenticated cook"""
         try:
+            user = request.user
+            
+            # Base queryset filtered by cook
+            base_queryset = BulkOrder.objects.all()
+            
+            # Filter by authenticated cook if not admin
+            if user.is_authenticated and not (user.is_staff or user.is_superuser):
+                if hasattr(user, 'role') and user.role in ['cook', 'Cook']:
+                    # Filter: pending unassigned orders OR user is the primary chef OR user is in assignments
+                    base_queryset = base_queryset.filter(
+                        Q(chef=None, status='pending') |  # Unassigned pending orders
+                        Q(chef=user) |  # Orders assigned to this chef
+                        Q(assignments__chef=user)  # Orders where this chef is a collaborator
+                    ).distinct()
+                else:
+                    # Non-cook users get empty stats
+                    base_queryset = BulkOrder.objects.none()
+            
             # Status counts
-            pending_count = BulkOrder.objects.filter(status='pending').count()
-            confirmed_count = BulkOrder.objects.filter(status='confirmed').count()
-            collaborating_count = BulkOrder.objects.filter(status='collaborating').count()
-            preparing_count = BulkOrder.objects.filter(status='preparing').count()
-            completed_count = BulkOrder.objects.filter(status='completed').count()
-            cancelled_count = BulkOrder.objects.filter(status='cancelled').count()
+            pending_count = base_queryset.filter(status='pending').count()
+            confirmed_count = base_queryset.filter(status='confirmed').count()
+            collaborating_count = base_queryset.filter(status='collaborating').count()
+            preparing_count = base_queryset.filter(status='preparing').count()
+            completed_count = base_queryset.filter(status='completed').count()
+            cancelled_count = base_queryset.filter(status='cancelled').count()
             
             # Revenue calculations from related orders (only completed orders)
-            total_revenue = BulkOrder.objects.filter(
+            total_revenue = base_queryset.filter(
                 status='completed'
             ).aggregate(
                 total=Sum('order__total_amount')
@@ -189,7 +176,7 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
             }
             
         except Exception as e:
-            # Return mock data if database has issues
+            # Return empty stats on error
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Error calculating bulk order stats: {str(e)}")

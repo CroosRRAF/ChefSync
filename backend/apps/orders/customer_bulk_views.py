@@ -80,15 +80,45 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
                 # Create a BulkOrder only (do not create a regular Order for bulk orders).
                 # Bulk orders live primarily in the BulkOrder table. Keep the 'order' FK null
                 # unless downstream systems explicitly need an Order instance.
+                # IMPORTANT: chef field is NOT assigned - it will be assigned later when a chef accepts the order
                 bulk_order = BulkOrder.objects.create(
-                    order=None,
+                    # Relationships
+                    order=None,  # No regular order for bulk orders
                     created_by=request.user,
+                    chef=None,  # IMPORTANT: No chef assigned yet - will be assigned when accepted
+                    delivery_partner=None,
+                    
+                    # Status
                     status='pending',
+                    payment_status='pending',
+                    
+                    # Financial
                     total_amount=validated_data['total_amount'],
+                    subtotal=validated_data['total_amount'] - validated_data.get('delivery_fee', 0),
+                    delivery_fee=validated_data.get('delivery_fee', 0),
+                    
+                    # Event Details
+                    event_date=validated_data['event_date'],
+                    event_time=validated_data['event_time'],
+                    num_persons=validated_data['num_persons'],
+                    menu_name=bulk_menu.menu_name,
+                    
+                    # Delivery/Pickup
+                    order_type=validated_data.get('order_type', 'delivery'),
+                    delivery_address=validated_data.get('delivery_address', ''),
+                    delivery_latitude=validated_data.get('delivery_latitude'),
+                    delivery_longitude=validated_data.get('delivery_longitude'),
+                    distance_km=validated_data.get('distance_km'),
+                    
+                    # Notes
                     notes=(
                         f"Bulk order for {validated_data['num_persons']} persons. "
-                        f"Menu: {bulk_menu.menu_name}. {validated_data.get('special_instructions', '')}"
+                        f"Menu: {bulk_menu.menu_name}."
                     ),
+                    customer_notes=validated_data.get('special_instructions', ''),
+                    
+                    # Timestamps
+                    estimated_delivery_time=estimated_delivery,
                 )
                 
                 # Get all menu items (mandatory + selected optional)

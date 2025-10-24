@@ -477,6 +477,7 @@ class BulkOrder(models.Model):
 
     # Primary Fields
     bulk_order_id = models.AutoField(primary_key=True)
+    order_number = models.CharField(max_length=50, unique=True, db_index=True)
     # Make the order reference optional: bulk orders live primarily in the BulkOrder table.
     # Keep a nullable link for backward compatibility when an underlying Order exists.
     order = models.ForeignKey(

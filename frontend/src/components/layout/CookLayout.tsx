@@ -11,7 +11,8 @@ import {
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
-import { LogOut, Moon, Settings, Sun, User } from "lucide-react";
+import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
+import { Bell, LogOut, Moon, Settings, Sun, User } from "lucide-react";
 import { useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { CookSidebar } from "./CookSidebar";

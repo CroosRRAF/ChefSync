@@ -33,10 +33,10 @@ import {
   XCircle, 
   Users,
   Package,
-  DollarSign,
   Calendar,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Utensils
 } from "lucide-react";
 
 // Import API types and service
@@ -115,7 +115,9 @@ export default function BulkOrders() {
   
   // Dialog state
   const [isCollaborateDialogOpen, setIsCollaborateDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<number | null>(null);
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState<BulkOrder | null>(null);
   const [availableChefs, setAvailableChefs] = useState<ChefCollaborator[]>([]);
   const [loadingChefs, setLoadingChefs] = useState(false);
   const [collaborationRequest, setCollaborationRequest] = useState<{
@@ -328,21 +330,46 @@ export default function BulkOrders() {
       </div>
 
       <Card className="chef-card">
-        <CardHeader>
+        <CardHeader className="space-y-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-primary" />
               Bulk Order Queue
             </CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search bulk orders..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+            <div className="flex items-center gap-3">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Orders</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="collaborating">Collaborating</SelectItem>
+                  <SelectItem value="preparing">Preparing</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search bulk orders..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertCircle className="h-4 w-4" />
+            <span>
+              {filteredOrders.length === 0 
+                ? "No bulk orders match your filters" 
+                : `Showing ${filteredOrders.length} order${filteredOrders.length !== 1 ? 's' : ''}`
+              }
+            </span>
           </div>
         </CardHeader>
         <CardContent>
@@ -367,113 +394,276 @@ export default function BulkOrders() {
                 <TableRow>
                   <TableHead>Order ID</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Event Type</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Total</TableHead>
                   <TableHead>Event Date</TableHead>
+                  <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Collaborators</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                      No bulk orders found
+                    <TableCell colSpan={6} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-2">
+                        <Package className="h-12 w-12 text-muted-foreground/50" />
+                        <p className="text-muted-foreground font-medium">No bulk orders found</p>
+                        <p className="text-sm text-muted-foreground/70">
+                          {statusFilter !== 'all' ? 'Try adjusting your filters' : 'New orders will appear here'}
+                        </p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredOrders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.order_number}</TableCell>
-                      <TableCell>{order.customer_name}</TableCell>
-                      <TableCell>{order.event_type}</TableCell>
-                      <TableCell>
-                        <div className="max-w-xs">
-                          {order.items.slice(0, 2).map((item, index) => (
-                            <span key={index} className="block text-sm">
-                              {item.food_name}
-                            </span>
-                          ))}
-                          {order.items.length > 2 && (
-                            <span className="text-xs text-muted-foreground">
-                              +{order.items.length - 2} more
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{order.total_quantity} servings</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-3 w-3" />
-                          {parseFloat(order.total_amount).toFixed(2)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(order.event_date).toLocaleDateString()}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(order.status)}</TableCell>
-                      <TableCell>
-                        {order.collaborators && order.collaborators.length > 0 ? (
-                          <div className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            <span className="text-sm">{order.collaborators.map(c => c.name).join(", ")}</span>
+                  filteredOrders.map((order) => {
+                    const formatEventDate = (dateStr: string) => {
+                      if (!dateStr || dateStr === '1970-01-01') return 'Not specified';
+                      try {
+                        const date = new Date(dateStr);
+                        if (isNaN(date.getTime())) return 'Invalid date';
+                        return date.toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric' 
+                        });
+                      } catch {
+                        return 'Invalid date';
+                      }
+                    };
+
+                    return (
+                      <TableRow 
+                        key={order.id} 
+                        className="hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          setSelectedOrderDetails(order);
+                          setIsDetailDialogOpen(true);
+                        }}
+                      >
+                        <TableCell className="font-mono text-sm font-semibold">
+                          {order.order_number}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-sm border-2 border-primary/20">
+                              {order.customer_name?.charAt(0).toUpperCase() || '?'}
+                            </div>
+                            <div>
+                              <div className="font-medium">{order.customer_name || 'Unknown'}</div>
+                              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Badge variant="outline" className="capitalize text-xs px-1.5 py-0">
+                                  {order.event_type || 'General'}
+                                </Badge>
+                                {order.total_quantity > 0 && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Users className="h-3 w-3" />
+                                    {order.total_quantity}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {order.status === "pending" && (
-                          <div className="flex items-center justify-end gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleCollaborate(order.id)}
-                              disabled={loading}
-                              className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                            >
-                              <Users className="h-4 w-4 mr-1" />
-                              Collaborate
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleAcceptOrder(order.id)}
-                              disabled={loading}
-                              className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Accept
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleDeclineOrder(order.id)}
-                              disabled={loading}
-                              className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Decline
-                            </Button>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{formatEventDate(order.event_date)}</span>
                           </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-semibold text-green-600">
+                            <span className="text-xs text-muted-foreground mr-1">LKR</span>
+                            {parseFloat(order.total_amount || '0').toLocaleString('en-US', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            })}
+                          </div>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(order.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedOrderDetails(order);
+                              setIsDetailDialogOpen(true);
+                            }}
+                          >
+                            View Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
+
+      {/* Order Detail Dialog */}
+      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          {selectedOrderDetails && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <Package className="h-5 w-5 text-primary" />
+                  {selectedOrderDetails.order_number}
+                </DialogTitle>
+              </DialogHeader>
+              
+              <div className="space-y-6">
+                {/* Customer Info */}
+                <div className="flex items-start justify-between p-4 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center text-primary font-bold text-lg border-2 border-primary/30">
+                      {selectedOrderDetails.customer_name?.charAt(0).toUpperCase() || '?'}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-lg">{selectedOrderDetails.customer_name || 'Unknown Customer'}</div>
+                      <div className="text-sm text-muted-foreground">Order placed {new Date(selectedOrderDetails.created_at).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                  {getStatusBadge(selectedOrderDetails.status)}
+                </div>
+
+                {/* Event Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">Event Type</div>
+                    <Badge variant="outline" className="capitalize">
+                      {selectedOrderDetails.event_type || 'General'}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">Event Date</div>
+                    <div className="flex items-center gap-1 font-medium">
+                      <Calendar className="h-4 w-4 text-primary" />
+                      {selectedOrderDetails.event_date && selectedOrderDetails.event_date !== '1970-01-01' 
+                        ? new Date(selectedOrderDetails.event_date).toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })
+                        : 'Not specified'}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">Number of Guests</div>
+                    <div className="flex items-center gap-1 font-medium">
+                      <Users className="h-4 w-4 text-blue-600" />
+                      {selectedOrderDetails.total_quantity > 0 ? selectedOrderDetails.total_quantity : 'Not specified'}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">Total Amount</div>
+                    <div className="font-bold text-green-600 text-xl">
+                      <span className="text-sm text-muted-foreground mr-1.5">LKR</span>
+                      {parseFloat(selectedOrderDetails.total_amount || '0').toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {selectedOrderDetails.description && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-muted-foreground">Order Description</div>
+                    <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                      {selectedOrderDetails.description}
+                    </div>
+                  </div>
+                )}
+
+                {/* Menu Items */}
+                {selectedOrderDetails.items && selectedOrderDetails.items.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                      <Utensils className="h-4 w-4" />
+                      Menu Items ({selectedOrderDetails.items.length})
+                    </div>
+                    <div className="space-y-2">
+                      {selectedOrderDetails.items.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-primary"></div>
+                            <span className="font-medium">{item.food_name}</span>
+                          </div>
+                          {item.special_instructions && (
+                            <span className="text-xs text-muted-foreground italic">{item.special_instructions}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Collaborators */}
+                {selectedOrderDetails.collaborators && selectedOrderDetails.collaborators.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Collaborating Chefs ({selectedOrderDetails.collaborators.length})
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedOrderDetails.collaborators.map((collab, index) => (
+                        <Badge key={index} variant="secondary" className="px-3 py-1">
+                          {collab.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                {selectedOrderDetails.status === 'pending' && (
+                  <div className="flex items-center gap-3 pt-4 border-t">
+                    <Button 
+                      onClick={() => {
+                        handleAcceptOrder(selectedOrderDetails.id);
+                        setIsDetailDialogOpen(false);
+                      }}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      size="lg"
+                    >
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      Accept Order
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedOrder(selectedOrderDetails.id);
+                        setIsDetailDialogOpen(false);
+                        handleCollaborate(selectedOrderDetails.id);
+                      }}
+                      className="flex-1 border-purple-200 text-purple-600 hover:bg-purple-50"
+                      size="lg"
+                    >
+                      <Users className="h-5 w-5 mr-2" />
+                      Request Collaboration
+                    </Button>
+                    <Button 
+                      variant="destructive"
+                      onClick={() => {
+                        handleDeclineOrder(selectedOrderDetails.id);
+                        setIsDetailDialogOpen(false);
+                      }}
+                      size="lg"
+                    >
+                      <XCircle className="h-5 w-5 mr-2" />
+                      Decline
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Collaboration Dialog */}
       <Dialog open={isCollaborateDialogOpen} onOpenChange={setIsCollaborateDialogOpen}>
