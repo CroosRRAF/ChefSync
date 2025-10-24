@@ -462,6 +462,7 @@ class BulkOrder(models.Model):
         ("collaborating", "Collaborating"),
         ("preparing", "Preparing"),
         ("completed", "Completed"),
+        ("ready_for_delivery", "Ready for Delivery"),
         ("cancelled", "Cancelled"),
     ]
 
@@ -619,6 +620,11 @@ class BulkOrderAssignment(models.Model):
         related_name="bulk_order_assignments",
     )
     assigned_at = models.DateTimeField(auto_now_add=True)
+    # Historical DBs sometimes have a `created_at` column on this table.
+    # Add a created_at field to match existing schema and prevent DB errors
+    # when inserting rows if the DB expects this column.
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
@@ -627,6 +633,50 @@ class BulkOrderAssignment(models.Model):
     class Meta:
         db_table = "BulkOrderAssignment"
         ordering = ["-assigned_at"]
+
+
+class CollaborationRequest(models.Model):
+    """Collaboration request for bulk orders between chefs
+
+    This model stores a request from one chef (or cook) to another to collaborate
+    on a BulkOrder. It tracks status and an optional response reason.
+    """
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("accepted", "Accepted"),
+        ("rejected", "Rejected"),
+    ]
+
+    request_id = models.AutoField(primary_key=True)
+    bulk_order = models.ForeignKey(
+        BulkOrder, on_delete=models.CASCADE, related_name="collaboration_requests"
+    )
+    from_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sent_collaboration_requests",
+        help_text="User who sent the collaboration request",
+    )
+    to_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="received_collaboration_requests",
+        help_text="User who is invited to collaborate",
+    )
+    message = models.TextField(blank=True, null=True)
+    work_distribution = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    response_reason = models.TextField(blank=True, null=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"CollabRequest {self.request_id} - {self.bulk_order.order_number} -> {self.to_user.username} ({self.status})"
+
+    class Meta:
+        db_table = "CollaborationRequest"
+        ordering = ["-created_at"]
 
 
 # ==========================================

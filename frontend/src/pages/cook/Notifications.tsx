@@ -72,7 +72,14 @@ export default function Notifications() {
     ) {
       type = 'menu';
       notificationType = 'menu';
-    } else if (subject.includes('profile') || message.includes('profile')) {
+    } else if (
+      subject.includes('profile updated') ||
+      subject.includes('profile update') ||
+      message.includes('profile updated') ||
+      message.includes('profile update') ||
+      subject.startsWith('profile:')
+    ) {
+      // Only treat as a profile notification when it explicitly mentions a profile update/change
       type = 'profile';
       notificationType = 'profile';
     } else if (subject.includes('error') || subject.includes('failed') || subject.includes('🗑️') || subject.includes('deleted') || subject.includes('removed')) {
@@ -233,17 +240,22 @@ export default function Notifications() {
 
   const handleDeleteNotification = async (notificationId: string) => {
     try {
-      // Try to delete from backend first
-      try {
-        await notificationService.markAsRead(parseInt(notificationId));
+      // Try to delete from backend first (preferred)
+      const deleted = await notificationService.deleteNotification(parseInt(notificationId));
+      if (deleted) {
         toast.success('Notification removed');
-      } catch (error) {
-        // If backend fails, still remove from local state
-        console.warn('Failed to delete notification from backend:', error);
+      } else {
+        // Fallback: if server delete failed, try marking it read to reduce noise
+        const marked = await notificationService.markAsRead(parseInt(notificationId));
+        if (marked) {
+          toast('Notification marked as read', { icon: 'ℹ️' });
+        } else {
+          toast.error('Failed to remove notification');
+        }
       }
-      
-      // Remove from local state
-      setNotifications(notifications.filter(notification => notification.id !== notificationId));
+
+      // Remove from local state regardless so UI updates immediately
+      setNotifications(prev => prev.filter(notification => notification.id !== notificationId));
     } catch (error) {
       console.error('Error deleting notification:', error);
       toast.error('Failed to remove notification');

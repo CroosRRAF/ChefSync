@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 from .bulk_views import BulkOrderManagementViewSet
+from .bulk_views import CollaborationRequestViewSet
 from .customer_bulk_views import CustomerBulkOrderViewSet
 from .customer_views import (
     customer_dashboard_stats,
@@ -23,6 +24,7 @@ router.register(
 
 # Bulk order management (for cooks/admins)
 router.register(r"bulk", BulkOrderManagementViewSet, basename="bulk-orders")
+router.register(r"collaboration-requests", CollaborationRequestViewSet, basename="collaboration-requests")
 
 # Customer bulk orders (for customers to place bulk orders)
 router.register(

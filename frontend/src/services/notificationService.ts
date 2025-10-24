@@ -124,6 +124,20 @@ class NotificationService {
   }
 
   /**
+   * Delete a single notification by id
+   */
+  async deleteNotification(notificationId: number): Promise<boolean> {
+    try {
+      // The backend exposes the ModelViewSet destroy action at the detail endpoint
+      await apiClient.delete(`/communications/notifications/${notificationId}/`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      return false;
+    }
+  }
+
+  /**
    * Parse notification to extract order information
    */
   parseNotification(notification: Notification): Notification {

@@ -9,7 +9,6 @@ export interface ChefDashboardStats {
   completed_orders: number;
   average_rating: number;
   recent_orders: any[];
-  total_orders: number;
 }
 
 export const useOrderService = () => {
@@ -167,6 +166,15 @@ export const useOrderService = () => {
     declineBulkOrder: orderService.declineBulkOrder.bind(orderService),
     requestCollaboration: orderService.requestCollaboration.bind(orderService),
     loadAvailableChefs: orderService.loadAvailableChefs.bind(orderService),
+  // Collaboration requests
+  loadIncomingCollaborationRequests: orderService.loadIncomingCollaborationRequests.bind(orderService),
+  acceptCollaborationRequest: orderService.acceptCollaborationRequest.bind(orderService),
+  rejectCollaborationRequest: orderService.rejectCollaborationRequest.bind(orderService),
+  deleteCollaborationRequest: orderService.deleteCollaborationRequest.bind(orderService),
+  loadOutgoingCollaborationRequests: orderService.loadOutgoingCollaborationRequests.bind(orderService),
+  // Bulk order workflow
+  updateBulkOrderStatus: orderService.updateBulkOrderStatus.bind(orderService),
+  assignDeliveryToBulkOrder: orderService.assignDeliveryToBulkOrder.bind(orderService),
     // Direct service methods - bind to preserve 'this' context
     calculateDeliveryFee: orderService.calculateDeliveryFee.bind(orderService),
     calculateTax: orderService.calculateTax.bind(orderService),

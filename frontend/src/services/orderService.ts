@@ -125,6 +125,8 @@ export interface ChefCollaborator {
   profile_image?: string;
   rating: number;
   specialties: string[];
+  active_assignments?: number;
+  availability_status?: string;
 }
 
 class OrderService {
@@ -472,6 +474,26 @@ class OrderService {
     }
   }
 
+  async updateBulkOrderStatus(orderId: number, status: string): Promise<any> {
+    try {
+      const response = await apiClient.patch(`${this.baseUrl}/bulk/${orderId}/update_status/`, { status });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error updating bulk order status:', error);
+      throw new Error(error.response?.data?.error || 'Failed to update bulk order status');
+    }
+  }
+
+  async assignDeliveryToBulkOrder(orderId: number): Promise<any> {
+    try {
+      const response = await apiClient.post(`${this.baseUrl}/bulk/${orderId}/assign_delivery/`, {});
+      return response.data;
+    } catch (error: any) {
+      console.error('Error assigning delivery to bulk order:', error);
+      throw new Error(error.response?.data?.error || 'Failed to assign delivery');
+    }
+  }
+
   /**
    * Decline a bulk order
    */
@@ -506,6 +528,68 @@ class OrderService {
     } catch (error: any) {
       console.error('Error loading available chefs:', error);
       throw new Error(`Failed to load available chefs: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Load incoming collaboration requests for the authenticated chef
+   */
+  async loadIncomingCollaborationRequests(): Promise<any[]> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/collaboration-requests/?incoming=1`);
+      // Handle both paginated and non-paginated
+      if (Array.isArray(response.data)) return response.data;
+      if (Array.isArray(response.data.results)) return response.data.results;
+      return response.data || [];
+    } catch (error: any) {
+      console.error('Error loading collaboration requests:', error);
+      throw new Error(`Failed to load collaboration requests: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  async loadOutgoingCollaborationRequests(): Promise<any[]> {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/collaboration-requests/?outgoing=1`);
+      if (Array.isArray(response.data)) return response.data;
+      if (Array.isArray(response.data.results)) return response.data.results;
+      return response.data || [];
+    } catch (error: any) {
+      console.error('Error loading outgoing collaboration requests:', error);
+      throw new Error(`Failed to load outgoing collaboration requests: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  async acceptCollaborationRequest(requestId: number, response_reason?: string): Promise<any> {
+    try {
+      const response = await apiClient.post(`${this.baseUrl}/collaboration-requests/${requestId}/accept/`, {
+        response_reason: response_reason || ''
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error accepting collaboration request:', error);
+      throw new Error(error.response?.data?.error || 'Failed to accept collaboration request');
+    }
+  }
+
+  async rejectCollaborationRequest(requestId: number, reason?: string): Promise<any> {
+    try {
+      const response = await apiClient.post(`${this.baseUrl}/collaboration-requests/${requestId}/reject/`, {
+        reason: reason || ''
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error rejecting collaboration request:', error);
+      throw new Error(error.response?.data?.error || 'Failed to reject collaboration request');
+    }
+  }
+
+  async deleteCollaborationRequest(requestId: number): Promise<any> {
+    try {
+      const response = await apiClient.delete(`${this.baseUrl}/collaboration-requests/${requestId}/`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error deleting collaboration request:', error);
+      throw new Error(error.response?.data?.error || 'Failed to delete collaboration request');
     }
   }
 

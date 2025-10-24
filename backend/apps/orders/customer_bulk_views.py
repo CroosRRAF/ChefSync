@@ -80,12 +80,15 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
                 # Create a BulkOrder only (do not create a regular Order for bulk orders).
                 # Bulk orders live primarily in the BulkOrder table. Keep the 'order' FK null
                 # unless downstream systems explicitly need an Order instance.
-                # IMPORTANT: chef field is NOT assigned - it will be assigned later when a chef accepts the order
+                # Assign the chef from the selected bulk menu so the order goes to that chef only.
+                # Previously this was left as `chef=None` which made pending bulk orders visible
+                # to all cooks. Setting the chef ensures only the intended chef (and collaborators)
+                # can see the new bulk order.
                 bulk_order = BulkOrder.objects.create(
                     # Relationships
                     order=None,  # No regular order for bulk orders
                     created_by=request.user,
-                    chef=None,  # IMPORTANT: No chef assigned yet - will be assigned when accepted
+                    chef=bulk_menu.chef,
                     delivery_partner=None,
                     
                     # Status

@@ -36,6 +36,7 @@ import {
   Calendar,
   RefreshCw,
   AlertCircle,
+  Trash2,
   Utensils
 } from "lucide-react";
 
@@ -95,7 +96,16 @@ export default function BulkOrders() {
     acceptBulkOrder,
     declineBulkOrder,
     requestCollaboration,
-    loadAvailableChefs
+    loadAvailableChefs,
+    // Collaboration request helpers
+    loadIncomingCollaborationRequests,
+    acceptCollaborationRequest,
+    rejectCollaborationRequest,
+    deleteCollaborationRequest,
+    loadOutgoingCollaborationRequests,
+    // Bulk workflow
+    updateBulkOrderStatus,
+    assignDeliveryToBulkOrder,
   } = useOrderService();
 
   // State management
@@ -120,11 +130,21 @@ export default function BulkOrders() {
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<BulkOrder | null>(null);
   const [availableChefs, setAvailableChefs] = useState<ChefCollaborator[]>([]);
   const [loadingChefs, setLoadingChefs] = useState(false);
+  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+  const [isIncomingDialogOpen, setIsIncomingDialogOpen] = useState(false);
+  const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
+  const [isOutgoingDialogOpen, setIsOutgoingDialogOpen] = useState(false);
   const [collaborationRequest, setCollaborationRequest] = useState<{
     chef_id: number;
     message: string;
     work_distribution: string;
   }>({ chef_id: 0, message: '', work_distribution: '' });
+  const [collaborationError, setCollaborationError] = useState<string | null>(null);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectTargetRequest, setRejectTargetRequest] = useState<any | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTargetRequest, setDeleteTargetRequest] = useState<any | null>(null);
   
   // Notification state
   const [notification, setNotification] = useState<NotificationState>({
@@ -174,9 +194,41 @@ export default function BulkOrders() {
     }
   };
 
+  const fetchIncomingRequests = async () => {
+    try {
+      const reqs = await loadIncomingCollaborationRequests();
+      setIncomingRequests(Array.isArray(reqs) ? reqs : []);
+    } catch (error) {
+      console.error('Error fetching incoming collaboration requests:', error);
+      showNotification('Failed to load incoming collaboration requests', 'error');
+      setIncomingRequests([]);
+    }
+  };
+
+  const fetchOutgoingRequests = async () => {
+    try {
+      const reqs = await loadOutgoingCollaborationRequests();
+      setOutgoingRequests(Array.isArray(reqs) ? reqs : []);
+    } catch (error) {
+      console.error('Error fetching outgoing collaboration requests:', error);
+      setOutgoingRequests([]);
+    }
+  };
+
   // Load data on component mount and when filters change
   useEffect(() => {
     fetchBulkOrders();
+    // Also load incoming collaboration requests for this chef
+    fetchIncomingRequests();
+    // Also load outgoing requests
+    (async () => {
+      try {
+        const out = await loadOutgoingCollaborationRequests();
+        setOutgoingRequests(Array.isArray(out) ? out : []);
+      } catch (err) {
+        console.error('Failed to load outgoing requests', err);
+      }
+    })();
   }, [statusFilter]); // Re-fetch when status filter changes
 
   // Search with debouncing
@@ -225,6 +277,7 @@ export default function BulkOrders() {
   const handleCollaborate = async (orderId: number) => {
     setSelectedOrder(orderId);
     setIsCollaborateDialogOpen(true);
+    setCollaborationError(null);
     
     // Load available chefs when dialog opens
     setLoadingChefs(true);
@@ -244,6 +297,7 @@ export default function BulkOrders() {
     event.preventDefault();
     if (selectedOrder && collaborationRequest.chef_id && collaborationRequest.message) {
       try {
+        setCollaborationError(null);
         await requestCollaboration(selectedOrder, collaborationRequest);
         showNotification('Collaboration request sent successfully', 'success');
         setIsCollaborateDialogOpen(false);
@@ -252,13 +306,16 @@ export default function BulkOrders() {
         setAvailableChefs([]);
         // Refresh data
         fetchBulkOrders();
-      } catch (error) {
-        console.error('Error requesting collaboration:', error);
-        showNotification('Failed to send collaboration request', 'error');
+      } catch (err: any) {
+        console.error('Error requesting collaboration:', err);
+
+        // Prefer backend-provided error message when available
+        const backendMessage = err?.response?.data?.error || err?.message || 'Failed to create collaboration request';
+        setCollaborationError(backendMessage);
+        showNotification(backendMessage, 'error');
       }
     }
   };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
@@ -273,12 +330,12 @@ export default function BulkOrders() {
         return <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800">Preparing</Badge>;
       case "completed":
         return <Badge className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800">Completed</Badge>;
+      case "ready_for_delivery":
+        return <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800">Ready for Delivery</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
-
-  // Calculate counts from API stats (with fallback to client-side calculation)
   const pendingCount = stats.pending || filteredOrders.filter(order => order.status === "pending").length;
   const acceptedCount = stats.accepted || filteredOrders.filter(order => order.status === "accepted").length;
   const collaboratingCount = stats.collaborating || filteredOrders.filter(order => order.status === "collaborating").length;
@@ -325,6 +382,15 @@ export default function BulkOrders() {
               <div className="text-2xl font-bold text-purple-600">{collaboratingCount}</div>
               <div className="text-sm text-muted-foreground">Collaborating</div>
             </div>
+            <div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsIncomingDialogOpen(true)}
+              >
+                Incoming Requests ({incomingRequests.length})
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -347,6 +413,7 @@ export default function BulkOrders() {
                   <SelectItem value="confirmed">Confirmed</SelectItem>
                   <SelectItem value="collaborating">Collaborating</SelectItem>
                   <SelectItem value="preparing">Preparing</SelectItem>
+                  <SelectItem value="ready_for_delivery">Ready for Delivery</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
@@ -472,7 +539,7 @@ export default function BulkOrders() {
                         <TableCell>
                           <div className="font-semibold text-green-600">
                             <span className="text-xs text-muted-foreground mr-1">LKR</span>
-                            {parseFloat(order.total_amount || '0').toLocaleString('en-US', {
+                            {Number(order.total_amount || 0).toLocaleString('en-US', {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2
                             })}
@@ -561,7 +628,7 @@ export default function BulkOrders() {
                     <div className="text-sm text-muted-foreground">Total Amount</div>
                     <div className="font-bold text-green-600 text-xl">
                       <span className="text-sm text-muted-foreground mr-1.5">LKR</span>
-                      {parseFloat(selectedOrderDetails.total_amount || '0').toLocaleString('en-US', {
+                      {Number(selectedOrderDetails.total_amount || 0).toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       })}
@@ -620,45 +687,120 @@ export default function BulkOrders() {
                 )}
 
                 {/* Action Buttons */}
-                {selectedOrderDetails.status === 'pending' && (
-                  <div className="flex items-center gap-3 pt-4 border-t">
-                    <Button 
-                      onClick={() => {
-                        handleAcceptOrder(selectedOrderDetails.id);
-                        setIsDetailDialogOpen(false);
-                      }}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                      size="lg"
-                    >
-                      <CheckCircle className="h-5 w-5 mr-2" />
-                      Accept Order
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedOrder(selectedOrderDetails.id);
-                        setIsDetailDialogOpen(false);
-                        handleCollaborate(selectedOrderDetails.id);
-                      }}
-                      className="flex-1 border-purple-200 text-purple-600 hover:bg-purple-50"
-                      size="lg"
-                    >
-                      <Users className="h-5 w-5 mr-2" />
-                      Request Collaboration
-                    </Button>
-                    <Button 
-                      variant="destructive"
-                      onClick={() => {
-                        handleDeclineOrder(selectedOrderDetails.id);
-                        setIsDetailDialogOpen(false);
-                      }}
-                      size="lg"
-                    >
-                      <XCircle className="h-5 w-5 mr-2" />
-                      Decline
-                    </Button>
-                  </div>
-                )}
+                <div className="flex items-center gap-3 pt-4 border-t">
+                  {selectedOrderDetails.status === 'pending' && (
+                    <>
+                      <Button 
+                        onClick={() => {
+                          handleAcceptOrder(selectedOrderDetails.id);
+                          setIsDetailDialogOpen(false);
+                        }}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                        size="lg"
+                      >
+                        <CheckCircle className="h-5 w-5 mr-2" />
+                        Accept Order
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedOrder(selectedOrderDetails.id);
+                          setIsDetailDialogOpen(false);
+                          handleCollaborate(selectedOrderDetails.id);
+                        }}
+                        className="flex-1 border-purple-200 text-purple-600 hover:bg-purple-50"
+                        size="lg"
+                      >
+                        <Users className="h-5 w-5 mr-2" />
+                        Request Collaboration
+                      </Button>
+                      <Button 
+                        variant="destructive"
+                        onClick={() => {
+                          handleDeclineOrder(selectedOrderDetails.id);
+                          setIsDetailDialogOpen(false);
+                        }}
+                        size="lg"
+                      >
+                        <XCircle className="h-5 w-5 mr-2" />
+                        Decline
+                      </Button>
+                    </>
+                  )}
+
+                  {/* Bulk order kitchen workflow actions */}
+                  {(selectedOrderDetails && (selectedOrderDetails.status === 'confirmed' || selectedOrderDetails.status === 'collaborating')) && (
+                      <Button
+                        onClick={async () => {
+                          try {
+                            await updateBulkOrderStatus(selectedOrderDetails.id, 'preparing');
+                            showNotification('Bulk order marked as preparing', 'success');
+                            // Close the detail dialog automatically on success
+                            setIsDetailDialogOpen(false);
+                            // Refresh lists after closing
+                            fetchBulkOrders();
+                            fetchIncomingRequests();
+                          } catch (error: any) {
+                            console.error('Error starting preparation:', error);
+                            const msg = error?.message || error?.response?.data?.error || 'Failed to start preparing';
+                            showNotification(msg, 'error');
+                          }
+                        }}
+                        className="bg-amber-500 hover:bg-amber-600 text-white"
+                        size="lg"
+                      >
+                        Start Preparing
+                      </Button>
+                    )}
+
+                  {selectedOrderDetails.status === 'preparing' && (
+                    <>
+                      {(selectedOrderDetails as any).order_type === 'delivery' && (
+                        <Button
+                          onClick={async () => {
+                            try {
+                              await assignDeliveryToBulkOrder(selectedOrderDetails.id);
+                              showNotification('Delivery assigned / sent for delivery', 'success');
+                              // Close dialog on success
+                              setIsDetailDialogOpen(false);
+                              fetchBulkOrders();
+                              fetchIncomingRequests();
+                            } catch (error: any) {
+                              console.error('Error assigning delivery:', error);
+                              const msg = error?.message || error?.response?.data?.error || 'Failed to assign delivery';
+                              showNotification(msg, 'error');
+                            }
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          size="lg"
+                        >
+                          Send for Delivery
+                        </Button>
+                      )}
+                        <Button
+                        onClick={async () => {
+                          try {
+                            // Mark order as ready for delivery (chef completed kitchen work)
+                            await updateBulkOrderStatus(selectedOrderDetails.id, 'ready_for_delivery');
+                            showNotification('Bulk order marked as ready for delivery', 'success');
+                            // Close dialog on success
+                            setIsDetailDialogOpen(false);
+                            fetchBulkOrders();
+                            fetchIncomingRequests();
+                          } catch (error: any) {
+                            console.error('Error marking completed:', error);
+                            const msg = error?.message || error?.response?.data?.error || 'Failed to mark completed';
+                            showNotification(msg, 'error');
+                          }
+                        }}
+                        className="bg-green-700 hover:bg-green-800 text-white"
+                        size="lg"
+                      >
+                        Mark Completed
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             </>
           )}
@@ -680,6 +822,7 @@ export default function BulkOrders() {
                   Loading available chefs...
                 </div>
               ) : (
+                <>
                 <Select 
                   value={collaborationRequest.chef_id ? collaborationRequest.chef_id.toString() : ''} 
                   onValueChange={(value) => setCollaborationRequest(prev => ({ 
@@ -717,6 +860,13 @@ export default function BulkOrders() {
                     )}
                   </SelectContent>
                 </Select>
+                  {/* show form-level error returned from backend */}
+                  {collaborationError && (
+                    <div className="text-sm text-red-700 bg-red-50 border border-red-100 p-2 rounded mt-2">
+                      {collaborationError}
+                    </div>
+                  )}
+                </>
               )}
             </div>
             
@@ -756,6 +906,7 @@ export default function BulkOrders() {
                   setIsCollaborateDialogOpen(false);
                   setCollaborationRequest({ chef_id: 0, message: '', work_distribution: '' });
                   setAvailableChefs([]);
+                  setCollaborationError(null);
                 }}
               >
                 Cancel
@@ -768,6 +919,166 @@ export default function BulkOrders() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Incoming Collaboration Requests Dialog */}
+      <Dialog open={isIncomingDialogOpen} onOpenChange={setIsIncomingDialogOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Incoming Collaboration Requests</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {incomingRequests.length === 0 ? (
+              <div className="text-center text-muted-foreground py-6">No incoming collaboration requests</div>
+            ) : (
+              incomingRequests.map((req: any) => (
+                <div key={req.request_id} className="p-3 bg-muted/50 rounded-md flex items-start justify-between">
+                  <div>
+                    <div className="font-medium">{req.from_user?.name || 'Unknown'}</div>
+                    <div className="text-sm text-muted-foreground">Bulk: {req.bulk_order?.order_number || 'N/A'}</div>
+                    <div className="mt-2 text-sm">{req.message}</div>
+                    {req.work_distribution && (<div className="mt-1 text-xs text-muted-foreground italic">{req.work_distribution}</div>)}
+                    {req.status && (
+                      <div className="mt-2">
+                        <Badge variant={req.status === 'pending' ? 'secondary' : req.status === 'accepted' ? 'default' : 'destructive'}>
+                          {req.status?.toString().toUpperCase()}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="text-sm text-muted-foreground">{new Date(req.created_at).toLocaleString()}</div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={req.status && req.status !== 'pending'}
+                        onClick={async () => {
+                          try {
+                            await acceptCollaborationRequest(req.request_id);
+                            showNotification('Collaboration accepted', 'success');
+                            // refresh lists
+                            fetchIncomingRequests();
+                            fetchBulkOrders();
+                          } catch (error: any) {
+                            console.error('Error accepting collaboration request:', error);
+                            // Prefer backend message when available
+                            const msg = error?.message || error?.response?.data?.error || 'Failed to accept request';
+                            showNotification(msg, 'error');
+                          }
+                        }}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={req.status && req.status !== 'pending'}
+                        onClick={async () => {
+                          // Open reject modal instead of prompt
+                          setRejectTargetRequest(req);
+                          setRejectReason('');
+                          setRejectDialogOpen(true);
+                        }}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:bg-red-50 p-2"
+                        onClick={() => {
+                          setDeleteTargetRequest(req);
+                          setDeleteDialogOpen(true);
+                        }}
+                        aria-label="Delete collaboration request"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Reason Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Reject Collaboration Request</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">Provide a reason for rejecting this collaboration request (optional). The requester will see this.</div>
+            <Textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Type rejection reason (optional)..."
+              rows={4}
+            />
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => { setRejectDialogOpen(false); setRejectTargetRequest(null); setRejectReason(''); }}>Cancel</Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (!rejectTargetRequest) return;
+                  try {
+                    await rejectCollaborationRequest(rejectTargetRequest.request_id, rejectReason || '');
+                    showNotification('Collaboration request rejected', 'info');
+                    setRejectDialogOpen(false);
+                    setRejectTargetRequest(null);
+                    setRejectReason('');
+                    fetchIncomingRequests();
+                    fetchBulkOrders();
+                  } catch (error: any) {
+                    console.error('Error rejecting collaboration request:', error);
+                    const msg = error?.message || error?.response?.data?.error || 'Failed to reject request';
+                    showNotification(msg, 'error');
+                  }
+                }}
+              >
+                Send Rejection
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Delete Collaboration Request</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">Are you sure you want to permanently delete this collaboration request? This action cannot be undone.</div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setDeleteTargetRequest(null); }}>Cancel</Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (!deleteTargetRequest) return;
+                  try {
+                    await deleteCollaborationRequest(deleteTargetRequest.request_id);
+                    showNotification('Collaboration request deleted', 'info');
+                    setDeleteDialogOpen(false);
+                    setDeleteTargetRequest(null);
+                    fetchIncomingRequests();
+                    fetchOutgoingRequests();
+                    fetchBulkOrders();
+                  } catch (error: any) {
+                    console.error('Error deleting collaboration request:', error);
+                    const msg = error?.message || error?.response?.data?.error || 'Failed to delete request';
+                    showNotification(msg, 'error');
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

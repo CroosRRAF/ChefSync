@@ -5,10 +5,10 @@ from rest_framework.response import Response
 from django.db.models import Q, Count, Sum
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Order, OrderItem, OrderStatusHistory, BulkOrder, BulkOrderAssignment
+from .models import Order, OrderItem, OrderStatusHistory, BulkOrder, BulkOrderAssignment, CollaborationRequest
 from .serializers import (
     OrderDetailSerializer, OrderListSerializer, BulkOrderActionSerializer,
-    BulkOrderListSerializer, BulkOrderDetailSerializer
+    BulkOrderListSerializer, BulkOrderDetailSerializer, CollaborationRequestSerializer
 )
 from apps.users.models import ChefProfile
 
@@ -34,15 +34,14 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
         )
         
         # Filter by authenticated cook - show bulk orders where user is either:
-        # 1. Pending orders without chef assigned (available for any cook to accept)
-        # 2. The primary chef (chef field)
-        # 3. A collaborating chef (through BulkOrderAssignment)
+        # 1. The primary chef (chef field)
+        # 2. A collaborating chef (through BulkOrderAssignment)
+        # Note: we intentionally do NOT expose unassigned pending orders to all cooks.
         if user.is_authenticated:
             # Check if user has cook/chef role
             if hasattr(user, 'role') and user.role in ['cook', 'Cook']:
-                # Filter: pending orders with no chef OR user is the primary chef OR user is in assignments
+                # Filter: user is the primary chef OR user is in assignments
                 queryset = queryset.filter(
-                    Q(chef=None, status='pending') |  # Unassigned pending orders - any cook can accept
                     Q(chef=user) |  # Orders assigned to this chef
                     Q(assignments__chef=user)  # Orders where this chef is a collaborator
                 ).distinct()
@@ -138,9 +137,9 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
             # Filter by authenticated cook if not admin
             if user.is_authenticated and not (user.is_staff or user.is_superuser):
                 if hasattr(user, 'role') and user.role in ['cook', 'Cook']:
-                    # Filter: pending unassigned orders OR user is the primary chef OR user is in assignments
+                    # Filter: user is the primary chef OR user is in assignments
+                    # Do not include unassigned pending orders here so cooks only see their own orders
                     base_queryset = base_queryset.filter(
-                        Q(chef=None, status='pending') |  # Unassigned pending orders
                         Q(chef=user) |  # Orders assigned to this chef
                         Q(assignments__chef=user)  # Orders where this chef is a collaborator
                     ).distinct()
@@ -154,6 +153,7 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
             collaborating_count = base_queryset.filter(status='collaborating').count()
             preparing_count = base_queryset.filter(status='preparing').count()
             completed_count = base_queryset.filter(status='completed').count()
+            ready_for_delivery_count = base_queryset.filter(status='ready_for_delivery').count()
             cancelled_count = base_queryset.filter(status='cancelled').count()
             
             # Revenue calculations from related orders (only completed orders)
@@ -170,9 +170,10 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
                 'collaborating': collaborating_count,
                 'preparing': preparing_count,
                 'completed': completed_count,
+                'ready_for_delivery': ready_for_delivery_count,
                 'cancelled': cancelled_count,
                 'total_revenue': str(total_revenue),
-                'total_orders': pending_count + confirmed_count + collaborating_count + preparing_count + completed_count,
+                'total_orders': pending_count + confirmed_count + collaborating_count + preparing_count + completed_count + ready_for_delivery_count,
             }
             
         except Exception as e:
@@ -198,51 +199,61 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def collaborate(self, request, pk=None):
         """Request collaboration on a bulk order"""
-        bulk_order = self.get_object()
-        chef_id = request.data.get('chef_id')
-        message = request.data.get('message', '')
-        work_distribution = request.data.get('work_distribution', '')
-        
-        if not chef_id:
-            return Response(
-                {'error': 'chef_id is required'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Check if chef exists and is active
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
         try:
-            chef = User.objects.get(user_id=chef_id, is_active=True, role__in=['cook', 'Cook'])
-        except User.DoesNotExist:
-            return Response(
-                {'error': 'Chef not found or inactive'}, 
-                status=status.HTTP_404_NOT_FOUND
+            bulk_order = self.get_object()
+            chef_id = request.data.get('chef_id')
+            message = request.data.get('message', '')
+            work_distribution = request.data.get('work_distribution', '')
+
+            if not chef_id:
+                return Response(
+                    {'error': 'chef_id is required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if chef exists and is active
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                chef = User.objects.get(user_id=chef_id, is_active=True, role__in=['cook', 'Cook'])
+            except User.DoesNotExist:
+                return Response(
+                    {'error': 'Chef not found or inactive'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Check if chef is already assigned to this bulk order
+            if BulkOrderAssignment.objects.filter(bulk_order=bulk_order, chef=chef).exists():
+                return Response(
+                    {'error': 'Chef is already assigned to this bulk order'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create a CollaborationRequest record (pending)
+            collab = CollaborationRequest.objects.create(
+                bulk_order=bulk_order,
+                from_user=request.user,
+                to_user=chef,
+                message=message,
+                work_distribution=work_distribution,
+                status='pending'
             )
-        
-        # Check if chef is already assigned to this bulk order
-        if BulkOrderAssignment.objects.filter(bulk_order=bulk_order, chef=chef).exists():
+
+            # Respond with the serialized collaboration request
+            return Response({
+                'message': f'Collaboration request sent to {chef.name or chef.username}',
+                'collaboration_request': CollaborationRequestSerializer(collab).data
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f"Error creating collaboration request for bulk order {pk}: {str(e)}")
+            # Return the exception message in the JSON error for the frontend to display.
+            # Keep generic prefix but include the underlying message to aid the user.
             return Response(
-                {'error': 'Chef is already assigned to this bulk order'}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {'error': f'Failed to create collaboration request: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        
-        # Create the assignment
-        assignment = BulkOrderAssignment.objects.create(
-            bulk_order=bulk_order,
-            chef=chef
-        )
-        
-        # Update bulk order status to collaborating
-        if bulk_order.status == 'pending':
-            bulk_order.status = 'collaborating'
-            bulk_order.save()
-        
-        return Response({
-            'message': f'Collaboration request sent to {chef.name or chef.username}',
-            'assignment_id': assignment.id,
-            'bulk_order': BulkOrderDetailSerializer(bulk_order).data
-        })
     
     @action(detail=False, methods=['get'])
     def available_chefs(self, request):
@@ -302,7 +313,7 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            if bulk_order.status not in ['confirmed', 'preparing']:
+            if bulk_order.status not in ['confirmed', 'preparing', 'ready_for_delivery']:
                 return Response(
                     {'error': 'Bulk order is not ready for delivery assignment'},
                     status=status.HTTP_400_BAD_REQUEST
@@ -334,3 +345,133 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
                 {'error': 'Failed to assign delivery agent'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=True, methods=['patch'], url_path='update_status')
+    def update_status(self, request, pk=None):
+        """Update the status of a bulk order (kitchen workflow)"""
+        try:
+            bulk_order = self.get_object()
+            new_status = request.data.get('status')
+            if not new_status:
+                return Response({'error': 'status is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Validate allowed statuses
+            allowed = {choice[0] for choice in BulkOrder.STATUS_CHOICES}
+            if new_status not in allowed:
+                return Response({'error': f'Invalid status: {new_status}'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Basic transition checks: once an order is completed or marked ready for delivery
+            # we don't allow arbitrary status changes from the chef UI.
+            if bulk_order.status in ['completed', 'ready_for_delivery'] and new_status != bulk_order.status:
+                return Response({'error': 'Cannot change status of a completed or ready-for-delivery order'}, status=status.HTTP_400_BAD_REQUEST)
+
+            bulk_order.status = new_status
+            bulk_order.save()
+
+            return Response(BulkOrderDetailSerializer(bulk_order).data)
+        except BulkOrder.DoesNotExist:
+            return Response({'error': 'Bulk order not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f"Error updating bulk order status {pk}: {str(e)}")
+            return Response({'error': f'Failed to update bulk order status: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CollaborationRequestViewSet(viewsets.ModelViewSet):
+    """Viewset to manage collaboration requests between chefs"""
+    queryset = CollaborationRequest.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = CollaborationRequestSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        # Allow chefs to see requests sent to them (incoming) and requests they sent (outgoing)
+        incoming = self.request.query_params.get('incoming')
+        outgoing = self.request.query_params.get('outgoing')
+
+        qs = CollaborationRequest.objects.select_related('bulk_order', 'from_user', 'to_user')
+        if incoming and incoming.lower() in ['1', 'true', 'yes']:
+            return qs.filter(to_user=user).order_by('-created_at')
+        if outgoing and outgoing.lower() in ['1', 'true', 'yes']:
+            return qs.filter(from_user=user).order_by('-created_at')
+        # Default: return requests where user is to_user or from_user
+        return qs.filter(Q(to_user=user) | Q(from_user=user)).order_by('-created_at')
+
+    @action(detail=True, methods=['post'])
+    def accept(self, request, pk=None):
+        """Accept a collaboration request (create assignment)"""
+        try:
+            collab = self.get_object()
+            user = request.user
+            if collab.to_user != user:
+                return Response({'error': 'Only the invited chef can accept this request'}, status=status.HTTP_403_FORBIDDEN)
+
+            # If already accepted/rejected
+            if collab.status != 'pending':
+                return Response({'error': 'This request has already been responded to'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Defensive checks: ensure the related bulk order still exists
+            if not collab.bulk_order:
+                return Response({'error': 'Related bulk order no longer exists'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Use an atomic transaction to avoid partial state on errors
+            from django.db import transaction
+            with transaction.atomic():
+                # If already assigned, mark request accepted and return
+                if BulkOrderAssignment.objects.filter(bulk_order=collab.bulk_order, chef=collab.to_user).exists():
+                    collab.status = 'accepted'
+                    collab.responded_at = timezone.now()
+                    collab.response_reason = request.data.get('response_reason', '')
+                    collab.save()
+                    return Response({'message': 'Chef already assigned', 'collaboration_request': CollaborationRequestSerializer(collab).data})
+
+                # Create assignment
+                assignment = BulkOrderAssignment.objects.create(
+                    bulk_order=collab.bulk_order,
+                    chef=collab.to_user
+                )
+
+                # Update request state
+                collab.status = 'accepted'
+                collab.responded_at = timezone.now()
+                collab.response_reason = request.data.get('response_reason', '')
+                collab.save()
+
+            # Update bulk order status
+            if collab.bulk_order.status == 'pending':
+                collab.bulk_order.status = 'collaborating'
+                collab.bulk_order.save()
+
+            return Response({'message': 'Collaboration accepted', 'collaboration_request': CollaborationRequestSerializer(collab).data})
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f"Error accepting collaboration request {pk}: {str(e)}")
+            # Include underlying exception message to help frontend debugging (kept generic prefix)
+            return Response({'error': f'Failed to accept request: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a collaboration request and provide a reason"""
+        try:
+            collab = self.get_object()
+            user = request.user
+            if collab.to_user != user:
+                return Response({'error': 'Only the invited chef can reject this request'}, status=status.HTTP_403_FORBIDDEN)
+
+            if collab.status != 'pending':
+                return Response({'error': 'This request has already been responded to'}, status=status.HTTP_400_BAD_REQUEST)
+
+            reason = request.data.get('reason', '')
+            collab.status = 'rejected'
+            collab.response_reason = reason
+            collab.responded_at = timezone.now()
+            collab.save()
+
+            return Response({'message': 'Collaboration request rejected', 'collaboration_request': CollaborationRequestSerializer(collab).data})
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error rejecting collaboration request {pk}: {str(e)}")
+            return Response({'error': 'Failed to reject request'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

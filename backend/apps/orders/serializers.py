@@ -611,13 +611,16 @@ class OrderItemSerializer(OrderItemDetailSerializer):
 
 class BulkOrderAssignmentSerializer(serializers.ModelSerializer):
     """Serializer for bulk order assignments"""
-
+    # Provide an `id` field for compatibility with frontend code that expects `id`.
+    # The DB model uses `assignment_id` as the primary key, so map `id` -> `assignment_id`.
+    id = serializers.IntegerField(source="assignment_id", read_only=True)
     chef_name = serializers.SerializerMethodField()
     chef_username = serializers.CharField(source="chef.username", read_only=True)
     chef_email = serializers.CharField(source="chef.email", read_only=True)
 
     class Meta:
         model = BulkOrderAssignment
+        # Expose `id` (maps to assignment_id) for frontend; include chef relation and helpers
         fields = ["id", "chef", "chef_name", "chef_username", "chef_email"]
 
     def get_chef_name(self, obj):
@@ -1258,6 +1261,51 @@ class DeliveryReviewSerializer(serializers.ModelSerializer):
                 ),
             }
         return None
+
+class CollaborationRequestSerializer(serializers.ModelSerializer):
+    """Serializer for collaboration requests between chefs"""
+
+    from_user = serializers.SerializerMethodField()
+    to_user = serializers.SerializerMethodField()
+    bulk_order = serializers.SerializerMethodField()
+
+    class Meta:
+        model = None  # set dynamically to avoid import ordering issues
+        fields = [
+            "request_id",
+            "bulk_order",
+            "from_user",
+            "to_user",
+            "message",
+            "work_distribution",
+            "status",
+            "response_reason",
+            "created_at",
+            "responded_at",
+        ]
+
+    def get_from_user(self, obj):
+        if obj.from_user:
+            return {"id": obj.from_user.id, "name": obj.from_user.name or obj.from_user.username}
+        return None
+
+    def get_to_user(self, obj):
+        if obj.to_user:
+            return {"id": obj.to_user.id, "name": obj.to_user.name or obj.to_user.username}
+        return None
+
+    def get_bulk_order(self, obj):
+        if obj.bulk_order:
+            return {
+                "id": getattr(obj.bulk_order, 'bulk_order_id', None),
+                "order_number": getattr(obj.bulk_order, 'order_number', None),
+            }
+        return None
+
+
+# Late-bind the model to avoid circular imports when module is imported
+from .models import CollaborationRequest as _CollabModel
+CollaborationRequestSerializer.Meta.model = _CollabModel
 
 
 class FoodReviewSerializer(serializers.ModelSerializer):
