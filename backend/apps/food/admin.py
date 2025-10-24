@@ -137,7 +137,7 @@ class BulkMenuAdmin(admin.ModelAdmin):
 @admin.register(BulkMenuItem)
 class BulkMenuItemAdmin(admin.ModelAdmin):
     list_display = ['item_name', 'bulk_menu', 'is_optional', 'extra_cost', 'sort_order', 'is_vegetarian', 'spice_level']
-    list_filter = ['is_optional', 'is_vegetarian', 'is_vegan', 'is_gluten_free', 'spice_level']
+    list_filter = ['is_optional', 'is_vegetarian', 'spice_level']
     search_fields = ['item_name', 'bulk_menu__menu_name', 'description']
     list_editable = ['is_optional', 'extra_cost', 'sort_order']
     ordering = ['bulk_menu', 'sort_order', 'item_name']

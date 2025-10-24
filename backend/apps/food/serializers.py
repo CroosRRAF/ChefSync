@@ -745,8 +745,6 @@ class BulkMenuItemSerializer(serializers.ModelSerializer):
             "extra_cost",
             "sort_order",
             "is_vegetarian",
-            "is_vegan",
-            "is_gluten_free",
             "spice_level",
             "allergens",
             "created_at",

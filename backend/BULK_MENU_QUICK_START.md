@@ -170,7 +170,7 @@ python manage.py shell -c "from apps.food.ai_service import ai_service; print(ai
 - description (text)
 - is_optional (boolean)
 - extra_cost (decimal)
-- is_vegetarian / is_vegan / is_gluten_free (boolean)
+- is_vegetarian (boolean)
 - spice_level (mild/medium/hot/very_hot)
 - allergens (JSON)
 - sort_order (int)

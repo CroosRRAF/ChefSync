@@ -12,7 +12,7 @@
  * Using real API calls to Django backend
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOrderService } from '@/hooks/useOrderService';
 import { ChefDashboardStats } from '@/hooks/useOrderService';
 import type { Order } from '@/types/orderType';
@@ -20,7 +20,7 @@ import {
   Search, Filter, RefreshCw, MoreVertical, Eye, Edit, Trash2, 
   Users, Clock, CheckCircle, AlertCircle, Package, TrendingUp,
   Calendar, DollarSign, User, MapPin, Phone, Mail, Bell,
-  Check, X, MessageSquare
+  Check, X, MessageSquare, Timer, Play, Pause, Square
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -33,11 +33,107 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
+
+
 interface NotificationState {
   show: boolean;
   message: string;
   type: 'success' | 'error' | 'info';
 }
+
+interface OrderTimer {
+  orderId: number;
+  totalTime: number; // in seconds
+  remainingTime: number; // in seconds
+  isActive: boolean;
+  isCompleted: boolean;
+  startTime: Date | null;
+}
+
+interface TimerDisplayProps {
+  timer: OrderTimer;
+  onStart: () => void;
+  onPause: () => void;
+  onReset: () => void;
+}
+
+// Timer Display Component
+const TimerDisplay: React.FC<TimerDisplayProps> = ({ timer, onStart, onPause, onReset }) => {
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getTimerColor = () => {
+    const percentage = (timer.remainingTime / timer.totalTime) * 100;
+    if (percentage <= 10) return 'text-red-600 bg-red-50 border-red-200';
+    if (percentage <= 25) return 'text-orange-600 bg-orange-50 border-orange-200';
+    return 'text-green-600 bg-green-50 border-green-200';
+  };
+
+  const getProgressPercentage = () => {
+    return ((timer.totalTime - timer.remainingTime) / timer.totalTime) * 100;
+  };
+
+  return (
+    <div className={`border rounded-lg p-4 ${getTimerColor()}`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Timer className="h-5 w-5" />
+          <span className="font-semibold">Preparation Timer</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {!timer.isActive && !timer.isCompleted && (
+            <Button size="sm" onClick={onStart} className="h-8">
+              <Play className="h-3 w-3 mr-1" />
+              Start
+            </Button>
+          )}
+          {timer.isActive && (
+            <Button size="sm" variant="outline" onClick={onPause} className="h-8">
+              <Pause className="h-3 w-3 mr-1" />
+              Pause
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={onReset} className="h-8">
+            <Square className="h-3 w-3 mr-1" />
+            Reset
+          </Button>
+        </div>
+      </div>
+      
+      <div className="text-center mb-3">
+        <div className="text-3xl font-mono font-bold mb-1">
+          {formatTime(timer.remainingTime)}
+        </div>
+        <div className="text-sm opacity-75">
+          Total: {formatTime(timer.totalTime)}
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+        <div 
+          className="bg-current h-2 rounded-full transition-all duration-1000"
+          style={{ width: `${getProgressPercentage()}%` }}
+        />
+      </div>
+
+      {timer.isCompleted && (
+        <div className="text-center text-green-700 font-semibold">
+          🎉 Timer Complete! Ready to serve!
+        </div>
+      )}
+      
+      {timer.remainingTime <= 60 && timer.remainingTime > 0 && timer.isActive && (
+        <div className="text-center text-red-700 font-semibold animate-pulse">
+          ⚠️ Less than 1 minute remaining!
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Custom Notification Component
 const Notification: React.FC<NotificationState & { onClose: () => void }> = ({
@@ -75,6 +171,10 @@ const Notification: React.FC<NotificationState & { onClose: () => void }> = ({
   );
 };
 
+const RsIcon = () => (
+  <span className="font-semibold text-lg">Rs.</span>
+);
+
 // Status Badge Component
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const getStatusColor = (status: string) => {
@@ -84,16 +184,23 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       case 'preparing': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-700';
       case 'ready': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700';
       case 'out_for_delivery': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700';
-      case 'delivered': return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700';
+      case 'delivered': return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700'; // For display only - chefs can't set this status
       case 'cancelled': return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700';
       case 'rejected': return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700';
       default: return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600';
     }
   };
 
+  const getDisplayText = (status: string) => {
+    if (status === 'out_for_delivery') {
+      return 'OUT FOR DELIVERY ✅';
+    }
+    return status.replace('_', ' ').toUpperCase();
+  };
+
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(status)}`}>
-      {status.replace('_', ' ').toUpperCase()}
+      {getDisplayText(status)}
     </span>
   );
 };
@@ -398,9 +505,9 @@ const DashboardStats: React.FC<{ stats: ChefDashboardStats | null }> = ({ stats 
       color: 'text-yellow-600'
     },
     {
-      title: 'Total Revenue',
-      value: `LKR ${(stats.total_revenue || 0).toFixed(2)}`,
-      icon: DollarSign,
+      title: 'Today Revenue',
+      value: `LKR ${(stats.today_revenue || 0).toFixed(2)}`,
+      icon: RsIcon,
       color: 'text-green-600'
     }
   ];
@@ -433,7 +540,11 @@ const OrderDetailModal: React.FC<{
   onAccept: (orderId: number) => void;
   onReject: (order: Order) => void;
   onUpdateStatus: (orderId: number, status: string) => void;
-}> = ({ isOpen, onClose, order, onAccept, onReject, onUpdateStatus }) => {
+  timer?: OrderTimer;
+  onTimerStart: (orderId: number) => void;
+  onTimerPause: (orderId: number) => void;
+  onTimerReset: (orderId: number) => void;
+}> = ({ isOpen, onClose, order, onAccept, onReject, onUpdateStatus, timer, onTimerStart, onTimerPause, onTimerReset }) => {
   
   if (!order) return null;
 
@@ -442,8 +553,8 @@ const OrderDetailModal: React.FC<{
       'pending': 'confirmed',
       'confirmed': 'preparing', 
       'preparing': 'ready',
-      'ready': 'out_for_delivery',
-      'out_for_delivery': 'delivered'
+      'ready': 'out_for_delivery'
+      // Chefs cannot mark orders as delivered - that's handled by delivery system
     };
     return statusFlow[currentStatus as keyof typeof statusFlow];
   };
@@ -453,8 +564,8 @@ const OrderDetailModal: React.FC<{
       'pending': 'Accept Order',
       'confirmed': 'Start Preparing',
       'preparing': 'Mark as Ready',
-      'ready': 'Send for Delivery',
-      'out_for_delivery': 'Mark as Delivered'
+      'ready': 'Send for Delivery'
+      // No action for 'out_for_delivery' - chef's job is done
     };
     return actions[status as keyof typeof actions];
   };
@@ -516,8 +627,8 @@ const OrderDetailModal: React.FC<{
                   </div>
                   <div className="text-right ml-4">
                     <p className="font-medium">Qty: {item.quantity}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">${item.price_details?.price || item.price || '0.00'}</p>
-                    <p className="font-bold">${item.item_total}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Rs.{item.unit_price || '0.00'}</p>
+                    <p className="font-bold">Rs.{item.total_price}</p>
                   </div>
                 </div>
               ))}
@@ -527,8 +638,8 @@ const OrderDetailModal: React.FC<{
           {/* Order Summary */}
           <div className="border rounded-lg p-4">
             <h3 className="font-semibold mb-3 flex items-center">
-              <DollarSign className="w-4 h-4 mr-2" />
-              Order Summary
+            <RsIcon />           
+             Order Summary
             </h3>
             <div className="space-y-2">
               <div className="flex justify-between">
@@ -548,7 +659,7 @@ const OrderDetailModal: React.FC<{
               <div className="border-t pt-2">
                 <div className="flex justify-between font-bold text-lg">
                   <span>Total Amount</span>
-                  <span>${order.total_amount}</span>
+                  <span>Rs.{order.total_amount}</span>
                 </div>
               </div>
             </div>
@@ -565,6 +676,16 @@ const OrderDetailModal: React.FC<{
                 {order.special_instructions}
               </p>
             </div>
+          )}
+
+          {/* Preparation Timer */}
+          {timer && (order.status === 'confirmed' || order.status === 'preparing') && (
+            <TimerDisplay
+              timer={timer}
+              onStart={() => onTimerStart(order.id)}
+              onPause={() => onTimerPause(order.id)}
+              onReset={() => onTimerReset(order.id)}
+            />
           )}
 
           {/* Action Buttons */}
@@ -602,6 +723,17 @@ const OrderDetailModal: React.FC<{
                 {statusAction}
               </Button>
             )}
+            
+            {order.status === 'out_for_delivery' && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-sm">
+                <p className="text-blue-800 dark:text-blue-200 font-medium">
+                  🚚 Order is out for delivery - Chef's work is complete!
+                </p>
+                <p className="text-blue-600 dark:text-blue-300 text-xs mt-1">
+                  The delivery team will handle the rest and update the status when delivered.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>
@@ -633,6 +765,9 @@ const Order: React.FC = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
 
+  // Timer state management
+  const [orderTimers, setOrderTimers] = useState<Map<number, OrderTimer>>(new Map());
+
   // Use the order service hook
   const {
     loadOrders,
@@ -646,15 +781,225 @@ const Order: React.FC = () => {
   const unreadCount = 0; // Placeholder for notifications
   const ordersPerPage = 10;
 
+  // Calculate total preparation time for an order
+  const calculateOrderPrepTime = useCallback((order: ChefOrder): number => {
+    if (!order.items || order.items.length === 0) return 900; // Default 15 minutes
+    
+    // Calculate preparation time based on items
+    let totalPrepTime = 0;
+    const itemPrepTimes: number[] = [];
+    
+    order.items.forEach(item => {
+      // Use a base preparation time enhanced with intelligent estimates
+      let itemPrepTime = 15; // Default 15 minutes per item
+      
+      // Get complexity multiplier based on food name
+      const complexityMultiplier = getItemComplexity(item.food_name || '');
+      itemPrepTime *= complexityMultiplier;
+      
+      // Adjust based on quantity with diminishing returns (parallel preparation)
+      const quantityFactor = Math.min(1 + (item.quantity - 1) * 0.4, 2.5);
+      itemPrepTime *= quantityFactor;
+      
+      // Ensure minimum and maximum per item
+      itemPrepTime = Math.max(Math.min(itemPrepTime, 45), 5);
+      
+      itemPrepTimes.push(itemPrepTime);
+    });
+    
+    // For multiple items, use the maximum time (assuming parallel preparation) 
+    // plus 20% of the sum of other items (for coordination overhead)
+    if (itemPrepTimes.length === 1) {
+      totalPrepTime = itemPrepTimes[0];
+    } else {
+      const maxTime = Math.max(...itemPrepTimes);
+      const otherItemsTime = itemPrepTimes.reduce((sum, time) => sum + time, 0) - maxTime;
+      totalPrepTime = maxTime + (otherItemsTime * 0.3); // 30% overhead for coordination
+    }
+    
+    // Add buffer time based on order complexity
+    const bufferTime = Math.min(order.items.length * 2, 10); // 2 min per item, max 10 min
+    totalPrepTime += bufferTime;
+    
+    // Convert to seconds and apply bounds
+    const prepTimeSeconds = Math.max(Math.min(totalPrepTime * 60, 3600), 300); // 5 min to 60 min
+    
+    return Math.floor(prepTimeSeconds);
+  }, []);
+
+  // Helper function to estimate item complexity based on food name
+  const getItemComplexity = useCallback((itemName: string): number => {
+    const name = itemName.toLowerCase();
+    
+    // Very complex dishes (45+ min base time)
+    if (name.includes('biryani') || name.includes('roast') || name.includes('braised') || 
+        name.includes('slow cooked') || name.includes('tandoor')) {
+      return 2.5;
+    }
+    
+    // Complex dishes (30+ min base time)
+    if (name.includes('curry') || name.includes('stew') || name.includes('soup') || 
+        name.includes('casserole') || name.includes('risotto')) {
+      return 2.0;
+    }
+    
+    // Medium-high complexity (20+ min)
+    if (name.includes('pasta') || name.includes('noodles') || name.includes('fried rice') || 
+        name.includes('grilled') || name.includes('baked') || name.includes('pizza')) {
+      return 1.5;
+    }
+    
+    // Medium complexity (15 min base - default)
+    if (name.includes('stir fry') || name.includes('sauteed') || name.includes('pan fried') ||
+        name.includes('steamed') || name.includes('boiled')) {
+      return 1.2;
+    }
+    
+    // Simple dishes (10 min or less)
+    if (name.includes('salad') || name.includes('sandwich') || name.includes('wrap') || 
+        name.includes('smoothie') || name.includes('toast') || name.includes('juice')) {
+      return 0.6;
+    }
+    
+    return 1.0; // Default complexity
+  }, []);
+
+  // Create timer for an order
+  const createOrderTimer = useCallback((order: ChefOrder): OrderTimer => {
+    const totalTime = calculateOrderPrepTime(order);
+    return {
+      orderId: order.id,
+      totalTime,
+      remainingTime: totalTime,
+      isActive: false,
+      isCompleted: false,
+      startTime: null
+    };
+  }, [calculateOrderPrepTime]);
+
+  // Timer management functions
+  const startTimer = useCallback((orderId: number) => {
+    setOrderTimers(prev => {
+      const newTimers = new Map(prev);
+      const timer = newTimers.get(orderId);
+      if (timer) {
+        newTimers.set(orderId, {
+          ...timer,
+          isActive: true,
+          startTime: new Date()
+        });
+      }
+      return newTimers;
+    });
+  }, []);
+
+  const pauseTimer = useCallback((orderId: number) => {
+    setOrderTimers(prev => {
+      const newTimers = new Map(prev);
+      const timer = newTimers.get(orderId);
+      if (timer) {
+        newTimers.set(orderId, {
+          ...timer,
+          isActive: false
+        });
+      }
+      return newTimers;
+    });
+  }, []);
+
+  const resetTimer = useCallback((orderId: number) => {
+    setOrderTimers(prev => {
+      const newTimers = new Map(prev);
+      const timer = newTimers.get(orderId);
+      if (timer) {
+        newTimers.set(orderId, {
+          ...timer,
+          remainingTime: timer.totalTime,
+          isActive: false,
+          isCompleted: false,
+          startTime: null
+        });
+      }
+      return newTimers;
+    });
+  }, []);
+
   // Show notification
-  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  const showNotification = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ show: true, message, type });
-  };
+  }, []);
 
   // Hide notification
-  const hideNotification = () => {
+  const hideNotification = useCallback(() => {
     setNotification(prev => ({ ...prev, show: false }));
-  };
+  }, []);
+
+  // Timer countdown effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setOrderTimers(prev => {
+        const newTimers = new Map(prev);
+        let hasActiveTimers = false;
+
+        for (const [orderId, timer] of newTimers) {
+          if (timer.isActive && timer.remainingTime > 0) {
+            hasActiveTimers = true;
+            const newRemainingTime = timer.remainingTime - 1;
+            
+            if (newRemainingTime <= 0) {
+              // Timer completed
+              newTimers.set(orderId, {
+                ...timer,
+                remainingTime: 0,
+                isActive: false,
+                isCompleted: true
+              });
+              
+              // Show completion notification
+              showNotification(`🎉 Timer completed for order! Time to check if it's ready.`, 'success');
+              
+              // Optional: Play audio alert
+              if ('Audio' in window) {
+                try {
+                  const audio = new Audio('/notification.mp3'); // Add a notification sound file
+                  audio.play().catch(() => {}); // Ignore errors if sound fails
+                } catch (e) {}
+              }
+              
+            } else {
+              newTimers.set(orderId, {
+                ...timer,
+                remainingTime: newRemainingTime
+              });
+              
+              // Warning notifications
+              if (newRemainingTime === 60) {
+                showNotification(`⚠️ 1 minute remaining for order preparation!`, 'info');
+              } else if (newRemainingTime === 300) {
+                showNotification(`⏰ 5 minutes remaining for order preparation!`, 'info');
+              }
+            }
+          }
+        }
+
+        return hasActiveTimers ? newTimers : prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [showNotification]);
+
+  // Initialize timers for preparing orders
+  useEffect(() => {
+    orders.forEach(order => {
+      if ((order.status === 'confirmed' || order.status === 'preparing') && !orderTimers.has(order.id)) {
+        const timer = createOrderTimer(order);
+        setOrderTimers(prev => new Map(prev.set(order.id, timer)));
+      }
+    });
+  }, [orders, createOrderTimer, orderTimers]);
+
+
 
   // Fetch dashboard stats from API
   const fetchDashboardStats = async () => {
@@ -714,15 +1059,25 @@ const Order: React.FC = () => {
       
       // Update local state
       setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === orderId 
-            ? { 
-                ...order, 
-                status: newStatus as Order['status'], 
-                status_display: newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ')
-              }
-            : order
-        )
+        prevOrders.map(order => {
+          if (order.id === orderId) {
+            const updatedOrder = { 
+              ...order, 
+              status: newStatus as ChefOrder['status'], 
+              status_display: newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ')
+            };
+            
+            // Auto-start timer when order moves to "preparing" status
+            if (newStatus === 'preparing' && !orderTimers.has(orderId)) {
+              const timer = createOrderTimer(updatedOrder);
+              setOrderTimers(prev => new Map(prev.set(orderId, { ...timer, isActive: true, startTime: new Date() })));
+              showNotification(`🍳 Preparation timer started for ${timer.totalTime / 60} minutes!`, 'success');
+            }
+            
+            return updatedOrder;
+          }
+          return order;
+        })
       );
       
       showNotification('Order status updated successfully', 'success');
@@ -741,11 +1096,20 @@ const Order: React.FC = () => {
       
       // Update local state
       setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === orderId 
-            ? { ...order, status: 'confirmed', status_display: 'Confirmed' }
-            : order
-        )
+        prevOrders.map(order => {
+          if (order.id === orderId) {
+            const updatedOrder = { ...order, status: 'confirmed', status_display: 'Confirmed' };
+            
+            // Create timer for the accepted order (ready to be started when preparation begins)
+            if (!orderTimers.has(orderId)) {
+              const timer = createOrderTimer(updatedOrder);
+              setOrderTimers(prev => new Map(prev.set(orderId, timer)));
+            }
+            
+            return updatedOrder;
+          }
+          return order;
+        })
       );
       
       showNotification('✅ Order accepted! Customer will receive confirmation message.', 'success');
@@ -869,6 +1233,53 @@ const Order: React.FC = () => {
       
       {/* Status Counts */}
       <StatusCounts statusCounts={statusCounts} onStatusClick={handleStatusCountClick} />
+      
+      {/* Active Timers */}
+      {Array.from(orderTimers.values()).filter(timer => timer.isActive).length > 0 && (
+        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg p-4 mb-6">
+          <h3 className="text-lg font-semibold text-orange-800 dark:text-orange-200 mb-3 flex items-center">
+            <Timer className="h-5 w-5 mr-2" />
+            Active Preparation Timers ({Array.from(orderTimers.values()).filter(timer => timer.isActive).length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array.from(orderTimers.entries())
+              .filter(([_, timer]) => timer.isActive)
+              .map(([orderId, timer]) => {
+                const order = orders.find(o => o.id === orderId);
+                const minutes = Math.floor(timer.remainingTime / 60);
+                const seconds = timer.remainingTime % 60;
+                const percentage = ((timer.totalTime - timer.remainingTime) / timer.totalTime) * 100;
+                const isUrgent = timer.remainingTime <= 300; // Less than 5 minutes
+
+                return (
+                  <div key={orderId} className={`border rounded-lg p-3 ${isUrgent ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-orange-300 bg-orange-50 dark:bg-orange-900/20'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-sm">{order?.order_number}</span>
+                      <span className={`text-xs px-2 py-1 rounded ${isUrgent ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                        {isUrgent ? '🚨 Urgent' : '🍳 Cooking'}
+                      </span>
+                    </div>
+                    <div className="text-center mb-2">
+                      <div className={`text-xl font-mono font-bold ${isUrgent ? 'text-red-600' : 'text-orange-600'}`}>
+                        {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-1000 ${isUrgent ? 'bg-red-500' : 'bg-orange-500'}`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                    <div className="text-xs text-center mt-1 text-gray-600 dark:text-gray-400">
+                      {order?.customer_name}
+                    </div>
+                  </div>
+                );
+              })
+            }
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border p-4 mb-6">
@@ -897,7 +1308,6 @@ const Order: React.FC = () => {
               <option value="preparing">Preparing</option>
               <option value="ready">Ready</option>
               <option value="out_for_delivery">Out for Delivery</option>
-              <option value="delivered">Delivered</option>
               <option value="cancelled">Cancelled</option>
             </select>
             <input
@@ -979,13 +1389,21 @@ const Order: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <StatusBadge status={order.status} />
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={order.status} />
+                          {orderTimers.has(order.id) && orderTimers.get(order.id)?.isActive && (
+                            <div className="flex items-center text-orange-600 text-xs animate-pulse">
+                              <Timer className="h-3 w-3 mr-1" />
+                              {Math.floor((orderTimers.get(order.id)?.remainingTime || 0) / 60)}m
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {order.total_items} items
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                        ${order.total_amount}
+                        Rs.{order.total_amount}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         <div className="flex items-center">
@@ -1069,6 +1487,10 @@ const Order: React.FC = () => {
         onAccept={handleAcceptOrder}
         onReject={handleRejectOrder}
         onUpdateStatus={updateOrderStatus}
+        timer={selectedOrder ? orderTimers.get(selectedOrder.id) : undefined}
+        onTimerStart={startTimer}
+        onTimerPause={pauseTimer}
+        onTimerReset={resetTimer}
       />
 
       {/* Rejection Modal */}
