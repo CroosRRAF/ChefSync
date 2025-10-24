@@ -597,7 +597,8 @@ class BulkOrder(models.Model):
         db_table = "BulkOrder"
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["customer", "status"]),
+            # 'created_by' is the user who created the bulk order (previously referred to as customer)
+            models.Index(fields=["created_by", "status"]),
             models.Index(fields=["chef", "status"]),
         ]
 
