@@ -222,7 +222,7 @@ const Contact: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Hero Section with Background Image */}
-      <div className="relative min-h-[70vh] md:h-screen flex items-center justify-center overflow-hidden">
+      <div className="relative min-h-[50vh] md:min-h-[60vh] flex items-center justify-center overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000"
           style={{ backgroundImage: `url(${heroImage4})` }}
@@ -230,29 +230,29 @@ const Contact: React.FC = () => {
         <div className="absolute inset-0 bg-black/50"></div>
 
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
-          <Badge className="mb-6 bg-orange-100/90 text-orange-800 dark:bg-orange-900/90 dark:text-orange-200 animate-fadeIn backdrop-blur-sm">
+          <Badge className="mb-3 bg-orange-100/90 text-orange-800 dark:bg-orange-900/90 dark:text-orange-200 animate-fadeIn backdrop-blur-sm">
             Contact Us
           </Badge>
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 md:mb-8 animate-slideUp leading-tight">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-3 md:mb-4 animate-slideUp leading-tight">
             Get in Touch
-            <span className="block text-orange-400 mt-3 md:mt-4 animate-slideUp animation-delay-200">
+            <span className="block text-orange-400 mt-1 md:mt-2 animate-slideUp animation-delay-200">
               We're Here to Help
             </span>
           </h1>
-          <p className="text-lg md:text-xl lg:text-2xl text-gray-200 max-w-3xl mx-auto leading-relaxed animate-slideUp animation-delay-400 backdrop-blur-sm bg-black/20 p-4 md:p-6 rounded-lg">
+          <p className="text-lg md:text-xl lg:text-2xl text-gray-200 max-w-3xl mx-auto leading-relaxed animate-slideUp animation-delay-400 backdrop-blur-sm bg-black/20 p-3 md:p-4 rounded-lg">
             Have questions about our platform, want to become a cook partner, or
             need support? We'd love to hear from you.
           </p>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-12 md:py-16 lg:py-20">
-        <div className="grid lg:grid-cols-3 gap-6 md:gap-8 mb-12 md:mb-16">
+      <div className="container mx-auto px-4 py-6 md:py-8">
+        <div className="grid lg:grid-cols-3 gap-5 mb-6 md:mb-8">
           {/* Contact Form */}
           <div className="lg:col-span-2" id="contact-form">
             <Card className="animate-slideUp animation-delay-600 shadow-xl border-0 hover:shadow-2xl transition-shadow duration-300">
-              <CardContent className="p-6 md:p-8 lg:p-10">
-                <div className="flex items-center space-x-3 mb-8">
+              <CardContent className="p-5 md:p-6">
+                <div className="flex items-center space-x-3 mb-4">
                   <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
                     <MessageSquare className="h-6 w-6 text-orange-500" />
                   </div>
@@ -266,9 +266,9 @@ const Contact: React.FC = () => {
                   </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
+                <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
                       <Label htmlFor="name" className="text-sm font-medium">
                         Full Name <span className="text-red-500">*</span>
                       </Label>
@@ -299,7 +299,7 @@ const Contact: React.FC = () => {
                         </p>
                       )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <Label htmlFor="email" className="text-sm font-medium">
                         Email Address <span className="text-red-500">*</span>
                       </Label>
@@ -333,8 +333,8 @@ const Contact: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
                       <Label htmlFor="phone" className="text-sm font-medium">
                         Phone Number <span className="text-gray-400 text-xs">(Optional)</span>
                       </Label>
@@ -366,7 +366,7 @@ const Contact: React.FC = () => {
                         </p>
                       )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <Label htmlFor="subject" className="text-sm font-medium">
                         Subject <span className="text-red-500">*</span>
                       </Label>
@@ -464,7 +464,7 @@ const Contact: React.FC = () => {
           </div>
 
           {/* Contact Information */}
-          <div className="space-y-4 md:space-y-6">
+          <div className="space-y-4">
             {contactInfo.map((info, index) => (
               <Card
                 key={index}
@@ -482,7 +482,7 @@ const Contact: React.FC = () => {
                   }
                 }}
               >
-                <CardContent className="p-5 md:p-6">
+                <CardContent className="p-5">
                   <div className="flex items-start space-x-4">
                     <div className="flex-shrink-0 p-3 bg-gradient-to-br from-orange-100 to-red-100 dark:from-orange-900/20 dark:to-red-900/20 rounded-xl shadow-inner">
                       <div className="text-orange-500 animate-float">
@@ -522,8 +522,8 @@ const Contact: React.FC = () => {
 
             {/* Social Media */}
             <Card className="animate-scaleIn animation-delay-800 bg-gradient-to-br from-gray-50 to-orange-50 dark:from-gray-800 dark:to-gray-900 border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-5 md:p-6">
-                <div className="text-center mb-6">
+              <CardContent className="p-5">
+                <div className="text-center mb-4">
                   <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-lg">
                     Connect With Us
                   </h3>
@@ -557,9 +557,9 @@ const Contact: React.FC = () => {
         </div>
 
         {/* Interactive Map Section */}
-        <div className="mb-12 md:mb-16">
-          <div className="text-center mb-8 md:mb-12">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4 animate-slideUp">
+        <div className="mb-6 md:mb-8">
+          <div className="text-center mb-4 md:mb-6">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2 animate-slideUp">
               Find Us Here
             </h2>
             <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto animate-slideUp animation-delay-200 px-4">
@@ -568,11 +568,11 @@ const Contact: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Map */}
             <div className="lg:col-span-2">
               <Card className="overflow-hidden animate-slideUp animation-delay-400 shadow-2xl border-0 hover:shadow-3xl transition-shadow duration-300">
-                <div className="relative h-80 md:h-96 lg:h-[500px]">
+                <div className="relative h-72 md:h-80 lg:h-[400px]">
                   <iframe
                     src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3926.8234567890123!2d80.0123456789!3d9.6612345678!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zOcKwMzknNDAuNCJOIDgwwrAwMCc0NC40IkU!5e0!3m2!1sen!2slk!4v1234567890"
                     width="100%"
@@ -597,19 +597,19 @@ const Contact: React.FC = () => {
             </div>
 
             {/* Location Details */}
-            <div className="space-y-4 md:space-y-6">
+            <div className="space-y-4">
               <Card className="animate-slideUp animation-delay-600 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/10 dark:to-red-900/10 border-0 shadow-xl hover:shadow-2xl transition-shadow duration-300">
-                <CardContent className="p-6 md:p-8">
-                  <div className="text-center mb-6">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-red-500 rounded-full mb-4">
-                      <MapPin className="h-8 w-8 text-white" />
+                <CardContent className="p-5">
+                  <div className="text-center mb-3">
+                    <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-full mb-2">
+                      <MapPin className="h-6 w-6 text-white" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
                       Our Location
                     </h3>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div className="flex items-start space-x-3">
                       <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
                       <div>
@@ -639,7 +639,7 @@ const Contact: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mt-8 space-y-3">
+                  <div className="mt-4 space-y-2">
                     <Button
                       className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white transform hover:scale-105 transition-all duration-300"
                       onClick={() =>
@@ -666,7 +666,7 @@ const Contact: React.FC = () => {
 
               {/* Quick Contact */}
               <Card className="animate-slideUp animation-delay-800 border-0 shadow-xl bg-gradient-to-br from-gray-50 to-orange-50 dark:from-gray-800 dark:to-gray-900 hover:shadow-2xl transition-shadow duration-300">
-                <CardContent className="p-5 md:p-6">
+                <CardContent className="p-5">
                   <h4 className="font-bold text-gray-900 dark:text-white mb-4 text-center">
                     Quick Contact
                   </h4>
@@ -700,15 +700,15 @@ const Contact: React.FC = () => {
         <Card className="overflow-hidden animate-fadeIn animation-delay-1000 border-0 shadow-2xl">
           <div className="bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 relative">
             <div className="absolute inset-0 bg-black/20"></div>
-            <CardContent className="relative p-12 text-center text-white">
+            <CardContent className="relative p-6 md:p-8 text-center text-white">
               <div className="max-w-3xl mx-auto">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full mb-6">
-                  <MessageSquare className="h-10 w-10 text-white animate-float" />
+                <div className="inline-flex items-center justify-center w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full mb-3">
+                  <MessageSquare className="h-7 w-7 text-white animate-float" />
                 </div>
-                <h3 className="text-3xl md:text-4xl font-bold mb-4">
+                <h3 className="text-2xl md:text-3xl font-bold mb-2">
                   Ready to Experience Amazing Food?
                 </h3>
-                <p className="text-xl text-white/90 mb-8 leading-relaxed">
+                <p className="text-base md:text-lg text-white/90 mb-4 leading-relaxed">
                   Whether you want to order delicious meals or become a cook
                   partner, we're here to make it happen. Get in touch with us
                   today!

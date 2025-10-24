@@ -442,6 +442,8 @@ class DeliveryReview(models.Model):
         related_name="delivery_reviews",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    admin_response = models.TextField(blank=True, null=True)
+    response_date = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"Delivery Review by {self.customer.name} - {self.rating}/5"

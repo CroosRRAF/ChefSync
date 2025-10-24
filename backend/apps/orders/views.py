@@ -14,10 +14,24 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import (CartItem, DeliveryChat, DeliveryIssue, DeliveryLog,
-                     LocationUpdate, Order, OrderItem, OrderStatusHistory,
-                     UserAddress)
-from .serializers import CartItemSerializer, UserAddressSerializer, DeliveryChatSerializer
+from .models import (
+    CartItem,
+    DeliveryChat,
+    DeliveryIssue,
+    DeliveryLog,
+    DeliveryReview,
+    LocationUpdate,
+    Order,
+    OrderItem,
+    OrderStatusHistory,
+    UserAddress,
+)
+from .serializers import (
+    CartItemSerializer,
+    DeliveryChatSerializer,
+    DeliveryReviewSerializer,
+    UserAddressSerializer,
+)
 
 User = get_user_model()
 
@@ -107,10 +121,14 @@ def _resolve_chef_location(chef, request_data):
             )
             # Update coordinates if already existed but empty or different
             updated = False
-            if kitchen_address.latitude != (Decimal(str(lat)) if lat is not None else None):
+            if kitchen_address.latitude != (
+                Decimal(str(lat)) if lat is not None else None
+            ):
                 kitchen_address.latitude = Decimal(str(lat))
                 updated = True
-            if kitchen_address.longitude != (Decimal(str(lng)) if lng is not None else None):
+            if kitchen_address.longitude != (
+                Decimal(str(lng)) if lng is not None else None
+            ):
                 kitchen_address.longitude = Decimal(str(lng))
                 updated = True
             if (
@@ -165,10 +183,8 @@ def _resolve_chef_location(chef, request_data):
 def _get_chef_address(chef):
     """Get the chef's kitchen address as a formatted string"""
     # Try to get Kitchen address first
-    kitchen_addr = UserAddress.objects.filter(
-        user=chef, label="Kitchen"
-    ).first()
-    
+    kitchen_addr = UserAddress.objects.filter(user=chef, label="Kitchen").first()
+
     if kitchen_addr:
         # Format the full address
         parts = []
@@ -180,17 +196,19 @@ def _get_chef_address(chef):
             parts.append(kitchen_addr.city)
         if kitchen_addr.pincode and kitchen_addr.pincode != "000000":
             parts.append(kitchen_addr.pincode)
-        
+
         if parts:
             return ", ".join(parts)
-    
+
     # Try any address with coordinates
-    any_addr = UserAddress.objects.filter(
-        user=chef,
-        latitude__isnull=False,
-        longitude__isnull=False
-    ).order_by("-is_default", "-created_at").first()
-    
+    any_addr = (
+        UserAddress.objects.filter(
+            user=chef, latitude__isnull=False, longitude__isnull=False
+        )
+        .order_by("-is_default", "-created_at")
+        .first()
+    )
+
     if any_addr:
         parts = []
         if any_addr.address_line1:
@@ -199,7 +217,7 @@ def _get_chef_address(chef):
             parts.append(any_addr.city)
         if parts:
             return ", ".join(parts)
-    
+
     # Fallback to chef name
     chef_name = chef.get_full_name() or chef.name or chef.username
     return f"{chef_name}'s Kitchen"
@@ -271,7 +289,9 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
     def get_items(self, obj):
         items = []
         try:
-            for order_item in obj.items.select_related("price__food", "price__cook").all():
+            for order_item in obj.items.select_related(
+                "price__food", "price__cook"
+            ).all():
                 try:
                     # Get food name with proper fallbacks
                     food_name = order_item.food_name
@@ -282,20 +302,39 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
 
                     # Get food description with proper fallbacks
                     food_description = order_item.food_description or ""
-                    if not food_description and order_item.price and order_item.price.food:
-                        food_description = getattr(order_item.price.food, 'description', "") or ""
+                    if (
+                        not food_description
+                        and order_item.price
+                        and order_item.price.food
+                    ):
+                        food_description = (
+                            getattr(order_item.price.food, "description", "") or ""
+                        )
 
                     # Get food image with proper fallbacks
                     food_image = None
                     try:
                         if order_item.price:
-                            if hasattr(order_item.price, 'image_url') and order_item.price.image_url:
+                            if (
+                                hasattr(order_item.price, "image_url")
+                                and order_item.price.image_url
+                            ):
                                 food_image = str(order_item.price.image_url)
                             elif order_item.price.food:
-                                if hasattr(order_item.price.food, 'image_url') and order_item.price.food.image_url:
+                                if (
+                                    hasattr(order_item.price.food, "image_url")
+                                    and order_item.price.food.image_url
+                                ):
                                     food_image = str(order_item.price.food.image_url)
-                                elif hasattr(order_item.price.food, 'image') and order_item.price.food.image:
-                                    food_image = str(order_item.price.food.image.url) if order_item.price.food.image else None
+                                elif (
+                                    hasattr(order_item.price.food, "image")
+                                    and order_item.price.food.image
+                                ):
+                                    food_image = (
+                                        str(order_item.price.food.image.url)
+                                        if order_item.price.food.image
+                                        else None
+                                    )
                     except Exception:
                         food_image = None
 
@@ -304,14 +343,18 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
                     try:
                         if order_item.price and order_item.price.cook:
                             cook = order_item.price.cook
-                            cook_name = getattr(cook, 'name', None) or cook.get_full_name() or cook.username
+                            cook_name = (
+                                getattr(cook, "name", None)
+                                or cook.get_full_name()
+                                or cook.username
+                            )
                     except Exception:
                         cook_name = "Unknown Cook"
 
                     # Get size with fallback
                     size = "Medium"
                     try:
-                        if order_item.price and hasattr(order_item.price, 'size'):
+                        if order_item.price and hasattr(order_item.price, "size"):
                             size = order_item.price.size
                     except Exception:
                         pass
@@ -322,7 +365,9 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
                             "quantity": int(order_item.quantity or 0),
                             "unit_price": float(order_item.unit_price or 0),
                             "total_price": float(order_item.total_price or 0),
-                            "special_instructions": str(order_item.special_instructions or ""),
+                            "special_instructions": str(
+                                order_item.special_instructions or ""
+                            ),
                             "food_name": food_name,
                             "food_description": food_description,
                             "food_image": food_image,
@@ -333,15 +378,19 @@ class SimpleOrderSerializer(serializers.ModelSerializer):
                 except Exception as item_error:
                     # Log the error but continue processing other items
                     import logging
+
                     logger = logging.getLogger(__name__)
-                    logger.error(f"Error processing order item {order_item.order_item_id}: {str(item_error)}")
+                    logger.error(
+                        f"Error processing order item {order_item.order_item_id}: {str(item_error)}"
+                    )
                     continue
         except Exception as e:
             # Log the error and return empty list
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Error getting items for order {obj.id}: {str(e)}")
-        
+
         return items
 
 
@@ -417,7 +466,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         agent_lat = request.data.get("agent_latitude")
         agent_lng = request.data.get("agent_longitude")
 
-        if agent_lat is None or agent_lng is None or agent_lat == '' or agent_lng == '':
+        if agent_lat is None or agent_lng is None or agent_lat == "" or agent_lng == "":
             return Response(
                 {
                     "error": "Location required",
@@ -425,16 +474,16 @@ class OrderViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         # Validate that coordinates are valid numbers
         try:
             agent_lat = float(agent_lat)
             agent_lng = float(agent_lng)
-            
+
             # Basic sanity check for coordinates
             if not (-90 <= agent_lat <= 90) or not (-180 <= agent_lng <= 180):
                 raise ValueError("Invalid coordinates")
-                
+
         except (ValueError, TypeError):
             return Response(
                 {
@@ -549,10 +598,14 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         # Send notification to customer
         try:
-            from apps.communications.services.order_notification_service import OrderNotificationService
+            from apps.communications.services.order_notification_service import (
+                OrderNotificationService,
+            )
+
             OrderNotificationService.notify_order_confirmed(order)
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to send order confirmation notification: {str(e)}")
 
@@ -600,10 +653,16 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         # Send notification to customer
         try:
-            from apps.communications.services.order_notification_service import OrderNotificationService
-            OrderNotificationService.notify_order_rejected(order, reason=rejection_reason)
+            from apps.communications.services.order_notification_service import (
+                OrderNotificationService,
+            )
+
+            OrderNotificationService.notify_order_rejected(
+                order, reason=rejection_reason
+            )
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to send order rejection notification: {str(e)}")
 
@@ -738,8 +797,10 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         if new_status not in valid_delivery_statuses:
             return Response(
-                {"error": f"Invalid status '{new_status}'. Valid statuses: {valid_delivery_statuses}"}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {
+                    "error": f"Invalid status '{new_status}'. Valid statuses: {valid_delivery_statuses}"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Check if user is authorized to update this order
@@ -990,47 +1051,68 @@ class OrderViewSet(viewsets.ModelViewSet):
     def tracking(self, request, pk=None):
         """Get comprehensive real-time tracking information for an order"""
         order = self.get_object()
-        
+
         # Check authorization: customer, chef, delivery partner, or admin
-        if not (order.customer == request.user or 
-                order.chef == request.user or 
-                order.delivery_partner == request.user or
-                request.user.is_staff):
+        if not (
+            order.customer == request.user
+            or order.chef == request.user
+            or order.delivery_partner == request.user
+            or request.user.is_staff
+        ):
             return Response(
                 {"error": "You are not authorized to track this order"},
-                status=status.HTTP_403_FORBIDDEN
+                status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         # Get order with related data (skip location_updates if table doesn't exist)
         try:
-            order = Order.objects.select_related('customer', 'chef', 'delivery_partner').prefetch_related(
-                'status_history', 'items__price__food', 'location_updates'
-            ).get(pk=pk)
+            order = (
+                Order.objects.select_related("customer", "chef", "delivery_partner")
+                .prefetch_related(
+                    "status_history", "items__price__food", "location_updates"
+                )
+                .get(pk=pk)
+            )
         except Exception as e:
             # Fallback without location_updates if table doesn't exist
-            order = Order.objects.select_related('customer', 'chef', 'delivery_partner').prefetch_related(
-                'status_history', 'items__price__food'
-            ).get(pk=pk)
-        
+            order = (
+                Order.objects.select_related("customer", "chef", "delivery_partner")
+                .prefetch_related("status_history", "items__price__food")
+                .get(pk=pk)
+            )
+
         # Build timeline from status_timestamps
         timeline = []
-        status_order = ['cart', 'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled']
-        
+        status_order = [
+            "cart",
+            "pending",
+            "confirmed",
+            "preparing",
+            "ready",
+            "out_for_delivery",
+            "delivered",
+            "cancelled",
+        ]
+
         # Handle case where status_timestamps might not exist or be None
         status_timestamps = order.status_timestamps if order.status_timestamps else {}
-        
+
         for status_key in status_order:
-            status_display = dict(Order.ORDER_STATUS_CHOICES).get(status_key, status_key)
+            status_display = dict(Order.ORDER_STATUS_CHOICES).get(
+                status_key, status_key
+            )
             timestamp = status_timestamps.get(status_key)
-            
-            timeline.append({
-                'status': status_key,
-                'status_display': status_display,
-                'timestamp': timestamp,
-                'completed': timestamp is not None,
-                'current': order.status == status_key,
-            })
-        
+
+            timeline.append(
+                {
+                    "status": status_key,
+                    "status_display": status_display,
+                    "timestamp": timestamp,
+                    "completed": timestamp is not None,
+                    "current": order.status == status_key,
+                }
+            )
+
         # Get chef location for map
         chef_location = None
         if order.chef:
@@ -1038,197 +1120,229 @@ class OrderViewSet(viewsets.ModelViewSet):
             if chef_lat and chef_lng:
                 chef_address = _get_chef_address(order.chef)
                 chef_location = {
-                    'latitude': chef_lat,
-                    'longitude': chef_lng,
-                    'address': chef_address
+                    "latitude": chef_lat,
+                    "longitude": chef_lng,
+                    "address": chef_address,
                 }
-        
+
         # Get delivery location
         delivery_location = None
         if order.delivery_latitude and order.delivery_longitude:
             delivery_location = {
-                'latitude': float(order.delivery_latitude),
-                'longitude': float(order.delivery_longitude),
-                'address': order.delivery_address
+                "latitude": float(order.delivery_latitude),
+                "longitude": float(order.delivery_longitude),
+                "address": order.delivery_address,
             }
-        
+
         # Get latest delivery agent location (if table exists)
         agent_location = None
         if order.delivery_partner:
             try:
                 latest_location = LocationUpdate.objects.filter(
-                    delivery_agent=order.delivery_partner,
-                    order=order
+                    delivery_agent=order.delivery_partner, order=order
                 ).first()
-                
+
                 if latest_location:
                     agent_location = {
-                        'latitude': float(latest_location.latitude),
-                        'longitude': float(latest_location.longitude),
-                        'timestamp': latest_location.timestamp.isoformat(),
-                        'address': latest_location.address
+                        "latitude": float(latest_location.latitude),
+                        "longitude": float(latest_location.longitude),
+                        "timestamp": latest_location.timestamp.isoformat(),
+                        "address": latest_location.address,
                     }
             except Exception:
                 # LocationUpdate table doesn't exist yet
                 pass
-        
+
         # Get order items summary
         items_summary = []
         for item in order.items.all():
-            items_summary.append({
-                'id': item.order_item_id,
-                'food_name': item.food_name,
-                'quantity': item.quantity,
-                'price': float(item.unit_price) if item.unit_price else 0,
-            })
-        
+            items_summary.append(
+                {
+                    "id": item.order_item_id,
+                    "food_name": item.food_name,
+                    "quantity": item.quantity,
+                    "price": float(item.unit_price) if item.unit_price else 0,
+                }
+            )
+
         # Calculate ETA if out for delivery
         estimated_time_remaining = None
-        if order.status == 'out_for_delivery' and order.estimated_delivery_time:
+        if order.status == "out_for_delivery" and order.estimated_delivery_time:
             time_remaining = order.estimated_delivery_time - timezone.now()
             estimated_time_remaining = max(0, int(time_remaining.total_seconds() / 60))
-        
+
         # Build response
         tracking_data = {
-            'id': order.id,
-            'order_number': order.order_number,
-            'status': order.status,
-            'status_display': order.get_status_display(),
-            'order_type': getattr(order, 'order_type', 'delivery'),  # 'delivery' or 'pickup'
-            'created_at': order.created_at.isoformat(),
-            'updated_at': order.updated_at.isoformat(),
-            
+            "id": order.id,
+            "order_number": order.order_number,
+            "status": order.status,
+            "status_display": order.get_status_display(),
+            "order_type": getattr(
+                order, "order_type", "delivery"
+            ),  # 'delivery' or 'pickup'
+            "created_at": order.created_at.isoformat(),
+            "updated_at": order.updated_at.isoformat(),
             # Timeline
-            'timeline': timeline,
-            'status_timestamps': status_timestamps,
-            
+            "timeline": timeline,
+            "status_timestamps": status_timestamps,
             # Locations
-            'chef_location': chef_location,
-            'delivery_location': delivery_location,
-            'agent_location': agent_location,
-            'distance_km': float(order.distance_km) if order.distance_km else None,
-            
+            "chef_location": chef_location,
+            "delivery_location": delivery_location,
+            "agent_location": agent_location,
+            "distance_km": float(order.distance_km) if order.distance_km else None,
             # Order details
-            'total_amount': float(order.total_amount),
-            'delivery_fee': float(order.delivery_fee) if order.delivery_fee else 0,
-            'items': items_summary,
-            'total_items': sum(item['quantity'] for item in items_summary),
-            
+            "total_amount": float(order.total_amount),
+            "delivery_fee": float(order.delivery_fee) if order.delivery_fee else 0,
+            "items": items_summary,
+            "total_items": sum(item["quantity"] for item in items_summary),
             # Time estimates
-            'estimated_delivery_time': order.estimated_delivery_time.isoformat() if order.estimated_delivery_time else None,
-            'estimated_time_remaining_minutes': estimated_time_remaining,
-            'actual_delivery_time': order.actual_delivery_time.isoformat() if order.actual_delivery_time else None,
-            
+            "estimated_delivery_time": (
+                order.estimated_delivery_time.isoformat()
+                if order.estimated_delivery_time
+                else None
+            ),
+            "estimated_time_remaining_minutes": estimated_time_remaining,
+            "actual_delivery_time": (
+                order.actual_delivery_time.isoformat()
+                if order.actual_delivery_time
+                else None
+            ),
             # People
-            'customer': {
-                'name': order.customer.name or order.customer.username,
-                'phone': getattr(order.customer, 'phone_no', None)
-            } if order.customer else None,
-            
-            'chef': {
-                'name': order.chef.name or order.chef.username,
-                'phone': getattr(order.chef, 'phone_no', None),
-                'specialty': getattr(order.chef, 'specialty', None) if hasattr(order.chef, 'cook') else None
-            } if order.chef else None,
-            
-            'delivery_partner': {
-                'name': order.delivery_partner.name or order.delivery_partner.username,
-                'phone': getattr(order.delivery_partner, 'phone_no', None)
-            } if order.delivery_partner else None,
-            
+            "customer": (
+                {
+                    "name": order.customer.name or order.customer.username,
+                    "phone": getattr(order.customer, "phone_no", None),
+                }
+                if order.customer
+                else None
+            ),
+            "chef": (
+                {
+                    "name": order.chef.name or order.chef.username,
+                    "phone": getattr(order.chef, "phone_no", None),
+                    "specialty": (
+                        getattr(order.chef, "specialty", None)
+                        if hasattr(order.chef, "cook")
+                        else None
+                    ),
+                }
+                if order.chef
+                else None
+            ),
+            "delivery_partner": (
+                {
+                    "name": order.delivery_partner.name
+                    or order.delivery_partner.username,
+                    "phone": getattr(order.delivery_partner, "phone_no", None),
+                }
+                if order.delivery_partner
+                else None
+            ),
             # Cancellation info
-            'can_cancel': order.can_be_cancelled,
-            'cancellation_time_remaining_seconds': order.cancellation_time_remaining,
+            "can_cancel": order.can_be_cancelled,
+            "cancellation_time_remaining_seconds": order.cancellation_time_remaining,
         }
-        
+
         return Response(tracking_data)
-    
-    @action(detail=True, methods=['get'], url_path='chat/messages')
+
+    @action(detail=True, methods=["get"], url_path="chat/messages")
     def get_chat_messages(self, request, pk=None):
         """Get all chat messages for an order between customer and delivery agent"""
         order = self.get_object()
-        
+
         # Check authorization: customer or delivery partner
-        if not (order.customer == request.user or order.delivery_partner == request.user):
+        if not (
+            order.customer == request.user or order.delivery_partner == request.user
+        ):
             return Response(
                 {"error": "You are not authorized to view these messages"},
-                status=status.HTTP_403_FORBIDDEN
+                status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         # Get all messages for this order
-        messages = DeliveryChat.objects.filter(order=order).order_by('created_at')
-        
+        messages = DeliveryChat.objects.filter(order=order).order_by("created_at")
+
         # Mark messages as read if user is the receiver
         messages.filter(receiver=request.user, is_read=False).update(is_read=True)
-        
-        serializer = DeliveryChatSerializer(messages, many=True, context={'request': request})
-        
-        return Response({
-            'order_number': order.order_number,
-            'messages': serializer.data,
-            'unread_count': messages.filter(receiver=request.user, is_read=False).count()
-        })
-    
-    @action(detail=True, methods=['post'], url_path='chat/send')
+
+        serializer = DeliveryChatSerializer(
+            messages, many=True, context={"request": request}
+        )
+
+        return Response(
+            {
+                "order_number": order.order_number,
+                "messages": serializer.data,
+                "unread_count": messages.filter(
+                    receiver=request.user, is_read=False
+                ).count(),
+            }
+        )
+
+    @action(detail=True, methods=["post"], url_path="chat/send")
     def send_chat_message(self, request, pk=None):
         """Send a chat message to delivery agent or customer"""
         order = self.get_object()
-        
+
         # Check authorization: customer or delivery partner
-        if not (order.customer == request.user or order.delivery_partner == request.user):
+        if not (
+            order.customer == request.user or order.delivery_partner == request.user
+        ):
             return Response(
                 {"error": "You are not authorized to send messages for this order"},
-                status=status.HTTP_403_FORBIDDEN
+                status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         # Check if delivery partner is assigned
         if not order.delivery_partner:
             return Response(
                 {"error": "No delivery partner assigned yet"},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        message_text = request.data.get('message', '').strip()
-        message_type = request.data.get('message_type', 'text')
-        
+
+        message_text = request.data.get("message", "").strip()
+        message_type = request.data.get("message_type", "text")
+
         if not message_text:
             return Response(
-                {"error": "Message cannot be empty"},
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Message cannot be empty"}, status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Determine receiver (if sender is customer, receiver is delivery partner and vice versa)
         sender = request.user
-        receiver = order.delivery_partner if sender == order.customer else order.customer
-        
+        receiver = (
+            order.delivery_partner if sender == order.customer else order.customer
+        )
+
         # Create message
         chat_message = DeliveryChat.objects.create(
             order=order,
             sender=sender,
             receiver=receiver,
             message=message_text,
-            message_type=message_type
+            message_type=message_type,
         )
-        
-        serializer = DeliveryChatSerializer(chat_message, context={'request': request})
-        
-        return Response({
-            'success': True,
-            'message': serializer.data
-        }, status=status.HTTP_201_CREATED)
-    
-    @action(detail=True, methods=['get'], url_path='chat/quick-messages')
+
+        serializer = DeliveryChatSerializer(chat_message, context={"request": request})
+
+        return Response(
+            {"success": True, "message": serializer.data},
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["get"], url_path="chat/quick-messages")
     def get_quick_messages(self, request, pk=None):
         """Get suggested quick messages based on order status"""
         order = self.get_object()
-        
+
         # Check authorization
-        if not (order.customer == request.user or order.delivery_partner == request.user):
+        if not (
+            order.customer == request.user or order.delivery_partner == request.user
+        ):
             return Response(
-                {"error": "You are not authorized"},
-                status=status.HTTP_403_FORBIDDEN
+                {"error": "You are not authorized"}, status=status.HTTP_403_FORBIDDEN
             )
-        
+
         # Quick messages for customers
         customer_messages = [
             "Where are you right now?",
@@ -1238,7 +1352,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             "Please ring the doorbell",
             "Leave it at the door, thanks!",
         ]
-        
+
         # Quick messages for delivery agents
         delivery_agent_messages = [
             "I'm on my way!",
@@ -1248,37 +1362,46 @@ class OrderViewSet(viewsets.ModelViewSet):
             "Order delivered successfully!",
             "Having trouble finding your address",
         ]
-        
+
         # Determine which messages to show
         if request.user == order.customer:
             quick_messages = customer_messages
         else:
             quick_messages = delivery_agent_messages
-        
-        return Response({
-            'quick_messages': quick_messages
-        })
-    
-    @action(detail=False, methods=['get'], url_path='delivery/available')
+
+        return Response({"quick_messages": quick_messages})
+
+    @action(detail=False, methods=["get"], url_path="delivery/available")
     def available_for_delivery(self, request):
         """Get orders available for delivery agents to accept"""
         # Orders that are ready and don't have a delivery partner yet
-        available_orders = Order.objects.filter(
-            Q(status__in=['confirmed', 'preparing', 'ready']) & Q(delivery_partner__isnull=True)
-        ).select_related('customer', 'chef').prefetch_related('items__price__food').order_by('-created_at')
-        
+        available_orders = (
+            Order.objects.filter(
+                Q(status__in=["confirmed", "preparing", "ready"])
+                & Q(delivery_partner__isnull=True)
+            )
+            .select_related("customer", "chef")
+            .prefetch_related("items__price__food")
+            .order_by("-created_at")
+        )
+
         serializer = self.get_serializer(available_orders, many=True)
         return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'], url_path='delivery/assigned')
+
+    @action(detail=False, methods=["get"], url_path="delivery/assigned")
     def my_assigned_deliveries(self, request):
         """Get orders assigned to the current delivery agent"""
         # Orders assigned to this delivery agent
-        assigned_orders = Order.objects.filter(
-            delivery_partner=request.user,
-            status__in=['ready', 'out_for_delivery', 'in_transit']
-        ).select_related('customer', 'chef').prefetch_related('items__price__food').order_by('-created_at')
-        
+        assigned_orders = (
+            Order.objects.filter(
+                delivery_partner=request.user,
+                status__in=["ready", "out_for_delivery", "in_transit"],
+            )
+            .select_related("customer", "chef")
+            .prefetch_related("items__price__food")
+            .order_by("-created_at")
+        )
+
         serializer = self.get_serializer(assigned_orders, many=True)
         return Response(serializer.data)
 
@@ -1709,81 +1832,111 @@ def calculate_checkout(request):
 def place_order(request):
     """Place a comprehensive order with delivery address reference and distance-based fee"""
     try:
-        order_type = request.data.get('order_type', 'delivery')  # 'delivery' or 'pickup'
-        delivery_address_id = request.data.get('delivery_address_id')
-        delivery_instructions = request.data.get('delivery_instructions', '')
-        customer_notes = request.data.get('customer_notes', '')
-        payment_method = request.data.get('payment_method', 'cash')
-        phone = request.data.get('phone', '')
-        delivery_fee = request.data.get('delivery_fee', 0)
-        subtotal = request.data.get('subtotal', 0)
-        tax_amount = request.data.get('tax_amount', 0)
-        total_amount = request.data.get('total_amount', 0)
+        order_type = request.data.get(
+            "order_type", "delivery"
+        )  # 'delivery' or 'pickup'
+        delivery_address_id = request.data.get("delivery_address_id")
+        delivery_instructions = request.data.get("delivery_instructions", "")
+        customer_notes = request.data.get("customer_notes", "")
+        payment_method = request.data.get("payment_method", "cash")
+        phone = request.data.get("phone", "")
+        delivery_fee = request.data.get("delivery_fee", 0)
+        subtotal = request.data.get("subtotal", 0)
+        tax_amount = request.data.get("tax_amount", 0)
+        total_amount = request.data.get("total_amount", 0)
 
         # Validate required fields - address only required for delivery
-        if order_type == 'delivery' and not delivery_address_id:
-            return Response({'error': 'Delivery address is required for delivery orders'}, status=status.HTTP_400_BAD_REQUEST)
+        if order_type == "delivery" and not delivery_address_id:
+            return Response(
+                {"error": "Delivery address is required for delivery orders"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Get cart items for the user (CartItem uses 'customer' FK)
         import logging
+
         logger = logging.getLogger(__name__)
-        
-        logger.info(f"🛒 Fetching cart for user: {request.user} (ID: {request.user.id if request.user else 'None'})")
-        
-        cart_items = (
-            CartItem.objects
-            .filter(customer=request.user)
-            .select_related('price__food', 'price__cook')
+
+        logger.info(
+            f"🛒 Fetching cart for user: {request.user} (ID: {request.user.id if request.user else 'None'})"
         )
-        
+
+        cart_items = CartItem.objects.filter(customer=request.user).select_related(
+            "price__food", "price__cook"
+        )
+
         logger.info(f"🛒 Cart items count: {cart_items.count()}")
-        
+
         if not cart_items.exists():
             # Check if cart items exist without customer filter to debug
             all_cart_count = CartItem.objects.count()
-            logger.error(f"❌ Cart is empty for user {request.user.id}. Total cart items in DB: {all_cart_count}")
-            return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
-        
+            logger.error(
+                f"❌ Cart is empty for user {request.user.id}. Total cart items in DB: {all_cart_count}"
+            )
+            return Response(
+                {"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Get delivery address (supports both old UserAddress and new Address systems)
         delivery_address = None
         new_address = None
-        if order_type == 'delivery':
+        if order_type == "delivery":
             try:
                 # First try new Address model from users app
                 from apps.users.models import Address
-                new_address = Address.objects.get(id=delivery_address_id, user=request.user, address_type='customer')
-                logger.info(f"✅ Found new delivery address: {new_address.label} - {new_address.city}")
+
+                new_address = Address.objects.get(
+                    id=delivery_address_id, user=request.user, address_type="customer"
+                )
+                logger.info(
+                    f"✅ Found new delivery address: {new_address.label} - {new_address.city}"
+                )
             except:
                 # Fallback to old UserAddress model
                 try:
-                    delivery_address = UserAddress.objects.get(id=delivery_address_id, user=request.user)
-                    logger.info(f"✅ Found old delivery address: {delivery_address.label} - {delivery_address.city}")
+                    delivery_address = UserAddress.objects.get(
+                        id=delivery_address_id, user=request.user
+                    )
+                    logger.info(
+                        f"✅ Found old delivery address: {delivery_address.label} - {delivery_address.city}"
+                    )
                 except UserAddress.DoesNotExist:
-                    logger.error(f"❌ Delivery address ID {delivery_address_id} not found for user {request.user.id}")
+                    logger.error(
+                        f"❌ Delivery address ID {delivery_address_id} not found for user {request.user.id}"
+                    )
                     # List all addresses for this user for debugging
                     user_addresses = UserAddress.objects.filter(user=request.user)
                     from apps.users.models import Address
-                    new_addresses = Address.objects.filter(user=request.user, address_type='customer')
-                    logger.error(f"Available old addresses: {list(user_addresses.values_list('id', 'label'))}")
-                    logger.error(f"Available new addresses: {list(new_addresses.values_list('id', 'label'))}")
-                    return Response({
-                        'error': 'Delivery address not found'
-                    }, status=status.HTTP_404_NOT_FOUND)
-        
+
+                    new_addresses = Address.objects.filter(
+                        user=request.user, address_type="customer"
+                    )
+                    logger.error(
+                        f"Available old addresses: {list(user_addresses.values_list('id', 'label'))}"
+                    )
+                    logger.error(
+                        f"Available new addresses: {list(new_addresses.values_list('id', 'label'))}"
+                    )
+                    return Response(
+                        {"error": "Delivery address not found"},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+
         # Get chef from first cart item
         first_item = cart_items.first()
         chef = first_item.price.cook if first_item and first_item.price else None
-        
+
         if not chef:
-            return Response({
-                'error': 'Chef information not found'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"error": "Chef information not found"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Get chef's kitchen location and calculate distance (only for delivery)
         distance_km = None
-        if order_type == 'delivery' and (delivery_address or new_address):
+        if order_type == "delivery" and (delivery_address or new_address):
             chef_lat, chef_lng = _resolve_chef_location(chef, request.data)
-            
+
             # Get delivery coordinates from either old or new address system
             delivery_lat = None
             delivery_lng = None
@@ -1793,66 +1946,78 @@ def place_order(request):
             elif delivery_address:
                 delivery_lat = delivery_address.latitude
                 delivery_lng = delivery_address.longitude
-            
+
             # Calculate distance if both coordinates available
             if chef_lat and chef_lng and delivery_lat and delivery_lng:
-                from math import radians, sin, cos, sqrt, atan2
-                
+                from math import atan2, cos, radians, sin, sqrt
+
                 def haversine_distance(lat1, lon1, lat2, lon2):
                     R = 6371  # Earth's radius in km
-                    lat1, lon1, lat2, lon2 = map(radians, [float(lat1), float(lon1), float(lat2), float(lon2)])
+                    lat1, lon1, lat2, lon2 = map(
+                        radians, [float(lat1), float(lon1), float(lat2), float(lon2)]
+                    )
                     dlat = lat2 - lat1
                     dlon = lon2 - lon1
-                    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-                    c = 2 * atan2(sqrt(a), sqrt(1-a))
+                    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+                    c = 2 * atan2(sqrt(a), sqrt(1 - a))
                     return R * c
-                
-                distance_km = haversine_distance(chef_lat, chef_lng, delivery_lat, delivery_lng)
-        
+
+                distance_km = haversine_distance(
+                    chef_lat, chef_lng, delivery_lat, delivery_lng
+                )
+
         # Prepare address data for order creation
         order_data = {
-            'customer': request.user,
-            'chef': chef,
-            'order_number': f'ORD-{uuid.uuid4().hex[:8].upper()}',
-            'status': 'pending',  # Order starts as pending, waiting for chef approval
-            'payment_method': payment_method,
-            'payment_status': 'pending',
-            'subtotal': Decimal(str(subtotal)),
-            'tax_amount': Decimal(str(tax_amount)),
-            'delivery_fee': Decimal(str(delivery_fee)),
-            'total_amount': Decimal(str(total_amount)),
-            'delivery_instructions': delivery_instructions if order_type == 'delivery' else '',
-            'customer_notes': customer_notes or delivery_instructions,
-            'distance_km': Decimal(str(distance_km)) if distance_km else None
+            "customer": request.user,
+            "chef": chef,
+            "order_number": f"ORD-{uuid.uuid4().hex[:8].upper()}",
+            "status": "pending",  # Order starts as pending, waiting for chef approval
+            "payment_method": payment_method,
+            "payment_status": "pending",
+            "subtotal": Decimal(str(subtotal)),
+            "tax_amount": Decimal(str(tax_amount)),
+            "delivery_fee": Decimal(str(delivery_fee)),
+            "total_amount": Decimal(str(total_amount)),
+            "delivery_instructions": (
+                delivery_instructions if order_type == "delivery" else ""
+            ),
+            "customer_notes": customer_notes or delivery_instructions,
+            "distance_km": Decimal(str(distance_km)) if distance_km else None,
         }
-        
+
         # Add address-specific fields based on which system is used
-        if order_type == 'delivery':
+        if order_type == "delivery":
             if new_address:
                 # Use new address system
-                order_data.update({
-                    'delivery_address_new_id': new_address.id,
-                    'delivery_address': f"{new_address.address_line1}, {new_address.city}",
-                    'delivery_latitude': new_address.latitude,
-                    'delivery_longitude': new_address.longitude,
-                })
+                order_data.update(
+                    {
+                        "delivery_address_new_id": new_address.id,
+                        "delivery_address": f"{new_address.address_line1}, {new_address.city}",
+                        "delivery_latitude": new_address.latitude,
+                        "delivery_longitude": new_address.longitude,
+                    }
+                )
             elif delivery_address:
                 # Use old address system (backward compatibility)
-                order_data.update({
-                    'delivery_address_ref': delivery_address,
-                    'delivery_address': f"{delivery_address.address_line1}, {delivery_address.city}",
-                    'delivery_latitude': delivery_address.latitude,
-                    'delivery_longitude': delivery_address.longitude,
-                })
+                order_data.update(
+                    {
+                        "delivery_address_ref": delivery_address,
+                        "delivery_address": f"{delivery_address.address_line1}, {delivery_address.city}",
+                        "delivery_latitude": delivery_address.latitude,
+                        "delivery_longitude": delivery_address.longitude,
+                    }
+                )
         else:
             # Pickup order
-            order_data['delivery_address'] = "Pickup"
-        
+            order_data["delivery_address"] = "Pickup"
+
         # Create order
         order = Order.objects.create(**order_data)
-        
-        logger.info(f"✅ Order {order.order_number} created successfully with status 'pending' for user {request.user.username}")
-        
+
+        logger.info(
+            f"✅ Order {order.order_number} created successfully with status 'pending' for user {request.user.username}"
+        )
+
         # Create order items from cart
         for cart_item in cart_items:
             OrderItem.objects.create(
@@ -1862,23 +2027,26 @@ def place_order(request):
                 unit_price=cart_item.price.price,
                 total_price=cart_item.price.price * cart_item.quantity,
                 food_name=cart_item.price.food.name,
-                food_description=cart_item.price.food.description
+                food_description=cart_item.price.food.description,
             )
-        
+
         # Clear cart after order placement
         cart_items.delete()
-        
+
         # Create initial status history
         OrderStatusHistory.objects.create(
             order=order,
-            status='pending',  # Initial status is pending
+            status="pending",  # Initial status is pending
             changed_by=request.user,
             notes="Order placed successfully. Waiting for chef approval.",
         )
 
         # Create notifications
         try:
-            from apps.communications.services.order_notification_service import OrderNotificationService
+            from apps.communications.services.order_notification_service import (
+                OrderNotificationService,
+            )
+
             # Notify customer
             OrderNotificationService.notify_customer_order_placed(order)
             # Notify chef
@@ -1931,9 +2099,7 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                     status__in=["out_for_delivery", "ready", "preparing"]
                 )
                 .select_related("customer", "chef", "delivery_partner")
-                .prefetch_related(
-                    "items__price__food"
-                )
+                .prefetch_related("items__price__food")
                 .order_by("-created_at")
             )
 
@@ -2131,10 +2297,9 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
         try:
             # Get the order
             try:
-                order = (
-                    Order.objects.select_related("customer", "chef", "delivery_partner")
-                    .get(pk=pk)
-                )
+                order = Order.objects.select_related(
+                    "customer", "chef", "delivery_partner"
+                ).get(pk=pk)
             except Order.DoesNotExist:
                 return Response(
                     {"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND
@@ -2361,7 +2526,8 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                     "top_delivery_partners": [
                         {
                             "id": partner["delivery_partner__id"],
-                            "name": partner.get("delivery_partner__username") or "Unknown",
+                            "name": partner.get("delivery_partner__username")
+                            or "Unknown",
                             "deliveries": partner["delivery_count"],
                             "total_earned": (
                                 float(partner["total_earned"])
@@ -2488,9 +2654,9 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                 )
 
                 # Mark messages as read for current user
-                DeliveryChat.objects.filter(order=order, receiver=request.user, is_read=False).update(
-                    is_read=True
-                )
+                DeliveryChat.objects.filter(
+                    order=order, receiver=request.user, is_read=False
+                ).update(is_read=True)
 
                 return Response(
                     {
@@ -2569,3 +2735,142 @@ class DeliveryTrackingViewSet(viewsets.ViewSet):
                 {"error": f"Chat operation failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class DeliveryReviewViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for managing delivery reviews (admin/read-only access)"""
+
+    serializer_class = DeliveryReviewSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Return delivery reviews based on user permissions.
+        Admins can see all, delivery agents can see their own, customers their own
+        """
+        user = self.request.user
+
+        if user.is_staff or user.is_superuser:
+            # Admin can see all delivery reviews
+            return DeliveryReview.objects.select_related(
+                "customer", "delivery__agent", "delivery__order"
+            ).order_by("-created_at")
+        elif hasattr(user, "deliveryagent"):
+            # Delivery agents can see reviews for their deliveries
+            return (
+                DeliveryReview.objects.filter(delivery__agent=user)
+                .select_related(
+                    "customer", "delivery__agent", "delivery__order"
+                )
+                .order_by("-created_at")
+            )
+        else:
+            # Customers can see their own reviews
+            return (
+                DeliveryReview.objects.filter(customer=user)
+                .select_related(
+                    "customer", "delivery__agent", "delivery__order"
+                )
+                .order_by("-created_at")
+            )
+
+    def list(self, request, *args, **kwargs):
+        """
+        List delivery reviews with optional filtering
+        """
+        queryset = self.get_queryset()
+
+        # Apply filters
+        rating = request.query_params.get("rating")
+        has_response = request.query_params.get("has_response")
+        search = request.query_params.get("search")
+
+        if rating:
+            try:
+                rating_val = int(rating)
+                queryset = queryset.filter(rating=rating_val)
+            except ValueError:
+                pass
+
+        if has_response is not None:
+            if has_response.lower() == "true":
+                queryset = queryset.exclude(
+                    admin_response__isnull=True, admin_response=""
+                )
+            elif has_response.lower() == "false":
+                queryset = queryset.filter(
+                    Q(admin_response__isnull=True) | Q(admin_response="")
+                )
+
+        if search:
+            queryset = queryset.filter(
+                Q(comment__icontains=search)
+                | Q(customer__name__icontains=search)
+                | Q(delivery__order__order_number__icontains=search)
+            )
+
+        # Pagination
+        page_size = int(request.query_params.get("limit", 20))
+        page = int(request.query_params.get("page", 1))
+
+        total_count = queryset.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        reviews = queryset[start:end]
+        serializer = self.get_serializer(reviews, many=True)
+
+        return Response(
+            {
+                "results": serializer.data,
+                "count": total_count,
+                "next": (
+                    None
+                    if end >= total_count
+                    else f"?page={page + 1}&limit={page_size}"
+                ),
+                "previous": (
+                    None if page <= 1 else f"?page={page - 1}&limit={page_size}"
+                ),
+            }
+        )
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def reply(self, request, pk=None):
+        """
+        Add admin response to a delivery review
+        """
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response(
+                {"error": "Only admin users can reply to reviews"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        review = self.get_object()
+        admin_response = request.data.get("admin_response", "").strip()
+
+        if not admin_response:
+            return Response(
+                {"error": "admin_response is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        review.admin_response = admin_response
+        review.response_date = timezone.now()
+        review.save(update_fields=["admin_response", "response_date"])
+
+        serializer = self.get_serializer(review)
+        return Response(
+            {
+                "success": True,
+                "message": "Reply sent successfully",
+                "review": serializer.data,
+            }
+        )
+        return Response(
+            {
+                "success": True,
+                "message": "Reply sent successfully",
+                "review": serializer.data,
+            }
+        )

@@ -6,9 +6,9 @@ from .bulk_views import BulkOrderManagementViewSet
 from .customer_bulk_views import CustomerBulkOrderViewSet
 from .customer_views import (
     customer_dashboard_stats,
-    submit_food_review,
-    submit_delivery_review,
     get_order_review_status,
+    submit_delivery_review,
+    submit_food_review,
 )
 
 router = DefaultRouter()
@@ -17,12 +17,17 @@ router.register(r"orders", views.OrderViewSet, basename="orders")
 # router.register(r'order-history', views.OrderStatusHistoryViewSet, basename='order-history')
 router.register(r"cart", views.CartItemViewSet, basename="cart")
 router.register(r"addresses", views.UserAddressViewSet, basename="addresses")
+router.register(
+    r"delivery-reviews", views.DeliveryReviewViewSet, basename="delivery-reviews"
+)
 
 # Bulk order management (for cooks/admins)
 router.register(r"bulk", BulkOrderManagementViewSet, basename="bulk-orders")
 
 # Customer bulk orders (for customers to place bulk orders)
-router.register(r"customer-bulk-orders", CustomerBulkOrderViewSet, basename="customer-bulk-orders")
+router.register(
+    r"customer-bulk-orders", CustomerBulkOrderViewSet, basename="customer-bulk-orders"
+)
 
 
 urlpatterns = [

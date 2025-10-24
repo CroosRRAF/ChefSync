@@ -1,9 +1,21 @@
-from rest_framework import serializers
-from django.db.models import Sum, Count
-from .models import Order, OrderItem, OrderStatusHistory, CartItem, BulkOrder, BulkOrderAssignment, UserAddress, DeliveryChat, Delivery, DeliveryReview
 from apps.food.models import Food, FoodPrice, FoodReview
 from apps.users.models import ChefProfile
 from django.contrib.auth import get_user_model
+from django.db.models import Count, Sum
+from rest_framework import serializers
+
+from .models import (
+    BulkOrder,
+    BulkOrderAssignment,
+    CartItem,
+    Delivery,
+    DeliveryChat,
+    DeliveryReview,
+    Order,
+    OrderItem,
+    OrderStatusHistory,
+    UserAddress,
+)
 
 User = get_user_model()
 
@@ -379,7 +391,9 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     # Food and price information
     food_name = serializers.CharField(source="price.food.name", read_only=True)
-    food_description = serializers.CharField(source="price.food.description", read_only=True)
+    food_description = serializers.CharField(
+        source="price.food.description", read_only=True
+    )
     food_id = serializers.IntegerField(source="price.food.food_id", read_only=True)
     price_id = serializers.IntegerField(source="price.price_id", read_only=True)
     size = serializers.CharField(source="price.size", read_only=True)
@@ -388,7 +402,7 @@ class CartItemSerializer(serializers.ModelSerializer):
     )
     total_price = serializers.SerializerMethodField()
     food_image = serializers.SerializerMethodField()
-    
+
     # Chef/Cook information
     chef_id = serializers.IntegerField(source="price.cook.user_id", read_only=True)
     chef_name = serializers.SerializerMethodField()
@@ -399,10 +413,24 @@ class CartItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = CartItem
         fields = [
-            'id', 'quantity', 'special_instructions', 'created_at', 'updated_at',
-            'food_name', 'food_description', 'food_id', 'price_id', 'size', 
-            'unit_price', 'total_price', 'food_image',
-            'chef_id', 'chef_name', 'cook_name', 'kitchen_address', 'kitchen_location'
+            "id",
+            "quantity",
+            "special_instructions",
+            "created_at",
+            "updated_at",
+            "food_name",
+            "food_description",
+            "food_id",
+            "price_id",
+            "size",
+            "unit_price",
+            "total_price",
+            "food_image",
+            "chef_id",
+            "chef_name",
+            "cook_name",
+            "kitchen_address",
+            "kitchen_location",
         ]
 
     def get_chef_name(self, obj):
@@ -416,7 +444,7 @@ class CartItemSerializer(serializers.ModelSerializer):
             return "Unknown Chef"
         except Exception:
             return "Unknown Chef"
-    
+
     def get_cook_name(self, obj):
         """Alias for chef_name for backward compatibility"""
         return self.get_chef_name(obj)
@@ -426,7 +454,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         try:
             if obj.price and obj.price.food and obj.price.food.image:
                 # Try to get optimized URL if available
-                if hasattr(obj.price.food, 'get_optimized_image_url'):
+                if hasattr(obj.price.food, "get_optimized_image_url"):
                     return obj.price.food.get_optimized_image_url()
                 return str(obj.price.food.image)
             return None
@@ -437,98 +465,97 @@ class CartItemSerializer(serializers.ModelSerializer):
         """Get chef's kitchen address"""
         try:
             from apps.users.models import Address
-            
+
             cook = obj.price.cook
             if not cook:
                 return "Address not available"
-            
+
             # Get kitchen address from Address model (users app)
             kitchen_address = Address.objects.filter(
-                user=cook,
-                address_type='kitchen',
-                is_default=True,
-                is_active=True
+                user=cook, address_type="kitchen", is_default=True, is_active=True
             ).first()
-            
+
             # If no default kitchen, get any active kitchen address
             if not kitchen_address:
                 kitchen_address = Address.objects.filter(
-                    user=cook,
-                    address_type='kitchen',
-                    is_active=True
+                    user=cook, address_type="kitchen", is_active=True
                 ).first()
-            
+
             # If still no kitchen address, get default address
             if not kitchen_address:
                 kitchen_address = Address.objects.filter(
-                    user=cook,
-                    is_default=True,
-                    is_active=True
+                    user=cook, is_default=True, is_active=True
                 ).first()
-            
+
             if kitchen_address:
                 # Format the address nicely
                 address_parts = []
                 if kitchen_address.label:
                     address_parts.append(kitchen_address.label)
-                if hasattr(kitchen_address, 'street_address') and kitchen_address.street_address:
+                if (
+                    hasattr(kitchen_address, "street_address")
+                    and kitchen_address.street_address
+                ):
                     address_parts.append(kitchen_address.street_address)
-                if hasattr(kitchen_address, 'city') and kitchen_address.city:
+                if hasattr(kitchen_address, "city") and kitchen_address.city:
                     address_parts.append(kitchen_address.city)
-                
+
                 return ", ".join(address_parts) if address_parts else "Kitchen Location"
-            
+
             return "Address not available"
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
-            logger.error(f"Error getting kitchen address for cook {obj.price.cook.user_id}: {str(e)}")
+            logger.error(
+                f"Error getting kitchen address for cook {obj.price.cook.user_id}: {str(e)}"
+            )
             return "Address not available"
 
     def get_kitchen_location(self, obj):
         """Get chef's kitchen location coordinates"""
         try:
             from apps.users.models import Address
-            
+
             cook = obj.price.cook
             if not cook:
                 return None
-            
+
             # Get kitchen address from Address model (users app)
             kitchen_address = Address.objects.filter(
-                user=cook,
-                address_type='kitchen',
-                is_default=True,
-                is_active=True
+                user=cook, address_type="kitchen", is_default=True, is_active=True
             ).first()
-            
+
             # If no default kitchen, get any active kitchen address
             if not kitchen_address:
                 kitchen_address = Address.objects.filter(
-                    user=cook,
-                    address_type='kitchen',
-                    is_active=True
+                    user=cook, address_type="kitchen", is_active=True
                 ).first()
-            
+
             # If still no kitchen address, get default address
             if not kitchen_address:
                 kitchen_address = Address.objects.filter(
-                    user=cook,
-                    is_default=True,
-                    is_active=True
+                    user=cook, is_default=True, is_active=True
                 ).first()
-            
-            if kitchen_address and kitchen_address.latitude and kitchen_address.longitude:
+
+            if (
+                kitchen_address
+                and kitchen_address.latitude
+                and kitchen_address.longitude
+            ):
                 return {
-                    'lat': float(kitchen_address.latitude),
-                    'lng': float(kitchen_address.longitude)
+                    "lat": float(kitchen_address.latitude),
+                    "lng": float(kitchen_address.longitude),
                 }
-            
+
             return None
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
-            logger.error(f"Error getting kitchen location for cook {obj.price.cook.user_id}: {str(e)}")
+            logger.error(
+                f"Error getting kitchen location for cook {obj.price.cook.user_id}: {str(e)}"
+            )
             return None
 
     def get_total_price(self, obj):
@@ -690,13 +717,13 @@ class BulkOrderListSerializer(serializers.ModelSerializer):
                 return str(obj.total_amount)
         except Exception:
             pass
-        if getattr(obj, 'order', None):
+        if getattr(obj, "order", None):
             return str(obj.order.total_amount)
         return "0.00"
 
     def get_items(self, obj):
         # Get items from the related order when available. Otherwise return empty list.
-        if getattr(obj, 'order', None):
+        if getattr(obj, "order", None):
             order_items = obj.order.items.all()[:3]  # Limit to first 3
             return [
                 {
@@ -714,7 +741,7 @@ class BulkOrderListSerializer(serializers.ModelSerializer):
         assignments = obj.assignments.select_related("chef")
         return [
             {
-                'id': assignment.chef.user_id,
+                "id": assignment.chef.user_id,
                 "name": (
                     assignment.chef.name
                     if assignment.chef.name
@@ -732,25 +759,25 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
 
     bulk_order_id = serializers.IntegerField(read_only=True)
     order_number = serializers.SerializerMethodField()
-    
+
     # Customer info - Handle both direct customer field and created_by
     customer = serializers.SerializerMethodField()
     customer_id = serializers.SerializerMethodField()
-    
+
     # Chef info
     chef = serializers.SerializerMethodField()
     chef_id = serializers.SerializerMethodField()
-    
+
     # Delivery agent info
     delivery_partner = serializers.SerializerMethodField()
     delivery_partner_id = serializers.SerializerMethodField()
-    
+
     # Delivery location
     delivery_address = serializers.SerializerMethodField()
     delivery_latitude = serializers.SerializerMethodField()
     delivery_longitude = serializers.SerializerMethodField()
     distance_km = serializers.SerializerMethodField()
-    
+
     # Order details
     order_type = serializers.SerializerMethodField()
     delivery_fee = serializers.SerializerMethodField()
@@ -760,7 +787,7 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
     event_time = serializers.SerializerMethodField()
     num_persons = serializers.SerializerMethodField()
     menu_name = serializers.SerializerMethodField()
-    
+
     assignments = BulkOrderAssignmentSerializer(many=True, read_only=True)
     order_details = OrderDetailSerializer(source="order", read_only=True)
 
@@ -769,25 +796,20 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
         fields = [
             "bulk_order_id",
             "order_number",
-            
             # Customer
             "customer",
             "customer_id",
-            
             # Chef
             "chef",
             "chef_id",
-            
             # Delivery agent
             "delivery_partner",
             "delivery_partner_id",
-            
             # Delivery location
             "delivery_address",
             "delivery_latitude",
             "delivery_longitude",
             "distance_km",
-            
             # Order details
             "order_type",
             "delivery_fee",
@@ -799,11 +821,9 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
             "status",
             "total_amount",
             "notes",
-            
             # Relations
             "assignments",
             "order_details",
-            
             # Timestamps
             "created_at",
             "updated_at",
@@ -811,140 +831,156 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
 
     def get_order_number(self, obj):
         # Try direct field first
-        if hasattr(obj, 'order_number') and obj.order_number:
+        if hasattr(obj, "order_number") and obj.order_number:
             return obj.order_number
         # Fallback to order relationship
         if obj.order:
             return obj.order.order_number
         return f"BULK-{obj.bulk_order_id:06d}"
-    
+
     # Customer getters - Handle both direct field and created_by
     def get_customer(self, obj):
         # Try direct customer field first (new structure)
-        if hasattr(obj, 'customer') and obj.customer:
+        if hasattr(obj, "customer") and obj.customer:
             try:
                 return {
-                    'id': obj.customer.id,
-                    'name': obj.customer.name,
-                    'email': obj.customer.email
+                    "id": obj.customer.id,
+                    "name": obj.customer.name,
+                    "email": obj.customer.email,
                 }
             except AttributeError:
                 pass
-        
+
         # Fallback to created_by (current structure)
         if obj.created_by:
             return {
-                'id': obj.created_by.id,
-                'name': obj.created_by.name,
-                'email': obj.created_by.email
+                "id": obj.created_by.id,
+                "name": obj.created_by.name,
+                "email": obj.created_by.email,
             }
         return None
-    
+
     def get_customer_id(self, obj):
         # Try direct customer_id first
-        if hasattr(obj, 'customer_id') and obj.customer_id:
+        if hasattr(obj, "customer_id") and obj.customer_id:
             return obj.customer_id
         # Fallback to created_by
         return obj.created_by.id if obj.created_by else None
-    
+
     # Chef getters - Handle both direct field and order relationship
     def get_chef(self, obj):
         # Try direct field first (new structure)
-        if hasattr(obj, 'chef') and obj.chef:
+        if hasattr(obj, "chef") and obj.chef:
             try:
                 return {
-                    'id': obj.chef.id,
-                    'name': obj.chef.name,
-                    'email': obj.chef.email
+                    "id": obj.chef.id,
+                    "name": obj.chef.name,
+                    "email": obj.chef.email,
                 }
             except AttributeError:
                 pass
-        
+
         # Fallback to order relationship (old structure)
         if obj.order and obj.order.chef:
             return {
-                'id': obj.order.chef.id,
-                'name': obj.order.chef.name,
-                'email': obj.order.chef.email
+                "id": obj.order.chef.id,
+                "name": obj.order.chef.name,
+                "email": obj.order.chef.email,
             }
         return None
-    
+
     def get_chef_id(self, obj):
         # Try direct field first
-        if hasattr(obj, 'chef_id') and obj.chef_id:
+        if hasattr(obj, "chef_id") and obj.chef_id:
             return obj.chef_id
         # Fallback to order
         return obj.order.chef.id if obj.order and obj.order.chef else None
-    
+
     # Delivery agent getters - Handle both structures
     def get_delivery_partner(self, obj):
         # Try direct field first
-        if hasattr(obj, 'delivery_partner') and obj.delivery_partner:
+        if hasattr(obj, "delivery_partner") and obj.delivery_partner:
             try:
                 return {
-                    'id': obj.delivery_partner.id,
-                    'name': obj.delivery_partner.name,
-                    'email': obj.delivery_partner.email
+                    "id": obj.delivery_partner.id,
+                    "name": obj.delivery_partner.name,
+                    "email": obj.delivery_partner.email,
                 }
             except AttributeError:
                 pass
-        
+
         # Fallback to order
         if obj.order and obj.order.delivery_partner:
             return {
-                'id': obj.order.delivery_partner.id,
-                'name': obj.order.delivery_partner.name,
-                'email': obj.order.delivery_partner.email
+                "id": obj.order.delivery_partner.id,
+                "name": obj.order.delivery_partner.name,
+                "email": obj.order.delivery_partner.email,
             }
         return None
-    
+
     def get_delivery_partner_id(self, obj):
         # Try direct field first
-        if hasattr(obj, 'delivery_partner_id') and obj.delivery_partner_id:
+        if hasattr(obj, "delivery_partner_id") and obj.delivery_partner_id:
             return obj.delivery_partner_id
         # Fallback to order
-        return obj.order.delivery_partner.id if obj.order and obj.order.delivery_partner else None
-    
+        return (
+            obj.order.delivery_partner.id
+            if obj.order and obj.order.delivery_partner
+            else None
+        )
+
     # Delivery location getters - Handle both structures
     def get_delivery_address(self, obj):
         # Try direct field first
-        if hasattr(obj, 'delivery_address') and obj.delivery_address:
+        if hasattr(obj, "delivery_address") and obj.delivery_address:
             return obj.delivery_address
         # Fallback to order
         return obj.order.delivery_address if obj.order else None
-    
+
     def get_delivery_latitude(self, obj):
         # Try direct field first
-        if hasattr(obj, 'delivery_latitude') and obj.delivery_latitude:
+        if hasattr(obj, "delivery_latitude") and obj.delivery_latitude:
             return float(obj.delivery_latitude)
         # Fallback to order
-        return float(obj.order.delivery_latitude) if obj.order and obj.order.delivery_latitude else None
-    
+        return (
+            float(obj.order.delivery_latitude)
+            if obj.order and obj.order.delivery_latitude
+            else None
+        )
+
     def get_delivery_longitude(self, obj):
         # Try direct field first
-        if hasattr(obj, 'delivery_longitude') and obj.delivery_longitude:
+        if hasattr(obj, "delivery_longitude") and obj.delivery_longitude:
             return float(obj.delivery_longitude)
         # Fallback to order
-        return float(obj.order.delivery_longitude) if obj.order and obj.order.delivery_longitude else None
-    
+        return (
+            float(obj.order.delivery_longitude)
+            if obj.order and obj.order.delivery_longitude
+            else None
+        )
+
     def get_distance_km(self, obj):
         # Try direct field first
-        if hasattr(obj, 'distance_km') and obj.distance_km:
+        if hasattr(obj, "distance_km") and obj.distance_km:
             return float(obj.distance_km)
         # Fallback to order
-        return float(obj.order.distance_km) if obj.order and obj.order.distance_km else None
-    
+        return (
+            float(obj.order.distance_km)
+            if obj.order and obj.order.distance_km
+            else None
+        )
+
     # Order details getters - Handle both structures
     def get_order_type(self, obj):
         # Try direct field first
-        if hasattr(obj, 'order_type') and obj.order_type:
+        if hasattr(obj, "order_type") and obj.order_type:
             return obj.order_type
         # Fallback to order
         return obj.order.order_type if obj.order else "delivery"
-    
+
     def get_delivery_fee(self, obj):
         # Try direct field first
-        if hasattr(obj, 'delivery_fee') and obj.delivery_fee is not None:
+        if hasattr(obj, "delivery_fee") and obj.delivery_fee is not None:
             return float(obj.delivery_fee)
         # Fallback to order
         return float(obj.order.delivery_fee) if obj.order else 0.0
@@ -970,7 +1006,7 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
                 return str(obj.total_amount)
         except Exception:
             pass
-        if getattr(obj, 'order', None):
+        if getattr(obj, "order", None):
             return str(obj.order.total_amount)
         return "0.00"
 
@@ -1016,153 +1052,148 @@ class BulkOrderDetailSerializer(serializers.ModelSerializer):
 
 # ===== CUSTOMER BULK ORDER SERIALIZERS =====
 
+
 class CustomerBulkOrderSerializer(serializers.Serializer):
     """Serializer for customers to place bulk orders from bulk menus"""
-    
+
     bulk_menu_id = serializers.IntegerField(required=True)
     num_persons = serializers.IntegerField(required=True, min_value=1)
     event_date = serializers.DateField(required=True)
     event_time = serializers.TimeField(required=True)
     order_type = serializers.ChoiceField(
-        choices=['delivery', 'pickup'],
-        default='delivery',
-        required=False
+        choices=["delivery", "pickup"], default="delivery", required=False
     )
-    delivery_address = serializers.CharField(required=False, max_length=500, allow_blank=True)
+    delivery_address = serializers.CharField(
+        required=False, max_length=500, allow_blank=True
+    )
     delivery_address_id = serializers.IntegerField(required=False, allow_null=True)
     delivery_latitude = serializers.DecimalField(
-        max_digits=10, 
-        decimal_places=8, 
-        required=False, 
-        allow_null=True
+        max_digits=10, decimal_places=8, required=False, allow_null=True
     )
     delivery_longitude = serializers.DecimalField(
-        max_digits=11, 
-        decimal_places=8, 
-        required=False, 
-        allow_null=True
+        max_digits=11, decimal_places=8, required=False, allow_null=True
     )
     delivery_fee = serializers.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        default=0,
-        required=False
+        max_digits=10, decimal_places=2, default=0, required=False
     )
     distance_km = serializers.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        required=False,
-        allow_null=True
+        max_digits=5, decimal_places=2, required=False, allow_null=True
     )
     special_instructions = serializers.CharField(required=False, allow_blank=True)
     selected_optional_items = serializers.ListField(
-        child=serializers.IntegerField(),
-        required=False,
-        default=list
+        child=serializers.IntegerField(), required=False, default=list
     )
     total_amount = serializers.DecimalField(
-        max_digits=12, 
-        decimal_places=2, 
-        required=True,
-        min_value=0
+        max_digits=12, decimal_places=2, required=True, min_value=0
     )
 
     def validate_bulk_menu_id(self, value):
         """Validate that the bulk menu exists and is available"""
         from apps.food.models import BulkMenu
-        
+
         try:
             menu = BulkMenu.objects.get(id=value)
-            if menu.approval_status != 'approved':
+            if menu.approval_status != "approved":
                 raise serializers.ValidationError("This bulk menu is not approved")
             if not menu.availability_status:
-                raise serializers.ValidationError("This bulk menu is not currently available")
+                raise serializers.ValidationError(
+                    "This bulk menu is not currently available"
+                )
             return value
         except BulkMenu.DoesNotExist:
             raise serializers.ValidationError("Bulk menu not found")
 
     def validate(self, data):
         """Validate that num_persons is within menu limits and event is in future"""
+        from datetime import datetime, timedelta
+
         from apps.food.models import BulkMenu
         from django.utils import timezone
-        from datetime import datetime, timedelta
-        
-        menu = BulkMenu.objects.get(id=data['bulk_menu_id'])
-        
+
+        menu = BulkMenu.objects.get(id=data["bulk_menu_id"])
+
         # Validate number of persons
-        if data['num_persons'] < menu.min_persons:
-            raise serializers.ValidationError({
-                'num_persons': f"Minimum {menu.min_persons} persons required for this menu"
-            })
-        if data['num_persons'] > menu.max_persons:
-            raise serializers.ValidationError({
-                'num_persons': f"Maximum {menu.max_persons} persons allowed for this menu"
-            })
-        
+        if data["num_persons"] < menu.min_persons:
+            raise serializers.ValidationError(
+                {
+                    "num_persons": f"Minimum {menu.min_persons} persons required for this menu"
+                }
+            )
+        if data["num_persons"] > menu.max_persons:
+            raise serializers.ValidationError(
+                {
+                    "num_persons": f"Maximum {menu.max_persons} persons allowed for this menu"
+                }
+            )
+
         # Validate event date/time is in future with advance notice
-        event_datetime = datetime.combine(data['event_date'], data['event_time'])
+        event_datetime = datetime.combine(data["event_date"], data["event_time"])
         event_datetime = timezone.make_aware(event_datetime)
-        
+
         if event_datetime <= timezone.now():
-            raise serializers.ValidationError({
-                'event_date': "Event must be in the future"
-            })
-        
+            raise serializers.ValidationError(
+                {"event_date": "Event must be in the future"}
+            )
+
         # Check advance notice requirement
         hours_until_event = (event_datetime - timezone.now()).total_seconds() / 3600
         if hours_until_event < menu.advance_notice_hours:
-            raise serializers.ValidationError({
-                'event_date': f"This menu requires {menu.advance_notice_hours} hours advance notice"
-            })
-        
+            raise serializers.ValidationError(
+                {
+                    "event_date": f"This menu requires {menu.advance_notice_hours} hours advance notice"
+                }
+            )
+
         # Validate delivery address for delivery orders
-        order_type = data.get('order_type', 'delivery')
-        if order_type == 'delivery':
-            if not data.get('delivery_address') and not data.get('delivery_address_id'):
-                raise serializers.ValidationError({
-                    'delivery_address': 'Delivery address is required for delivery orders'
-                })
-        
+        order_type = data.get("order_type", "delivery")
+        if order_type == "delivery":
+            if not data.get("delivery_address") and not data.get("delivery_address_id"):
+                raise serializers.ValidationError(
+                    {
+                        "delivery_address": "Delivery address is required for delivery orders"
+                    }
+                )
+
         return data
 
 
 class DeliveryChatSerializer(serializers.ModelSerializer):
     """Serializer for delivery chat messages"""
-    
+
     sender_name = serializers.SerializerMethodField()
     sender_role = serializers.SerializerMethodField()
     is_own_message = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = DeliveryChat
         fields = [
-            'message_id',
-            'order',
-            'sender',
-            'receiver',
-            'sender_name',
-            'sender_role',
-            'message',
-            'message_type',
-            'is_read',
-            'is_own_message',
-            'created_at',
+            "message_id",
+            "order",
+            "sender",
+            "receiver",
+            "sender_name",
+            "sender_role",
+            "message",
+            "message_type",
+            "is_read",
+            "is_own_message",
+            "created_at",
         ]
-        read_only_fields = ['message_id', 'sender', 'created_at']
-    
+        read_only_fields = ["message_id", "sender", "created_at"]
+
     def get_sender_name(self, obj):
         """Get sender's display name"""
         return obj.sender.name or obj.sender.username
-    
+
     def get_sender_role(self, obj):
         """Get sender's role (customer or delivery_agent)"""
-        if hasattr(obj.sender, 'deliveryagent'):
-            return 'delivery_agent'
-        return 'customer'
-    
+        if hasattr(obj.sender, "deliveryagent"):
+            return "delivery_agent"
+        return "customer"
+
     def get_is_own_message(self, obj):
         """Check if message was sent by the current user"""
-        request = self.context.get('request')
+        request = self.context.get("request")
         if request and request.user:
             return obj.sender == request.user
         return False
@@ -1170,96 +1201,131 @@ class DeliveryChatSerializer(serializers.ModelSerializer):
 
 class DeliveryReviewSerializer(serializers.ModelSerializer):
     """Serializer for delivery reviews"""
-    
-    customer_name = serializers.SerializerMethodField()
-    delivery_agent_name = serializers.SerializerMethodField()
-    order_number = serializers.SerializerMethodField()
-    
+
+    customer = serializers.SerializerMethodField()
+    delivery = serializers.SerializerMethodField()
+
     class Meta:
         model = DeliveryReview
         fields = [
-            'review_id',
-            'rating',
-            'comment',
-            'delivery',
-            'customer',
-            'customer_name',
-            'delivery_agent_name',
-            'order_number',
-            'created_at',
+            "review_id",
+            "rating",
+            "comment",
+            "delivery",
+            "customer",
+            "created_at",
+            "admin_response",
+            "response_date",
         ]
-        read_only_fields = ['review_id', 'customer', 'customer_name', 'delivery_agent_name', 'order_number', 'created_at']
-    
-    def get_customer_name(self, obj):
-        """Get customer's display name"""
+        read_only_fields = ["review_id", "created_at"]
+
+    def get_customer(self, obj):
+        """Get customer information"""
         if obj.customer:
-            return obj.customer.name or obj.customer.username
-        return "Unknown Customer"
-    
-    def get_delivery_agent_name(self, obj):
-        """Get delivery agent's display name"""
-        if obj.delivery and obj.delivery.agent:
-            return obj.delivery.agent.name or obj.delivery.agent.username
-        return "Unknown Agent"
-    
-    def get_order_number(self, obj):
-        """Get order number"""
-        if obj.delivery and obj.delivery.order:
-            return obj.delivery.order.order_number
-        return "N/A"
+            return {
+                "id": obj.customer.id,
+                "name": obj.customer.name or obj.customer.username,
+                "email": obj.customer.email,
+            }
+        return None
+
+    def get_delivery(self, obj):
+        """Get delivery information"""
+        if obj.delivery:
+            delivery_agent = (
+                obj.delivery.agent if obj.delivery.agent else None
+            )
+            order = obj.delivery.order if obj.delivery.order else None
+
+            return {
+                "delivery_id": obj.delivery.delivery_id,
+                "order": (
+                    {
+                        "order_id": order.id if order else None,
+                        "order_number": order.order_number if order else None,
+                    }
+                    if order
+                    else None
+                ),
+                "delivery_agent": (
+                    {
+                        "id": delivery_agent.id if delivery_agent else None,
+                        "name": delivery_agent.name if delivery_agent else None,
+                        "email": delivery_agent.email if delivery_agent else None,
+                    }
+                    if delivery_agent
+                    else None
+                ),
+            }
+        return None
 
 
 class FoodReviewSerializer(serializers.ModelSerializer):
     """Serializer for food/cook reviews"""
-    
+
     customer_name = serializers.SerializerMethodField()
     cook_name = serializers.SerializerMethodField()
     food_name = serializers.SerializerMethodField()
     order_number = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = FoodReview
         fields = [
-            'review_id',
-            'rating',
-            'comment',
-            'price',
-            'order',
-            'customer',
-            'customer_name',
-            'cook_name',
-            'food_name',
-            'order_number',
-            'taste_rating',
-            'presentation_rating',
-            'value_rating',
-            'is_verified_purchase',
-            'helpful_votes',
-            'created_at',
-            'updated_at',
+            "review_id",
+            "rating",
+            "comment",
+            "price",
+            "order",
+            "customer",
+            "customer_name",
+            "cook_name",
+            "food_name",
+            "order_number",
+            "taste_rating",
+            "presentation_rating",
+            "value_rating",
+            "is_verified_purchase",
+            "helpful_votes",
+            "created_at",
+            "updated_at",
         ]
-        read_only_fields = ['review_id', 'customer', 'customer_name', 'cook_name', 'food_name', 'order_number', 'is_verified_purchase', 'helpful_votes', 'created_at', 'updated_at']
-    
+        read_only_fields = [
+            "review_id",
+            "customer",
+            "customer_name",
+            "cook_name",
+            "food_name",
+            "order_number",
+            "is_verified_purchase",
+            "helpful_votes",
+            "created_at",
+            "updated_at",
+        ]
+
     def get_customer_name(self, obj):
         """Get customer's display name"""
         if obj.customer:
             return obj.customer.name or obj.customer.username
         return "Unknown Customer"
-    
+
     def get_cook_name(self, obj):
         """Get cook's display name"""
         if obj.price and obj.price.cook:
             return obj.price.cook.name or obj.price.cook.username
         return "Unknown Cook"
-    
+
     def get_food_name(self, obj):
         """Get food name"""
         if obj.price and obj.price.food:
             return obj.price.food.name
         return "Unknown Food"
-    
+
     def get_order_number(self, obj):
         """Get order number"""
         if obj.order:
             return obj.order.order_number
-        return data
+        return "N/A"
+        """Get order number"""
+        if obj.order:
+            return obj.order.order_number
+        return "N/A"
