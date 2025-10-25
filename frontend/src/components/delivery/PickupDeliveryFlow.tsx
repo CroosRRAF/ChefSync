@@ -48,6 +48,7 @@ import {
 } from "@/utils/mapUtils";
 import type { Order } from "../../types/orderType";
 import IntegratedMapView from "@/components/maps/IntegratedMapView";
+import { formatCurrency } from "@/utils/numberUtils";
 
 interface CookDetails {
   id: number;
@@ -527,7 +528,7 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
             <div className="text-right">
               <p className="text-sm text-gray-600">Total Value</p>
               <p className="text-lg font-semibold text-green-600">
-                ${order.total_amount}
+                {formatCurrency(order.total_amount)}
               </p>
             </div>
           </div>

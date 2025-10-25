@@ -32,6 +32,7 @@ import OrderStatusTracker from "@/components/delivery/OrderStatusTracker";
 import SimplifiedDeliveryFlow from "@/components/delivery/SimplifiedDeliveryFlow";
 import DeliveryContacts from "@/components/delivery/DeliveryContacts";
 import QuickContact from "@/components/delivery/QuickContact";
+import { formatCurrency } from "@/utils/numberUtils";
 import {
   getAvailableOrders,
   getMyAssignedOrders,
@@ -118,9 +119,13 @@ const AllOrdersPage: React.FC = () => {
       // Filter available orders (not yet assigned to anyone)
       const actuallyAvailable = available.filter(
         (order) =>
-          !["assigned", "picked_up", "in_transit", "delivered","confirmed"].includes(
-            order.status
-          )
+          ![
+            "assigned",
+            "picked_up",
+            "in_transit",
+            "delivered",
+            "confirmed",
+          ].includes(order.status)
       );
 
       setAvailableOrders(actuallyAvailable);
@@ -393,7 +398,7 @@ const AllOrdersPage: React.FC = () => {
             </div>
             <div className="flex items-center font-semibold text-green-600">
               <DollarSign className="h-4 w-4 mr-1" />
-              <span>${order.total_amount}</span>
+              <span>{formatCurrency(order.total_amount)}</span>
             </div>
           </div>
 
@@ -668,7 +673,7 @@ const AllOrdersPage: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center font-semibold text-green-600">
                             <DollarSign className="h-4 w-4 mr-1" />
-                            <span>${order.total_amount}</span>
+                            <span>{formatCurrency(order.total_amount)}</span>
                           </div>
                           <div className="flex items-center text-yellow-600">
                             <Star className="h-4 w-4 fill-current" />
@@ -730,11 +735,11 @@ const AllOrdersPage: React.FC = () => {
                         Order Value
                       </label>
                       <p className="font-medium text-lg text-green-600">
-                        ${selectedOrder.total_amount}
+                        {formatCurrency(selectedOrder.total_amount)}
                       </p>
                       {selectedOrder.delivery_fee && (
                         <p className="text-sm text-gray-500">
-                          Delivery: ${selectedOrder.delivery_fee}
+                          Delivery: {formatCurrency(selectedOrder.delivery_fee)}
                         </p>
                       )}
                     </div>

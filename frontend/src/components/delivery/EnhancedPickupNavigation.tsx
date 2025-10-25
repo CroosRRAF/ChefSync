@@ -25,6 +25,7 @@ import {
 import { Order } from "@/types/orderType";
 import { generateNavigationUrl } from "@/utils/mapUtils";
 import IntegratedMapView from "@/components/maps/IntegratedMapView";
+import { formatCurrency } from "@/utils/numberUtils";
 
 interface EnhancedPickupNavigationProps {
   orders: Order[];
@@ -346,7 +347,7 @@ const EnhancedPickupNavigation: React.FC<EnhancedPickupNavigationProps> = ({
                 <div className="flex items-center justify-between text-sm text-muted-foreground border-t pt-2">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    <span>${order.total_amount}</span>
+                    <span>{formatCurrency(order.total_amount)}</span>
                   </div>
                   <span>{new Date(order.created_at).toLocaleDateString()}</span>
                 </div>

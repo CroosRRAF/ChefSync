@@ -17,6 +17,7 @@ import {
 import type { Order } from "../../types/orderType";
 import TwoPhaseDeliveryDialog from "./TwoPhaseDeliveryDialog";
 import ContactCard from "./ContactCard";
+import { formatCurrency } from "@/utils/numberUtils";
 
 interface DeliveryPhaseCardProps {
   order: Order;
@@ -162,7 +163,7 @@ const DeliveryPhaseCard: React.FC<DeliveryPhaseCardProps> = ({
 
           <div className="text-right">
             <p className="text-sm font-semibold text-green-600">
-              ${order.total_amount}
+              {formatCurrency(order.total_amount)}
             </p>
           </div>
         </div>

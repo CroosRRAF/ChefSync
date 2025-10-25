@@ -48,6 +48,7 @@ import {
   Users,
 } from "lucide-react";
 import SimplifiedDeliveryFlow from "@/components/delivery/SimplifiedDeliveryFlow";
+import { formatCurrency } from "@/utils/numberUtils";
 
 const DeliveryDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -541,7 +542,7 @@ const DeliveryDashboard: React.FC = () => {
               <div>
                 <p className="text-green-100 text-sm">Today's Earnings</p>
                 <p className="text-3xl font-bold text-white">
-                  LKR ${totalEarnings.toFixed(2)}
+                  {formatCurrency(totalEarnings)}
                 </p>
               </div>
               <DollarSign className="h-10 w-10 text-green-200 group-hover:scale-110 transition-transform duration-300" />
@@ -807,7 +808,7 @@ const DeliveryDashboard: React.FC = () => {
                                 className="font-semibold"
                                 style={{ color: "#9C27B0" }}
                               >
-                                ${order.total_amount}
+                                {formatCurrency(order.total_amount)}
                               </span>
                             </div>
                           </div>
@@ -1100,14 +1101,14 @@ const DeliveryDashboard: React.FC = () => {
                     <div>
                       <div className="flex justify-between mb-2">
                         <span>Earnings</span>
-                        <span>LKR ${totalEarnings.toFixed(2)}/LKR 200</span>
+                        <span>{formatCurrency(totalEarnings)}/LKR 20,000</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-green-600 h-2 rounded-full"
                           style={{
                             width: `${Math.min(
-                              (totalEarnings / 200) * 100,
+                              (totalEarnings / 20000) * 100,
                               100
                             )}%`,
                           }}

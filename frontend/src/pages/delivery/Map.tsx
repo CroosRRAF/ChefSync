@@ -46,6 +46,7 @@ import {
 import type { Order } from "../../types/orderType";
 import OrderStatusTracker from "@/components/delivery/OrderStatusTracker";
 import DeliveryTracker from "@/components/delivery/DeliveryTracker";
+import { formatCurrency } from "@/utils/numberUtils";
 
 import SimplifiedDeliveryFlow from "@/components/delivery/SimplifiedDeliveryFlow";
 import DeliveryContacts from "@/components/delivery/DeliveryContacts";
@@ -677,7 +678,7 @@ const DeliveryMap: React.FC = () => {
                         Order Total
                       </label>
                       <p className="font-medium text-lg text-green-600">
-                        ${selectedOrder.total_amount}
+                        {formatCurrency(selectedOrder.total_amount)}
                       </p>
                     </div>
 
