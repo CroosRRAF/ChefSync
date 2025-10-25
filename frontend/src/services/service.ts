@@ -177,11 +177,11 @@ export const getAvailableOrders = async (): Promise<UnifiedOrder[]> => {
     console.log("Raw bulk orders fetched:", bulkOrders.length);
 
     // Filter normal orders for available states (ready for pickup/delivery)
-    // Only including preparing and ready orders, excluding confirmed, pending, cancelled, out_for_delivery
+    // Including confirmed, preparing and ready orders
     const availableNormalOrders = normalOrders
       .filter(
         (order: Order) => {
-          const isAvailableStatus = ["preparing", "ready"].includes(order.status);
+          const isAvailableStatus = ["confirmed", "preparing", "ready"].includes(order.status);
           const hasNoDeliveryPartner = !order.delivery_partner;
           console.log(`Order ${order.id}: status=${order.status}, hasDeliveryPartner=${!!order.delivery_partner}, available=${isAvailableStatus && hasNoDeliveryPartner}`);
           return isAvailableStatus && hasNoDeliveryPartner;

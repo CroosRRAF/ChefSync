@@ -792,6 +792,97 @@ const CommunicationCenter: React.FC = () => {
     }
   }, [currentPage, itemsPerPage, feedbackFilters, toast]);
 
+  // Export functionality
+  const handleExportData = useCallback(() => {
+    try {
+      let csvContent = "";
+      let filename = "";
+      const timestamp = new Date().toISOString().split("T")[0];
+
+      if (activeTab === "feedback") {
+        // Export feedback data
+        filename = `feedback-data-${timestamp}.csv`;
+        csvContent = "ID,Type,Subject,Status,Priority,Customer,Created At\n";
+        feedbacks.forEach((feedback: any) => {
+          const row = [
+            feedback.id || "",
+            feedback.type || "",
+            `"${(feedback.subject || "").replace(/"/g, '""')}"`,
+            feedback.status || "",
+            feedback.priority || "",
+            `"${(feedback.customer?.name || "").replace(/"/g, '""')}"`,
+            feedback.created_at || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      } else if (activeTab === "templates") {
+        // Export email templates
+        filename = `email-templates-${timestamp}.csv`;
+        csvContent = "ID,Name,Subject,Status,Created At\n";
+        templates.forEach((template: any) => {
+          const row = [
+            template.id || "",
+            `"${(template.name || "").replace(/"/g, '""')}"`,
+            `"${(template.subject || "").replace(/"/g, '""')}"`,
+            template.status || "",
+            template.created_at || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      } else if (activeTab === "notifications") {
+        // Export notifications
+        filename = `notifications-${timestamp}.csv`;
+        csvContent = "ID,Title,Message,Type,Status,Created At\n";
+        notifications.forEach((notification: any) => {
+          const row = [
+            notification.id || "",
+            `"${(notification.title || "").replace(/"/g, '""')}"`,
+            `"${(notification.message || "").replace(/"/g, '""')}"`,
+            notification.type || "",
+            notification.status || "",
+            notification.created_at || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      } else if (activeTab === "overview") {
+        // Export communication stats
+        filename = `communication-stats-${timestamp}.csv`;
+        csvContent = "Metric,Value\n";
+        if (communicationStats) {
+          csvContent += `Total Communications,${communicationStats.total || 0}\n`;
+          csvContent += `Pending Communications,${communicationStats.pending || 0}\n`;
+          csvContent += `In Progress,${communicationStats.in_progress || 0}\n`;
+          csvContent += `Resolved Communications,${communicationStats.resolved || 0}\n`;
+          csvContent += `Closed Communications,${communicationStats.closed || 0}\n`;
+          csvContent += `Average Rating,${communicationStats.average_rating || 0}\n`;
+        }
+      }
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Success",
+        description: "Data exported successfully",
+      });
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export data",
+        variant: "destructive",
+      });
+    }
+  }, [activeTab, feedbacks, templates, notifications, communicationStats]);
+
   // Handle feedback response
   const handleSendResponse = async () => {
     if (!selectedFeedback || !responseText.trim()) return;
@@ -2380,7 +2471,7 @@ const CommunicationCenter: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportData}>
             <Download className="h-4 w-4 mr-2" />
             Export Data
           </Button>

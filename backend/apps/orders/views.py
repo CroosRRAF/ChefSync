@@ -1,3 +1,4 @@
+import logging
 import math
 import uuid
 from datetime import datetime, timedelta
@@ -6,6 +7,8 @@ from decimal import Decimal
 import pytz
 
 from apps.food.models import FoodPrice, FoodReview
+
+logger = logging.getLogger(__name__)
 from apps.payments.models import Payment
 from django.contrib.auth import get_user_model
 from django.db.models import Avg, Count, F, Q, Sum
@@ -441,7 +444,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         ):
             return queryset.filter(
                 Q(delivery_partner=user)
-                | Q(status="ready", delivery_partner__isnull=True)
+                | Q(status__in=["confirmed", "preparing", "ready"], delivery_partner__isnull=True)
             )
         # For admins, show all orders
         elif (
@@ -1382,11 +1385,10 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="delivery/available")
     def available_for_delivery(self, request):
         """Get orders available for delivery agents to accept"""
-        # Orders that are ready and don't have a delivery partner yet
-        # Excluding confirmed orders as per business requirement
+        # Orders that are confirmed, preparing, or ready and don't have a delivery partner yet
         available_orders = (
             Order.objects.filter(
-                Q(status__in=["preparing", "ready"])
+                Q(status__in=["confirmed", "preparing", "ready"])
                 & Q(delivery_partner__isnull=True)
             )
             .select_related("customer", "chef")
@@ -2081,7 +2083,7 @@ def calculate_checkout(request):
         if not chef_latitude or not chef_longitude:
             first_item = cart_items[0]
             try:
-                food_price = FoodPrice.objects.select_related("price__cook").get(
+                food_price = FoodPrice.objects.select_related("cook").get(
                     id=first_item["price_id"]
                 )
                 chef = food_price.cook
@@ -2396,11 +2398,14 @@ def place_order(request):
                 )
 
         # Prepare address data for order creation
+        # For cash on delivery, auto-confirm the order so it shows up for delivery agents
+        initial_status = "confirmed" if payment_method == "cash" else "pending"
+        
         order_data = {
             "customer": request.user,
             "chef": chef,
             "order_number": f"ORD-{uuid.uuid4().hex[:8].upper()}",
-            "status": "pending",  # Order starts as pending, waiting for chef approval
+            "status": initial_status,
             "payment_method": payment_method,
             "payment_status": "pending",
             "subtotal": Decimal(str(subtotal)),
@@ -2463,11 +2468,16 @@ def place_order(request):
         cart_items.delete()
 
         # Create initial status history
+        status_note = (
+            "Order placed and confirmed successfully. Chef can start preparing."
+            if initial_status == "confirmed"
+            else "Order placed successfully. Waiting for payment confirmation."
+        )
         OrderStatusHistory.objects.create(
             order=order,
-            status="pending",  # Initial status is pending
+            status=initial_status,
             changed_by=request.user,
-            notes="Order placed successfully. Waiting for chef approval.",
+            notes=status_note,
         )
 
         # Create notifications

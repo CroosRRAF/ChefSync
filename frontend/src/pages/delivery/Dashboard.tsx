@@ -206,8 +206,8 @@ const DeliveryDashboard: React.FC = () => {
       console.log("Fetched available orders:", ordersData);
 
       // Define statuses considered "available for delivery"
-      // Only including preparing and ready orders, excluding confirmed, pending, cancelled, out_for_delivery
-      const deliverableStatuses = ["preparing", "ready"];
+      // Including confirmed, preparing and ready orders
+      const deliverableStatuses = ["confirmed", "preparing", "ready"];
 
       // Filter orders that are in deliverable statuses
       const availableOrdersData = ordersData.filter((order) =>

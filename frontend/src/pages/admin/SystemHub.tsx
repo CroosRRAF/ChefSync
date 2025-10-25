@@ -352,6 +352,77 @@ const SystemHub: React.FC = () => {
     }
   }, []);
 
+  // Export functionality
+  const handleExportData = useCallback(() => {
+    try {
+      let csvContent = "";
+      let filename = "";
+      const timestamp = new Date().toISOString().split("T")[0];
+
+      if (activeTab === "overview" || activeTab === "settings") {
+        // Export system stats
+        filename = `system-stats-${timestamp}.csv`;
+        csvContent = "Metric,Value\n";
+        if (realtimeStats) {
+          csvContent += `Connections,${realtimeStats.connections}\n`;
+          csvContent += `Active Users,${realtimeStats.activeUsers}\n`;
+          csvContent += `Messages Sent,${realtimeStats.messagesSent}\n`;
+          csvContent += `Delivery Rate,${realtimeStats.deliveryRate}%\n`;
+          csvContent += `Avg Response Time,${realtimeStats.avgResponseTime}ms\n`;
+          csvContent += `System Load,${realtimeStats.systemLoad}%\n`;
+          csvContent += `Error Rate,${realtimeStats.errorRate}%\n`;
+          csvContent += `Last Updated,${realtimeStats.lastUpdated}\n`;
+        }
+      } else if (activeTab === "analytics") {
+        // Export analytics data
+        filename = `analytics-data-${timestamp}.csv`;
+        csvContent = "Metric,Value\n";
+        if (analyticsData) {
+          csvContent += `Total Orders,${analyticsData.totalOrders || 0}\n`;
+          csvContent += `Total Revenue,${analyticsData.totalRevenue || 0}\n`;
+          csvContent += `Active Users,${analyticsData.activeUsers || 0}\n`;
+          csvContent += `Conversion Rate,${analyticsData.conversionRate || 0}%\n`;
+        }
+      } else if (activeTab === "reports") {
+        // Export report templates info
+        filename = `report-templates-${timestamp}.csv`;
+        csvContent = "ID,Name,Type,Description\n";
+        reportTemplates.forEach((template: any) => {
+          const row = [
+            template.id || "",
+            `"${(template.name || "").replace(/"/g, '""')}"`,
+            template.type || "",
+            `"${(template.description || "").replace(/"/g, '""')}"`,
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      }
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Success",
+        description: "Data exported successfully",
+      });
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export data",
+        variant: "destructive",
+      });
+    }
+  }, [activeTab, realtimeStats, analyticsData, reportTemplates]);
+
   // WebSocket connection management
   const connectWebSocket = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -949,7 +1020,7 @@ const SystemHub: React.FC = () => {
                   >
                     Generate
                   </Button>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" onClick={handleExportData}>
                     <Download className="h-3 w-3 mr-1" />
                     Export
                   </Button>
@@ -1139,7 +1210,7 @@ const SystemHub: React.FC = () => {
         </div>
         
         <div className="flex items-center space-x-4">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportData}>
             <Download className="h-4 w-4 mr-2" />
             Export Data
           </Button>

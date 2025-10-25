@@ -220,13 +220,19 @@ const AnalyticsHub: React.FC = () => {
   // Load business metrics with better error handling
   const loadBusinessMetrics = useCallback(async () => {
     try {
-      const [metrics, performance] = await Promise.all([
+      const [metrics, performance, orders, customers] = await Promise.all([
         analyticsService
           .getRevenueAnalytics(timeRange)
           .catch(() => ({ current: 0, previous: 0, trend: "stable" as const })),
         analyticsService
           .getPerformanceMetrics(timeRange)
           .catch(() => ({ avgDeliveryTime: 0, customerSatisfaction: 0 })),
+        analyticsService
+          .getOrderAnalytics(timeRange)
+          .catch(() => ({ total: 0, avgOrderValue: 0, trend: 0 })),
+        analyticsService
+          .getCustomerAnalytics(timeRange)
+          .catch(() => ({ total: 0, retention: 0 })),
       ]);
 
       const transformedMetrics: BusinessMetrics = {
@@ -236,15 +242,15 @@ const AnalyticsHub: React.FC = () => {
           trend: metrics.trend || "stable",
         },
         orders: {
-          total: 0,
-          completed: 0,
-          pending: 0,
-          trend: 0,
+          total: orders.total || 0,
+          completed: Math.round((orders.total || 0) * 0.85), // Estimate 85% completed
+          pending: Math.round((orders.total || 0) * 0.15), // Estimate 15% pending
+          trend: orders.trend || 0,
         },
         customers: {
-          total: 0,
-          active: 0,
-          retention: 0,
+          total: customers.total || 0,
+          active: Math.round((customers.total || 0) * 0.7), // Estimate 70% active
+          retention: customers.retention || 0,
         },
         performance: {
           avgDeliveryTime: performance.avgDeliveryTime || 0,
@@ -669,14 +675,16 @@ const AnalyticsHub: React.FC = () => {
             </div>
           </div>
           <LineChart
-            data={[
-              { name: "Week 1", value: 15000 },
-              { name: "Week 2", value: 18000 },
-              { name: "Week 3", value: 22000 },
-              { name: "Week 4", value: 25000 },
-              { name: "Week 5", value: 28000 },
-              { name: "Week 6", value: 24000 },
-            ]}
+            data={
+              advancedAnalytics?.trends?.revenue_trends?.length
+                ? advancedAnalytics.trends.revenue_trends.map((item) => ({
+                    name: item.day_name || item.date.split('-').slice(1).join('/'),
+                    value: item.revenue || 0,
+                  }))
+                : [
+                    { name: "No Data", value: 0 },
+                  ]
+            }
             dataKeys={["value"]}
             xAxisDataKey="name"
             height={280}
@@ -703,11 +711,17 @@ const AnalyticsHub: React.FC = () => {
             </div>
           </div>
           <PieChart
-            data={[
-              { name: "Completed", value: 65, color: "#22c55e" },
-              { name: "Processing", value: 25, color: "#f59e0b" },
-              { name: "Cancelled", value: 10, color: "#ef4444" },
-            ]}
+            data={
+              businessMetrics?.orders
+                ? [
+                    { name: "Completed", value: businessMetrics.orders.completed, color: "#22c55e" },
+                    { name: "Processing", value: businessMetrics.orders.pending, color: "#f59e0b" },
+                    { name: "Cancelled", value: Math.round(businessMetrics.orders.total * 0.05), color: "#ef4444" },
+                  ]
+                : [
+                    { name: "No Data", value: 1, color: "#d1d5db" },
+                  ]
+            }
             height={280}
             colors={["#22c55e", "#f59e0b", "#ef4444"]}
             noCard={true}
@@ -732,16 +746,18 @@ const AnalyticsHub: React.FC = () => {
             </div>
           </div>
           <LineChart
-            data={[
-              { name: "Mon", performance: 85, completion: 92 },
-              { name: "Tue", performance: 88, completion: 94 },
-              { name: "Wed", performance: 82, completion: 89 },
-              { name: "Thu", performance: 90, completion: 96 },
-              { name: "Fri", performance: 93, completion: 98 },
-              { name: "Sat", performance: 87, completion: 91 },
-              { name: "Sun", performance: 85, completion: 88 },
-            ]}
-            dataKeys={["performance", "completion"]}
+            data={
+              advancedAnalytics?.trends?.order_trends?.length
+                ? advancedAnalytics.trends.order_trends.map((item) => ({
+                    name: item.day_name || item.date.split('-').slice(2).join('/'),
+                    orders: item.orders || 0,
+                    completion: businessMetrics?.performance?.customerSatisfaction || 85,
+                  }))
+                : [
+                    { name: "No Data", orders: 0, completion: 0 },
+                  ]
+            }
+            dataKeys={["orders", "completion"]}
             xAxisDataKey="name"
             height={280}
             showTrend={true}
@@ -768,12 +784,18 @@ const AnalyticsHub: React.FC = () => {
             </div>
           </div>
           <BarChart
-            data={[
-              { name: "Week 1", users: 120, orders: 85, revenue: 15000 },
-              { name: "Week 2", users: 150, orders: 102, revenue: 18000 },
-              { name: "Week 3", users: 180, orders: 125, revenue: 22000 },
-              { name: "Week 4", users: 210, orders: 145, revenue: 25000 },
-            ]}
+            data={
+              advancedAnalytics?.trends?.revenue_trends?.length
+                ? advancedAnalytics.trends.revenue_trends.map((item, index) => ({
+                    name: item.day_name || item.date.split('-').slice(1).join('/'),
+                    users: advancedAnalytics.trends.user_trends[index]?.new_users || 0,
+                    orders: advancedAnalytics.trends.order_trends[index]?.orders || 0,
+                    revenue: item.revenue || 0,
+                  }))
+                : [
+                    { name: "No Data", users: 0, orders: 0, revenue: 0 },
+                  ]
+            }
             dataKeys={["users", "orders", "revenue"]}
             xAxisDataKey="name"
             height={280}
@@ -800,15 +822,26 @@ const AnalyticsHub: React.FC = () => {
             </div>
           </div>
           <PieChart
-            data={[
-              { name: "Monday", value: 18 },
-              { name: "Tuesday", value: 22 },
-              { name: "Wednesday", value: 20 },
-              { name: "Thursday", value: 25 },
-              { name: "Friday", value: 28 },
-              { name: "Saturday", value: 35 },
-              { name: "Sunday", value: 15 },
-            ]}
+            data={
+              advancedAnalytics?.trends?.order_trends?.length
+                ? (() => {
+                    // Group orders by day_name
+                    const dayOrders: Record<string, number> = {};
+                    advancedAnalytics.trends.order_trends.forEach((item) => {
+                      const day = item.day_name || new Date(item.date).toLocaleDateString('en-US', { weekday: 'long' });
+                      dayOrders[day] = (dayOrders[day] || 0) + (item.orders || 0);
+                    });
+                    // Convert to array format
+                    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                    return days.map(day => ({
+                      name: day,
+                      value: dayOrders[day] || 0,
+                    })).filter(item => item.value > 0);
+                  })()
+                : [
+                    { name: "No Data", value: 1 },
+                  ]
+            }
             height={280}
             colors={[
               "#8B5CF6",
@@ -841,17 +874,35 @@ const AnalyticsHub: React.FC = () => {
             </div>
           </div>
           <BarChart
-            data={[
-              { name: "New", customers: 45, orders: 52, revenue: 8500 },
-              {
-                name: "Returning",
-                customers: 120,
-                orders: 185,
-                revenue: 22000,
-              },
-              { name: "VIP", customers: 25, orders: 78, revenue: 15500 },
-            ]}
-            dataKeys={["customers", "orders", "revenue"]}
+            data={
+              advancedAnalytics?.segmentation?.segments
+                ? [
+                    {
+                      name: "New",
+                      customers: advancedAnalytics.segmentation.segments.new.customers,
+                      revenue: advancedAnalytics.segmentation.segments.new.total_spent,
+                    },
+                    {
+                      name: "Occasional",
+                      customers: advancedAnalytics.segmentation.segments.occasional.customers,
+                      revenue: advancedAnalytics.segmentation.segments.occasional.total_spent,
+                    },
+                    {
+                      name: "Regular",
+                      customers: advancedAnalytics.segmentation.segments.regular.customers,
+                      revenue: advancedAnalytics.segmentation.segments.regular.total_spent,
+                    },
+                    {
+                      name: "VIP",
+                      customers: advancedAnalytics.segmentation.segments.vip.customers,
+                      revenue: advancedAnalytics.segmentation.segments.vip.total_spent,
+                    },
+                  ]
+                : [
+                    { name: "No Data", customers: 0, revenue: 0 },
+                  ]
+            }
+            dataKeys={["customers", "revenue"]}
             xAxisDataKey="name"
             height={280}
             colors={["#F97316", "#EF4444", "#8B5CF6"]}

@@ -341,6 +341,75 @@ const UserManagementHub: React.FC = () => {
     }
   }, [searchQuery, roleFilter, statusFilter, updateData, toast]);
 
+  // Export functionality
+  const handleExportUsers = useCallback(() => {
+    try {
+      let csvContent = "";
+      let filename = "";
+      const timestamp = new Date().toISOString().split("T")[0];
+
+      if (activeTab === "users") {
+        // Export all users
+        filename = `users-${timestamp}.csv`;
+        csvContent = "ID,Name,Email,Role,Phone,Status,Approval Status,Date Joined,Last Login\n";
+        optimisticUsers.forEach((user: any) => {
+          const row = [
+            user.id || "",
+            `"${(user.name || "").replace(/"/g, '""')}"`,
+            user.email || "",
+            user.role || "",
+            user.phone_no || "",
+            user.is_active ? "Active" : "Inactive",
+            user.approval_status || "",
+            user.date_joined || "",
+            user.last_login || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      } else if (activeTab === "pending") {
+        // Export pending approvals
+        filename = `pending-approvals-${timestamp}.csv`;
+        csvContent = "ID,Name,Email,Role,Phone,Status,Documents,Date Joined\n";
+        pendingUsers.forEach((user: any) => {
+          const row = [
+            user.id || "",
+            `"${(user.name || "").replace(/"/g, '""')}"`,
+            user.email || "",
+            user.role || "",
+            user.phone_no || "",
+            user.approval_status || "",
+            user.documents?.length || "0",
+            user.date_joined || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      }
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Success",
+        description: "Users exported successfully",
+      });
+    } catch (error) {
+      console.error("Error exporting users:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export users",
+        variant: "destructive",
+      });
+    }
+  }, [activeTab, optimisticUsers, pendingUsers]);
+
   // Load admin profile
   const loadAdminProfile = useCallback(async () => {
     if (!user?.id) {
@@ -1561,7 +1630,7 @@ const UserManagementHub: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportUsers}>
             <Download className="h-4 w-4 mr-2" />
             Export Users
           </Button>

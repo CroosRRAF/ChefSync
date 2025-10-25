@@ -770,6 +770,92 @@ const ContentManagementHub: React.FC = () => {
     }
   }, []);
 
+  // Export functionality
+  const handleExportData = useCallback(() => {
+    try {
+      let csvContent = "";
+      let filename = "";
+      const timestamp = new Date().toISOString().split("T")[0];
+
+      if (activeTab === "food") {
+        // Export food items
+        filename = `food-items-${timestamp}.csv`;
+        csvContent = "ID,Name,Description,Price,Category,Cook,Is Vegetarian,Status,Created At\n";
+        foods.forEach((food: any) => {
+          const row = [
+            food.id || "",
+            `"${(food.name || "").replace(/"/g, '""')}"`,
+            `"${(food.description || "").replace(/"/g, '""')}"`,
+            food.price || "",
+            `"${(food.category_name || "").replace(/"/g, '""')}"`,
+            `"${(food.cook_name || "").replace(/"/g, '""')}"`,
+            food.is_vegetarian ? "Yes" : "No",
+            food.status || "",
+            food.created_at || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      } else if (activeTab === "offers") {
+        // Export offers
+        filename = `offers-${timestamp}.csv`;
+        csvContent = "ID,Title,Description,Discount,Code,Start Date,End Date,Status,Created At\n";
+        offers.forEach((offer: any) => {
+          const row = [
+            offer.id || "",
+            `"${(offer.title || "").replace(/"/g, '""')}"`,
+            `"${(offer.description || "").replace(/"/g, '""')}"`,
+            offer.discount_percentage || "",
+            offer.code || "",
+            offer.start_date || "",
+            offer.end_date || "",
+            offer.status || "",
+            offer.created_at || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      } else if (activeTab === "referrals") {
+        // Export referral tokens
+        filename = `referral-tokens-${timestamp}.csv`;
+        csvContent = "Token,User,Status,Uses,Max Uses,Created At,Expires At\n";
+        referralTokens.forEach((token: any) => {
+          const row = [
+            token.token || "",
+            `"${(token.user || "").replace(/"/g, '""')}"`,
+            token.status || "",
+            token.uses || "0",
+            token.max_uses || "",
+            token.created_at || "",
+            token.expires_at || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      }
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Success",
+        description: "Data exported successfully",
+      });
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export data",
+        variant: "destructive",
+      });
+    }
+  }, [activeTab, foods, offers, referralTokens]);
+
   // Delete food item
   const handleDeleteFood = async (food: Food) => {
     try {
@@ -1835,7 +1921,7 @@ const ContentManagementHub: React.FC = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
-            <Button variant="outline" size="sm" className="w-full sm:w-auto">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleExportData}>
               <Download className="h-4 w-4 mr-2" />
               <span className="hidden xs:inline">Export All</span>
               <span className="xs:hidden">Export</span>

@@ -632,6 +632,90 @@ const OrderManagementHub: React.FC = () => {
     }
   };
 
+  // Export functionality
+  const handleExportData = useCallback(() => {
+    try {
+      let csvContent = "";
+      let filename = "";
+      const timestamp = new Date().toISOString().split("T")[0];
+
+      if (activeTab === "orders") {
+        // Export orders
+        filename = `orders-${timestamp}.csv`;
+        csvContent = "Order #,Customer Name,Customer Email,Items Count,Total Amount,Status,Payment Status,Created At\n";
+        orders.forEach((order: any) => {
+          const row = [
+            order.order_number || "",
+            `"${(order.customer_name || "").replace(/"/g, '""')}"`,
+            order.customer_email || "",
+            order.items_count || "0",
+            order.total_amount || "",
+            order.status || "",
+            order.payment_status || "",
+            order.created_at || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      } else if (activeTab === "delivery") {
+        // Export active deliveries
+        filename = `deliveries-${timestamp}.csv`;
+        csvContent = "Order ID,Customer,Delivery Partner,Status,Delivery Address,Total Amount,Delivery Fee,Time Elapsed\n";
+        activeDeliveries.forEach((delivery: any) => {
+          const row = [
+            delivery.order_id || "",
+            `"${(delivery.customer?.name || "").replace(/"/g, '""')}"`,
+            `"${(delivery.delivery_partner?.name || "Unassigned").replace(/"/g, '""')}"`,
+            delivery.status || "",
+            `"${(delivery.delivery_address || "").replace(/"/g, '""')}"`,
+            delivery.total_amount || "",
+            delivery.delivery_fee || "",
+            delivery.time_elapsed || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      } else if (activeTab === "payments") {
+        // Export transactions
+        filename = `transactions-${timestamp}.csv`;
+        csvContent = "Transaction ID,Order ID,Payment ID,Amount,Type,Status,Date\n";
+        transactions.forEach((transaction: any) => {
+          const row = [
+            transaction.id || "",
+            transaction.order_id || "",
+            transaction.payment_id || "",
+            transaction.amount || "",
+            transaction.type || "",
+            transaction.status || "",
+            transaction.transaction_date || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      }
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Success",
+        description: "Data exported successfully",
+      });
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export data",
+        variant: "destructive",
+      });
+    }
+  }, [activeTab, orders, activeDeliveries, transactions]);
+
   // Load data based on active tab with performance optimization
   useEffect(() => {
     // Only load data for the active tab to reduce API calls
@@ -1329,7 +1413,7 @@ const OrderManagementHub: React.FC = () => {
       <GlassCard className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Orders</h3>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportData}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -1448,7 +1532,7 @@ const OrderManagementHub: React.FC = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExportData}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
@@ -1705,7 +1789,7 @@ const OrderManagementHub: React.FC = () => {
       <GlassCard className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Recent Transactions</h3>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportData}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -1773,7 +1857,7 @@ const OrderManagementHub: React.FC = () => {
             </Button>
           )}
 
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportData}>
             <Download className="h-4 w-4 mr-2" />
             Export All
           </Button>
