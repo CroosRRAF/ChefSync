@@ -21,6 +21,7 @@ import {
   BarChart3,
   Calendar,
 } from "lucide-react";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { useEffect, useState } from "react";
 
 function CookDashboardContent() {
@@ -135,12 +136,46 @@ function CookDashboardContent() {
   // Export functions - based on dashboard stats only
   const downloadPDF = async () => {
     try {
-      const element = document.createElement('a');
-      const content = generatePDFContent();
-      const periodLabel = periodStats?.period_label || 'All-Time';
-      const blob = new Blob([content], { type: 'text/plain' });
+      // Create a real PDF using pdf-lib so the download is a proper PDF file
+      if (!stats) {
+        throw new Error("No dashboard data available to generate PDF");
+      }
+
+  const pdfDoc = await PDFDocument.create();
+  let page = pdfDoc.addPage();
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontSize = 11;
+      const margin = 40;
+      let y = page.getHeight() - margin;
+
+      const lines = generatePDFContent().split("\n");
+
+      for (const line of lines) {
+        // If we run out of space on the page, add a new page and update reference
+        if (y < margin + fontSize) {
+          page = pdfDoc.addPage();
+          y = page.getHeight() - margin;
+        }
+
+        page.drawText(line, {
+          x: margin,
+          y: y,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
+
+        y -= fontSize + 6; // line height
+      }
+
+  const pdfBytes = await pdfDoc.save();
+  // pdfBytes is a Uint8Array; convert to an ArrayBuffer for Blob to satisfy TypeScript
+  const arrayBuffer = pdfBytes.buffer as ArrayBuffer;
+  const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+      const element = document.createElement("a");
+      const periodLabel = periodStats?.period_label || "All-Time";
       element.href = URL.createObjectURL(blob);
-      element.download = `dashboard-report-${periodLabel.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.txt`;
+      element.download = `dashboard-report-${periodLabel.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.pdf`;
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
