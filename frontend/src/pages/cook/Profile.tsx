@@ -37,7 +37,8 @@ import {
   ChefHat,
   Clock,
   Star,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { userService, CookProfileResponse } from "@/services/userService";
@@ -96,6 +97,81 @@ interface NotificationState {
   type: 'success' | 'error' | 'info';
 }
 
+// Validation errors interface
+interface ValidationErrors {
+  name?: string;
+  phone?: string;
+  username?: string;
+  bio?: string;
+  available_hours?: string;
+  specialty_cuisine?: string;
+}
+
+// Validation utility functions
+const validateName = (name: string): string | null => {
+  if (!name.trim()) return "Name is required";
+  if (name.length < 2) return "Name must be at least 2 characters";
+  if (name.length > 50) return "Name must be less than 50 characters";
+  if (!/^[a-zA-Z\s\-'\.]+$/.test(name)) return "Name can only contain letters, spaces, hyphens, and apostrophes";
+  return null;
+};
+
+const validatePhone = (phone: string): string | null => {
+  if (!phone.trim()) return null; // Phone is optional
+  
+  // Remove all non-digit characters for validation
+  const digitsOnly = phone.replace(/\D/g, '');
+  
+  // Sri Lankan phone number validation
+  if (phone.startsWith('+94')) {
+    if (digitsOnly.length !== 11) return "Sri Lankan phone number must be 11 digits including country code";
+    if (!digitsOnly.startsWith('94')) return "Invalid Sri Lankan country code";
+  } else if (phone.startsWith('0')) {
+    if (digitsOnly.length !== 10) return "Local phone number must be 10 digits";
+    if (!digitsOnly.startsWith('07')) return "Sri Lankan mobile numbers should start with 07";
+  } else {
+    if (digitsOnly.length < 7 || digitsOnly.length > 15) return "Phone number must be between 7-15 digits";
+  }
+  
+  return null;
+};
+
+const validateUsername = (username: string): string | null => {
+  if (!username.trim()) return "Username is required";
+  if (username.length < 3) return "Username must be at least 3 characters";
+  if (username.length > 20) return "Username must be less than 20 characters";
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) return "Username can only contain letters, numbers, and underscores";
+  if (/^\d+$/.test(username)) return "Username cannot be only numbers";
+  return null;
+};
+
+const validateBio = (bio: string): string | null => {
+  if (bio.length > 500) return "Bio must be less than 500 characters";
+  // Check for inappropriate content (basic check)
+  const inappropriateWords = ['spam', 'fake', 'scam']; // Add more as needed
+  const lowerBio = bio.toLowerCase();
+  for (const word of inappropriateWords) {
+    if (lowerBio.includes(word)) return "Bio contains inappropriate content";
+  }
+  return null;
+};
+
+const validateAvailableHours = (hours: string): string | null => {
+  if (!hours.trim()) return null; // Optional field
+  
+  // Basic format validation for common patterns
+  const timePatterns = [
+    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)(-|to)(Mon|Tue|Wed|Thu|Fri|Sat|Sun)?\s+\d{1,2}(AM|PM|am|pm)(-|to)\d{1,2}(AM|PM|am|pm)$/i,
+    /^\d{1,2}(AM|PM|am|pm)(-|to)\d{1,2}(AM|PM|am|pm)$/i,
+    /^24\/7$/i,
+    /^Always available$/i
+  ];
+  
+  if (hours.length > 100) return "Available hours description is too long";
+  
+  return null;
+};
+
 // Notification Component
 const Notification: React.FC<NotificationState & { onClose: () => void }> = ({
   show,
@@ -130,6 +206,17 @@ const Notification: React.FC<NotificationState & { onClose: () => void }> = ({
   );
 };
 
+// Field Error Component
+const FieldError: React.FC<{ error?: string }> = ({ error }) => {
+  if (!error) return null;
+  return (
+    <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+      <AlertTriangle className="h-3 w-3" />
+      {error}
+    </p>
+  );
+};
+
 export default function Profile() {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -140,6 +227,10 @@ export default function Profile() {
     message: '',
     type: 'info'
   });
+
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [isFormValid, setIsFormValid] = useState(true);
 
   // Combined profile data (user + cook profile)
   const [formData, setFormData] = useState({
@@ -176,6 +267,58 @@ export default function Profile() {
     setNotification(prev => ({ ...prev, show: false }));
   };
 
+  // Validate individual field
+  const validateField = (field: string, value: string): string | null => {
+    switch (field) {
+      case 'name':
+        return validateName(value);
+      case 'phone':
+        return validatePhone(value);
+      case 'username':
+        return validateUsername(value);
+      case 'bio':
+        return validateBio(value);
+      case 'available_hours':
+        return validateAvailableHours(value);
+      default:
+        return null;
+    }
+  };
+
+  // Validate entire form
+  const validateForm = (): boolean => {
+    const errors: ValidationErrors = {};
+    
+    // Validate required fields
+    const nameError = validateName(formData.name);
+    if (nameError) errors.name = nameError;
+    
+    const usernameError = validateUsername(formData.username || '');
+    if (usernameError) errors.username = usernameError;
+    
+    // Validate optional fields
+    if (formData.phone) {
+      const phoneError = validatePhone(formData.phone);
+      if (phoneError) errors.phone = phoneError;
+    }
+    
+    if (formData.bio) {
+      const bioError = validateBio(formData.bio);
+      if (bioError) errors.bio = bioError;
+    }
+    
+    if (formData.available_hours) {
+      const hoursError = validateAvailableHours(formData.available_hours);
+      if (hoursError) errors.available_hours = hoursError;
+    }
+    
+    setValidationErrors(errors);
+    const isValid = Object.keys(errors).length === 0;
+    setIsFormValid(isValid);
+    
+    return isValid;
+  };
+
   // Load profile data on component mount
   useEffect(() => {
     const loadProfile = async () => {
@@ -210,10 +353,31 @@ export default function Profile() {
   }, [user]);
 
   const handleFormChange = (field: string, value: string | number) => {
+    // Update form data
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Real-time validation for the changed field
+    if (isEditing && typeof value === 'string') {
+      const error = validateField(field, value);
+      setValidationErrors(prev => ({
+        ...prev,
+        [field]: error
+      }));
+      
+      // Check if form is valid
+      const newErrors = { ...validationErrors, [field]: error };
+      const hasErrors = Object.values(newErrors).some(err => err !== null);
+      setIsFormValid(!hasErrors);
+    }
   };
 
   const handleSave = async () => {
+    // Validate form before saving
+    if (!validateForm()) {
+      showNotification('Please fix the validation errors before saving.', 'error');
+      return;
+    }
+
     try {
       setLoading(true);
       console.log('Saving profile data:', formData);
@@ -239,6 +403,9 @@ export default function Profile() {
         kitchen_location: updatedProfile.kitchen_location
       });
       
+      // Clear validation errors
+      setValidationErrors({});
+      setIsFormValid(true);
       setIsEditing(false);
       showNotification('Profile updated successfully!', 'success');
     } catch (error) {
@@ -302,7 +469,15 @@ export default function Profile() {
         </div>
         <Button
           variant={isEditing ? "outline" : "default"}
-          onClick={() => setIsEditing(!isEditing)}
+          onClick={() => {
+            if (isEditing) {
+              handleCancel();
+            } else {
+              setIsEditing(true);
+              // Validate current data when entering edit mode
+              setTimeout(() => validateForm(), 100);
+            }
+          }}
           className="flex items-center gap-2"
           disabled={loading}
         >
@@ -310,6 +485,47 @@ export default function Profile() {
           {isEditing ? "Cancel" : "Edit Profile"}
         </Button>
       </div>
+
+      {/* Validation Summary */}
+      {isEditing && Object.keys(validationErrors).length > 0 && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-medium text-red-800 dark:text-red-200 mb-2">
+                Please fix the following errors:
+              </h3>
+              <ul className="text-sm text-red-700 dark:text-red-300 space-y-1">
+                {Object.entries(validationErrors).map(([field, error]) => {
+                  if (!error) return null;
+                  const fieldLabels: Record<string, string> = {
+                    name: 'Full Name',
+                    phone: 'Phone Number',
+                    username: 'Username',
+                    bio: 'Bio',
+                    available_hours: 'Available Hours'
+                  };
+                  return (
+                    <li key={field}>• {fieldLabels[field] || field}: {error}</li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Validation Success */}
+      {isEditing && Object.keys(validationErrors).length === 0 && isFormValid && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 text-green-500" />
+            <p className="text-green-800 dark:text-green-200 font-medium">
+              ✅ All fields are valid! You can save your changes.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Card */}
@@ -377,12 +593,15 @@ export default function Profile() {
             <div className="flex items-center gap-3 text-sm">
               <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               {isEditing ? (
-                <Input
-                  value={formData.phone || ""}
-                  onChange={(e) => handleFormChange("phone", e.target.value)}
-                  placeholder="Phone number"
-                  className="text-sm h-8"
-                />
+                <div className="flex-1">
+                  <Input
+                    value={formData.phone || ""}
+                    onChange={(e) => handleFormChange("phone", e.target.value)}
+                    placeholder="Phone number"
+                    className={`text-sm h-8 ${validationErrors.phone ? 'border-red-500' : ''}`}
+                  />
+                  <FieldError error={validationErrors.phone} />
+                </div>
               ) : (
                 <span>{profileData?.phone || "No phone"}</span>
               )}
@@ -512,7 +731,9 @@ export default function Profile() {
                     onChange={(e) => handleFormChange("name", e.target.value)}
                     disabled={!isEditing}
                     placeholder="Enter your full name"
+                    className={validationErrors.name ? 'border-red-500' : ''}
                   />
+                  <FieldError error={validationErrors.name} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address 📧</Label>
@@ -523,6 +744,7 @@ export default function Profile() {
                     placeholder="Email cannot be changed"
                     className="bg-muted"
                   />
+                  <p className="text-xs text-muted-foreground">Email cannot be changed for security reasons</p>
                 </div>
               </div>
 
@@ -534,8 +756,13 @@ export default function Profile() {
                     value={formData.phone || ""}
                     onChange={(e) => handleFormChange("phone", e.target.value)}
                     disabled={!isEditing}
-                    placeholder="Enter your phone number"
+                    placeholder="Enter your phone number (e.g., +94771234567 or 0771234567)"
+                    className={validationErrors.phone ? 'border-red-500' : ''}
                   />
+                  <FieldError error={validationErrors.phone} />
+                  {!validationErrors.phone && isEditing && (
+                    <p className="text-xs text-muted-foreground">Format: +94XXXXXXXXX or 0XXXXXXXXX</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="username">Username 👤</Label>
@@ -545,7 +772,12 @@ export default function Profile() {
                     onChange={(e) => handleFormChange("username", e.target.value)}
                     disabled={!isEditing}
                     placeholder="Enter your username"
+                    className={validationErrors.username ? 'border-red-500' : ''}
                   />
+                  <FieldError error={validationErrors.username} />
+                  {!validationErrors.username && isEditing && (
+                    <p className="text-xs text-muted-foreground">3-20 characters, letters, numbers, and underscores only</p>
+                  )}
                 </div>
               </div>
 
@@ -638,8 +870,13 @@ export default function Profile() {
                     value={formData.available_hours || ""}
                     onChange={(e) => handleFormChange("available_hours", e.target.value)}
                     disabled={!isEditing}
-                    placeholder="e.g., Mon-Fri 9AM-6PM"
+                    placeholder="e.g., Mon-Fri 9AM-6PM, 24/7, Always available"
+                    className={validationErrors.available_hours ? 'border-red-500' : ''}
                   />
+                  <FieldError error={validationErrors.available_hours} />
+                  {!validationErrors.available_hours && isEditing && (
+                    <p className="text-xs text-muted-foreground">Examples: "Mon-Fri 9AM-6PM", "24/7", "Always available"</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   {isEditing ? (
@@ -704,9 +941,23 @@ export default function Profile() {
                   value={formData.bio || ""}
                   onChange={(e) => handleFormChange("bio", e.target.value)}
                   disabled={!isEditing}
-                  placeholder="Tell customers about yourself"
+                  placeholder="Tell customers about yourself, your cooking style, specialties..."
                   rows={4}
+                  className={validationErrors.bio ? 'border-red-500' : ''}
                 />
+                <div className="flex justify-between items-center">
+                  <FieldError error={validationErrors.bio} />
+                  {isEditing && (
+                    <span className={`text-xs ${(formData.bio?.length || 0) > 450 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                      {formData.bio?.length || 0}/500 characters
+                    </span>
+                  )}
+                </div>
+                {!validationErrors.bio && isEditing && (
+                  <p className="text-xs text-muted-foreground">
+                    Share your cooking passion, experience, and what makes your food special!
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -749,7 +1000,11 @@ export default function Profile() {
                 <Button variant="outline" onClick={handleCancel} disabled={loading}>
                   Cancel ↩️
                 </Button>
-                <Button onClick={handleSave} disabled={loading} className="flex items-center gap-2">
+                <Button 
+                  onClick={handleSave} 
+                  disabled={loading || !isFormValid} 
+                  className="flex items-center gap-2"
+                >
                   <Save className="h-4 w-4" />
                   {loading ? 'Saving...' : 'Save Changes ✅'}
                 </Button>

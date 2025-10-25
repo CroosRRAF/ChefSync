@@ -636,7 +636,7 @@ const OrderDetailModal: React.FC<{
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Name</p>
-                <p className="font-medium">{order.customer?.full_name || order.customer_name}</p>
+                <p className="font-medium">{order.customer?.name || order.customer_name}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
@@ -1129,6 +1129,9 @@ const Order: React.FC = () => {
       showNotification('Order status updated successfully', 'success');
       await fetchDashboardStats(); // Refresh stats
       
+      // Close the detail modal after successful status update
+      setIsDetailModalOpen(false);
+      
     } catch (error) {
       console.error('Error updating order status:', error);
       showNotification('Failed to update order status', 'error');
@@ -1160,6 +1163,9 @@ const Order: React.FC = () => {
       
       showNotification('✅ Order accepted! Customer will receive confirmation message.', 'success');
       await fetchDashboardStats();
+      
+      // Close the detail modal after successful order acceptance
+      setIsDetailModalOpen(false);
       
     } catch (error) {
       console.error('Error accepting order:', error);
@@ -1196,6 +1202,7 @@ const Order: React.FC = () => {
       
       // Close modal and reset state
       setIsRejectionModalOpen(false);
+      setIsDetailModalOpen(false); // Also close the order detail modal
       setOrderToReject(null);
       setRejectionReason('');
       
@@ -1426,7 +1433,7 @@ const Order: React.FC = () => {
                           <User className="h-4 w-4 text-gray-400 mr-2" />
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {order.customer?.full_name || order.customer_name}
+                              {order.customer?.name || order.customer_name}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
                               {order.customer?.phone}
