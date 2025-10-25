@@ -3217,62 +3217,73 @@ class DeliveryReviewViewSet(viewsets.ReadOnlyModelViewSet):
         """
         List delivery reviews with optional filtering
         """
-        queryset = self.get_queryset()
+        try:
+            queryset = self.get_queryset()
 
-        # Apply filters
-        rating = request.query_params.get("rating")
-        has_response = request.query_params.get("has_response")
-        search = request.query_params.get("search")
+            # Apply filters
+            rating = request.query_params.get("rating")
+            has_response = request.query_params.get("has_response")
+            search = request.query_params.get("search")
 
-        if rating:
-            try:
-                rating_val = int(rating)
-                queryset = queryset.filter(rating=rating_val)
-            except ValueError:
-                pass
+            if rating:
+                try:
+                    rating_val = int(rating)
+                    queryset = queryset.filter(rating=rating_val)
+                except ValueError:
+                    pass
 
-        if has_response is not None:
-            if has_response.lower() == "true":
-                queryset = queryset.exclude(
-                    admin_response__isnull=True, admin_response=""
-                )
-            elif has_response.lower() == "false":
+            if has_response is not None:
+                if has_response.lower() == "true":
+                    queryset = queryset.exclude(
+                        admin_response__isnull=True, admin_response=""
+                    )
+                elif has_response.lower() == "false":
+                    queryset = queryset.filter(
+                        Q(admin_response__isnull=True) | Q(admin_response="")
+                    )
+
+            if search:
                 queryset = queryset.filter(
-                    Q(admin_response__isnull=True) | Q(admin_response="")
+                    Q(comment__icontains=search)
+                    | Q(customer__name__icontains=search)
+                    | Q(delivery__order__order_number__icontains=search)
                 )
 
-        if search:
-            queryset = queryset.filter(
-                Q(comment__icontains=search)
-                | Q(customer__name__icontains=search)
-                | Q(delivery__order__order_number__icontains=search)
+            # Pagination
+            page_size = int(request.query_params.get("limit", 20))
+            page = int(request.query_params.get("page", 1))
+
+            total_count = queryset.count()
+            start = (page - 1) * page_size
+            end = start + page_size
+
+            reviews = queryset[start:end]
+            serializer = self.get_serializer(reviews, many=True)
+
+            return Response(
+                {
+                    "results": serializer.data,
+                    "count": total_count,
+                    "next": (
+                        None
+                        if end >= total_count
+                        else f"?page={page + 1}&limit={page_size}"
+                    ),
+                    "previous": (
+                        None if page <= 1 else f"?page={page - 1}&limit={page_size}"
+                    ),
+                }
             )
-
-        # Pagination
-        page_size = int(request.query_params.get("limit", 20))
-        page = int(request.query_params.get("page", 1))
-
-        total_count = queryset.count()
-        start = (page - 1) * page_size
-        end = start + page_size
-
-        reviews = queryset[start:end]
-        serializer = self.get_serializer(reviews, many=True)
-
-        return Response(
-            {
-                "results": serializer.data,
-                "count": total_count,
-                "next": (
-                    None
-                    if end >= total_count
-                    else f"?page={page + 1}&limit={page_size}"
-                ),
-                "previous": (
-                    None if page <= 1 else f"?page={page - 1}&limit={page_size}"
-                ),
-            }
-        )
+        except Exception as e:
+            import logging
+            import traceback
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in DeliveryReviewViewSet.list: {str(e)}")
+            logger.error(traceback.format_exc())
+            return Response(
+                {"error": "An error occurred while fetching delivery reviews", "detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def reply(self, request, pk=None):

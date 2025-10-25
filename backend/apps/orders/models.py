@@ -11,8 +11,12 @@ from django.db import models
 class UserAddress(models.Model):
     """User saved addresses for delivery"""
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='addresses')
-    label = models.CharField(max_length=100, help_text='Address label (e.g., Home, Work)')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="addresses"
+    )
+    label = models.CharField(
+        max_length=100, help_text="Address label (e.g., Home, Work)"
+    )
     address_line1 = models.CharField(max_length=200)
     address_line2 = models.CharField(max_length=200, blank=True, null=True)
     city = models.CharField(max_length=100)
@@ -74,10 +78,10 @@ class Order(models.Model):
     # Order Identification
     order_number = models.CharField(max_length=50, unique=True, db_index=True)
     order_type = models.CharField(
-        max_length=20, 
-        choices=ORDER_TYPE_CHOICES, 
+        max_length=20,
+        choices=ORDER_TYPE_CHOICES,
         default="delivery",
-        help_text="Whether this is a delivery or pickup order"
+        help_text="Whether this is a delivery or pickup order",
     )
 
     # User Relations
@@ -130,7 +134,9 @@ class Order(models.Model):
     )
 
     # Delivery Information
-    delivery_address = models.TextField(default="No address provided")  # Keep for backward compatibility
+    delivery_address = models.TextField(
+        default="No address provided"
+    )  # Keep for backward compatibility
     delivery_address_ref = models.ForeignKey(
         UserAddress,
         on_delete=models.SET_NULL,
@@ -141,9 +147,7 @@ class Order(models.Model):
 
     # New address system - reference to apps.users.address_models.Address
     delivery_address_new_id = models.BigIntegerField(
-        null=True,
-        blank=True,
-        help_text='New address system reference'
+        null=True, blank=True, help_text="New address system reference"
     )
 
     delivery_instructions = models.TextField(blank=True)
@@ -162,12 +166,9 @@ class Order(models.Model):
     )
     promo_code = models.CharField(max_length=50, null=True, blank=True)
 
-
     # Kitchen location reference
     kitchen_location_id = models.BigIntegerField(
-        null=True,
-        blank=True,
-        help_text='Kitchen location for this order'
+        null=True, blank=True, help_text="Kitchen location for this order"
     )
 
     # Timing
@@ -189,20 +190,20 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     confirmed_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
-    
+
     # Status tracking - JSON field to store timestamps for each stage
     status_timestamps = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Timestamps for each order status transition"
+        help_text="Timestamps for each order status transition",
     )
 
     def save(self, *args, **kwargs):
         from django.utils import timezone
-        
+
         if not self.order_number:
             self.order_number = self.generate_order_number()
-        
+
         # Track status changes with timestamps
         if self.pk:  # Only for existing orders
             old_order = Order.objects.filter(pk=self.pk).first()
@@ -216,7 +217,7 @@ class Order(models.Model):
             if not self.status_timestamps:
                 self.status_timestamps = {}
             self.status_timestamps[self.status] = timezone.now().isoformat()
-        
+
         super().save(*args, **kwargs)
 
     def generate_order_number(self):
@@ -234,33 +235,35 @@ class Order(models.Model):
     @property
     def can_be_cancelled(self):
         """Check if order can be cancelled based on status and time"""
-        from django.utils import timezone
         from datetime import timedelta
-        
+
+        from django.utils import timezone
+
         # Only allow cancellation for these statuses
         if self.status not in ["pending", "confirmed"]:
             return False
-        
+
         # Check 10-minute window
         time_since_order = timezone.now() - self.created_at
         return time_since_order <= timedelta(minutes=10)
-    
+
     @property
     def cancellation_time_remaining(self):
         """Get remaining time for cancellation in seconds"""
-        from django.utils import timezone
         from datetime import timedelta
-        
+
+        from django.utils import timezone
+
         if not self.can_be_cancelled:
             return 0
-        
+
         time_since_order = timezone.now() - self.created_at
         time_remaining = timedelta(minutes=10) - time_since_order
         return max(0, int(time_remaining.total_seconds()))
 
     def calculate_delivery_fee(self, distance_km):
         """Calculate delivery fee based on distance
-        
+
         Fee Structure:
         - First 5 km: LKR 300
         - After 5 km: LKR 100 per km
@@ -480,7 +483,9 @@ class BulkOrder(models.Model):
 
     # Primary Fields
     bulk_order_id = models.AutoField(primary_key=True)
-    order_number = models.CharField(max_length=50, unique=True, db_index=True)
+    order_number = models.CharField(
+        max_length=50, unique=True, db_index=True, blank=True, default=""
+    )
     # Make the order reference optional: bulk orders live primarily in the BulkOrder table.
     # Keep a nullable link for backward compatibility when an underlying Order exists.
     order = models.ForeignKey(
@@ -494,7 +499,7 @@ class BulkOrder(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="created_bulk_orders",
-        help_text="User who created this bulk order (usually same as customer)"
+        help_text="User who created this bulk order (usually same as customer)",
     )
     chef = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -502,7 +507,7 @@ class BulkOrder(models.Model):
         null=True,
         blank=True,
         related_name="bulk_orders_as_chef",
-        help_text="Chef assigned to this bulk order"
+        help_text="Chef assigned to this bulk order",
     )
     delivery_partner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -510,73 +515,67 @@ class BulkOrder(models.Model):
         null=True,
         blank=True,
         related_name="bulk_delivery_orders",
-        help_text="Delivery agent assigned to this bulk order"
+        help_text="Delivery agent assigned to this bulk order",
     )
-    
+
     # Status Fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     payment_status = models.CharField(
-        max_length=20, 
-        choices=PAYMENT_STATUS_CHOICES, 
-        default="pending"
+        max_length=20, choices=PAYMENT_STATUS_CHOICES, default="pending"
     )
-    
+
     # Financial Information
     subtotal = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal("0.00")
+        max_digits=10, decimal_places=2, default=Decimal("0.00")
     )
     delivery_fee = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal("0.00")
+        max_digits=10, decimal_places=2, default=Decimal("0.00")
     )
     total_amount = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        default=Decimal("0.00")
+        max_digits=10, decimal_places=2, default=Decimal("0.00")
     )
-    
+
     # Delivery/Pickup Information
     order_type = models.CharField(
         max_length=20,
         choices=ORDER_TYPE_CHOICES,
         default="delivery",
-        help_text="Whether this is a delivery or pickup order"
+        help_text="Whether this is a delivery or pickup order",
     )
     delivery_address = models.TextField(blank=True, null=True)
     delivery_latitude = models.DecimalField(
-        max_digits=10, 
-        decimal_places=8, 
-        null=True, 
-        blank=True
+        max_digits=10, decimal_places=8, null=True, blank=True
     )
     delivery_longitude = models.DecimalField(
-        max_digits=11, 
-        decimal_places=8, 
-        null=True, 
-        blank=True
+        max_digits=11, decimal_places=8, null=True, blank=True
     )
     distance_km = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Distance from kitchen to delivery address in km"
+        help_text="Distance from kitchen to delivery address in km",
     )
-    
+
     # Event Details
     event_date = models.DateField(null=True, blank=True, help_text="Date of the event")
     event_time = models.TimeField(null=True, blank=True, help_text="Time of the event")
-    num_persons = models.PositiveIntegerField(default=0, help_text="Number of persons for the event")
-    menu_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the bulk menu")
-    
+    num_persons = models.PositiveIntegerField(
+        default=0, help_text="Number of persons for the event"
+    )
+    menu_name = models.CharField(
+        max_length=255, blank=True, null=True, help_text="Name of the bulk menu"
+    )
+
     # Notes
-    notes = models.TextField(blank=True, null=True, help_text="Internal notes about the bulk order")
-    customer_notes = models.TextField(blank=True, null=True, help_text="Special instructions from customer")
+    notes = models.TextField(
+        blank=True, null=True, help_text="Internal notes about the bulk order"
+    )
+    customer_notes = models.TextField(
+        blank=True, null=True, help_text="Special instructions from customer"
+    )
     chef_notes = models.TextField(blank=True, null=True, help_text="Notes from chef")
-    
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -592,6 +591,7 @@ class BulkOrder(models.Model):
     def generate_order_number(self):
         """Generate unique bulk order number"""
         import uuid
+
         return f"BULK-{uuid.uuid4().hex[:8].upper()}"
 
     def __str__(self):
@@ -837,5 +837,7 @@ class DeliveryLog(models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
+        db_table = "delivery_logs"
+        ordering = ["-start_time"]
         db_table = "delivery_logs"
         ordering = ["-start_time"]

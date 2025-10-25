@@ -183,7 +183,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "utils.pagination.CustomPageNumberPagination",
     "PAGE_SIZE": 10,
 }
 
@@ -390,7 +390,8 @@ ACCOUNT_RATE_LIMITS = {
 
 # Email Configuration (using Brevo SMTP)
 EMAIL_BACKEND = config(
-    "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"  # Changed to console for development
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.console.EmailBackend",  # Changed to console for development
 )
 EMAIL_HOST = config("EMAIL_HOST", default="smtp-relay.brevo.com")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)

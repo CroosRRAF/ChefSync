@@ -85,6 +85,7 @@ import {
 // Import services
 import { adminService } from "@/services/adminService";
 import {
+  approveFood,
   createCuisine,
   createFoodCategory,
   deleteCuisine,
@@ -93,6 +94,8 @@ import {
   fetchCuisines,
   fetchFoodCategories,
   fetchFoods,
+  rejectFood,
+  toggleFoodAvailability,
   updateCuisine,
   updateFoodCategory,
 } from "@/services/foodService";
@@ -386,7 +389,14 @@ const ContentManagementHub: React.FC = () => {
   const [foodLoading, setFoodLoading] = useState(false);
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
   const [showFoodDialog, setShowFoodDialog] = useState(false);
+  const [foodDialogMode, setFoodDialogMode] = useState<
+    "view" | "edit" | "create"
+  >("view");
   const [showDeleteFoodDialog, setShowDeleteFoodDialog] = useState(false);
+  const [showApproveFoodDialog, setShowApproveFoodDialog] = useState(false);
+  const [showRejectFoodDialog, setShowRejectFoodDialog] = useState(false);
+  const [approvalComments, setApprovalComments] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
 
   // Categories Tab States
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -445,6 +455,7 @@ const ContentManagementHub: React.FC = () => {
     category: "all",
     cuisine: "all",
     availability: "all",
+    status: "all",
     featured: "all",
     page: 1,
     limit: 25,
@@ -465,14 +476,14 @@ const ContentManagementHub: React.FC = () => {
 
       // Map the API response to our local interface
       const mappedStats: FoodStats = {
-        totalFoods: statsData.total_foods || 0,
-        availableFoods: statsData.approved_foods || 0,
-        featuredFoods: 0, // This would need to be added to the backend
-        totalCategories: statsData.total_categories || 0,
-        totalCuisines: statsData.total_cuisines || 0,
-        averageRating: statsData.average_rating || 0,
+        totalFoods: statsData.totalFoods || 0,
+        availableFoods: statsData.approvedFoods || 0,
+        featuredFoods: statsData.pendingFoods || 0, // Show pending foods as a metric
+        totalCategories: statsData.totalCategories || 0,
+        totalCuisines: statsData.totalCuisines || 0,
+        averageRating: statsData.averageRating || 0,
         totalOrders: 0, // This would need to be added to the backend
-        averagePrice: statsData.price_stats?.average_price || 0,
+        averagePrice: statsData.averagePrice || 0,
       };
 
       setFoodStats(mappedStats);
@@ -511,6 +522,7 @@ const ContentManagementHub: React.FC = () => {
           : typeof filters.cuisine === "string"
           ? parseInt(filters.cuisine)
           : filters.cuisine,
+      status: filters.status === "all" ? undefined : filters.status,
       is_available:
         filters.availability === "all"
           ? undefined
@@ -872,6 +884,81 @@ const ContentManagementHub: React.FC = () => {
       toast({
         title: "Error",
         description: "Failed to delete food item",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Approve food item
+  const handleApproveFood = async () => {
+    if (!selectedFood) return;
+    try {
+      await approveFood(selectedFood.id, approvalComments);
+      await loadFoods();
+      setShowApproveFoodDialog(false);
+      setSelectedFood(null);
+      setApprovalComments("");
+      toast({
+        title: "Success",
+        description: `Food item "${selectedFood.name}" approved successfully`,
+      });
+    } catch (error) {
+      console.error("Error approving food:", error);
+      toast({
+        title: "Error",
+        description: "Failed to approve food item",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Reject food item
+  const handleRejectFood = async () => {
+    if (!selectedFood) return;
+    if (!rejectionReason.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a reason for rejection",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await rejectFood(selectedFood.id, rejectionReason);
+      await loadFoods();
+      setShowRejectFoodDialog(false);
+      setSelectedFood(null);
+      setRejectionReason("");
+      toast({
+        title: "Success",
+        description: `Food item "${selectedFood.name}" rejected`,
+      });
+    } catch (error) {
+      console.error("Error rejecting food:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reject food item",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Toggle food availability
+  const handleToggleFoodAvailability = async (food: Food) => {
+    try {
+      await toggleFoodAvailability(food.id, !food.is_available);
+      await loadFoods();
+      toast({
+        title: "Success",
+        description: `Food item marked as ${
+          !food.is_available ? "available" : "unavailable"
+        }`,
+      });
+    } catch (error) {
+      console.error("Error toggling food availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update food availability",
         variant: "destructive",
       });
     }
@@ -1243,17 +1330,17 @@ const ContentManagementHub: React.FC = () => {
           />
           <AnimatedStats
             value={foodStats.availableFoods}
-            label="Available Items"
+            label="Approved Foods"
             icon={CheckCircle}
             trend={5.1}
             gradient="green"
           />
           <AnimatedStats
             value={foodStats.featuredFoods}
-            label="Featured Items"
-            icon={Star}
+            label="Pending Approval"
+            icon={AlertCircle}
             trend={12.3}
-            gradient="purple"
+            gradient="orange"
           />
           <AnimatedStats
             value={foodStats.averagePrice}
@@ -1300,6 +1387,22 @@ const ContentManagementHub: React.FC = () => {
             </SelectContent>
           </Select>
           <Select
+            value={foodFilters.status}
+            onValueChange={(value) =>
+              setFoodFilters((prev) => ({ ...prev, status: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="Approved">Approved</SelectItem>
+              <SelectItem value="Pending">Pending</SelectItem>
+              <SelectItem value="Rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
             value={foodFilters.availability}
             onValueChange={(value) =>
               setFoodFilters((prev) => ({ ...prev, availability: value }))
@@ -1332,14 +1435,6 @@ const ContentManagementHub: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <h3 className="text-lg font-semibold">Food Items</h3>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              onClick={() => setShowFoodDialog(true)}
-              size="sm"
-              className="w-full sm:w-auto"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Food
-            </Button>
             <Button variant="outline" size="sm" className="w-full sm:w-auto">
               <Download className="h-4 w-4 mr-2" />
               Export
@@ -1357,7 +1452,7 @@ const ContentManagementHub: React.FC = () => {
                 </TableHead>
                 <TableHead className="sm:hidden">Item</TableHead>
                 <TableHead className="hidden md:table-cell">Category</TableHead>
-                <TableHead className="hidden lg:table-cell">Price</TableHead>
+                <TableHead className="hidden md:table-cell">Chef</TableHead>
                 <TableHead className="hidden xl:table-cell">Status</TableHead>
                 <TableHead className="hidden lg:table-cell">Rating</TableHead>
                 <TableHead>Actions</TableHead>
@@ -1408,9 +1503,12 @@ const ContentManagementHub: React.FC = () => {
                       {food?.category_name || "Uncategorized"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <div className="font-medium">
-                      LKR {food?.price?.toFixed(2) || "0.00"}
+                  <TableCell className="hidden md:table-cell">
+                    <div className="flex items-center space-x-2">
+                      <ChefHat className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm">
+                        {food?.chef_name || "Unknown Chef"}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell className="hidden xl:table-cell">
@@ -1446,6 +1544,7 @@ const ContentManagementHub: React.FC = () => {
                         <DropdownMenuItem
                           onClick={() => {
                             setSelectedFood(food);
+                            setFoodDialogMode("view");
                             setShowFoodDialog(true);
                           }}
                         >
@@ -1455,12 +1554,59 @@ const ContentManagementHub: React.FC = () => {
                         <DropdownMenuItem
                           onClick={() => {
                             setSelectedFood(food);
+                            setFoodDialogMode("edit");
                             setShowFoodDialog(true);
                           }}
                         >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+
+                        {/* Approval actions - only show for pending foods */}
+                        {food?.status === "Pending" && (
+                          <>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedFood(food);
+                                setShowApproveFoodDialog(true);
+                              }}
+                              className="text-green-600"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Approve
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedFood(food);
+                                setShowRejectFoodDialog(true);
+                              }}
+                              className="text-orange-600"
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Reject
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
+
+                        {/* Availability toggle */}
+                        <DropdownMenuItem
+                          onClick={() => handleToggleFoodAvailability(food)}
+                        >
+                          {food?.is_available ? (
+                            <>
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Make Inactive
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Make Active
+                            </>
+                          )}
+                        </DropdownMenuItem>
+
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => {
@@ -1847,13 +1993,19 @@ const ContentManagementHub: React.FC = () => {
           <TableBody>
             {referralLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-gray-500">
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-sm text-gray-500"
+                >
                   Loading referral tokens...
                 </TableCell>
               </TableRow>
             ) : referralTokens.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-gray-500">
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-sm text-gray-500"
+                >
                   No referral tokens found
                 </TableCell>
               </TableRow>
@@ -1888,7 +2040,9 @@ const ContentManagementHub: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const link = referralService.generateReferralLink(token.token);
+                          const link = referralService.generateReferralLink(
+                            token.token
+                          );
                           window.open(link, "_blank");
                         }}
                       >
@@ -2023,88 +2177,409 @@ const ContentManagementHub: React.FC = () => {
         </Tabs>
       </div>
 
-      {/* Food Dialog */}
+      {/* Food View/Edit/Create Dialog */}
       <Dialog open={showFoodDialog} onOpenChange={setShowFoodDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {selectedFood ? "Edit Food Item" : "Add New Food Item"}
+              {foodDialogMode === "view" && "Food Item Details"}
+              {foodDialogMode === "edit" && "Edit Food Item"}
+              {foodDialogMode === "create" && "Add New Food Item"}
             </DialogTitle>
             <DialogDescription>
-              {selectedFood
-                ? "Update food item details"
-                : "Create a new food item for the menu"}
+              {foodDialogMode === "view" &&
+                "Viewing complete food item information"}
+              {foodDialogMode === "edit" && "Update food item details"}
+              {foodDialogMode === "create" &&
+                "Create a new food item for the menu"}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+
+          {foodDialogMode === "view" && selectedFood ? (
+            // View Mode - Show all details (keeping existing view code)
+            <div className="space-y-6">
+              {/* Image Section */}
+              {selectedFood.primary_image && (
+                <div className="flex justify-center">
+                  <img
+                    src={selectedFood.primary_image}
+                    alt={selectedFood.name}
+                    className="max-w-full h-64 object-cover rounded-lg shadow-md"
+                  />
+                </div>
+              )}
+
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-gray-500">Food Name</Label>
+                  <p className="font-semibold">{selectedFood.name}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-gray-500">Status</Label>
+                  <Badge
+                    variant={
+                      selectedFood.is_available ? "default" : "secondary"
+                    }
+                  >
+                    {selectedFood.is_available ? "Available" : "Unavailable"}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label className="text-gray-500">Description</Label>
+                <p className="text-sm">
+                  {selectedFood.description || "No description available"}
+                </p>
+              </div>
+
+              {/* Category & Cuisine */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-gray-500">Category</Label>
+                  <p className="font-medium">
+                    {selectedFood.category_name || "N/A"}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-gray-500">Cuisine</Label>
+                  <p className="font-medium">
+                    {selectedFood.cuisine_name || "N/A"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Chef Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-gray-500">Chef</Label>
+                  <p className="font-medium">
+                    {selectedFood.chef_name || "N/A"}
+                  </p>
+                </div>
+                {selectedFood.chef_rating && (
+                  <div className="space-y-2">
+                    <Label className="text-gray-500">Chef Rating</Label>
+                    <div className="flex items-center gap-2">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-medium">
+                        {selectedFood.chef_rating}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Dietary Information */}
+              <div className="space-y-3">
+                <Label className="text-gray-500">Dietary Information</Label>
+                <div className="flex flex-wrap gap-2">
+                  {selectedFood.is_vegetarian && (
+                    <Badge variant="outline" className="bg-green-50">
+                      <Leaf className="h-3 w-3 mr-1" />
+                      Vegetarian
+                    </Badge>
+                  )}
+                  {selectedFood.is_vegan && (
+                    <Badge variant="outline" className="bg-green-50">
+                      <Leaf className="h-3 w-3 mr-1" />
+                      Vegan
+                    </Badge>
+                  )}
+                  {selectedFood.is_gluten_free && (
+                    <Badge variant="outline" className="bg-blue-50">
+                      Gluten Free
+                    </Badge>
+                  )}
+                  {selectedFood.spice_level && (
+                    <Badge variant="outline" className="bg-red-50">
+                      {selectedFood.spice_level.charAt(0).toUpperCase() +
+                        selectedFood.spice_level
+                          .slice(1)
+                          .replace("_", " ")}{" "}
+                      Spice
+                    </Badge>
+                  )}
+                  {selectedFood.is_featured && (
+                    <Badge variant="default">Featured</Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Nutritional Information */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {selectedFood.preparation_time && (
+                  <div className="space-y-2">
+                    <Label className="text-gray-500">Prep Time</Label>
+                    <p className="font-medium">
+                      {selectedFood.preparation_time} mins
+                    </p>
+                  </div>
+                )}
+                {selectedFood.calories_per_serving && (
+                  <div className="space-y-2">
+                    <Label className="text-gray-500">Calories</Label>
+                    <p className="font-medium">
+                      {selectedFood.calories_per_serving} kcal
+                    </p>
+                  </div>
+                )}
+                {selectedFood.available_cooks_count !== undefined && (
+                  <div className="space-y-2">
+                    <Label className="text-gray-500">Available Cooks</Label>
+                    <p className="font-medium">
+                      {selectedFood.available_cooks_count}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Ingredients */}
+              {selectedFood.ingredients &&
+                selectedFood.ingredients.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-gray-500">Ingredients</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedFood.ingredients.map((ingredient, index) => (
+                        <Badge key={index} variant="secondary">
+                          {ingredient}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* Allergens */}
+              {selectedFood.allergens && selectedFood.allergens.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-gray-500">Allergens</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedFood.allergens.map((allergen, index) => (
+                      <Badge key={index} variant="destructive">
+                        {allergen}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Statistics */}
+              <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+                <div className="text-center">
+                  <p className="text-2xl font-bold">
+                    {selectedFood.rating_average || "0.0"}
+                  </p>
+                  <p className="text-sm text-gray-500">Rating</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold">
+                    {selectedFood.total_reviews || 0}
+                  </p>
+                  <p className="text-sm text-gray-500">Reviews</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold">
+                    {selectedFood.total_orders || 0}
+                  </p>
+                  <p className="text-sm text-gray-500">Orders</p>
+                </div>
+              </div>
+
+              {/* Prices Section */}
+              {selectedFood.prices && selectedFood.prices.length > 0 && (
+                <div className="space-y-3">
+                  <Label className="text-gray-500">Price Options</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {selectedFood.prices.map((priceItem, index) => (
+                      <div
+                        key={index}
+                        className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-800"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium">{priceItem.size}</span>
+                          <span className="text-lg font-bold text-primary">
+                            ${priceItem.price}
+                          </span>
+                        </div>
+                        {priceItem.cook_name && (
+                          <p className="text-xs text-gray-600">
+                            Cook: {priceItem.cook_name}
+                          </p>
+                        )}
+                        {priceItem.preparation_time && (
+                          <p className="text-xs text-gray-600">
+                            Prep: {priceItem.preparation_time} mins
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t text-sm text-gray-500">
+                <div>
+                  <Label className="text-gray-500">Created At</Label>
+                  <p>{new Date(selectedFood.created_at).toLocaleString()}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Updated At</Label>
+                  <p>{new Date(selectedFood.updated_at).toLocaleString()}</p>
+                </div>
+              </div>
+
+              {/* Action Buttons in View Mode */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setFoodDialogMode("edit");
+                  }}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Food
+                </Button>
+              </div>
+            </div>
+          ) : (
+            // Edit or Create Mode - Form fields
+            <div className="space-y-4">
+              <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded">
+                Note: Full edit/create functionality will be implemented. This
+                is the form interface.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Name</Label>
+                  <Input
+                    placeholder="Enter food name"
+                    defaultValue={selectedFood?.name}
+                  />
+                </div>
+                <div>
+                  <Label>Preparation Time (mins)</Label>
+                  <Input
+                    type="number"
+                    placeholder="30"
+                    defaultValue={selectedFood?.preparation_time}
+                  />
+                </div>
+              </div>
               <div>
-                <Label>Name</Label>
-                <Input
-                  placeholder="Enter food name"
-                  defaultValue={selectedFood?.name}
+                <Label>Description</Label>
+                <Textarea
+                  placeholder="Enter food description..."
+                  defaultValue={selectedFood?.description}
                 />
               </div>
-              <div>
-                <Label>Price</Label>
-                <Input
-                  type="number"
-                  placeholder="0.00"
-                  defaultValue={selectedFood?.price}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Category</Label>
+                  <Select
+                    defaultValue={selectedFood?.food_category?.toString()}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem
+                          key={category?.id}
+                          value={category?.id?.toString()}
+                        >
+                          {category?.name || "Unnamed"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Calories per Serving</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    defaultValue={selectedFood?.calories_per_serving}
+                  />
+                </div>
               </div>
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea
-                placeholder="Enter food description..."
-                defaultValue={selectedFood?.description}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Category</Label>
-                <Select defaultValue={selectedFood?.category?.toString()}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem
-                        key={category?.id}
-                        value={category?.id?.toString()}
+
+              {/* Price Information */}
+              <div className="space-y-3 pt-4 border-t">
+                <Label className="text-lg font-semibold">
+                  Price Information
+                </Label>
+                <p className="text-sm text-gray-500">
+                  Prices are managed in the FoodPrice table.{" "}
+                  {selectedFood?.prices?.length || 0} price(s) available.
+                </p>
+                {selectedFood?.prices && selectedFood.prices.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {selectedFood.prices.map((priceItem, index) => (
+                      <div
+                        key={index}
+                        className="border rounded-lg p-3 bg-gray-50"
                       >
-                        {category?.name || "Unnamed"}
-                      </SelectItem>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{priceItem.size}</span>
+                          <span className="text-lg font-bold">
+                            ${priceItem.price}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Cook: {priceItem.cook_name}
+                        </p>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
               </div>
-              <div>
-                <Label>Cuisine</Label>
-                <Select defaultValue={selectedFood?.cuisine_name}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select cuisine" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cuisines.map((cuisine) => (
-                      <SelectItem
-                        key={cuisine.id}
-                        value={cuisine.id.toString()}
-                      >
-                        {cuisine.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              {/* Dietary Options */}
+              <div className="space-y-3 pt-4 border-t">
+                <Label>Dietary Options</Label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      defaultChecked={selectedFood?.is_vegetarian}
+                    />
+                    <span>Vegetarian</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      defaultChecked={selectedFood?.is_vegan}
+                    />
+                    <span>Vegan</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      defaultChecked={selectedFood?.is_gluten_free}
+                    />
+                    <span>Gluten Free</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      defaultChecked={selectedFood?.is_featured}
+                    />
+                    <span>Featured</span>
+                  </label>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowFoodDialog(false)}>
-              Cancel
+              {foodDialogMode === "view" ? "Close" : "Cancel"}
             </Button>
-            <Button>{selectedFood ? "Update" : "Create"}</Button>
+            {foodDialogMode === "edit" && <Button>Update Food</Button>}
+            {foodDialogMode === "create" && <Button>Create Food</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2133,6 +2608,96 @@ const ContentManagementHub: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Approve Food Dialog */}
+      <Dialog
+        open={showApproveFoodDialog}
+        onOpenChange={setShowApproveFoodDialog}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Approve Food Item</DialogTitle>
+            <DialogDescription>
+              Approve "{selectedFood?.name}" for public listing
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="approval-comments">Comments (Optional)</Label>
+              <Textarea
+                id="approval-comments"
+                placeholder="Add any comments or notes for the chef..."
+                value={approvalComments}
+                onChange={(e) => setApprovalComments(e.target.value)}
+                className="mt-2"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowApproveFoodDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApproveFood}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Approve
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Food Dialog */}
+      <Dialog
+        open={showRejectFoodDialog}
+        onOpenChange={setShowRejectFoodDialog}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reject Food Item</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting "{selectedFood?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="rejection-reason">Rejection Reason *</Label>
+              <Textarea
+                id="rejection-reason"
+                placeholder="Explain why this food item is being rejected..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="mt-2"
+                rows={4}
+                required
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRejectFoodDialog(false);
+                setRejectionReason("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRejectFood}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Category Dialog */}
       <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>

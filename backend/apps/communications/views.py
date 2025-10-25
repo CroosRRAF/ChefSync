@@ -1616,6 +1616,42 @@ class ContactViewSet(viewsets.ModelViewSet):
 
         return Response(stats)
 
+    @action(
+        detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated]
+    )
+    def reply(self, request, pk=None):
+        """
+        Add admin response to a contact
+        """
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response(
+                {"error": "Only admin users can reply to contacts"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        contact = self.get_object()
+        admin_response = request.data.get("admin_response", "").strip()
+
+        if not admin_response:
+            return Response(
+                {"error": "admin_response is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        contact.admin_response = admin_response
+        contact.response_date = timezone.now()
+        contact.status = "replied"
+        contact.save(update_fields=["admin_response", "response_date", "status"])
+
+        serializer = self.get_serializer(contact)
+        return Response(
+            {
+                "success": True,
+                "message": "Reply sent successfully",
+                "contact": serializer.data,
+            }
+        )
+
     @action(detail=False, methods=["post"])
     def send_reply(self, request):
         """Send reply to a contact form submission (admin only)"""

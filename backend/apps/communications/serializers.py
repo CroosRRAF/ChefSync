@@ -58,15 +58,16 @@ class CommunicationResponseSerializer(serializers.ModelSerializer):
         model = CommunicationResponse
         fields = (
             "id",
+            "communication",
             "communication_id",
             "responder",
+            "message",
             "response",
+            "is_internal",
             "created_at",
             "updated_at",
-            "is_resolution",
-            "metadata",
         )
-        read_only_fields = ("created_at", "updated_at", "responder")
+        read_only_fields = ("created_at", "updated_at", "responder", "response")
 
     def get_responder(self, obj):
         return (
@@ -246,6 +247,8 @@ class ContactSerializer(serializers.ModelSerializer):
             "status",
             "user",
             "user_name",
+            "admin_response",
+            "response_date",
             "created_at",
             "updated_at",
         ]

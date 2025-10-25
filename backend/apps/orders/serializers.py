@@ -1257,43 +1257,55 @@ class DeliveryReviewSerializer(serializers.ModelSerializer):
 
     def get_customer(self, obj):
         """Get customer information"""
-        if obj.customer:
+        try:
+            if not obj.customer:
+                return None
             return {
-                "id": obj.customer.id,
-                "name": obj.customer.name or obj.customer.username,
-                "email": obj.customer.email,
+                "id": getattr(obj.customer, 'id', None),
+                "name": getattr(obj.customer, 'name', None) or getattr(obj.customer, 'username', 'Unknown'),
+                "email": getattr(obj.customer, 'email', None),
             }
-        return None
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in get_customer for DeliveryReview {getattr(obj, 'review_id', 'unknown')}: {str(e)}")
+            return None
 
     def get_delivery(self, obj):
         """Get delivery information"""
-        if obj.delivery:
-            delivery_agent = (
-                obj.delivery.agent if obj.delivery.agent else None
-            )
-            order = obj.delivery.order if obj.delivery.order else None
+        try:
+            if not obj.delivery:
+                return None
+                
+            delivery_agent = getattr(obj.delivery, 'agent', None)
+            order = getattr(obj.delivery, 'order', None)
 
             return {
                 "delivery_id": obj.delivery.delivery_id,
                 "order": (
                     {
-                        "order_id": order.id if order else None,
-                        "order_number": order.order_number if order else None,
+                        "order_id": getattr(order, 'id', None),
+                        "order_number": getattr(order, 'order_number', None),
                     }
                     if order
                     else None
                 ),
                 "delivery_agent": (
                     {
-                        "id": delivery_agent.id if delivery_agent else None,
-                        "name": delivery_agent.name if delivery_agent else None,
-                        "email": delivery_agent.email if delivery_agent else None,
+                        "id": getattr(delivery_agent, 'id', None),
+                        "name": getattr(delivery_agent, 'name', getattr(delivery_agent, 'username', None)),
+                        "email": getattr(delivery_agent, 'email', None),
                     }
                     if delivery_agent
                     else None
                 ),
             }
-        return None
+        except Exception as e:
+            # Log the error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in get_delivery for DeliveryReview {getattr(obj, 'review_id', 'unknown')}: {str(e)}")
+            return None
 
 class CollaborationRequestSerializer(serializers.ModelSerializer):
     """Serializer for collaboration requests between chefs"""

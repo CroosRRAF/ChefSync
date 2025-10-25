@@ -215,8 +215,8 @@ const CommunicationCenter: React.FC = () => {
 
   // Active tab state
   const [activeTab, setActiveTab] = useState<
-    "overview" | "feedback" | "templates" | "campaigns" | "notifications"
-  >("overview");
+    "feedback" | "templates" | "campaigns" | "notifications"
+  >("feedback");
 
   // Communication Tab States
   const [communications, setCommunications] = useState<any[]>([]);
@@ -888,17 +888,38 @@ const CommunicationCenter: React.FC = () => {
     if (!selectedFeedback || !responseText.trim()) return;
 
     try {
-      // Create a response to the communication
-      await communicationService.addResponse(selectedFeedback.id, {
-        response: responseText,
-        is_resolution: isResolution,
-      });
-
-      // If marked as resolution, also update the status to resolved
-      if (isResolution && selectedFeedback.status !== "resolved") {
-        await communicationService.updateStatus(
+      // Handle different feedback types
+      if (selectedFeedback.type === "food_review") {
+        // Reply to food review
+        await communicationService.replyToFoodReview(
           selectedFeedback.id,
-          "resolved"
+          responseText
+        );
+      } else if (selectedFeedback.type === "delivery_review") {
+        // Reply to delivery review
+        await communicationService.replyToDeliveryReview(
+          selectedFeedback.id,
+          responseText
+        );
+      } else if (selectedFeedback.type === "communication") {
+        // Create a response to the communication
+        await communicationService.addResponse(selectedFeedback.id, {
+          response: responseText,
+          is_resolution: isResolution,
+        });
+
+        // If marked as resolution, also update the status to resolved
+        if (isResolution && selectedFeedback.status !== "resolved") {
+          await communicationService.updateStatus(
+            selectedFeedback.id,
+            "resolved"
+          );
+        }
+      } else if (selectedFeedback.type === "contact") {
+        // Reply to contact form
+        await communicationService.replyToContact(
+          selectedFeedback.id,
+          responseText
         );
       }
 
@@ -1148,9 +1169,8 @@ const CommunicationCenter: React.FC = () => {
 
   // Load data based on active tab
   useEffect(() => {
-    if (activeTab === "overview") {
+    if (activeTab === "feedback") {
       loadCommunicationStats();
-    } else if (activeTab === "feedback") {
       loadFeedbacks();
     } else if (activeTab === "templates") {
       loadCommunications();
@@ -2034,6 +2054,358 @@ const CommunicationCenter: React.FC = () => {
     );
   };
 
+  // Render Merged Feedback Tab (combines Overview + Feedback)
+  const renderMergedFeedbackTab = () => {
+    const complaints = feedbacks.filter(
+      (item) => item?.communication_type === "complaint"
+    );
+    const complaintsCount = complaints.length;
+    const openComplaints = complaints
+      .filter((item) =>
+        ["pending", "in_progress"].includes((item.status || "").toLowerCase())
+      )
+      .slice(0, 3);
+    const urgentComplaints = complaints.filter(
+      (item) => (item.priority || "").toLowerCase() === "urgent"
+    ).length;
+
+    // Calculate feedback stats
+    const feedbackStats = {
+      feedback: feedbacks.filter((f) => f.communication_type === "feedback")
+        .length,
+      complaints: feedbacks.filter((f) => f.communication_type === "complaint")
+        .length,
+      suggestions: feedbacks.filter(
+        (f) => f.communication_type === "suggestion"
+      ).length,
+      inquiries: feedbacks.filter((f) => f.communication_type === "inquiry")
+        .length,
+      other: feedbacks.filter((f) => f.communication_type === "other").length,
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Combined Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <AnimatedStats
+            value={totalItems}
+            label="Total Feedback"
+            icon={MessageSquare}
+            trend={12.5}
+            gradient="blue"
+          />
+          <AnimatedStats
+            value={feedbacks.filter((f) => f.status === "pending").length}
+            label="Pending Review"
+            icon={Clock}
+            trend={-5.2}
+            gradient="orange"
+          />
+          <AnimatedStats
+            value={feedbacks.filter((f) => f.status === "resolved").length}
+            label="Resolved"
+            icon={CheckCircle}
+            trend={18.7}
+            gradient="green"
+          />
+          <AnimatedStats
+            value={communicationStats?.average_rating || 0}
+            label="Average Rating"
+            icon={TrendingUp}
+            trend={5.1}
+            gradient="purple"
+            suffix="/5"
+            decimals={1}
+          />
+        </div>
+
+        {/* Communication Type Breakdown & Sentiment Analysis */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Communication Types */}
+          <GlassCard className="p-6">
+            <h3 className="text-lg font-semibold mb-4">
+              Customer Feedback Types
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <MessageSquare className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium">Food Reviews</span>
+                </div>
+                <div className="text-xl font-bold text-blue-600">
+                  {feedbackStats.feedback}
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                  <span className="text-sm font-medium">Delivery Issues</span>
+                </div>
+                <div className="text-xl font-bold text-red-600">
+                  {feedbackStats.complaints}
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Sparkles className="h-5 w-5 text-green-600" />
+                  <span className="text-sm font-medium">Suggestions</span>
+                </div>
+                <div className="text-xl font-bold text-green-600">
+                  {feedbackStats.suggestions}
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Users className="h-5 w-5 text-purple-600" />
+                  <span className="text-sm font-medium">Contact Messages</span>
+                </div>
+                <div className="text-xl font-bold text-purple-600">
+                  {feedbackStats.inquiries}
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* AI Sentiment Analysis */}
+          <GlassCard className="p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
+              <Brain className="h-5 w-5 mr-2" />
+              AI Sentiment Analysis
+              {sentimentLoading && (
+                <RefreshCw className="h-4 w-4 ml-2 animate-spin" />
+              )}
+            </h3>
+
+            {sentimentLoading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <Brain className="h-12 w-12 text-blue-500 mx-auto mb-2 animate-pulse" />
+                  <p className="text-gray-500">Analyzing sentiment...</p>
+                </div>
+              </div>
+            )}
+
+            {sentimentError && !sentimentLoading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-2" />
+                  <p className="text-red-600 mb-2">{sentimentError}</p>
+                  <Button
+                    onClick={() => loadCommunicationStats()}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {sentimentData && !sentimentLoading && !sentimentError && (
+              <>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-green-600">Positive</span>
+                    <span className="text-sm font-medium">
+                      {sentimentData.positive}%
+                    </span>
+                  </div>
+                  <Progress value={sentimentData.positive} className="h-2" />
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Neutral</span>
+                    <span className="text-sm font-medium">
+                      {sentimentData.neutral}%
+                    </span>
+                  </div>
+                  <Progress value={sentimentData.neutral} className="h-2" />
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-red-600">Negative</span>
+                    <span className="text-sm font-medium">
+                      {sentimentData.negative}%
+                    </span>
+                  </div>
+                  <Progress value={sentimentData.negative} className="h-2" />
+                </div>
+                <div className="mt-4 text-sm text-gray-500">
+                  Confidence: {sentimentData.confidence}%
+                </div>
+              </>
+            )}
+          </GlassCard>
+        </div>
+
+        {/* Urgent Complaints Alert */}
+        {openComplaints.length > 0 && (
+          <GlassCard className="p-6 bg-orange-50 dark:bg-orange-900/10 border-orange-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center text-orange-800 dark:text-orange-300">
+                <AlertTriangle className="h-5 w-5 mr-2" />
+                Urgent Issues Needing Attention
+              </h3>
+              <Badge
+                variant="outline"
+                className="border-orange-500 text-orange-700"
+              >
+                {openComplaints.length} of {complaintsCount}
+              </Badge>
+            </div>
+            <div className="space-y-3">
+              {openComplaints.map((complaint) => (
+                <div
+                  key={complaint.id}
+                  className="flex flex-col md:flex-row md:items-center md:justify-between p-4 bg-white dark:bg-gray-800 border border-orange-200 rounded-lg gap-3"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-red-500 text-red-700"
+                      >
+                        {complaint.priority || "Medium"}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {complaint.communication_type || "Unknown"}
+                      </Badge>
+                    </div>
+                    <h4 className="font-medium text-sm">
+                      {complaint.subject || "No Subject"}
+                    </h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+                      {complaint.message || "No message"}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedFeedback(complaint);
+                        setShowDetailModal(true);
+                      }}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSelectedFeedback(complaint);
+                        setShowResponseModal(true);
+                      }}
+                    >
+                      <Reply className="h-4 w-4 mr-1" />
+                      Reply
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        )}
+
+        {/* Filters */}
+        <GlassCard className="p-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search feedback, reviews, complaints..."
+                value={feedbackFilters.search}
+                onChange={(e) =>
+                  setFeedbackFilters((prev) => ({
+                    ...prev,
+                    search: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <Select
+              value={feedbackFilters.status}
+              onValueChange={(value) =>
+                setFeedbackFilters((prev) => ({ ...prev, status: value }))
+              }
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={feedbackFilters.priority}
+              onValueChange={(value) =>
+                setFeedbackFilters((prev) => ({ ...prev, priority: value }))
+              }
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priority</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={feedbackFilters.type}
+              onValueChange={(value) => {
+                setCurrentPage(1);
+                setFeedbackFilters((prev) => ({ ...prev, type: value }));
+              }}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="feedback">Food Reviews</SelectItem>
+                <SelectItem value="complaint">Delivery Issues</SelectItem>
+                <SelectItem value="suggestion">Suggestions</SelectItem>
+                <SelectItem value="inquiry">Contact Messages</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={loadFeedbacks} variant="outline">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        </GlassCard>
+
+        {/* Unified Feedback Table */}
+        <GlassCard className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">All Customer Feedback</h3>
+            <div className="flex items-center space-x-2">
+              <Badge variant="outline">
+                Showing {feedbacks.length} of {totalItems}
+              </Badge>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </div>
+          </div>
+
+          <DataTable
+            data={feedbacks || []}
+            columns={feedbackColumns}
+            loading={feedbackLoading}
+          />
+        </GlassCard>
+      </div>
+    );
+  };
+
   // Render Templates Tab
   const renderTemplatesTab = () => (
     <div className="space-y-6">
@@ -2477,9 +2849,10 @@ const CommunicationCenter: React.FC = () => {
           </Button>
           <Button
             onClick={() => {
-              if (activeTab === "overview") loadCommunicationStats();
-              else if (activeTab === "feedback") loadFeedbacks();
-              else if (
+              if (activeTab === "feedback") {
+                loadCommunicationStats();
+                loadFeedbacks();
+              } else if (
                 activeTab === "templates" ||
                 activeTab === "campaigns" ||
                 activeTab === "notifications"
@@ -2498,20 +2871,15 @@ const CommunicationCenter: React.FC = () => {
         value={activeTab}
         onValueChange={(value: any) => setActiveTab(value)}
       >
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="feedback">Feedback</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="feedback">Customer Feedback</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
-          {renderOverviewTab()}
-        </TabsContent>
-
         <TabsContent value="feedback" className="mt-6">
-          {renderFeedbackTab()}
+          {renderMergedFeedbackTab()}
         </TabsContent>
 
         <TabsContent value="templates" className="mt-6">
@@ -2786,14 +3154,6 @@ const CommunicationCenter: React.FC = () => {
                             <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
                               {response.responder?.name || "Admin"}
                             </span>
-                            {response.is_resolution && (
-                              <Badge
-                                variant="outline"
-                                className="text-xs border-green-500 text-green-700"
-                              >
-                                Resolution
-                              </Badge>
-                            )}
                           </div>
                           <span className="text-xs text-gray-500">
                             {response.created_at

@@ -101,16 +101,17 @@ export interface Communication {
 
 export interface CommunicationResponse {
   id: number;
+  communication: number;
   communication_id: number;
   responder: {
     id: number;
     name: string;
   };
-  response: string;
+  message: string;
+  response: string; // Alias for message for backward compatibility
+  is_internal: boolean;
   created_at: string;
   updated_at: string;
-  is_resolution: boolean;
-  metadata?: Record<string, any>;
 }
 
 export interface EmailTemplate {
@@ -365,7 +366,6 @@ class CommunicationService {
       const responseData = {
         communication: communicationId,
         message: data.response,
-        is_resolution: data.is_resolution || false,
         is_internal: false,
       };
 
@@ -1005,6 +1005,24 @@ class CommunicationService {
       return res.data;
     } catch (error) {
       return this.handleError(error, "replyToFoodReview");
+    }
+  }
+
+  async replyToContact(contactId: number, response: string): Promise<any> {
+    try {
+      const res = await apiClient.post(
+        `/communications/contacts/${contactId}/reply/`,
+        {
+          admin_response: response,
+        }
+      );
+      toast({
+        title: "Success",
+        description: "Reply sent to contact successfully",
+      });
+      return res.data;
+    } catch (error) {
+      return this.handleError(error, "replyToContact");
     }
   }
 
