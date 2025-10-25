@@ -248,7 +248,7 @@ const CustomerOrdersNew: React.FC = () => {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              price_id: item.price_details?.id || item.price?.id,
+              price_id: item.price_details?.price_id || item.price?.price_id || item.price?.id,
               quantity: item.quantity,
               special_instructions: item.special_instructions || ''
             })

@@ -62,6 +62,19 @@ export interface OrderItem {
   food_image: string | null;
   size: string;
   cook_name: string;
+  price_details?: {
+    price_id: number;
+    price: number;
+    size: string;
+    food_name: string;
+    food_description: string;
+    food_category: string;
+    food_image: string | null;
+  };
+  price?: {
+    id: number;
+    price_id?: number;
+  };
 }
 
 export interface CustomerStats {
