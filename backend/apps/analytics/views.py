@@ -587,6 +587,7 @@ def order_analytics(request):
                 "completed": completed_orders,
                 "pending": pending_orders,
                 "cancelled": cancelled_orders,
+                "revenue": float(total_revenue),  # Add total revenue
                 "trend": round(trend, 2),
                 "avgOrderValue": round(avg_order_value, 2),
                 "peakHours": peak_hours,

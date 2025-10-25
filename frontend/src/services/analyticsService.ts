@@ -177,6 +177,7 @@ export interface OrderAnalytics {
   completed: number;
   pending: number;
   cancelled: number;
+  revenue: number;  // Total revenue from orders
   trend: number;
   avgOrderValue: number;
   peakHours: Array<{ hour: number; count: number }>;
@@ -1077,24 +1078,39 @@ class AnalyticsService {
     timeRange: string = "30d"
   ): Promise<AdvancedAnalyticsData> {
     try {
-      const response = await fetch(
-        `${this.baseUrl}/analytics/admin/analytics/dashboard/advanced_analytics/?range=${timeRange}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-        }
-      );
+      const url = `${this.baseUrl}/analytics/admin/analytics/dashboard/advanced_analytics/?range=${timeRange}`;
+      console.log("🔗 Fetching advanced analytics from:", url);
+      
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+      });
+
+      console.log("📡 Advanced analytics response status:", response.status);
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error("❌ Advanced analytics error response:", errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      console.log("✅ Advanced analytics data received successfully:", {
+        hasData: !!data,
+        hasTrends: !!data?.trends,
+        trendCount: data?.trends?.revenue_trends?.length || 0,
+        hasSegmentation: !!data?.segmentation,
+      });
+      return data;
     } catch (error) {
-      console.error("Failed to get advanced analytics:", error);
+      console.error("❌ Failed to get advanced analytics - USING MOCK DATA:", error);
+      console.error("   Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       // Return mock data for development
       return this._getMockAdvancedAnalytics(timeRange);
     }

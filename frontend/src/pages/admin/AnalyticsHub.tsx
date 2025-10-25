@@ -151,7 +151,7 @@ const AnalyticsHub: React.FC = () => {
   // UI states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d">("30d");
+  const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d">("90d"); // Default to 90d to show all seeded data
   const [autoRefresh, setAutoRefresh] = useState(true); // Default to true for automatic refreshing
   const [refreshInterval, setRefreshInterval] = useState<"30s" | "1m" | "5m">("30s");
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -179,15 +179,18 @@ const AnalyticsHub: React.FC = () => {
       const [orderData, customerData] = await Promise.all([
         analyticsService
           .getOrderAnalytics(timeRange)
-          .catch(() => ({ total: 0, avgOrderValue: 0, trend: 0 })),
+          .catch(() => ({ total: 0, revenue: 0, avgOrderValue: 0, trend: 0 })),
         analyticsService
           .getCustomerAnalytics(timeRange)
           .catch(() => ({ total: 0, retention: 0 })),
       ]);
 
+      console.log(`📊 Order Data received (${timeRange}):`, orderData);
+      console.log(`👥 Customer Data received (${timeRange}):`, customerData);
+
       // Transform API data to match backend response shape
       const transformedData: AnalyticsData = {
-        revenue: orderData.total || 0,
+        revenue: orderData.revenue || 0,  // Use actual revenue from backend
         orders: orderData.total || 0,
         users: customerData.total || 0,
         avgOrderValue: orderData.avgOrderValue || 0,
@@ -197,6 +200,12 @@ const AnalyticsHub: React.FC = () => {
           users: customerData.retention || 0,
         },
       };
+
+      console.log(`✅ Transformed Analytics Data (${timeRange}):`, transformedData);
+      console.log(`   Revenue: LKR ${transformedData.revenue.toLocaleString()}`);
+      console.log(`   Orders: ${transformedData.orders.toLocaleString()}`);
+      console.log(`   Users: ${transformedData.users}`);
+      console.log(`   Avg Order Value: LKR ${transformedData.avgOrderValue.toLocaleString()}`);
 
       setAnalyticsData(transformedData);
       setLastUpdated(new Date());
@@ -220,20 +229,38 @@ const AnalyticsHub: React.FC = () => {
   // Load business metrics with better error handling
   const loadBusinessMetrics = useCallback(async () => {
     try {
+      console.log("🔄 Loading business metrics for timeRange:", timeRange);
       const [metrics, performance, orders, customers] = await Promise.all([
         analyticsService
           .getRevenueAnalytics(timeRange)
-          .catch(() => ({ current: 0, previous: 0, trend: "stable" as const })),
+          .catch((e) => {
+            console.error("Revenue analytics error:", e);
+            return { current: 0, previous: 0, trend: "stable" as const };
+          }),
         analyticsService
           .getPerformanceMetrics(timeRange)
-          .catch(() => ({ avgDeliveryTime: 0, customerSatisfaction: 0 })),
+          .catch((e) => {
+            console.error("Performance metrics error:", e);
+            return { avgDeliveryTime: 0, customerSatisfaction: 0 };
+          }),
         analyticsService
           .getOrderAnalytics(timeRange)
-          .catch(() => ({ total: 0, avgOrderValue: 0, trend: 0 })),
+          .catch((e) => {
+            console.error("Order analytics error:", e);
+            return { total: 0, revenue: 0, avgOrderValue: 0, trend: 0 };
+          }),
         analyticsService
           .getCustomerAnalytics(timeRange)
-          .catch(() => ({ total: 0, retention: 0 })),
+          .catch((e) => {
+            console.error("Customer analytics error:", e);
+            return { total: 0, retention: 0 };
+          }),
       ]);
+
+      console.log("💰 Revenue metrics:", metrics);
+      console.log("📊 Orders:", orders);
+      console.log("👥 Customers:", customers);
+      console.log("⚡ Performance:", performance);
 
       const transformedMetrics: BusinessMetrics = {
         revenue: {
@@ -322,10 +349,16 @@ const AnalyticsHub: React.FC = () => {
 
     try {
       loadingRef.current = true;
+      console.log("📈 Fetching advanced analytics for:", timeRange);
       const data = await analyticsService.getAdvancedAnalytics(timeRange);
+      console.log("📈 Advanced Analytics Data received:", data);
+      console.log("  - Revenue trends:", data?.trends?.revenue_trends?.length || 0, "days");
+      console.log("  - User trends:", data?.trends?.user_trends?.length || 0, "days");
+      console.log("  - Order trends:", data?.trends?.order_trends?.length || 0, "days");
+      console.log("  - Customer segments:", data?.segmentation?.segments ? "✅ Available" : "❌ Missing");
       setAdvancedAnalytics(data);
     } catch (error) {
-      console.error("Error loading advanced analytics:", error);
+      console.error("❌ Error loading advanced analytics:", error);
       // Set fallback data instead of null to prevent UI crashes
       setAdvancedAnalytics({
         trends: {
@@ -784,18 +817,30 @@ const AnalyticsHub: React.FC = () => {
             </div>
           </div>
           <BarChart
-            data={
-              advancedAnalytics?.trends?.revenue_trends?.length
-                ? advancedAnalytics.trends.revenue_trends.map((item, index) => ({
-                    name: item.day_name || item.date.split('-').slice(1).join('/'),
-                    users: advancedAnalytics.trends.user_trends[index]?.new_users || 0,
-                    orders: advancedAnalytics.trends.order_trends[index]?.orders || 0,
-                    revenue: item.revenue || 0,
-                  }))
-                : [
-                    { name: "No Data", users: 0, orders: 0, revenue: 0 },
-                  ]
-            }
+            data={(() => {
+              console.log("🔍 Growth Analytics Chart Rendering");
+              console.log("  advancedAnalytics exists?", !!advancedAnalytics);
+              console.log("  trends exists?", !!advancedAnalytics?.trends);
+              console.log("  revenue_trends length:", advancedAnalytics?.trends?.revenue_trends?.length || 0);
+              console.log("  user_trends length:", advancedAnalytics?.trends?.user_trends?.length || 0);
+              console.log("  order_trends length:", advancedAnalytics?.trends?.order_trends?.length || 0);
+              
+              if (!advancedAnalytics?.trends?.revenue_trends?.length) {
+                console.log("  ❌ NO DATA - Showing fallback");
+                return [{ name: "No Data", users: 0, orders: 0, revenue: 0 }];
+              }
+              
+              const chartData = advancedAnalytics.trends.revenue_trends.map((item, index) => ({
+                name: item.day_name || item.date.split('-').slice(1).join('/'),
+                users: advancedAnalytics.trends.user_trends[index]?.new_users || 0,
+                orders: advancedAnalytics.trends.order_trends[index]?.orders || 0,
+                revenue: item.revenue || 0,
+              }));
+              
+              console.log("  ✅ Chart data prepared:", chartData.length, "items");
+              console.log("  Sample data point:", chartData[0]);
+              return chartData;
+            })()}
             dataKeys={["users", "orders", "revenue"]}
             xAxisDataKey="name"
             height={280}
@@ -822,26 +867,35 @@ const AnalyticsHub: React.FC = () => {
             </div>
           </div>
           <PieChart
-            data={
-              advancedAnalytics?.trends?.order_trends?.length
-                ? (() => {
-                    // Group orders by day_name
-                    const dayOrders: Record<string, number> = {};
-                    advancedAnalytics.trends.order_trends.forEach((item) => {
-                      const day = item.day_name || new Date(item.date).toLocaleDateString('en-US', { weekday: 'long' });
-                      dayOrders[day] = (dayOrders[day] || 0) + (item.orders || 0);
-                    });
-                    // Convert to array format
-                    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                    return days.map(day => ({
-                      name: day,
-                      value: dayOrders[day] || 0,
-                    })).filter(item => item.value > 0);
-                  })()
-                : [
-                    { name: "No Data", value: 1 },
-                  ]
-            }
+            data={(() => {
+              console.log("🔍 Weekly Distribution Chart Rendering");
+              console.log("  order_trends length:", advancedAnalytics?.trends?.order_trends?.length || 0);
+              
+              if (!advancedAnalytics?.trends?.order_trends?.length) {
+                console.log("  ❌ NO DATA - Showing fallback");
+                return [{ name: "No Data", value: 1 }];
+              }
+              
+              // Group orders by day_name
+              const dayOrders: Record<string, number> = {};
+              advancedAnalytics.trends.order_trends.forEach((item) => {
+                const day = item.day_name || new Date(item.date).toLocaleDateString('en-US', { weekday: 'long' });
+                dayOrders[day] = (dayOrders[day] || 0) + (item.orders || 0);
+              });
+              
+              console.log("  Day orders aggregated:", dayOrders);
+              
+              // Convert to array format
+              const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+              const chartData = days.map(day => ({
+                name: day,
+                value: dayOrders[day] || 0,
+              })).filter(item => item.value > 0);
+              
+              console.log("  ✅ Chart data prepared:", chartData.length, "items");
+              console.log("  Total orders:", chartData.reduce((sum, item) => sum + item.value, 0));
+              return chartData.length > 0 ? chartData : [{ name: "No Data", value: 1 }];
+            })()}
             height={280}
             colors={[
               "#8B5CF6",
@@ -874,34 +928,44 @@ const AnalyticsHub: React.FC = () => {
             </div>
           </div>
           <BarChart
-            data={
-              advancedAnalytics?.segmentation?.segments
-                ? [
-                    {
-                      name: "New",
-                      customers: advancedAnalytics.segmentation.segments.new.customers,
-                      revenue: advancedAnalytics.segmentation.segments.new.total_spent,
-                    },
-                    {
-                      name: "Occasional",
-                      customers: advancedAnalytics.segmentation.segments.occasional.customers,
-                      revenue: advancedAnalytics.segmentation.segments.occasional.total_spent,
-                    },
-                    {
-                      name: "Regular",
-                      customers: advancedAnalytics.segmentation.segments.regular.customers,
-                      revenue: advancedAnalytics.segmentation.segments.regular.total_spent,
-                    },
-                    {
-                      name: "VIP",
-                      customers: advancedAnalytics.segmentation.segments.vip.customers,
-                      revenue: advancedAnalytics.segmentation.segments.vip.total_spent,
-                    },
-                  ]
-                : [
-                    { name: "No Data", customers: 0, revenue: 0 },
-                  ]
-            }
+            data={(() => {
+              console.log("🔍 Customer Analytics Chart Rendering");
+              console.log("  segmentation exists?", !!advancedAnalytics?.segmentation);
+              console.log("  segments exists?", !!advancedAnalytics?.segmentation?.segments);
+              
+              if (!advancedAnalytics?.segmentation?.segments) {
+                console.log("  ❌ NO DATA - Showing fallback");
+                return [{ name: "No Data", customers: 0, revenue: 0 }];
+              }
+              
+              const segments = advancedAnalytics.segmentation.segments;
+              const chartData = [
+                {
+                  name: "New",
+                  customers: segments.new?.customers || 0,
+                  revenue: segments.new?.total_spent || 0,
+                },
+                {
+                  name: "Occasional",
+                  customers: segments.occasional?.customers || 0,
+                  revenue: segments.occasional?.total_spent || 0,
+                },
+                {
+                  name: "Regular",
+                  customers: segments.regular?.customers || 0,
+                  revenue: segments.regular?.total_spent || 0,
+                },
+                {
+                  name: "VIP",
+                  customers: segments.vip?.customers || 0,
+                  revenue: segments.vip?.total_spent || 0,
+                },
+              ];
+              
+              console.log("  ✅ Chart data prepared:", chartData);
+              console.log("  Total customers:", chartData.reduce((sum, item) => sum + item.customers, 0));
+              return chartData;
+            })()}
             dataKeys={["customers", "revenue"]}
             xAxisDataKey="name"
             height={280}
@@ -1660,13 +1724,13 @@ const AnalyticsHub: React.FC = () => {
             value={timeRange}
             onValueChange={(value: any) => setTimeRange(value)}
           >
-            <SelectTrigger className="w-32">
-              <SelectValue />
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Select range" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="7d">📅 Last 7 days</SelectItem>
+              <SelectItem value="30d">📅 Last 30 days</SelectItem>
+              <SelectItem value="90d">📅 Last 90 days</SelectItem>
             </SelectContent>
           </Select>
 
