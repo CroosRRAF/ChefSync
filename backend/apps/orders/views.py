@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytz
-
 from apps.food.models import FoodPrice, FoodReview
 
 logger = logging.getLogger(__name__)
@@ -33,8 +32,8 @@ from .models import (
 )
 from .serializers import (
     CartItemSerializer,
-    CustomerSerializer,
     ChefSerializer,
+    CustomerSerializer,
     DeliveryChatSerializer,
     DeliveryReviewSerializer,
     UserAddressSerializer,
@@ -50,7 +49,19 @@ class UserAddressViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return UserAddress.objects.filter(user=self.request.user)
+        """Get user addresses with error handling"""
+        try:
+            if not self.request.user or not self.request.user.is_authenticated:
+                return UserAddress.objects.none()
+
+            return UserAddress.objects.filter(user=self.request.user)
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching user addresses: {e}", exc_info=True)
+            return UserAddress.objects.none()
 
     def perform_create(self, serializer):
         # If this is the first address or marked as default, set it as default
@@ -233,7 +244,7 @@ def _get_chef_address(chef):
 # Temporary simple serializer to fix the 500 error
 class SimpleOrderSerializer(serializers.ModelSerializer):
     """Simple order serializer that works"""
-    
+
     customer = CustomerSerializer(read_only=True)
     chef = ChefSerializer(read_only=True)
     customer_name = serializers.SerializerMethodField()
@@ -444,7 +455,10 @@ class OrderViewSet(viewsets.ModelViewSet):
         ):
             return queryset.filter(
                 Q(delivery_partner=user)
-                | Q(status__in=["confirmed", "preparing", "ready"], delivery_partner__isnull=True)
+                | Q(
+                    status__in=["confirmed", "preparing", "ready"],
+                    delivery_partner__isnull=True,
+                )
             )
         # For admins, show all orders
         elif (
@@ -1536,74 +1550,81 @@ def chef_dashboard_stats(request):
 
         # Calculate main stats including bulk orders
         completed_regular_orders = chef_orders.filter(status__in=["delivered"]).count()
-        completed_bulk_orders = chef_bulk_orders.filter(status__in=["completed"]).count()
-        
+        completed_bulk_orders = chef_bulk_orders.filter(
+            status__in=["completed"]
+        ).count()
+
         active_regular_orders = chef_orders.filter(
             status__in=["confirmed", "preparing", "ready", "out_for_delivery"]
         ).count()
         active_bulk_orders = chef_bulk_orders.filter(
             status__in=["confirmed", "preparing", "ready_for_delivery"]
         ).count()
-        
+
         pending_regular_orders = chef_orders.filter(status="pending").count()
         pending_bulk_orders = chef_bulk_orders.filter(status="pending").count()
 
         # Calculate revenue including bulk orders
         # For today revenue, include all completed payments for orders delivered or out for delivery today
         regular_revenue_today = float(
-            Payment.objects.filter(
-                order__chef=chef, 
-                status="completed"
-            ).filter(
-                Q(created_at__date=today) |  # Payment made today
-                Q(order__updated_at__date=today, order__status__in=["out_for_delivery", "delivered", "in_transit"])  # Order delivered/dispatched today
-            ).aggregate(total=Sum("amount"))["total"] or 0
+            Payment.objects.filter(order__chef=chef, status="completed")
+            .filter(
+                Q(created_at__date=today)  # Payment made today
+                | Q(
+                    order__updated_at__date=today,
+                    order__status__in=["out_for_delivery", "delivered", "in_transit"],
+                )  # Order delivered/dispatched today
+            )
+            .aggregate(total=Sum("amount"))["total"]
+            or 0
         )
-        
+
         # Calculate bulk order revenue for delivered/completed orders
         bulk_revenue_today = float(
             chef_bulk_orders.filter(
-                status__in=["completed", "ready_for_delivery"],
-                updated_at__date=today
-            ).aggregate(total=Sum("total_amount"))["total"] or 0
+                status__in=["completed", "ready_for_delivery"], updated_at__date=today
+            ).aggregate(total=Sum("total_amount"))["total"]
+            or 0
         )
 
         stats = {
             # Regular Order counts only (not mixed with bulk orders)
             "orders_completed": completed_regular_orders,  # Only regular orders
-            "orders_active": active_regular_orders,        # Only regular orders  
-            "pending_orders": pending_regular_orders,      # Only regular orders
-            "total_orders": chef_orders.count(),           # Only regular orders
-            
+            "orders_active": active_regular_orders,  # Only regular orders
+            "pending_orders": pending_regular_orders,  # Only regular orders
+            "total_orders": chef_orders.count(),  # Only regular orders
             # Separate bulk order counts
             "bulk_orders_completed": completed_bulk_orders,
             "bulk_orders_active": active_bulk_orders,
             "bulk_orders_pending": pending_bulk_orders,
             "bulk_orders_total": chef_bulk_orders.count(),
-            
             # Revenue includes both regular and bulk orders (this makes sense for total revenue)
             "today_revenue": regular_revenue_today + bulk_revenue_today,
             "total_revenue": float(
-                Payment.objects.filter(
-                    order__chef=chef, status="completed"
-                ).aggregate(total=Sum("amount"))["total"] or 0
-            ) + float(
+                Payment.objects.filter(order__chef=chef, status="completed").aggregate(
+                    total=Sum("amount")
+                )["total"]
+                or 0
+            )
+            + float(
                 chef_bulk_orders.filter(
                     status__in=["completed", "ready_for_delivery"]
-                ).aggregate(total=Sum("total_amount"))["total"] or 0
+                ).aggregate(total=Sum("total_amount"))["total"]
+                or 0
             ),
-            
             # General stats
             "bulk_orders": chef_bulk_orders.count(),
             "total_reviews": FoodReview.objects.filter(price__cook=chef).count(),
             "average_rating": float(
                 FoodReview.objects.filter(price__cook=chef).aggregate(
                     avg=Avg("rating")
-                )["avg"] or 0
+                )["avg"]
+                or 0
             ),
             "monthly_orders": chef_orders.filter(
                 created_at__month=current_month, created_at__year=current_year
-            ).count() + chef_bulk_orders.filter(
+            ).count()
+            + chef_bulk_orders.filter(
                 created_at__month=current_month, created_at__year=current_year
             ).count(),
             "customer_satisfaction": 94,  # Placeholder - can be calculated from reviews later
@@ -1748,112 +1769,114 @@ def chef_income_data(request):
     """
     try:
         chef = request.user
-        period = request.GET.get('period', '7days')
-        
+        period = request.GET.get("period", "7days")
+
         # Import BulkOrder here to avoid circular imports
         from .models import BulkOrder
-        
+
         # Calculate date range based on period
         today = timezone.now().date()
-        if period == '7days':
+        if period == "7days":
             start_date = today - timedelta(days=7)
             days = 7
-        elif period == '30days':
+        elif period == "30days":
             start_date = today - timedelta(days=30)
             days = 30
-        elif period == '90days':
+        elif period == "90days":
             start_date = today - timedelta(days=90)
             days = 90
         else:
             start_date = today - timedelta(days=7)
             days = 7
-        
+
         # Get chef's payments in the date range (regular orders)
         payments = Payment.objects.filter(
             order__chef=chef,
-            status='completed',
+            status="completed",
             created_at__date__gte=start_date,
-            created_at__date__lte=today
-        ).select_related('order')
-        
+            created_at__date__lte=today,
+        ).select_related("order")
+
         # Get chef's bulk orders in the date range
         bulk_orders = BulkOrder.objects.filter(
             chef=chef,
-            status__in=['completed', 'ready_for_delivery'],
+            status__in=["completed", "ready_for_delivery"],
             updated_at__date__gte=start_date,
-            updated_at__date__lte=today
+            updated_at__date__lte=today,
         )
-        
+
         # Calculate daily data
         daily_data = {}
         for i in range(days):
             date = start_date + timedelta(days=i)
             daily_data[date.isoformat()] = {
-                'date': date.isoformat(),
-                'income': 0.0,
-                'orders': 0,
-                'tips': 0.0,
-                'bulk_orders': 0,
-                'delivery_fees': 0.0
+                "date": date.isoformat(),
+                "income": 0.0,
+                "orders": 0,
+                "tips": 0.0,
+                "bulk_orders": 0,
+                "delivery_fees": 0.0,
             }
-        
+
         # Process regular order payments
         for payment in payments:
             date_key = payment.created_at.date().isoformat()
             if date_key in daily_data:
                 order = payment.order
-                daily_data[date_key]['income'] += float(payment.amount)
-                daily_data[date_key]['orders'] += 1
-                
+                daily_data[date_key]["income"] += float(payment.amount)
+                daily_data[date_key]["orders"] += 1
+
                 # Calculate estimated tips (8% of order value)
-                daily_data[date_key]['tips'] += float(payment.amount) * 0.08
-                
+                daily_data[date_key]["tips"] += float(payment.amount) * 0.08
+
                 # Estimate delivery fees (300 LKR per order)
-                daily_data[date_key]['delivery_fees'] += 300.0
-        
+                daily_data[date_key]["delivery_fees"] += 300.0
+
         # Process bulk orders
         for bulk_order in bulk_orders:
             date_key = bulk_order.updated_at.date().isoformat()
             if date_key in daily_data:
-                daily_data[date_key]['income'] += float(bulk_order.total_amount)
-                daily_data[date_key]['orders'] += 1
-                daily_data[date_key]['bulk_orders'] += 1
-                
+                daily_data[date_key]["income"] += float(bulk_order.total_amount)
+                daily_data[date_key]["orders"] += 1
+                daily_data[date_key]["bulk_orders"] += 1
+
                 # Calculate estimated tips for bulk orders (5% since they're usually business)
-                daily_data[date_key]['tips'] += float(bulk_order.total_amount) * 0.05
-                
+                daily_data[date_key]["tips"] += float(bulk_order.total_amount) * 0.05
+
                 # Add bulk order delivery fee if it's a delivery order
-                if bulk_order.order_type == 'delivery':
-                    daily_data[date_key]['delivery_fees'] += float(bulk_order.delivery_fee)
-        
+                if bulk_order.order_type == "delivery":
+                    daily_data[date_key]["delivery_fees"] += float(
+                        bulk_order.delivery_fee
+                    )
+
         # Convert to list and round values
         data_list = []
         for date_key in sorted(daily_data.keys()):
             day_data = daily_data[date_key]
-            day_data['income'] = round(day_data['income'], 2)
-            day_data['tips'] = round(day_data['tips'], 2)
-            day_data['delivery_fees'] = round(day_data['delivery_fees'], 2)
+            day_data["income"] = round(day_data["income"], 2)
+            day_data["tips"] = round(day_data["tips"], 2)
+            day_data["delivery_fees"] = round(day_data["delivery_fees"], 2)
             data_list.append(day_data)
-        
+
         # Calculate totals
-        total_income = sum(day['income'] for day in data_list)
-        total_orders = sum(day['orders'] for day in data_list)
-        total_tips = sum(day['tips'] for day in data_list)
-        total_bulk_orders = sum(day['bulk_orders'] for day in data_list)
+        total_income = sum(day["income"] for day in data_list)
+        total_orders = sum(day["orders"] for day in data_list)
+        total_tips = sum(day["tips"] for day in data_list)
+        total_bulk_orders = sum(day["bulk_orders"] for day in data_list)
         average_daily = total_income / days if days > 0 else 0
-        
+
         response_data = {
-            'period': period,
-            'total_income': round(total_income, 2),
-            'total_orders': total_orders,
-            'total_bulk_orders': total_bulk_orders,
-            'total_tips': round(total_tips, 2),
-            'average_daily': round(average_daily, 2),
-            'data': data_list
+            "period": period,
+            "total_income": round(total_income, 2),
+            "total_orders": total_orders,
+            "total_bulk_orders": total_bulk_orders,
+            "total_tips": round(total_tips, 2),
+            "average_daily": round(average_daily, 2),
+            "data": data_list,
         }
-        
+
         return JsonResponse(response_data)
-        
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
@@ -1866,65 +1889,61 @@ def chef_income_breakdown(request):
     """
     try:
         chef = request.user
-        period = request.GET.get('period', '7days')
-        
+        period = request.GET.get("period", "7days")
+
         # Calculate date range based on period
         today = timezone.now().date()
-        if period == '7days':
+        if period == "7days":
             start_date = today - timedelta(days=7)
-        elif period == '30days':
+        elif period == "30days":
             start_date = today - timedelta(days=30)
-        elif period == '90days':
+        elif period == "90days":
             start_date = today - timedelta(days=90)
         else:
             start_date = today - timedelta(days=7)
-        
+
         # Get chef's completed payments in the date range
         payments = Payment.objects.filter(
             order__chef=chef,
-            status='completed',
+            status="completed",
             created_at__date__gte=start_date,
-            created_at__date__lte=today
-        ).select_related('order')
-        
+            created_at__date__lte=today,
+        ).select_related("order")
+
         total_revenue = sum(float(payment.amount) for payment in payments)
-        
+
         # Calculate breakdown
         regular_orders = total_revenue * 0.7  # 70% from regular orders
-        bulk_orders = total_revenue * 0.2     # 20% from bulk orders
-        delivery_fees = total_revenue * 0.1   # 10% delivery fees
-        tips = total_revenue * 0.08           # 8% tips
-        
+        bulk_orders = total_revenue * 0.2  # 20% from bulk orders
+        delivery_fees = total_revenue * 0.1  # 10% delivery fees
+        tips = total_revenue * 0.08  # 8% tips
+
         categories = [
             {
-                'name': 'Regular Orders',
-                'amount': round(regular_orders, 2),
-                'percentage': 70
+                "name": "Regular Orders",
+                "amount": round(regular_orders, 2),
+                "percentage": 70,
             },
+            {"name": "Bulk Orders", "amount": round(bulk_orders, 2), "percentage": 20},
             {
-                'name': 'Bulk Orders',
-                'amount': round(bulk_orders, 2),
-                'percentage': 20
+                "name": "Delivery Fees",
+                "amount": round(delivery_fees, 2),
+                "percentage": 10,
             },
-            {
-                'name': 'Delivery Fees',
-                'amount': round(delivery_fees, 2),
-                'percentage': 10
-            }
         ]
-        
+
         response_data = {
-            'period': period,
-            'total_revenue': round(total_revenue, 2),
-            'regular_orders': round(regular_orders, 2),
-            'bulk_orders': round(bulk_orders, 2),
-            'delivery_fees': round(delivery_fees, 2),
-            'tips': round(tips, 2),
-            'categories': categories
+            "period": period,
+            "total_revenue": round(total_revenue, 2),
+            "regular_orders": round(regular_orders, 2),
+            "bulk_orders": round(bulk_orders, 2),
+            "delivery_fees": round(delivery_fees, 2),
+            "tips": round(tips, 2),
+            "categories": categories,
         }
-        
+
         return JsonResponse(response_data)
-        
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
@@ -2023,34 +2042,35 @@ def chef_income_breakdown(request):
 @permission_classes([IsAuthenticated])
 def calculate_checkout(request):
     """Calculate delivery fee, tax, and total for checkout with dynamic pricing"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🚀 CALCULATE_CHECKOUT API CALLED!")
     print(f"📥 Request Data: {request.data}")
-    print("="*80 + "\n")
-    
+    print("=" * 80 + "\n")
+
     try:
         from .services.delivery_fee_service import delivery_fee_calculator
 
         cart_items = request.data.get("cart_items", [])
         order_type = request.data.get("order_type", "regular")  # 'regular' or 'bulk'
-        
+
         print(f"📦 Cart Items: {len(cart_items)}")
         print(f"🏷️  Order Type: {order_type}")
-        
+
         # Delivery address information
         delivery_address_id = request.data.get("delivery_address_id")
         delivery_latitude = request.data.get("delivery_latitude")
         delivery_longitude = request.data.get("delivery_longitude")
-        
+
         # Kitchen/chef location
         chef_latitude = request.data.get("chef_latitude")
         chef_longitude = request.data.get("chef_longitude")
-        
+
         # Delivery time (optional, defaults to now)
         delivery_time_str = request.data.get("delivery_time")
         delivery_time = None
         if delivery_time_str:
             from dateutil import parser
+
             delivery_time = parser.parse(delivery_time_str)
 
         if not cart_items:
@@ -2098,132 +2118,163 @@ def calculate_checkout(request):
         if delivery_address_id and (not delivery_latitude or not delivery_longitude):
             try:
                 from apps.users.models import Address
+
                 address = Address.objects.get(
-                    id=delivery_address_id, 
-                    user=request.user, 
-                    address_type="customer"
+                    id=delivery_address_id, user=request.user, address_type="customer"
                 )
-                delivery_latitude = float(address.latitude) if address.latitude else None
-                delivery_longitude = float(address.longitude) if address.longitude else None
+                delivery_latitude = (
+                    float(address.latitude) if address.latitude else None
+                )
+                delivery_longitude = (
+                    float(address.longitude) if address.longitude else None
+                )
             except Exception:
                 try:
                     address = UserAddress.objects.get(
-                        id=delivery_address_id, 
-                        user=request.user
+                        id=delivery_address_id, user=request.user
                     )
-                    delivery_latitude = float(address.latitude) if address.latitude else None
-                    delivery_longitude = float(address.longitude) if address.longitude else None
+                    delivery_latitude = (
+                        float(address.latitude) if address.latitude else None
+                    )
+                    delivery_longitude = (
+                        float(address.longitude) if address.longitude else None
+                    )
                 except Exception:
                     pass
 
         # Calculate dynamic delivery fee
         delivery_fee_result = None
         delivery_fee = Decimal("0.00")
-        
+
         print(f"\n📍 Coordinates Check:")
         print(f"   Chef: ({chef_latitude}, {chef_longitude})")
         print(f"   Delivery: ({delivery_latitude}, {delivery_longitude})")
-        
-        if chef_latitude and chef_longitude and delivery_latitude and delivery_longitude:
+
+        if (
+            chef_latitude
+            and chef_longitude
+            and delivery_latitude
+            and delivery_longitude
+        ):
             try:
-                print(f"\n🚀 Calling delivery_fee_calculator.calculate_delivery_fee()...")
+                print(
+                    f"\n🚀 Calling delivery_fee_calculator.calculate_delivery_fee()..."
+                )
                 print(f"   Order Type: {order_type}")
-                
-                logger.info(f"🚀 Calling delivery_fee_calculator with order_type={order_type}")
+
+                logger.info(
+                    f"🚀 Calling delivery_fee_calculator with order_type={order_type}"
+                )
                 delivery_fee_result = delivery_fee_calculator.calculate_delivery_fee(
                     order_type=order_type,
                     origin_lat=float(chef_latitude),
                     origin_lng=float(chef_longitude),
                     dest_lat=float(delivery_latitude),
                     dest_lng=float(delivery_longitude),
-                    delivery_time=delivery_time
+                    delivery_time=delivery_time,
                 )
-                delivery_fee = Decimal(str(delivery_fee_result['total_fee']))
-                
+                delivery_fee = Decimal(str(delivery_fee_result["total_fee"]))
+
                 print(f"\n✅ API Response from calculator:")
                 print(f"   Total Fee: {delivery_fee} LKR")
                 print(f"   Breakdown: {delivery_fee_result.get('breakdown', {})}")
                 print(f"   Factors: {delivery_fee_result.get('factors', {})}")
-                
-                logger.info(f"✅ Delivery fee calculated: {delivery_fee} LKR (with surcharges)")
+
+                logger.info(
+                    f"✅ Delivery fee calculated: {delivery_fee} LKR (with surcharges)"
+                )
             except Exception as e:
                 logger.warning(f"⚠️ Failed to calculate dynamic delivery fee: {str(e)}")
                 # Fallback to basic calculation with surcharges
                 distance_km = delivery_fee_calculator._haversine_distance(
-                    float(chef_latitude), float(chef_longitude),
-                    float(delivery_latitude), float(delivery_longitude)
+                    float(chef_latitude),
+                    float(chef_longitude),
+                    float(delivery_latitude),
+                    float(delivery_longitude),
                 )
-                
+
                 # Calculate base distance fee
-                if order_type == 'bulk':
+                if order_type == "bulk":
                     if distance_km <= 5:
-                        distance_fee = Decimal('250.00')
+                        distance_fee = Decimal("250.00")
                     else:
-                        distance_fee = Decimal('250.00') + (Decimal(str(distance_km - 5)) * Decimal('15.00'))
+                        distance_fee = Decimal("250.00") + (
+                            Decimal(str(distance_km - 5)) * Decimal("15.00")
+                        )
                 else:
                     if distance_km <= 5:
-                        distance_fee = Decimal('50.00')
+                        distance_fee = Decimal("50.00")
                     else:
-                        distance_fee = Decimal('50.00') + (Decimal(str(distance_km - 5)) * Decimal('15.00'))
-                
+                        distance_fee = Decimal("50.00") + (
+                            Decimal(str(distance_km - 5)) * Decimal("15.00")
+                        )
+
                 # Calculate surcharges
-                time_surcharge = Decimal('0')
-                weather_surcharge = Decimal('0')
+                time_surcharge = Decimal("0")
+                weather_surcharge = Decimal("0")
                 is_night = False
                 is_rainy = False
-                
+
                 # Check if night time (6 PM - 5 AM) in Sri Lanka time
-                current_time = delivery_time if delivery_time else datetime.now(pytz.UTC)
+                current_time = (
+                    delivery_time if delivery_time else datetime.now(pytz.UTC)
+                )
                 # Convert to Sri Lanka timezone
-                sri_lanka_tz = pytz.timezone('Asia/Colombo')
+                sri_lanka_tz = pytz.timezone("Asia/Colombo")
                 if current_time.tzinfo is None:
                     current_time = pytz.UTC.localize(current_time)
                 local_time = current_time.astimezone(sri_lanka_tz)
                 current_hour = local_time.hour
-                logger.info(f"🌙 FALLBACK Night Check: Sri Lanka time = {local_time.strftime('%H:%M')}, Hour = {current_hour}")
+                logger.info(
+                    f"🌙 FALLBACK Night Check: Sri Lanka time = {local_time.strftime('%H:%M')}, Hour = {current_hour}"
+                )
                 if current_hour >= 18 or current_hour < 5:
                     is_night = True
-                    time_surcharge = distance_fee * Decimal('0.10')
-                    logger.info(f"💰 FALLBACK Night Surcharge Applied: {time_surcharge} LKR")
-                
+                    time_surcharge = distance_fee * Decimal("0.10")
+                    logger.info(
+                        f"💰 FALLBACK Night Surcharge Applied: {time_surcharge} LKR"
+                    )
+
                 # Note: Weather check requires API, so skip in fallback
                 # Total includes surcharges
                 total_fee = distance_fee + time_surcharge + weather_surcharge
-                logger.info(f"📊 FALLBACK Total: Distance={distance_fee} + Night={time_surcharge} = {total_fee}")
-                
+                logger.info(
+                    f"📊 FALLBACK Total: Distance={distance_fee} + Night={time_surcharge} = {total_fee}"
+                )
+
                 delivery_fee_result = {
-                    'total_fee': float(total_fee),
-                    'breakdown': {
-                        'distance_fee': float(distance_fee),
-                        'time_surcharge': float(time_surcharge),
-                        'weather_surcharge': float(weather_surcharge),
+                    "total_fee": float(total_fee),
+                    "breakdown": {
+                        "distance_fee": float(distance_fee),
+                        "time_surcharge": float(time_surcharge),
+                        "weather_surcharge": float(weather_surcharge),
                     },
-                    'factors': {
-                        'distance_km': distance_km,
-                        'order_type': order_type,
-                        'is_night_delivery': is_night,
-                        'is_rainy': is_rainy,
-                    }
+                    "factors": {
+                        "distance_km": distance_km,
+                        "order_type": order_type,
+                        "is_night_delivery": is_night,
+                        "is_rainy": is_rainy,
+                    },
                 }
-                
+
                 # Update delivery_fee to total
                 delivery_fee = total_fee
         else:
             # No location data, use minimal fee
             delivery_fee = Decimal("50.00")
             delivery_fee_result = {
-                'total_fee': 50.0,
-                'breakdown': {
-                    'distance_fee': 50.0,
-                    'time_surcharge': 0,
-                    'weather_surcharge': 0,
+                "total_fee": 50.0,
+                "breakdown": {
+                    "distance_fee": 50.0,
+                    "time_surcharge": 0,
+                    "weather_surcharge": 0,
                 },
-                'factors': {
-                    'distance_km': 0,
-                    'order_type': order_type,
-                    'is_night_delivery': False,
-                    'is_rainy': False,
-                }
+                "factors": {
+                    "distance_km": 0,
+                    "order_type": order_type,
+                    "is_night_delivery": False,
+                    "is_rainy": False,
+                },
             }
 
         # Calculate tax
@@ -2239,18 +2290,22 @@ def calculate_checkout(request):
             "total_amount": float(total_amount),
             "tax_rate": float(tax_rate),
         }
-        
+
         # Add delivery fee breakdown if available
         if delivery_fee_result:
             response_data["delivery_fee_breakdown"] = delivery_fee_result
             print(f"\n📤 SENDING RESPONSE WITH BREAKDOWN:")
             print(f"   Delivery Fee: {float(delivery_fee)}")
-            print(f"   Night Surcharge: {delivery_fee_result.get('breakdown', {}).get('time_surcharge', 0)}")
-            print(f"   Is Night: {delivery_fee_result.get('factors', {}).get('is_night_delivery', False)}")
+            print(
+                f"   Night Surcharge: {delivery_fee_result.get('breakdown', {}).get('time_surcharge', 0)}"
+            )
+            print(
+                f"   Is Night: {delivery_fee_result.get('factors', {}).get('is_night_delivery', False)}"
+            )
         else:
             print(f"\n⚠️  WARNING: No delivery_fee_breakdown in response!")
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         return Response(response_data)
 
     except Exception as e:
@@ -2400,7 +2455,7 @@ def place_order(request):
         # Prepare address data for order creation
         # For cash on delivery, auto-confirm the order so it shows up for delivery agents
         initial_status = "confirmed" if payment_method == "cash" else "pending"
-        
+
         order_data = {
             "customer": request.user,
             "chef": chef,
@@ -3198,18 +3253,14 @@ class DeliveryReviewViewSet(viewsets.ReadOnlyModelViewSet):
             # Delivery agents can see reviews for their deliveries
             return (
                 DeliveryReview.objects.filter(delivery__agent=user)
-                .select_related(
-                    "customer", "delivery__agent", "delivery__order"
-                )
+                .select_related("customer", "delivery__agent", "delivery__order")
                 .order_by("-created_at")
             )
         else:
             # Customers can see their own reviews
             return (
                 DeliveryReview.objects.filter(customer=user)
-                .select_related(
-                    "customer", "delivery__agent", "delivery__order"
-                )
+                .select_related("customer", "delivery__agent", "delivery__order")
                 .order_by("-created_at")
             )
 
@@ -3277,12 +3328,16 @@ class DeliveryReviewViewSet(viewsets.ReadOnlyModelViewSet):
         except Exception as e:
             import logging
             import traceback
+
             logger = logging.getLogger(__name__)
             logger.error(f"Error in DeliveryReviewViewSet.list: {str(e)}")
             logger.error(traceback.format_exc())
             return Response(
-                {"error": "An error occurred while fetching delivery reviews", "detail": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {
+                    "error": "An error occurred while fetching delivery reviews",
+                    "detail": str(e),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])

@@ -1,11 +1,4 @@
-import { useState, useEffect, FC } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DeliveryAddressSelector from "@/components/delivery/DeliveryAddressSelector";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,39 +10,55 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/context/AuthContext";
+import { addressService, DeliveryAddress } from "@/services/addressService";
+import {
+  customerService,
+  CustomerStats,
+  Order,
+} from "@/services/customerService";
+import { userService } from "@/services/userService";
+import {
+  Building,
   Calendar,
-  Edit,
-  Save,
-  X,
-  Trash2,
-  ShoppingBag,
-  Package,
-  Users,
-  Home,
   Camera,
-  Plus,
-  Shield,
-  Key,
-  Lock,
+  ChevronRight,
+  Edit,
   Eye,
   EyeOff,
+  Home,
+  Key,
   Loader2,
-  Building,
-  ChevronRight
+  Mail,
+  MapPin,
+  Package,
+  Phone,
+  Plus,
+  Save,
+  Shield,
+  ShoppingBag,
+  Trash2,
+  User,
+  Users,
+  X,
 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import { userService } from "@/services/userService";
-import { toast } from "sonner";
-import DeliveryAddressSelector from "@/components/delivery/DeliveryAddressSelector";
-import { addressService, DeliveryAddress } from "@/services/addressService";
+import { FC, memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Skeleton } from "@/components/ui/skeleton";
-import { customerService, CustomerStats, Order } from "@/services/customerService";
+import { toast } from "sonner";
 
 interface UserData {
   id?: number;
@@ -62,7 +71,6 @@ interface UserData {
   avatar?: string;
   createdAt?: string;
 }
-
 
 interface BulkOrder {
   bulk_order_id: string;
@@ -91,7 +99,11 @@ const ProfileSkeleton: FC = () => (
         </CardContent>
       </Card>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => <Card key={i} className="p-6"><Skeleton className="h-20 w-full" /></Card>)}
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="p-6">
+            <Skeleton className="h-20 w-full" />
+          </Card>
+        ))}
       </div>
       <Card className="p-6">
         <Skeleton className="h-10 w-1/3 mb-6" />
@@ -114,42 +126,74 @@ const CustomerProfileNew = () => {
   const [loadingRegularOrders, setLoadingRegularOrders] = useState(false);
   const [stats, setStats] = useState<CustomerStats | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [profileData, setProfileData] = useState<UserData>({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    username: '',
-    address: user?.address || '',
-    avatar: user?.avatar || '',
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
+    username: "",
+    address: user?.address || "",
+    avatar: user?.avatar || "",
     createdAt: new Date().toISOString(),
   });
 
   useEffect(() => {
+    // Debounce the fetch to prevent multiple simultaneous calls
+    let isMounted = true;
+    const controller = new AbortController();
+
     const fetchData = async () => {
+      if (!isMounted) return;
+
       setLoading(true);
       try {
-        await Promise.all([
-          fetchProfileData(),
-          fetchCustomerStats(),
-          fetchAddresses(),
-          fetchBulkOrders(),
-          fetchRegularOrders(),
-        ]);
+        // Fetch data in parallel for better performance
+        const [profileResult, statsResult, addressesResult] =
+          await Promise.allSettled([
+            fetchProfileData(),
+            fetchCustomerStats(),
+            fetchAddresses(),
+          ]);
+
+        // Only fetch orders after critical data is loaded (lazy loading)
+        if (isMounted) {
+          setTimeout(() => {
+            Promise.allSettled([fetchBulkOrders(), fetchRegularOrders()]);
+          }, 100); // Small delay to prioritize critical content
+        }
+
+        // Handle any errors
+        if (profileResult.status === "rejected") {
+          console.error("Failed to fetch profile:", profileResult.reason);
+        }
+        if (statsResult.status === "rejected") {
+          console.error("Failed to fetch stats:", statsResult.reason);
+        }
+        if (addressesResult.status === "rejected") {
+          console.error("Failed to fetch addresses:", addressesResult.reason);
+        }
       } catch (error) {
         console.error("Failed to fetch profile data", error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
+
     fetchData();
-  }, []);
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, []); // Empty dependency array - only run once on mount
 
   const fetchProfileData = async () => {
     try {
       const response = await userService.getUserProfile();
       if (response) {
-        setProfileData(prev => ({
+        setProfileData((prev) => ({
           ...prev,
           name: response.name || prev.name,
           email: response.email || prev.email,
@@ -161,7 +205,7 @@ const CustomerProfileNew = () => {
         }));
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error("Error fetching profile:", error);
     }
   };
 
@@ -170,20 +214,20 @@ const CustomerProfileNew = () => {
       const fetchedAddresses = await addressService.getAddresses();
       setAddresses(fetchedAddresses);
     } catch (error) {
-      console.error('Error fetching addresses:', error);
+      console.error("Error fetching addresses:", error);
     }
   };
 
   const fetchBulkOrders = async () => {
     try {
       setLoadingBulkOrders(true);
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/orders/customer-bulk-orders/', {
-        headers: { 'Authorization': `Bearer ${token}` },
+      const token = localStorage.getItem("access_token");
+      const response = await fetch("/api/orders/customer-bulk-orders/", {
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (response.ok) setBulkOrders(await response.json());
     } catch (error) {
-      console.error('Error fetching bulk orders:', error);
+      console.error("Error fetching bulk orders:", error);
     } finally {
       setLoadingBulkOrders(false);
     }
@@ -195,7 +239,7 @@ const CustomerProfileNew = () => {
       const fetchedOrders = await customerService.getCustomerOrders();
       setRegularOrders(fetchedOrders);
     } catch (error) {
-      console.error('Error fetching regular orders:', error);
+      console.error("Error fetching regular orders:", error);
     } finally {
       setLoadingRegularOrders(false);
     }
@@ -206,35 +250,78 @@ const CustomerProfileNew = () => {
       const stats = await customerService.getCustomerStats();
       setStats(stats);
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error("Error fetching stats:", error);
     }
   };
 
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = useCallback(async () => {
     try {
       setLoading(true);
       await userService.updateUserProfile(profileData);
       setIsEditing(false);
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error("Error updating profile:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [profileData]);
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     fetchProfileData();
     setIsEditing(false);
-  };
+  }, []);
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = useCallback(async () => {
     try {
       await userService.deleteUserAccount();
       logout();
     } catch (error) {
-      console.error('Error deleting account:', error);
+      console.error("Error deleting account:", error);
     }
-  };
+  }, [logout]);
+
+  const handleImageUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select an image file");
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size should be less than 5MB");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        toast.loading("Uploading profile image...");
+
+        const result = await customerService.uploadProfileImage(file);
+
+        // Update local state with new image URL
+        setProfileData((prev) => ({
+          ...prev,
+          avatar: result.image_url,
+        }));
+
+        toast.success("Profile image updated successfully!");
+
+        // Refresh profile data to ensure consistency
+        await fetchProfileData();
+      } catch (error) {
+        console.error("Error uploading profile image:", error);
+        toast.error("Failed to upload profile image. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   if (loading) {
     return <ProfileSkeleton />;
@@ -243,7 +330,6 @@ const CustomerProfileNew = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
-        
         {/* Profile Header */}
         <Card className="overflow-hidden shadow-lg">
           <div className="h-48 bg-gradient-to-r from-primary to-destructive" />
@@ -251,22 +337,47 @@ const CustomerProfileNew = () => {
             <div className="flex items-end -mt-16">
               <div className="relative group">
                 <Avatar className="h-32 w-32 rounded-full border-4 border-background shadow-lg">
-                  <AvatarImage src={profileData.avatar} alt={profileData.name} />
+                  <AvatarImage
+                    src={
+                      profileData.avatar
+                        ? profileData.avatar.includes("cloudinary.com")
+                          ? profileData.avatar.replace(
+                              "/upload/",
+                              "/upload/w_128,h_128,c_fill,f_auto,q_auto/"
+                            )
+                          : profileData.avatar
+                        : undefined
+                    }
+                    alt={profileData.name}
+                    loading="eager"
+                  />
                   <AvatarFallback className="bg-primary text-primary-foreground text-4xl font-bold">
-                    {profileData.name?.charAt(0).toUpperCase() || 'C'}
+                    {profileData.name?.charAt(0).toUpperCase() || "C"}
                   </AvatarFallback>
                 </Avatar>
                 {isEditing && (
                   <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-3 bg-background/80 rounded-full text-foreground hover:bg-background">
+                    <label
+                      htmlFor="profile-image-upload"
+                      className="cursor-pointer p-3 bg-background/80 rounded-full text-foreground hover:bg-background"
+                    >
                       <Camera className="h-5 w-5" />
-                    </button>
+                      <input
+                        id="profile-image-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                      />
+                    </label>
                   </div>
                 )}
               </div>
-              
+
               <div className="ml-4 mb-4 flex-1">
-                <h1 className="text-3xl font-bold text-foreground">{profileData.name}</h1>
+                <h1 className="text-3xl font-bold text-foreground">
+                  {profileData.name}
+                </h1>
                 <p className="text-muted-foreground flex items-center gap-2">
                   <Mail className="h-4 w-4" />
                   {profileData.email}
@@ -298,20 +409,55 @@ const CustomerProfileNew = () => {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard icon={ShoppingBag} title="Total Orders" value={stats?.total_orders || 0} color="blue" />
-          <StatCard icon={Package} title="Completed" value={stats?.completed_orders || 0} color="emerald" />
-          <StatCard icon={Users} title="Bulk Orders" value={bulkOrders.length} color="purple" />
-          <StatCard icon={Calendar} title="Member Since" value={new Date(profileData.createdAt || Date.now()).getFullYear()} color="amber" />
+          <StatCard
+            icon={ShoppingBag}
+            title="Total Orders"
+            value={stats?.total_orders || 0}
+            color="blue"
+          />
+          <StatCard
+            icon={Package}
+            title="Completed"
+            value={stats?.completed_orders || 0}
+            color="emerald"
+          />
+          <StatCard
+            icon={Users}
+            title="Bulk Orders"
+            value={bulkOrders.length}
+            color="purple"
+          />
+          <StatCard
+            icon={Calendar}
+            title="Member Since"
+            value={new Date(profileData.createdAt || Date.now()).getFullYear()}
+            color="amber"
+          />
         </div>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="info" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 md:grid-cols-5">
-            <TabsTrigger value="info"><User className="h-4 w-4 mr-2" />Personal Info</TabsTrigger>
-            <TabsTrigger value="addresses"><MapPin className="h-4 w-4 mr-2" />Addresses</TabsTrigger>
-            <TabsTrigger value="regular-orders"><ShoppingBag className="h-4 w-4 mr-2" />Regular Orders</TabsTrigger>
-            <TabsTrigger value="bulk-orders"><Package className="h-4 w-4 mr-2" />Bulk Orders</TabsTrigger>
-            <TabsTrigger value="security"><Shield className="h-4 w-4 mr-2" />Security</TabsTrigger>
+            <TabsTrigger value="info">
+              <User className="h-4 w-4 mr-2" />
+              Personal Info
+            </TabsTrigger>
+            <TabsTrigger value="addresses">
+              <MapPin className="h-4 w-4 mr-2" />
+              Addresses
+            </TabsTrigger>
+            <TabsTrigger value="regular-orders">
+              <ShoppingBag className="h-4 w-4 mr-2" />
+              Regular Orders
+            </TabsTrigger>
+            <TabsTrigger value="bulk-orders">
+              <Package className="h-4 w-4 mr-2" />
+              Bulk Orders
+            </TabsTrigger>
+            <TabsTrigger value="security">
+              <Shield className="h-4 w-4 mr-2" />
+              Security
+            </TabsTrigger>
           </TabsList>
 
           {/* Personal Information Tab */}
@@ -319,14 +465,55 @@ const CustomerProfileNew = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Personal Information</CardTitle>
-                <CardDescription>Manage your personal details and contact information.</CardDescription>
+                <CardDescription>
+                  Manage your personal details and contact information.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Field icon={User} label="Full Name" id="name" value={profileData.name} onChange={(e) => setProfileData({ ...profileData, name: e.target.value })} disabled={!isEditing} />
-                  <Field icon={User} label="Username" id="username" value={profileData.username} onChange={(e) => setProfileData({ ...profileData, username: e.target.value })} disabled={!isEditing} />
-                  <Field icon={Mail} label="Email Address" id="email" type="email" value={profileData.email} disabled={true} description="Email cannot be changed." />
-                  <Field icon={Phone} label="Phone Number" id="phone" value={profileData.phone} onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })} disabled={!isEditing} placeholder="+94 77 123 4567" />
+                  <Field
+                    icon={User}
+                    label="Full Name"
+                    id="name"
+                    value={profileData.name}
+                    onChange={(e) =>
+                      setProfileData({ ...profileData, name: e.target.value })
+                    }
+                    disabled={!isEditing}
+                  />
+                  <Field
+                    icon={User}
+                    label="Username"
+                    id="username"
+                    value={profileData.username}
+                    onChange={(e) =>
+                      setProfileData({
+                        ...profileData,
+                        username: e.target.value,
+                      })
+                    }
+                    disabled={!isEditing}
+                  />
+                  <Field
+                    icon={Mail}
+                    label="Email Address"
+                    id="email"
+                    type="email"
+                    value={profileData.email}
+                    disabled={true}
+                    description="Email cannot be changed."
+                  />
+                  <Field
+                    icon={Phone}
+                    label="Phone Number"
+                    id="phone"
+                    value={profileData.phone}
+                    onChange={(e) =>
+                      setProfileData({ ...profileData, phone: e.target.value })
+                    }
+                    disabled={!isEditing}
+                    placeholder="+94 77 123 4567"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -338,7 +525,9 @@ const CustomerProfileNew = () => {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Delivery Addresses</CardTitle>
-                  <CardDescription>Manage your saved delivery locations for faster checkout.</CardDescription>
+                  <CardDescription>
+                    Manage your saved delivery locations for faster checkout.
+                  </CardDescription>
                 </div>
                 <Button onClick={() => setIsAddressDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -347,10 +536,18 @@ const CustomerProfileNew = () => {
               </CardHeader>
               <CardContent>
                 {addresses.length === 0 ? (
-                  <EmptyState icon={MapPin} title="No Saved Addresses" description="Add a delivery address to get started." buttonText="Add Address" onClick={() => setIsAddressDialogOpen(true)} />
+                  <EmptyState
+                    icon={MapPin}
+                    title="No Saved Addresses"
+                    description="Add a delivery address to get started."
+                    buttonText="Add Address"
+                    onClick={() => setIsAddressDialogOpen(true)}
+                  />
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {addresses.map((address) => <AddressCard key={address.id} address={address} />)}
+                    {addresses.map((address) => (
+                      <AddressCard key={address.id} address={address} />
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -362,16 +559,28 @@ const CustomerProfileNew = () => {
             <Card>
               <CardHeader>
                 <CardTitle>My Regular Orders</CardTitle>
-                <CardDescription>View your history of individual meal orders.</CardDescription>
+                <CardDescription>
+                  View your history of individual meal orders.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingRegularOrders ? (
-                  <div className="text-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /></div>
+                  <div className="text-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+                  </div>
                 ) : regularOrders.length === 0 ? (
-                  <EmptyState icon={ShoppingBag} title="No Regular Orders Yet" description="Your food orders will appear here." buttonText="Browse Menu" onClick={() => navigate('/menu')} />
+                  <EmptyState
+                    icon={ShoppingBag}
+                    title="No Regular Orders Yet"
+                    description="Your food orders will appear here."
+                    buttonText="Browse Menu"
+                    onClick={() => navigate("/menu")}
+                  />
                 ) : (
                   <div className="space-y-3">
-                    {regularOrders.map((order) => <OrderRow key={order.id} order={order} />)}
+                    {regularOrders.map((order) => (
+                      <OrderRow key={order.id} order={order} />
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -383,15 +592,28 @@ const CustomerProfileNew = () => {
             <Card>
               <CardHeader>
                 <CardTitle>My Bulk Orders</CardTitle>
-                <CardDescription>View your history of orders for events and large gatherings.</CardDescription>
+                <CardDescription>
+                  View your history of orders for events and large gatherings.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                {loadingBulkOrders ? <div className="text-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /></div>
-                : bulkOrders.length === 0 ? (
-                  <EmptyState icon={Users} title="No Bulk Orders Yet" description="Planning an event? Place a bulk order with us!" buttonText="Browse Bulk Menus" onClick={() => navigate('/menu')} />
+                {loadingBulkOrders ? (
+                  <div className="text-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+                  </div>
+                ) : bulkOrders.length === 0 ? (
+                  <EmptyState
+                    icon={Users}
+                    title="No Bulk Orders Yet"
+                    description="Planning an event? Place a bulk order with us!"
+                    buttonText="Browse Bulk Menus"
+                    onClick={() => navigate("/menu")}
+                  />
                 ) : (
                   <div className="space-y-3">
-                    {bulkOrders.map((order) => <BulkOrderRow key={order.bulk_order_id} order={order} />)}
+                    {bulkOrders.map((order) => (
+                      <BulkOrderRow key={order.bulk_order_id} order={order} />
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -403,23 +625,45 @@ const CustomerProfileNew = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Change Password</CardTitle>
-                <CardDescription>For your security, we recommend using a strong, unique password.</CardDescription>
+                <CardDescription>
+                  For your security, we recommend using a strong, unique
+                  password.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 max-w-md">
                 <div className="space-y-2 relative">
                   <Label htmlFor="current-password">Current Password</Label>
-                  <Input id="current-password" type={showPassword ? "text" : "password"} placeholder="••••••••" />
-                  <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-9 text-muted-foreground">
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  <Input
+                    id="current-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-9 text-muted-foreground"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-password">New Password</Label>
-                  <Input id="new-password" type="password" placeholder="••••••••" />
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="••••••••"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm-password">Confirm New Password</Label>
-                  <Input id="confirm-password" type="password" placeholder="••••••••" />
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    placeholder="••••••••"
+                  />
                 </div>
                 <Button>
                   <Key className="h-4 w-4 mr-2" />
@@ -434,7 +678,10 @@ const CustomerProfileNew = () => {
                   <Trash2 className="h-5 w-5" />
                   Delete Account
                 </CardTitle>
-                <CardDescription>Permanently delete your account and all associated data. This action cannot be undone.</CardDescription>
+                <CardDescription>
+                  Permanently delete your account and all associated data. This
+                  action cannot be undone.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <AlertDialog>
@@ -443,14 +690,20 @@ const CustomerProfileNew = () => {
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogTitle>
+                        Are you absolutely sure?
+                      </AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will permanently delete your account, orders, and all other data. This action is irreversible.
+                        This will permanently delete your account, orders, and
+                        all other data. This action is irreversible.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive hover:bg-destructive/90">
+                      <AlertDialogAction
+                        onClick={handleDeleteAccount}
+                        className="bg-destructive hover:bg-destructive/90"
+                      >
                         Yes, delete my account
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -464,26 +717,36 @@ const CustomerProfileNew = () => {
 
       <DeliveryAddressSelector
         isOpen={isAddressDialogOpen}
-        onClose={() => { setIsAddressDialogOpen(false); fetchAddresses(); }}
-        onAddressSelect={(address) => console.log('Address selected:', address)}
+        onClose={() => {
+          setIsAddressDialogOpen(false);
+          fetchAddresses();
+        }}
+        onAddressSelect={(address) => console.log("Address selected:", address)}
         showHeader={true}
       />
     </div>
   );
 };
 
-// Helper Components
-const StatCard: FC<{ icon: React.ElementType; title: string; value: string | number; color: 'blue' | 'emerald' | 'purple' | 'amber' }> = ({ icon: Icon, title, value, color }) => {
+// Helper Components - Memoized to prevent unnecessary re-renders
+const StatCard: FC<{
+  icon: React.ElementType;
+  title: string;
+  value: string | number;
+  color: "blue" | "emerald" | "purple" | "amber";
+}> = memo(({ icon: Icon, title, value, color }) => {
   const colorClasses = {
-    blue: 'text-blue-500 bg-blue-100 dark:bg-blue-900/30',
-    emerald: 'text-emerald-500 bg-emerald-100 dark:bg-emerald-900/30',
-    purple: 'text-purple-500 bg-purple-100 dark:bg-purple-900/30',
-    amber: 'text-amber-500 bg-amber-100 dark:bg-amber-900/30',
+    blue: "text-blue-500 bg-blue-100 dark:bg-blue-900/30",
+    emerald: "text-emerald-500 bg-emerald-100 dark:bg-emerald-900/30",
+    purple: "text-purple-500 bg-purple-100 dark:bg-purple-900/30",
+    amber: "text-amber-500 bg-amber-100 dark:bg-amber-900/30",
   };
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-5 flex items-center gap-4">
-        <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${colorClasses[color]}`}>
+        <div
+          className={`h-12 w-12 rounded-lg flex items-center justify-center ${colorClasses[color]}`}
+        >
           <Icon className="h-6 w-6" />
         </div>
         <div>
@@ -493,31 +756,63 @@ const StatCard: FC<{ icon: React.ElementType; title: string; value: string | num
       </CardContent>
     </Card>
   );
-};
+});
+StatCard.displayName = "StatCard";
 
-const Field: FC<{icon: React.ElementType, label: string, id: string, value?: string, onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void, disabled?: boolean, type?: string, placeholder?: string, description?: string}> = 
-({ icon: Icon, label, id, description, ...props }) => (
+const Field: FC<{
+  icon: React.ElementType;
+  label: string;
+  id: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+  type?: string;
+  placeholder?: string;
+  description?: string;
+}> = memo(({ icon: Icon, label, id, description, ...props }) => (
   <div className="space-y-2">
-    <Label htmlFor={id} className="flex items-center gap-2 text-muted-foreground">
+    <Label
+      htmlFor={id}
+      className="flex items-center gap-2 text-muted-foreground"
+    >
       <Icon className="h-4 w-4" />
       {label}
     </Label>
     <Input id={id} {...props} className="bg-background" />
-    {description && <p className="text-xs text-muted-foreground">{description}</p>}
+    {description && (
+      <p className="text-xs text-muted-foreground">{description}</p>
+    )}
   </div>
-);
+));
+Field.displayName = "Field";
 
 const AddressCard: FC<{ address: DeliveryAddress }> = ({ address }) => (
-  <Card className={`${address.is_default ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted/50'} transition-all`}>
+  <Card
+    className={`${
+      address.is_default
+        ? "ring-2 ring-primary bg-primary/5"
+        : "hover:bg-muted/50"
+    } transition-all`}
+  >
     <CardContent className="p-4">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            {address.label.toLowerCase() === 'home' ? <Home className="h-4 w-4 text-primary" /> : <Building className="h-4 w-4 text-primary" />}
+            {address.label.toLowerCase() === "home" ? (
+              <Home className="h-4 w-4 text-primary" />
+            ) : (
+              <Building className="h-4 w-4 text-primary" />
+            )}
             <h4 className="font-semibold">{address.label}</h4>
-            {address.is_default && <Badge variant="secondary" className="text-xs">Default</Badge>}
+            {address.is_default && (
+              <Badge variant="secondary" className="text-xs">
+                Default
+              </Badge>
+            )}
           </div>
-          <p className="text-sm text-muted-foreground">{address.address_line1}, {address.city}, {address.pincode}</p>
+          <p className="text-sm text-muted-foreground">
+            {address.address_line1}, {address.city}, {address.pincode}
+          </p>
         </div>
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -528,12 +823,17 @@ const AddressCard: FC<{ address: DeliveryAddress }> = ({ address }) => (
 );
 
 const BulkOrderRow: FC<{ order: BulkOrder }> = ({ order }) => {
-  const getStatusColor = (status: string) => ({
-    'completed': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300',
-    'pending': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-    'confirmed': 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-    'cancelled': 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
-  }[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300');
+  const getStatusColor = (status: string) =>
+    ({
+      completed:
+        "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
+      pending:
+        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+      confirmed:
+        "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+      cancelled: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+    }[status] ||
+    "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300");
 
   return (
     <div className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
@@ -541,38 +841,63 @@ const BulkOrderRow: FC<{ order: BulkOrder }> = ({ order }) => {
         <Users className="h-6 w-6 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-foreground truncate">Order #{order.order_number}</p>
-        <p className="text-sm text-muted-foreground">{new Date(order.event_date).toLocaleDateString()}</p>
+        <p className="font-semibold text-foreground truncate">
+          Order #{order.order_number}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {new Date(order.event_date).toLocaleDateString()}
+        </p>
       </div>
       <div className="text-right flex-shrink-0">
-        <p className="font-bold text-foreground">LKR {Math.round(order.total_amount)}</p>
-        <Badge className={`${getStatusColor(order.status)} text-xs font-medium`}>{order.status.replace('_', ' ')}</Badge>
+        <p className="font-bold text-foreground">
+          LKR {Math.round(order.total_amount)}
+        </p>
+        <Badge
+          className={`${getStatusColor(order.status)} text-xs font-medium`}
+        >
+          {order.status.replace("_", " ")}
+        </Badge>
       </div>
     </div>
   );
 };
 
-const EmptyState: FC<{ icon: React.ElementType, title: string, description: string, buttonText: string, onClick: () => void }> = ({ icon: Icon, title, description, buttonText, onClick }) => (
+const EmptyState: FC<{
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  buttonText: string;
+  onClick: () => void;
+}> = ({ icon: Icon, title, description, buttonText, onClick }) => (
   <div className="text-center py-10 border-2 border-dashed rounded-lg">
     <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
       <Icon className="h-8 w-8 text-muted-foreground" />
     </div>
     <h3 className="text-lg font-semibold text-foreground">{title}</h3>
     <p className="text-muted-foreground mb-4">{description}</p>
-    <Button onClick={onClick} variant="outline">{buttonText}</Button>
+    <Button onClick={onClick} variant="outline">
+      {buttonText}
+    </Button>
   </div>
 );
 
 const OrderRow: FC<{ order: Order }> = ({ order }) => {
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      'delivered': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300',
-      'cancelled': 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
-      'preparing': 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-      'out_for_delivery': 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
-      'ready': 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
+      delivered:
+        "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
+      cancelled: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+      preparing:
+        "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+      out_for_delivery:
+        "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300",
+      ready:
+        "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
     };
-    return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+    return (
+      colors[status] ||
+      "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+    );
   };
 
   return (
@@ -581,12 +906,22 @@ const OrderRow: FC<{ order: Order }> = ({ order }) => {
         <ShoppingBag className="h-6 w-6 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-foreground truncate">Order #{order.order_number}</p>
-        <p className="text-sm text-muted-foreground">{new Date(order.created_at).toLocaleDateString()}</p>
+        <p className="font-semibold text-foreground truncate">
+          Order #{order.order_number}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {new Date(order.created_at).toLocaleDateString()}
+        </p>
       </div>
       <div className="text-right flex-shrink-0">
-        <p className="font-bold text-foreground">LKR {Math.round(order.total_amount)}</p>
-        <Badge className={`${getStatusColor(order.status)} text-xs font-medium`}>{order.status.replace(/_/g, ' ')}</Badge>
+        <p className="font-bold text-foreground">
+          LKR {Math.round(order.total_amount)}
+        </p>
+        <Badge
+          className={`${getStatusColor(order.status)} text-xs font-medium`}
+        >
+          {order.status.replace(/_/g, " ")}
+        </Badge>
       </div>
     </div>
   );

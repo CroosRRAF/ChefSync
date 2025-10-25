@@ -1,4 +1,4 @@
-import apiClient from './apiClient';
+import apiClient from "./apiClient";
 
 // Types
 export interface CustomerProfile {
@@ -78,27 +78,36 @@ export interface CustomerStats {
 export const customerService = {
   // Get customer profile
   getProfile: async (): Promise<CustomerProfile> => {
-    const response = await apiClient.get('/auth/profile/');
+    const response = await apiClient.get("/auth/profile/");
     return response.data;
   },
 
   // Update customer profile
-  updateProfile: async (data: Partial<CustomerProfile>): Promise<CustomerProfile> => {
-    const response = await apiClient.patch('/auth/profile/update/', data);
+  updateProfile: async (
+    data: Partial<CustomerProfile>
+  ): Promise<CustomerProfile> => {
+    const response = await apiClient.patch("/auth/profile/update/", data);
     return response.data;
   },
 
   // Get customer orders
-  getOrders: async (params: {
-    status?: string;
-    page?: number;
-    page_size?: number;
-    ordering?: string;
-  } = {}): Promise<{ results: Order[]; count: number; next: string | null; previous: string | null }> => {
+  getOrders: async (
+    params: {
+      status?: string;
+      page?: number;
+      page_size?: number;
+      ordering?: string;
+    } = {}
+  ): Promise<{
+    results: Order[];
+    count: number;
+    next: string | null;
+    previous: string | null;
+  }> => {
     const searchParams = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value !== undefined && value !== null && value !== "") {
         searchParams.append(key, value.toString());
       }
     });
@@ -115,28 +124,87 @@ export const customerService = {
 
   // Get customer stats
   getCustomerStats: async (): Promise<CustomerStats> => {
-        const response = await apiClient.get<CustomerStats>('/orders/customer/stats/');
+    const response = await apiClient.get<CustomerStats>(
+      "/orders/customer/stats/"
+    );
     return response.data;
   },
 
   // Cancel order
   cancelOrder: async (orderId: number, reason?: string): Promise<void> => {
     await apiClient.patch(`/orders/orders/${orderId}/`, {
-      status: 'cancelled',
-      customer_notes: reason || 'Order cancelled by customer'
+      status: "cancelled",
+      customer_notes: reason || "Order cancelled by customer",
     });
   },
 
   // Get order status history
   getOrderHistory: async (orderId: number): Promise<any[]> => {
-    const response = await apiClient.get(`/orders/order-history/?order=${orderId}`);
+    const response = await apiClient.get(
+      `/orders/order-history/?order=${orderId}`
+    );
     return response.data.results || response.data;
   },
 
   // Get customer orders
   getCustomerOrders: async (): Promise<Order[]> => {
-    const response = await apiClient.get<Order[]>('/orders/customer/orders/');
+    const response = await apiClient.get<Order[]>("/orders/customer/orders/");
     return response.data;
+  },
+
+  // Upload profile image
+  uploadProfileImage: async (
+    imageFile: File
+  ): Promise<{ image_url: string; public_id: string }> => {
+    // Validate file before upload
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+    if (imageFile.size > maxSizeBytes) {
+      throw new Error("Image size must be less than 10MB");
+    }
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(imageFile.type)) {
+      throw new Error("Only JPEG, PNG, and WebP images are allowed");
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onloadend = async () => {
+        try {
+          const base64Image = reader.result as string;
+
+          // Make upload request with timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+          const response = await apiClient.post(
+            "/auth/profile/upload-image/",
+            { image: base64Image },
+            { signal: controller.signal }
+          );
+
+          clearTimeout(timeoutId);
+          resolve(response.data);
+        } catch (error: any) {
+          if (error.name === "AbortError") {
+            reject(new Error("Upload timeout - please try again"));
+          } else if (error.response?.status === 413) {
+            reject(new Error("Image size too large"));
+          } else if (error.response?.status === 503) {
+            reject(new Error("Storage service unavailable - please try again"));
+          } else {
+            reject(error);
+          }
+        }
+      };
+
+      reader.onerror = () => {
+        reject(new Error("Failed to read image file"));
+      };
+
+      reader.readAsDataURL(imageFile);
+    });
   },
 };
 

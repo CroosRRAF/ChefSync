@@ -1466,9 +1466,26 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def unread_count(self, request):
-        """Get count of unread notifications"""
-        count = self.get_queryset().filter(status="Unread").count()
-        return Response({"count": count})
+        """Get count of unread notifications with error handling"""
+        try:
+            # Validate user authentication
+            if not request.user or not request.user.is_authenticated:
+                return Response(
+                    {"error": "Authentication required"},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
+            count = self.get_queryset().filter(status="Unread").count()
+            return Response({"count": count})
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching unread count: {e}", exc_info=True)
+
+            # Return 0 count instead of error for better UX
+            return Response({"count": 0, "error": str(e)})
 
     @action(detail=True, methods=["post"])
     def mark_read(self, request, pk=None):

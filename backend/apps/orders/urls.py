@@ -2,11 +2,11 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from . import views
-from .bulk_views import BulkOrderManagementViewSet
-from .bulk_views import CollaborationRequestViewSet
+from .bulk_views import BulkOrderManagementViewSet, CollaborationRequestViewSet
 from .customer_bulk_views import CustomerBulkOrderViewSet
 from .customer_views import (
     customer_dashboard_stats,
+    customer_orders,
     get_order_review_status,
     submit_delivery_review,
     submit_food_review,
@@ -24,7 +24,11 @@ router.register(
 
 # Bulk order management (for cooks/admins)
 router.register(r"bulk", BulkOrderManagementViewSet, basename="bulk-orders")
-router.register(r"collaboration-requests", CollaborationRequestViewSet, basename="collaboration-requests")
+router.register(
+    r"collaboration-requests",
+    CollaborationRequestViewSet,
+    basename="collaboration-requests",
+)
 
 # Customer bulk orders (for customers to place bulk orders)
 router.register(
@@ -39,6 +43,11 @@ urlpatterns = [
         "customer/stats/",
         customer_dashboard_stats,
         name="customer-dashboard-stats",
+    ),
+    path(
+        "customer/orders/",
+        customer_orders,
+        name="customer-orders",
     ),
     # Review endpoints
     path(
@@ -65,7 +74,11 @@ urlpatterns = [
         "chef/activity/recent/", views.chef_recent_activity, name="chef-recent-activity"
     ),
     path("chef/income/", views.chef_income_data, name="chef-income-data"),
-    path("chef/income/breakdown/", views.chef_income_breakdown, name="chef-income-breakdown"),
+    path(
+        "chef/income/breakdown/",
+        views.chef_income_breakdown,
+        name="chef-income-breakdown",
+    ),
     # Checkout and order placement endpoints
     path("checkout/calculate/", views.calculate_checkout, name="calculate-checkout"),
     path("place/", views.place_order, name="place-order"),
