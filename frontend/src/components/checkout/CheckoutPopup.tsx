@@ -711,16 +711,19 @@ const CheckoutPopup: React.FC<CheckoutPopupProps> = ({
           </CardContent>
         </Card>
 
-        <Card className={`cursor-pointer ${paymentMethod === 'card' ? 'ring-2 ring-orange-500' : ''}`}>
+        <Card className="cursor-not-allowed bg-gray-100 dark:bg-gray-900 opacity-60">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="card" id="card" />
-              <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer flex-1">
-                <CreditCard className="h-5 w-5" />
-                <div>
-                  <p className="font-medium">Card Payment</p>
-                  <p className="text-xs text-gray-500">Pay securely online</p>
+              <RadioGroupItem value="card" id="card" disabled />
+              <Label htmlFor="card" className="flex items-center gap-2 flex-1 opacity-60">
+                <CreditCard className="h-5 w-5 text-gray-400" />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-500">Card Payment</p>
+                  <p className="text-xs text-gray-400">Pay securely online</p>
                 </div>
+                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                  Coming Soon
+                </Badge>
               </Label>
             </div>
           </CardContent>

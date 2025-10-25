@@ -102,16 +102,6 @@ class ChefProfile(models.Model):
     
     class Meta:
         db_table = 'chef_profiles'
-    rating_average = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
-    total_orders = models.PositiveIntegerField(default=0)
-    total_reviews = models.PositiveIntegerField(default=0)
-    is_featured = models.BooleanField(default=False)
-    
-    def __str__(self):
-        return f"Chef {self.user.username}"
-    
-    class Meta:
-        db_table = 'chef_profiles'
 
 
 class DeliveryProfile(models.Model):

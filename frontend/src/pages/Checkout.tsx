@@ -108,7 +108,7 @@ const Checkout: React.FC = () => {
         // Set default methods if API fails
         setAvailablePaymentMethods([
           { id: 'cash', name: 'Cash on Delivery', type: 'cash', enabled: true },
-          { id: 'card', name: 'Credit/Debit Card', type: 'card', enabled: true },
+          { id: 'card', name: 'Credit/Debit Card', type: 'card', enabled: false }, // Coming soon
           { id: 'online', name: 'Online Payment', type: 'online', enabled: false }
         ]);
       }

@@ -123,10 +123,18 @@ class UserService {
           ? "/auth/cook-profile/"
           : "/auth/profile/";
 
+      // Add cache-busting timestamp to ensure fresh data
+      const cacheBuster = `?_t=${Date.now()}`;
+      
       console.log(`Fetching user profile from ${endpoint} (role: ${userRole})`);
-      const response = await fetch(`${this.apiUrl}${endpoint}`, {
+      const response = await fetch(`${this.apiUrl}${endpoint}${cacheBuster}`, {
         method: "GET",
-        headers: this.getAuthHeaders(),
+        headers: {
+          ...this.getAuthHeaders(),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
       });
 
       if (!response.ok) {

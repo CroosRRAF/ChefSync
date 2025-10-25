@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +31,9 @@ import {
   User,
   Filter,
   Leaf,
-  TrendingUp
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -208,7 +210,7 @@ const CustomerBulkOrderDashboard: React.FC = () => {
     num_persons: 10,
     event_date: undefined,
     event_time: '',
-    order_type: 'delivery',
+    order_type: 'pickup', // Default to pickup (delivery coming soon)
     delivery_address: '',
     special_instructions: '',
     selected_optional_items: [],
@@ -464,44 +466,25 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       return;
     }
 
-    // 7. Check advance notice requirement
+    // 7. Check advance notice requirement (use menu-specific or default to 24 hours)
     const hoursUntilEvent = (eventDateTime.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+    const requiredAdvanceHours = selectedMenu.advance_notice_hours || 24; // Use menu requirement or default to 24 hours
+    const requiredDays = Math.ceil(requiredAdvanceHours / 24);
     
-    console.log(`⏰ Hours until event: ${hoursUntilEvent.toFixed(1)}, Required: ${selectedMenu.advance_notice_hours}`);
+    console.log(`⏰ Hours until event: ${hoursUntilEvent.toFixed(1)}, Required: ${requiredAdvanceHours} hours (${requiredDays} days)`);
     
-    if (selectedMenu.advance_notice_hours && hoursUntilEvent < selectedMenu.advance_notice_hours) {
-      toast.error(`This menu requires at least ${selectedMenu.advance_notice_hours} hours advance notice. Please select a later date/time.`);
+    // Check if event meets the advance notice requirement
+    if (hoursUntilEvent < requiredAdvanceHours) {
+      toast.error(
+        `This menu requires at least ${requiredAdvanceHours} hours (${requiredDays} ${requiredDays === 1 ? 'day' : 'days'}) advance notice. Please select a later date/time.`
+      );
       return;
     }
 
-    // 8. Validate order type
-    if (!orderForm.order_type || (orderForm.order_type !== 'delivery' && orderForm.order_type !== 'pickup')) {
-      toast.error('Please select delivery or pickup option.');
+    // 8. Validate order type (only pickup is available for bulk orders)
+    if (orderForm.order_type !== 'pickup') {
+      toast.error('Only pickup is available for bulk orders at this time.');
       return;
-    }
-
-    // 9. Validate delivery address for delivery orders
-    if (orderForm.order_type === 'delivery') {
-      const hasAddress = (selectedAddress && selectedAddress.address_line1) || 
-                         (orderForm.delivery_address && orderForm.delivery_address.trim().length > 0);
-      
-      if (!hasAddress) {
-        toast.error('Please provide a delivery address or select from saved addresses.');
-        return;
-      }
-
-      // Validate selected address has required fields
-      if (selectedAddress) {
-        if (!selectedAddress.address_line1 || selectedAddress.address_line1.trim() === '') {
-          toast.error('Delivery address is incomplete. Please select a valid address.');
-          return;
-        }
-        
-        if (!selectedAddress.city || selectedAddress.city.trim() === '') {
-          toast.error('City is required in delivery address.');
-          return;
-        }
-      }
     }
 
     // 10. Use selected address if available, otherwise use manual entry
@@ -546,13 +529,10 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         num_persons: orderForm.num_persons,
         event_date: format(orderForm.event_date, 'yyyy-MM-dd'),
         event_time: orderForm.event_time,
-        order_type: orderForm.order_type,
-        delivery_address: orderForm.order_type === 'delivery' ? finalAddress : 'Pickup', // Use the validated final address
-        delivery_address_id: selectedAddress?.id,
-        delivery_latitude: selectedAddress?.latitude,
-        delivery_longitude: selectedAddress?.longitude,
-        delivery_fee: orderForm.order_type === 'delivery' ? orderForm.delivery_fee : 0,
-        distance_km: orderForm.distance_km,
+        order_type: 'pickup', // Only pickup is available for bulk orders
+        delivery_address: 'Pickup',
+        delivery_fee: 0,
+        distance_km: 0,
         special_instructions: orderForm.special_instructions || '',
         selected_optional_items: orderForm.selected_optional_items,
         total_amount: calculateTotalCost(),
@@ -576,6 +556,8 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       if (response.ok) {
         const responseData = await response.json();
         console.log('✅ Order placed successfully:', responseData);
+        
+        // Close dialog and navigate to orders page
         setIsOrderDialogOpen(false);
         navigate('/customer/orders');
       } else {
@@ -728,9 +710,11 @@ const CustomerBulkOrderDashboard: React.FC = () => {
     }
   };
 
-  // AI-powered search function
-  const handleAiSearch = async () => {
-    if (!aiSearchQuery.trim()) {
+  // AI-powered search function with auto-search
+  const handleAiSearch = async (query: string) => {
+    if (!query.trim()) {
+      // If empty, reset to normal view
+      handleClearAiSearch();
       return;
     }
     
@@ -744,7 +728,7 @@ const CustomerBulkOrderDashboard: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: aiSearchQuery,
+          query: query,
           meal_type: selectedMealType !== 'all' ? selectedMealType : undefined,
           people_count: peopleCountFilter !== 'all' ? peopleCountFilter : undefined,
           price_range: priceRangeFilter !== 'all' ? priceRangeFilter : undefined,
@@ -771,6 +755,20 @@ const CustomerBulkOrderDashboard: React.FC = () => {
     setIsAiSearchActive(false);
     fetchBulkMenus();
   };
+
+  // Debounced AI search - auto-search after user stops typing
+  useEffect(() => {
+    if (aiSearchQuery.trim()) {
+      const timeoutId = setTimeout(() => {
+        handleAiSearch(aiSearchQuery);
+      }, 800); // Wait 800ms after user stops typing
+      
+      return () => clearTimeout(timeoutId);
+    } else if (isAiSearchActive) {
+      // If query is cleared, reset to normal view
+      handleClearAiSearch();
+    }
+  }, [aiSearchQuery]);
 
   const filteredMenus = bulkMenus
     .filter(menu => selectedMealType === 'all' || menu.meal_type === selectedMealType)
@@ -844,127 +842,66 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         <TabsContent value="browse" className="space-y-4">
       {/* Search and Filter Bar */}
       <div className="space-y-4">
-        {/* AI Search Section */}
-        <Card className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-2 border-purple-200 dark:border-purple-700">
+        {/* Smart Search Section */}
+        <Card className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-5 w-5 text-purple-600" />
-              <h3 className="font-semibold text-purple-900 dark:text-purple-100">AI-Powered Smart Search</h3>
-              {isAiSearchActive && (
-                <Badge className="bg-purple-600 text-white">Active</Badge>
-              )}
-            </div>
-            <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
-              Ask in natural language: "vegetarian food for wedding with 100 guests", "healthy low-calorie breakfast for 50 people under LKR 600", "spicy Indian dinner menu", "gluten-free vegan options for corporate event"
-            </p>
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Sparkles className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400 w-4 h-4" />
-                <Input
-                  type="text"
-                  placeholder="Try: 'healthy vegetarian food for corporate event'..."
-                  value={aiSearchQuery}
-                  onChange={(e) => setAiSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAiSearch()}
-                  className="pl-9 border-purple-300 focus:border-purple-500"
-                  disabled={aiSearching}
-                />
-              </div>
-              <Button 
-                onClick={handleAiSearch}
-                disabled={aiSearching || !aiSearchQuery.trim()}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
-              >
-                {aiSearching ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                    Searching...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    AI Search
-                  </>
+            <div className="space-y-3">
+              {/* Smart Search Input */}
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    type="text"
+                    placeholder="Search menus... (e.g., 'vegetarian food for 100 guests', 'spicy Indian dinner menu')"
+                    value={aiSearchQuery}
+                    onChange={(e) => setAiSearchQuery(e.target.value)}
+                    className="pl-10 h-12 text-base"
+                    disabled={aiSearching}
+                  />
+                  {aiSearching && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-orange-500 border-t-transparent" />
+                    </div>
+                  )}
+                </div>
+                {(isAiSearchActive || aiSearchQuery.trim()) && (
+                  <Button 
+                    onClick={handleClearAiSearch}
+                    variant="outline"
+                    className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
                 )}
-              </Button>
+              </div>
+              
+              {/* Search Status */}
               {isAiSearchActive && (
-                <Button 
-                  onClick={handleClearAiSearch}
-                  variant="outline"
-                  className="border-purple-300 text-purple-700 hover:bg-purple-100"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
+                <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                  <Check className="h-4 w-4" />
+                  <span>Smart search active - showing {bulkMenus.length} results</span>
+                </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Traditional Search */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              type="text"
-              placeholder="Or use traditional search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              disabled={isAiSearchActive}
-            />
+        {/* Traditional Text Search (kept for filtering AI results) */}
+        {isAiSearchActive && (
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                type="text"
+                placeholder="Filter results by name, chef, or item..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
-        </div>
-
-        {/* AI Analytics Dashboard */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">Available Menus</p>
-                  <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">{filteredMenus.length}</p>
-                  <p className="text-xs text-orange-500 mt-1">of {bulkMenus.length} total</p>
-                </div>
-                <Package className="h-10 w-10 text-orange-500 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">Vegetarian Options</p>
-                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-                    {bulkMenus.filter(m => m.items?.some(i => i.is_vegetarian)).length}
-                  </p>
-                  <p className="text-xs text-green-500 mt-1">
-                    {bulkMenus.filter(m => m.items?.some(i => i.is_vegan)).length} vegan
-                  </p>
-                </div>
-                <Leaf className="h-10 w-10 text-green-500 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Avg. Price/Person</p>
-                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                    LKR {bulkMenus.length > 0 ? Math.round(bulkMenus.reduce((sum, m) => sum + m.base_price_per_person, 0) / bulkMenus.length) : 0}
-                  </p>
-                  <p className="text-xs text-blue-500 mt-1">
-                    {bulkMenus.length > 0 ? `LKR ${Math.min(...bulkMenus.map(m => m.base_price_per_person))} - LKR ${Math.max(...bulkMenus.map(m => m.base_price_per_person))}` : 'No data'}
-                  </p>
-                </div>
-                <TrendingUp className="h-10 w-10 text-blue-500 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        )}
 
         {/* Smart Filters */}
         <Card className="bg-white dark:bg-gray-800">
@@ -1233,99 +1170,179 @@ const CustomerBulkOrderDashboard: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Order Dialog */}
+      {/* Order Dialog - Improved UI */}
       <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Place Bulk Order</DialogTitle>
-            <DialogDescription>
-              {selectedMenu?.menu_name} - LKR {selectedMenu?.base_price_per_person}/person
+        <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader className="border-b pb-4">
+            <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <ShoppingCart className="h-6 w-6 text-orange-500" />
+              Place Bulk Order
+            </DialogTitle>
+            <DialogDescription className="flex items-center gap-2 mt-2">
+              <ChefHat className="h-4 w-4 text-orange-500" />
+              <span className="font-semibold">{selectedMenu?.menu_name}</span>
+              <span className="mx-2">•</span>
+              <Banknote className="h-4 w-4 text-green-600" />
+              <span className="font-semibold text-green-600">LKR {selectedMenu?.base_price_per_person}/person</span>
             </DialogDescription>
           </DialogHeader>
 
           {selectedMenu && (
-            <div className="space-y-6">
-              {/* Number of Persons */}
-              <div>
-                <Label htmlFor="num_persons">Number of Persons *</Label>
+            <div className="space-y-6 py-4">
+              {/* Number of Persons with Visual Indicator */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  <Label htmlFor="num_persons" className="text-base font-semibold">Number of Persons *</Label>
+                </div>
                 <Input
                   id="num_persons"
                   type="number"
                   min={selectedMenu.min_persons}
                   max={selectedMenu.max_persons}
                   value={orderForm.num_persons}
-                  onChange={(e) => setOrderForm({ ...orderForm, num_persons: parseInt(e.target.value) })}
-                  className="mt-1"
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    if (value >= selectedMenu.min_persons && value <= selectedMenu.max_persons) {
+                      setOrderForm({ ...orderForm, num_persons: value });
+                    }
+                  }}
+                  className="mt-2 text-lg font-semibold h-12"
+                  placeholder={`Enter between ${selectedMenu.min_persons} and ${selectedMenu.max_persons}`}
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  Min: {selectedMenu.min_persons}, Max: {selectedMenu.max_persons}
-                </p>
+                <div className="flex items-center justify-between mt-2 text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Min: {selectedMenu.min_persons} | Max: {selectedMenu.max_persons}
+                  </span>
+                  <span className="font-semibold text-blue-600">
+                    {orderForm.num_persons} {orderForm.num_persons === 1 ? 'person' : 'people'}
+                  </span>
+                </div>
               </div>
 
-              {/* Event Date */}
-              <div>
-                <Label>Event Date *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal mt-1"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {orderForm.event_date ? format(orderForm.event_date, 'PPP') : 'Pick a date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={orderForm.event_date}
-                      onSelect={(date) => setOrderForm({ ...orderForm, event_date: date })}
-                      disabled={(date) => date < new Date()}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+              {/* Event Date & Time - Side by Side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Event Date with Calendar */}
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CalendarIcon className="h-5 w-5 text-purple-600" />
+                    <Label className="text-base font-semibold">Event Date *</Label>
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={`w-full justify-start text-left font-medium mt-2 h-12 ${
+                          !orderForm.event_date ? 'text-gray-500' : 'text-gray-900 dark:text-white'
+                        }`}
+                      >
+                        <CalendarIcon className="mr-2 h-5 w-5" />
+                        {orderForm.event_date ? format(orderForm.event_date, 'PPP') : 'Pick a date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={orderForm.event_date}
+                        onSelect={(date) => setOrderForm({ ...orderForm, event_date: date })}
+                        disabled={(date) => {
+                          // Get the required advance notice hours (default to 24 if not specified)
+                          const requiredAdvanceHours = selectedMenu?.advance_notice_hours || 24;
+                          
+                          // Calculate the minimum allowed date based on advance notice requirement
+                          const minDate = new Date();
+                          minDate.setHours(minDate.getHours() + requiredAdvanceHours);
+                          minDate.setHours(0, 0, 0, 0); // Reset to start of day for date comparison
+                          
+                          // Disable dates before the minimum required date
+                          const dateToCheck = new Date(date);
+                          dateToCheck.setHours(0, 0, 0, 0);
+                          
+                          return dateToCheck < minDate;
+                        }}
+                        initialFocus
+                        className="rounded-md border"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {!orderForm.event_date && (
+                    <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Please select an event date
+                    </p>
+                  )}
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-2 flex items-center gap-1">
+                    <Info className="h-3 w-3" />
+                    {selectedMenu?.advance_notice_hours 
+                      ? `This menu requires at least ${selectedMenu.advance_notice_hours} hours (${Math.ceil(selectedMenu.advance_notice_hours / 24)} ${Math.ceil(selectedMenu.advance_notice_hours / 24) === 1 ? 'day' : 'days'}) advance notice`
+                      : 'Bulk orders require at least 24 hours advance notice'
+                    }
+                  </p>
+                </div>
+
+                {/* Event Time */}
+                <div className="bg-gradient-to-br from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-5 w-5 text-orange-600" />
+                    <Label htmlFor="event_time" className="text-base font-semibold">Event Time *</Label>
+                  </div>
+                  <Input
+                    id="event_time"
+                    type="time"
+                    value={orderForm.event_time}
+                    onChange={(e) => setOrderForm({ ...orderForm, event_time: e.target.value })}
+                    className="mt-2 h-12 text-lg font-semibold"
+                  />
+                  {!orderForm.event_time && (
+                    <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Please select an event time
+                    </p>
+                  )}
+                </div>
               </div>
 
-              {/* Event Time */}
-              <div>
-                <Label htmlFor="event_time">Event Time *</Label>
-                <Input
-                  id="event_time"
-                  type="time"
-                  value={orderForm.event_time}
-                  onChange={(e) => setOrderForm({ ...orderForm, event_time: e.target.value })}
-                  className="mt-1"
-                />
-              </div>
-
-              {/* Order Type Toggle */}
-              <div className="space-y-2">
-                <Label>Order Type *</Label>
-                <div className="flex items-center space-x-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <button
-                    type="button"
-                    onClick={() => setOrderForm({ ...orderForm, order_type: 'delivery', delivery_fee: selectedAddress ? 300 : 0 })}
-                    className={`flex-1 px-4 py-2 rounded-md font-medium transition-all ${
-                      orderForm.order_type === 'delivery'
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border'
-                    }`}
+              {/* Order Type Toggle - Pickup Only (Delivery Coming Soon) */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Navigation className="h-5 w-5 text-gray-600" />
+                  Order Type *
+                </Label>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Delivery - Disabled (Coming Soon) */}
+                  <div
+                    className="relative p-6 rounded-xl font-semibold bg-gray-100 dark:bg-gray-900 text-gray-400 dark:text-gray-600 border-2 border-gray-200 dark:border-gray-800 cursor-not-allowed opacity-60"
                   >
-                    🚚 Delivery
-                  </button>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="text-4xl opacity-30">
+                        🚚
+                      </div>
+                      <span className="text-lg">Delivery</span>
+                      <Badge variant="secondary" className="text-xs mt-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                        Coming Soon
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  {/* Pickup - Active and Default */}
                   <button
                     type="button"
                     onClick={() => setOrderForm({ ...orderForm, order_type: 'pickup', delivery_fee: 0, delivery_address: '' })}
-                    className={`flex-1 px-4 py-2 rounded-md font-medium transition-all ${
-                      orderForm.order_type === 'pickup'
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border'
-                    }`}
+                    className="relative p-6 rounded-xl font-semibold transition-all transform hover:scale-105 bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg ring-2 ring-green-400 ring-offset-2"
                   >
-                    📦 Pickup
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="text-4xl">
+                        📦
+                      </div>
+                      <span className="text-lg">Pickup</span>
+                      <CheckCircle className="absolute top-2 right-2 h-6 w-6 text-white" />
+                    </div>
                   </button>
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-2">
+                  <Info className="h-3 w-3" />
+                  Currently, bulk orders are only available for pickup. Delivery option coming soon!
+                </p>
               </div>
 
               {/* Delivery Address - Only show for delivery orders */}
@@ -1438,94 +1455,137 @@ const CustomerBulkOrderDashboard: React.FC = () => {
               </div>
               )}
 
-              {/* Optional Items */}
+              {/* Optional Items - Enhanced */}
               {selectedMenu.items.some(item => item.is_optional) && (
-                <div>
-                  <Label className="mb-3 block">Optional Add-ons</Label>
-                  <div className="space-y-2">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-purple-600" />
+                    <Label className="text-base font-semibold">Optional Add-ons</Label>
+                    <Badge variant="outline" className="ml-2">
+                      {orderForm.selected_optional_items.length} selected
+                    </Badge>
+                  </div>
+                  <div className="space-y-3">
                     {selectedMenu.items.filter(item => item.is_optional).map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            checked={orderForm.selected_optional_items.includes(item.id)}
-                            onCheckedChange={() => toggleOptionalItem(item.id)}
-                          />
-                          <div>
-                            <p className="font-medium">{item.item_name}</p>
-                            <p className="text-sm text-gray-500">+LKR {item.extra_cost}/person</p>
+                      <div 
+                        key={item.id} 
+                        className={`relative p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                          orderForm.selected_optional_items.includes(item.id)
+                            ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 shadow-md'
+                            : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'
+                        }`}
+                        onClick={() => toggleOptionalItem(item.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4 flex-1">
+                            <Switch
+                              checked={orderForm.selected_optional_items.includes(item.id)}
+                              onCheckedChange={() => toggleOptionalItem(item.id)}
+                              className="data-[state=checked]:bg-purple-600"
+                            />
+                            <div className="flex-1">
+                              <p className="font-semibold text-gray-900 dark:text-white">{item.item_name}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
+                                <Banknote className="h-3 w-3" />
+                                +LKR {item.extra_cost}/person
+                              </p>
+                            </div>
                           </div>
+                          {orderForm.selected_optional_items.includes(item.id) && (
+                            <Badge className="bg-purple-600 text-white px-3 py-1">
+                              <Plus className="h-3 w-3 mr-1" />
+                              LKR {item.extra_cost * orderForm.num_persons}
+                            </Badge>
+                          )}
                         </div>
-                        {orderForm.selected_optional_items.includes(item.id) && (
-                          <Badge className="bg-orange-500">
-                            +LKR {item.extra_cost * orderForm.num_persons}
-                          </Badge>
-                        )}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Special Instructions */}
-              <div>
-                <Label htmlFor="special_instructions">Special Instructions (Optional)</Label>
+              {/* Special Instructions - Enhanced */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Info className="h-5 w-5 text-blue-600" />
+                  <Label htmlFor="special_instructions" className="text-base font-semibold">
+                    Special Instructions <span className="text-gray-500 font-normal">(Optional)</span>
+                  </Label>
+                </div>
                 <Textarea
                   id="special_instructions"
                   value={orderForm.special_instructions}
                   onChange={(e) => setOrderForm({ ...orderForm, special_instructions: e.target.value })}
-                  placeholder="Any special requests or dietary requirements"
-                  className="mt-1"
-                  rows={3}
+                  placeholder="Any special requests or dietary requirements... (e.g., extra spicy, no peanuts, vegetarian options)"
+                  className="mt-2 min-h-[100px] resize-none"
+                  rows={4}
                 />
+                <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                  <Info className="h-3 w-3" />
+                  Let us know about allergies, preferences, or any special requests
+                </p>
               </div>
 
-              {/* Total Cost */}
-              <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-600 dark:text-gray-400">Base Cost:</span>
-                  <span className="font-semibold">
-                    LKR {(selectedMenu.base_price_per_person * orderForm.num_persons).toFixed(2)}
-                  </span>
-                </div>
-                {orderForm.selected_optional_items.length > 0 && (
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600 dark:text-gray-400">Optional Items:</span>
-                    <span className="font-semibold">
-                      LKR {selectedMenu.items
-                        .filter(item => orderForm.selected_optional_items.includes(item.id))
-                        .reduce((sum, item) => sum + (item.extra_cost * orderForm.num_persons), 0)
-                        .toFixed(2)}
+              {/* Total Cost - Enhanced Display */}
+              <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-green-900/20 dark:via-emerald-900/20 dark:to-teal-900/20 p-6 rounded-xl border-2 border-green-300 dark:border-green-700 shadow-sm">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center py-2 border-b border-green-200 dark:border-green-700">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-green-600" />
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">Base Cost:</span>
+                    </div>
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      LKR {(selectedMenu.base_price_per_person * orderForm.num_persons).toFixed(2)}
                     </span>
                   </div>
-                )}
-                {orderForm.order_type === 'delivery' && orderForm.delivery_fee > 0 && (
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Delivery Fee {orderForm.distance_km ? `(~${orderForm.distance_km.toFixed(1)} km)` : ''}:
-                    </span>
-                    <span className="font-semibold">
-                      LKR {orderForm.delivery_fee.toFixed(2)}
-                    </span>
+                  
+                  {orderForm.selected_optional_items.length > 0 && (
+                    <div className="flex justify-between items-center py-2 border-b border-green-200 dark:border-green-700">
+                      <div className="flex items-center gap-2">
+                        <Plus className="h-4 w-4 text-orange-600" />
+                        <span className="text-gray-700 dark:text-gray-300 font-medium">Optional Items:</span>
+                      </div>
+                      <span className="font-bold text-orange-600">
+                        +LKR {selectedMenu.items
+                          .filter(item => orderForm.selected_optional_items.includes(item.id))
+                          .reduce((sum, item) => sum + (item.extra_cost * orderForm.num_persons), 0)
+                          .toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Delivery fee section removed - pickup only for bulk orders */}
+                  
+                  <div className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-800/30 dark:to-emerald-800/30 p-4 rounded-lg mt-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="h-6 w-6 text-green-700 dark:text-green-400" />
+                        <span className="text-xl font-bold text-green-900 dark:text-green-100">Total:</span>
+                      </div>
+                      <span className="text-3xl font-bold text-green-700 dark:text-green-400">
+                        LKR {calculateTotalCost().toFixed(2)}
+                      </span>
+                    </div>
                   </div>
-                )}
-                <div className="border-t pt-2 flex justify-between items-center">
-                  <span className="text-lg font-bold">Total:</span>
-                  <span className="text-2xl font-bold text-orange-600">
-                    LKR {calculateTotalCost().toFixed(2)}
-                  </span>
                 </div>
               </div>
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsOrderDialogOpen(false)}>
+          <DialogFooter className="border-t pt-4 gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsOrderDialogOpen(false)}
+              className="flex-1 h-12 text-base font-semibold"
+            >
+              <X className="mr-2 h-5 w-5" />
               Cancel
             </Button>
             <Button 
-              className="bg-orange-500 hover:bg-orange-600"
               onClick={handleSubmitOrder}
+              className="flex-1 h-12 text-base font-bold bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg"
             >
+              <ShoppingCart className="mr-2 h-5 w-5" />
               Place Order
             </Button>
           </DialogFooter>

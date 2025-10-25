@@ -218,7 +218,7 @@ const FieldError: React.FC<{ error?: string }> = ({ error }) => {
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [profileData, setProfileData] = useState<CookProfileResponse | null>(null);
@@ -381,11 +381,23 @@ export default function Profile() {
     try {
       setLoading(true);
       console.log('Saving profile data:', formData);
-      await userService.updateUserProfile(formData);
       
-      // Refetch the profile data to update the UI
+      // Update profile via service
+      await userService.updateUserProfile(formData);
+      console.log('✅ Profile updated via userService');
+      
+      // Update the global auth context with new user data
+      await updateProfile(formData);
+      console.log('✅ Auth context updated');
+      
+      // Wait a bit to ensure database has committed the changes
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Refetch the profile data with cache busting to get the latest from server
       const updatedProfile = await userService.getUserProfile();
-      console.log('Updated profile received:', updatedProfile);
+      console.log('✅ Fresh profile data received:', updatedProfile);
+      
+      // Update state with fresh data
       setProfileData(updatedProfile);
       
       // Update formData with the fresh data from server
@@ -408,8 +420,16 @@ export default function Profile() {
       setIsFormValid(true);
       setIsEditing(false);
       showNotification('Profile updated successfully!', 'success');
+      
+      console.log('✅ Profile update complete - UI refreshed with latest data');
+      
+      // Force a page refresh after showing success message to ensure all components update
+      setTimeout(() => {
+        console.log('🔄 Reloading page to ensure all components are in sync');
+        window.location.reload();
+      }, 2000);
     } catch (error) {
-      console.error('Profile update failed:', error);
+      console.error('❌ Profile update failed:', error);
       showNotification('Failed to update profile. Please try again.', 'error');
     } finally {
       setLoading(false);

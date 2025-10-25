@@ -827,21 +827,19 @@ const CheckoutPage: React.FC = () => {
                     </div>
 
                     <div 
-                      className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
-                        paymentMethod === 'card' 
-                          ? 'border-orange-500 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20' 
-                          : 'border-gray-300 dark:border-gray-600 hover:border-orange-300 dark:hover:border-orange-500'
-                      }`}
-                      onClick={() => setPaymentMethod('card')}
+                      className="border-2 rounded-xl p-4 cursor-not-allowed transition-all bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-800 opacity-60"
                     >
                       <div className="flex items-center gap-3">
-                        <RadioGroupItem value="card" id="card" />
-                        <Label htmlFor="card" className="flex items-center gap-3 cursor-pointer flex-1">
-                          <CreditCard className="w-5 h-5 text-blue-600" />
-                          <div>
-                            <p className="font-semibold text-gray-900 dark:text-white">Online Payment</p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">Pay securely with card</p>
+                        <RadioGroupItem value="card" id="card" disabled />
+                        <Label htmlFor="card" className="flex items-center gap-3 flex-1 opacity-60">
+                          <CreditCard className="w-5 h-5 text-gray-400" />
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-500 dark:text-gray-600">Online Payment</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">Pay securely with card</p>
                           </div>
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                            Coming Soon
+                          </Badge>
                         </Label>
                       </div>
                     </div>

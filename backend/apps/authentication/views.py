@@ -734,11 +734,12 @@ def user_profile(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-@api_view(["PUT"])
+@api_view(["PUT", "PATCH"])
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     """
     Update user profile
+    Supports both PUT (full update) and PATCH (partial update)
     """
     serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
     if serializer.is_valid():
@@ -949,11 +950,12 @@ def cook_profile_detail(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-@api_view(["PATCH"])
+@api_view(["PATCH", "PUT"])
 @permission_classes([IsAuthenticated])
 def cook_profile_update(request):
     """
     Update comprehensive cook profile combining user and cook data
+    Supports both PATCH (partial update) and PUT (full update)
     """
     if request.user.role not in ["cook", "Cook"]:
         return Response(
@@ -961,17 +963,21 @@ def cook_profile_update(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    print(f"🔧 Cook profile update request data: {request.data}")
+    
     serializer = CookProfileManagementSerializer(
         request.user, data=request.data, partial=True
     )
 
     if serializer.is_valid():
         serializer.save()
+        print(f"✅ Cook profile updated successfully for user {request.user.user_id}")
         return Response(
             {"message": "Profile updated successfully", "profile": serializer.data},
             status=status.HTTP_200_OK,
         )
 
+    print(f"❌ Cook profile update validation errors: {serializer.errors}")
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

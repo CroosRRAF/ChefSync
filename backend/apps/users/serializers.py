@@ -31,14 +31,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class ChefProfileSerializer(serializers.ModelSerializer):
-    # User information
-    user_id = serializers.IntegerField(source='user.user_id', read_only=True)
-    name = serializers.CharField(source='user.name', read_only=True)
-    username = serializers.CharField(source='user.username', read_only=True)
-    email = serializers.EmailField(source='user.email', read_only=True)
-    phone_no = serializers.CharField(source='user.phone_no', read_only=True)
-    rating = serializers.FloatField(source='rating_average', read_only=True)
-    rating_average = serializers.FloatField(read_only=True)
+    # User information - with error handling
+    user_id = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    phone_no = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
+    rating_average = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True)
     
     # Kitchen location and availability
     kitchen_location = serializers.SerializerMethodField()
@@ -57,67 +57,120 @@ class ChefProfileSerializer(serializers.ModelSerializer):
             'is_currently_open', 'availability_message'
         ]
     
+    def get_user_id(self, obj):
+        """Safely get user ID"""
+        try:
+            return obj.user.user_id if hasattr(obj.user, 'user_id') else obj.user.id
+        except Exception:
+            return None
+    
+    def get_name(self, obj):
+        """Safely get user name"""
+        try:
+            return obj.user.name if hasattr(obj.user, 'name') else obj.user.username
+        except Exception:
+            return None
+    
+    def get_username(self, obj):
+        """Safely get username"""
+        try:
+            return obj.user.username
+        except Exception:
+            return None
+    
+    def get_email(self, obj):
+        """Safely get email"""
+        try:
+            return obj.user.email
+        except Exception:
+            return None
+    
+    def get_phone_no(self, obj):
+        """Safely get phone number"""
+        try:
+            return obj.user.phone_no if hasattr(obj.user, 'phone_no') else None
+        except Exception:
+            return None
+    
+    def get_rating(self, obj):
+        """Safely get rating"""
+        try:
+            return float(obj.rating_average) if obj.rating_average else 0.0
+        except Exception:
+            return 0.0
+    
     def get_kitchen_location(self, obj):
         """Get chef's kitchen location details"""
-        from .availability_utils import is_within_operating_hours, format_operating_hours_readable
-        
-        kitchen_address = Address.objects.filter(
-            user=obj.user,
-            address_type='kitchen',
-            is_default=True,
-            is_active=True
-        ).first()
-        
-        if kitchen_address:
-            # Get kitchen details if available
-            kitchen_details = None
-            if hasattr(kitchen_address, 'kitchen_details'):
-                kitchen_details = kitchen_address.kitchen_details
+        try:
+            kitchen_address = Address.objects.filter(
+                user=obj.user,
+                address_type='kitchen',
+                is_default=True,
+                is_active=True
+            ).first()
             
-            return {
-                'address': kitchen_address.full_address,
-                'city': kitchen_address.city,
-                'state': kitchen_address.state,
-                'latitude': float(kitchen_address.latitude) if kitchen_address.latitude else None,
-                'longitude': float(kitchen_address.longitude) if kitchen_address.longitude else None,
-            }
+            if kitchen_address:
+                return {
+                    'address': kitchen_address.full_address,
+                    'city': kitchen_address.city,
+                    'state': kitchen_address.state,
+                    'latitude': float(kitchen_address.latitude) if kitchen_address.latitude else None,
+                    'longitude': float(kitchen_address.longitude) if kitchen_address.longitude else None,
+                }
+        except Exception as e:
+            print(f"Error getting kitchen location: {str(e)}")
         return None
     
     def get_operating_hours(self, obj):
         """Get chef's operating hours"""
-        kitchen_address = Address.objects.filter(
-            user=obj.user,
-            address_type='kitchen',
-            is_default=True,
-            is_active=True
-        ).first()
-        
-        if kitchen_address and hasattr(kitchen_address, 'kitchen_details'):
-            return kitchen_address.kitchen_details.operating_hours
+        try:
+            kitchen_address = Address.objects.filter(
+                user=obj.user,
+                address_type='kitchen',
+                is_default=True,
+                is_active=True
+            ).first()
+            
+            if kitchen_address and hasattr(kitchen_address, 'kitchen_details'):
+                return kitchen_address.kitchen_details.operating_hours
+        except Exception as e:
+            print(f"Error getting operating hours: {str(e)}")
         return None
     
     def get_operating_hours_readable(self, obj):
         """Get human-readable operating hours"""
-        from .availability_utils import format_operating_hours_readable
-        
-        operating_hours = self.get_operating_hours(obj)
-        return format_operating_hours_readable(operating_hours)
+        try:
+            from .availability_utils import format_operating_hours_readable
+            
+            operating_hours = self.get_operating_hours(obj)
+            return format_operating_hours_readable(operating_hours)
+        except Exception as e:
+            print(f"Error formatting operating hours: {str(e)}")
+            return "Hours not available"
     
     def get_is_currently_open(self, obj):
         """Check if chef is currently accepting orders"""
-        from .availability_utils import is_within_operating_hours
-        
-        operating_hours = self.get_operating_hours(obj)
-        is_open, _, _ = is_within_operating_hours(operating_hours)
-        return is_open
+        try:
+            from .availability_utils import is_within_operating_hours
+            
+            operating_hours = self.get_operating_hours(obj)
+            is_open, _, _ = is_within_operating_hours(operating_hours)
+            return is_open
+        except Exception as e:
+            print(f"Error checking if currently open: {str(e)}")
+            return True  # Default to open if error
     
     def get_availability_message(self, obj):
         """Get current availability status message"""
-        from .availability_utils import is_within_operating_hours
-        
-        operating_hours = self.get_operating_hours(obj)
-        _, message, _ = is_within_operating_hours(operating_hours)
-        return message
+        try:
+            from .availability_utils import is_within_operating_hours
+            
+            operating_hours = self.get_operating_hours(obj)
+            _, message, _ = is_within_operating_hours(operating_hours)
+            return message
+        except Exception as e:
+            print(f"Error getting availability message: {str(e)}")
+            return "Available"
 
 
 class DeliveryProfileSerializer(serializers.ModelSerializer):

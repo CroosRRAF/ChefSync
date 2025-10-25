@@ -22,7 +22,7 @@ class UserProfileViewSet(viewsets.ModelViewSet):
 
 
 class ChefProfileViewSet(viewsets.ModelViewSet):
-    queryset = ChefProfile.objects.filter(approval_status='approved')
+    queryset = ChefProfile.objects.filter(approval_status='approved').select_related('user')
     serializer_class = ChefProfileSerializer
     permission_classes = [IsAuthenticated]
     
@@ -31,6 +31,27 @@ class ChefProfileViewSet(viewsets.ModelViewSet):
         if self.action in ['retrieve', 'list']:
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Override retrieve to add better error handling"""
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except ChefProfile.DoesNotExist:
+            return Response(
+                {'error': 'Chef profile not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            # Log the error for debugging
+            import traceback
+            print(f"Error retrieving chef profile: {str(e)}")
+            print(traceback.format_exc())
+            return Response(
+                {'error': 'An error occurred while loading the chef profile'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class DeliveryProfileViewSet(viewsets.ModelViewSet):

@@ -209,7 +209,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
 
     def update(self, instance, validated_data):
-        """Update user profile with Cloudinary image handling"""
+        """Update user profile with Cloudinary image handling and role-specific profile updates"""
         profile_image_data = validated_data.get("profile_image")
 
         # Handle profile image upload to Cloudinary if base64 data is provided
@@ -236,7 +236,70 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 print(f"Error uploading profile image to Cloudinary: {e}")
                 validated_data.pop("profile_image", None)
 
-        return super().update(instance, validated_data)
+        # Update User model
+        updated_instance = super().update(instance, validated_data)
+        
+        # Update role-specific profile (Cook table) if user is a cook
+        if instance.role in ["cook", "Cook"]:
+            self._update_cook_profile(instance)
+        
+        return updated_instance
+    
+    def _update_cook_profile(self, user_instance):
+        """Update Cook profile with cook-specific fields from initial_data"""
+        try:
+            cook_profile, created = Cook.objects.get_or_create(user=user_instance)
+            
+            # Map of frontend field names to Cook model field names
+            field_mapping = {
+                'specialty_cuisine': 'specialty',
+                'available_hours': 'availability_hours',
+                'service_location': 'kitchen_location',
+                'bio': None,  # Bio is stored in User.address, not Cook
+            }
+            
+            # Handle experience_level conversion to experience_years
+            if 'experience_level' in self.initial_data:
+                experience_level = self.initial_data['experience_level']
+                experience_map = {
+                    'beginner': 1,
+                    'intermediate': 2,
+                    'advanced': 5,
+                    'expert': 10,
+                }
+                cook_profile.experience_years = experience_map.get(experience_level, 1)
+            
+            # Update cook-specific fields
+            for frontend_field, cook_field in field_mapping.items():
+                if frontend_field in self.initial_data and cook_field:
+                    value = self.initial_data[frontend_field]
+                    if value is not None:  # Only update if value is provided
+                        setattr(cook_profile, cook_field, value)
+            
+            # Handle kitchen_location data (coordinates and address)
+            if 'kitchen_location' in self.initial_data:
+                kitchen_location_data = self.initial_data['kitchen_location']
+                if kitchen_location_data and isinstance(kitchen_location_data, dict):
+                    if 'latitude' in kitchen_location_data:
+                        cook_profile.kitchen_latitude = kitchen_location_data['latitude']
+                    if 'longitude' in kitchen_location_data:
+                        cook_profile.kitchen_longitude = kitchen_location_data['longitude']
+                    
+                    # Build address string from location components
+                    address_parts = []
+                    for field in ['address_line1', 'address_line2', 'landmark', 'city', 'state', 'country', 'pincode']:
+                        if kitchen_location_data.get(field):
+                            address_parts.append(str(kitchen_location_data[field]))
+                    if address_parts:
+                        cook_profile.kitchen_location = ', '.join(address_parts)
+            
+            cook_profile.save()
+            print(f"✅ Cook profile updated for user {user_instance.user_id}: {cook_profile.__dict__}")
+            
+        except Exception as e:
+            print(f"❌ Error updating cook profile: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
     def get_profile_data(self, obj):
         """Get additional profile data based on user role"""
@@ -245,15 +308,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
             if obj.role == "customer":
                 return {"type": "customer", "profile_id": profile.pk}
             elif obj.role == "cook":
-                return {
+                # Refresh from database to ensure we have the latest data
+                profile.refresh_from_db()
+                cook_data = {
                     "type": "cook",
                     "profile_id": profile.pk,
                     "specialty": profile.specialty,
                     "kitchen_location": profile.kitchen_location,
                     "experience_years": profile.experience_years,
-                    "rating_avg": profile.rating_avg,
+                    "rating_avg": float(profile.rating_avg) if profile.rating_avg else 0.0,
                     "availability_hours": profile.availability_hours,
                 }
+                print(f"📊 Cook profile data for user {obj.user_id}: {cook_data}")
+                return cook_data
             elif obj.role == "delivery_agent":
                 return {
                     "type": "delivery_agent",
@@ -520,12 +587,29 @@ class CookProfileManagementSerializer(serializers.Serializer):
         return instance
 
     def to_representation(self, instance):
-        """Custom representation to include cook data"""
-        data = super().to_representation(instance)
-
-        # Ensure cook profile exists
+        """Custom representation to include cook data with proper field population"""
+        # Ensure cook profile exists before serialization
         cook_profile, created = Cook.objects.get_or_create(user=instance)
-
+        
+        # If created, set default values
+        if created:
+            print(f"📝 Created new Cook profile for user {instance.user_id}")
+            cook_profile.save()
+        
+        # Refresh from DB to ensure we have the latest data
+        cook_profile.refresh_from_db()
+        instance.refresh_from_db()
+        
+        # Get the representation
+        data = super().to_representation(instance)
+        
+        print(f"📤 Serializing cook profile for user {instance.user_id}:")
+        print(f"   - name: {data.get('name')}")
+        print(f"   - specialty_cuisine: {data.get('specialty_cuisine')}")
+        print(f"   - experience_level: {data.get('experience_level')}")
+        print(f"   - available_hours: {data.get('available_hours')}")
+        print(f"   - service_location: {data.get('service_location')}")
+        
         return data
 
 

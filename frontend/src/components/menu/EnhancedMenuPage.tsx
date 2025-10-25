@@ -150,14 +150,26 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
         page_size: 20,
       };
 
-      // Add location if available
+      // Add location and sort by distance if available
       if (userLocation) {
         menuFilters.user_lat = userLocation.latitude;
         menuFilters.user_lng = userLocation.longitude;
+        menuFilters.sort_by = 'distance'; // Sort food cards by distance from selected address
       }
 
       const response = await enhancedMenuService.getMenuFoods(menuFilters);
-      setFoods(response.results);
+      
+      // Sort foods by distance if user location is available (closest first)
+      let sortedFoods = response.results;
+      if (userLocation && response.results.length > 0) {
+        sortedFoods = [...response.results].sort((a, b) => {
+          const distanceA = a.distance_km ?? Infinity;
+          const distanceB = b.distance_km ?? Infinity;
+          return distanceA - distanceB; // Ascending order (closest first)
+        });
+      }
+      
+      setFoods(sortedFoods);
       setTotalPages(response.num_pages);
     } catch (error) {
       console.error('Error loading foods:', error);
@@ -444,9 +456,17 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
             </div>
           </div>
 
-          {/* Active Filters Display */}
-          {Object.keys(filters).length > 0 && (
+          {/* Active Filters Display & Sort Indicator */}
+          {(Object.keys(filters).length > 0 || userLocation) && (
             <div className="flex flex-wrap gap-1 sm:gap-2 mt-2 sm:mt-3 px-1">
+              {/* Distance Sort Indicator */}
+              {userLocation && (
+                <Badge className="flex items-center gap-1 text-xs sm:text-sm px-2 py-1 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-300 dark:border-orange-700">
+                  <Target className="h-3 w-3" />
+                  <span>Sorted by Distance</span>
+                </Badge>
+              )}
+              
               {filters.cuisines?.map(id => {
                 const cuisine = filterOptions?.cuisines.find(c => c.id === id);
                 return cuisine ? (
@@ -643,6 +663,13 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                           {deliveryInfo?.time && (
                             <span className="hidden sm:inline">• {deliveryInfo.time} mins total</span>
                           )}
+                        </div>
+                      )}
+                      {/* Display distance when user has selected an address */}
+                      {userLocation && food.distance_km != null && typeof food.distance_km === 'number' && (
+                        <div className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 font-medium">
+                          <MapPin className="h-3 w-3 flex-shrink-0" />
+                          <span>{food.distance_km.toFixed(1)} km away</span>
                         </div>
                       )}
                     </div>
