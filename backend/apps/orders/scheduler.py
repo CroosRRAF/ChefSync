@@ -97,7 +97,6 @@ def delete_old_job_executions(max_age=604_800):
 
 # Create the scheduler instance
 scheduler = BackgroundScheduler()
-scheduler.add_jobstore(DjangoJobStore(), "default")
 
 
 def start_scheduler():
@@ -108,6 +107,10 @@ def start_scheduler():
     if scheduler.running:
         logger.info('⚠️ Scheduler is already running!')
         return
+    
+    # Add the Django job store only when starting the scheduler
+    if not scheduler._jobstores:
+        scheduler.add_jobstore(DjangoJobStore(), "default")
     
     try:
         # Register the auto-cancel job - runs every minute

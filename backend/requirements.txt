@@ -74,4 +74,4 @@ googlemaps==4.10.0  # Google Maps API for distance calculation
 pytz==2025.2  # Timezone support for time-based surcharges
 
 # Background Task Scheduling
-django-apscheduler==0.6.2  # Automatic scheduling for order auto-cancellation
+django-apscheduler==0.7.0  # Automatic scheduling for order auto-cancellation

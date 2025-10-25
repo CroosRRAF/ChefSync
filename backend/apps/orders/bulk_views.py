@@ -365,6 +365,20 @@ class BulkOrderManagementViewSet(viewsets.ModelViewSet):
             if bulk_order.status in ['completed', 'ready_for_delivery'] and new_status != bulk_order.status:
                 return Response({'error': 'Cannot change status of a completed or ready-for-delivery order'}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Event date validation: prevent status changes to preparing/ready/completed until event date
+            from django.utils import timezone
+            today = timezone.now().date()
+            
+            # Statuses that require event date validation
+            restricted_statuses = ['preparing', 'ready_for_delivery', 'completed']
+            
+            if new_status in restricted_statuses and bulk_order.event_date:
+                if bulk_order.event_date > today:
+                    days_remaining = (bulk_order.event_date - today).days
+                    return Response({
+                        'error': f'Cannot change status to "{new_status}" until the event date ({bulk_order.event_date.strftime("%Y-%m-%d")}). {days_remaining} day(s) remaining.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
             bulk_order.status = new_status
             bulk_order.save()
 

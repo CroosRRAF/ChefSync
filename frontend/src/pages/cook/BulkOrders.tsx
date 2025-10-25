@@ -37,7 +37,8 @@ import {
   RefreshCw,
   AlertCircle,
   Trash2,
-  Utensils
+  Utensils,
+  Lock
 } from "lucide-react";
 
 // Import API types and service
@@ -107,6 +108,32 @@ export default function BulkOrders() {
     updateBulkOrderStatus,
     assignDeliveryToBulkOrder,
   } = useOrderService();
+
+  // Helper function to check if order is locked due to event date
+  const isOrderLockedByEventDate = (order: BulkOrder): { locked: boolean; message?: string; daysRemaining?: number } => {
+    if (!order.event_date || order.event_date === '1970-01-01') {
+      return { locked: false };
+    }
+    
+    const today = new Date();
+    const eventDate = new Date(order.event_date);
+    
+    // Normalize dates to avoid time zone issues
+    today.setHours(0, 0, 0, 0);
+    eventDate.setHours(0, 0, 0, 0);
+    
+    if (eventDate > today) {
+      const timeDiff = eventDate.getTime() - today.getTime();
+      const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      return {
+        locked: true,
+        message: `Event is in ${daysRemaining} day(s). Status changes to preparing/completed are locked until ${eventDate.toLocaleDateString()}.`,
+        daysRemaining
+      };
+    }
+    
+    return { locked: false };
+  };
 
   // State management
   const [bulkOrders, setBulkOrders] = useState<BulkOrder[]>([]);
@@ -531,10 +558,23 @@ export default function BulkOrders() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{formatEventDate(order.event_date)}</span>
-                          </div>
+                          {(() => {
+                            const lockInfo = isOrderLockedByEventDate(order);
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm">{formatEventDate(order.event_date)}</span>
+                                {lockInfo.locked && (
+                                  <div className="flex items-center gap-1">
+                                    <Lock className="h-3 w-3 text-amber-600" />
+                                    <span className="text-xs text-amber-600 font-medium">
+                                      {lockInfo.daysRemaining}d
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <div className="font-semibold text-green-600">
@@ -729,29 +769,51 @@ export default function BulkOrders() {
                   )}
 
                   {/* Bulk order kitchen workflow actions */}
-                  {(selectedOrderDetails && (selectedOrderDetails.status === 'confirmed' || selectedOrderDetails.status === 'collaborating')) && (
-                      <Button
-                        onClick={async () => {
-                          try {
-                            await updateBulkOrderStatus(selectedOrderDetails.id, 'preparing');
-                            showNotification('Bulk order marked as preparing', 'success');
-                            // Close the detail dialog automatically on success
-                            setIsDetailDialogOpen(false);
-                            // Refresh lists after closing
-                            fetchBulkOrders();
-                            fetchIncomingRequests();
-                          } catch (error: any) {
-                            console.error('Error starting preparation:', error);
-                            const msg = error?.message || error?.response?.data?.error || 'Failed to start preparing';
-                            showNotification(msg, 'error');
-                          }
-                        }}
-                        className="bg-amber-500 hover:bg-amber-600 text-white"
-                        size="lg"
-                      >
-                        Start Preparing
-                      </Button>
-                    )}
+                  {(selectedOrderDetails && (selectedOrderDetails.status === 'confirmed' || selectedOrderDetails.status === 'collaborating')) && (() => {
+                    const lockInfo = isOrderLockedByEventDate(selectedOrderDetails);
+                    return (
+                      <div className="flex flex-col gap-2">
+                        {lockInfo.locked && (
+                          <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
+                            <AlertCircle className="h-4 w-4" />
+                            {lockInfo.message}
+                          </div>
+                        )}
+                        <Button
+                          onClick={async () => {
+                            try {
+                              await updateBulkOrderStatus(selectedOrderDetails.id, 'preparing');
+                              showNotification('Bulk order marked as preparing', 'success');
+                              // Close the detail dialog automatically on success
+                              setIsDetailDialogOpen(false);
+                              // Refresh lists after closing
+                              fetchBulkOrders();
+                              fetchIncomingRequests();
+                            } catch (error: any) {
+                              console.error('Error starting preparation:', error);
+                              const msg = error?.message || error?.response?.data?.error || 'Failed to start preparing';
+                              showNotification(msg, 'error');
+                            }
+                          }}
+                          disabled={lockInfo.locked}
+                          className={`${lockInfo.locked ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white`}
+                          size="lg"
+                        >
+                          {lockInfo.locked ? (
+                            <>
+                              <AlertCircle className="h-5 w-5 mr-2" />
+                              Locked ({lockInfo.daysRemaining} day{lockInfo.daysRemaining !== 1 ? 's' : ''} left)
+                            </>
+                          ) : (
+                            <>
+                              <Utensils className="h-5 w-5 mr-2" />
+                              Start Preparing
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    );
+                  })()}
 
                   {selectedOrderDetails.status === 'preparing' && (
                     <>
@@ -777,27 +839,51 @@ export default function BulkOrders() {
                           Send for Delivery
                         </Button>
                       )}
-                        <Button
-                        onClick={async () => {
-                          try {
-                            // Mark order as ready for delivery (chef completed kitchen work)
-                            await updateBulkOrderStatus(selectedOrderDetails.id, 'ready_for_delivery');
-                            showNotification('Bulk order marked as ready for delivery', 'success');
-                            // Close dialog on success
-                            setIsDetailDialogOpen(false);
-                            fetchBulkOrders();
-                            fetchIncomingRequests();
-                          } catch (error: any) {
-                            console.error('Error marking completed:', error);
-                            const msg = error?.message || error?.response?.data?.error || 'Failed to mark completed';
-                            showNotification(msg, 'error');
-                          }
-                        }}
-                        className="bg-green-700 hover:bg-green-800 text-white"
-                        size="lg"
-                      >
-                        Mark Completed
-                      </Button>
+                        {(() => {
+                          const lockInfo = isOrderLockedByEventDate(selectedOrderDetails);
+                          return (
+                            <div className="flex flex-col gap-2">
+                              {lockInfo.locked && (
+                                <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
+                                  <AlertCircle className="h-4 w-4" />
+                                  {lockInfo.message}
+                                </div>
+                              )}
+                              <Button
+                                onClick={async () => {
+                                  try {
+                                    // Mark order as ready for delivery (chef completed kitchen work)
+                                    await updateBulkOrderStatus(selectedOrderDetails.id, 'ready_for_delivery');
+                                    showNotification('Bulk order marked as ready for delivery', 'success');
+                                    // Close dialog on success
+                                    setIsDetailDialogOpen(false);
+                                    fetchBulkOrders();
+                                    fetchIncomingRequests();
+                                  } catch (error: any) {
+                                    console.error('Error marking completed:', error);
+                                    const msg = error?.message || error?.response?.data?.error || 'Failed to mark completed';
+                                    showNotification(msg, 'error');
+                                  }
+                                }}
+                                disabled={lockInfo.locked}
+                                className={`${lockInfo.locked ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-700 hover:bg-green-800'} text-white`}
+                                size="lg"
+                              >
+                                {lockInfo.locked ? (
+                                  <>
+                                    <AlertCircle className="h-5 w-5 mr-2" />
+                                    Locked ({lockInfo.daysRemaining} day{lockInfo.daysRemaining !== 1 ? 's' : ''} left)
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="h-5 w-5 mr-2" />
+                                    Mark Completed
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          );
+                        })()}
                     </>
                   )}
                 </div>
