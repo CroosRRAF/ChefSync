@@ -58,9 +58,9 @@ const SimplifiedDeliveryFlow: React.FC<SimplifiedDeliveryFlowProps> = ({
         return {
           phase: "accept",
           title: "Ready for Pickup",
-          nextAction: "Accept Order",
+          nextAction: "Navigate to Chef",
           nextStatus: "out_for_delivery" as const,
-          description: "Accept this order and navigate to pickup location",
+          description: "Click to start pickup and get directions to chef",
           icon: Package,
           color: "bg-blue-500",
           bgColor: "bg-blue-50",
@@ -76,9 +76,9 @@ const SimplifiedDeliveryFlow: React.FC<SimplifiedDeliveryFlowProps> = ({
         return {
           phase: "pickup",
           title: "Navigate to Chef",
-          nextAction: "Pickup Complete",
+          nextAction: "Mark as Picked Up",
           nextStatus: "in_transit" as const,
-          description: "Mark as picked up and navigate to customer",
+          description: "Mark as picked up to navigate to customer",
           icon: ChefHat,
           color: "bg-orange-500",
           bgColor: "bg-orange-50",
@@ -93,8 +93,8 @@ const SimplifiedDeliveryFlow: React.FC<SimplifiedDeliveryFlowProps> = ({
       case "in_transit":
         return {
           phase: "delivery",
-          title: "Out for Delivery",
-          nextAction: "Delivery Complete",
+          title: "Navigate to Customer",
+          nextAction: "Mark as Delivered",
           nextStatus: "delivered" as const,
           description: "Mark as delivered to complete the order",
           icon: Truck,
@@ -159,17 +159,9 @@ const SimplifiedDeliveryFlow: React.FC<SimplifiedDeliveryFlowProps> = ({
           window.open(navigationUrl, "_blank");
         }
 
-        // Navigate to map with order details
-        navigate("/delivery/map", {
-          state: {
-            selectedOrderId: order.id,
-            orderDetails: order,
-          },
-        });
-
         toast({
-          title: "Order Accepted!",
-          description: "Navigating to pickup location. Tracking started.",
+          title: "Navigating to Chef!",
+          description: "Opening directions to pickup location.",
         });
       }
 
@@ -177,7 +169,7 @@ const SimplifiedDeliveryFlow: React.FC<SimplifiedDeliveryFlowProps> = ({
       else if (phaseInfo.phase === "pickup") {
         await updateOrderStatus(order.id, phaseInfo.nextStatus, location);
 
-        // Navigate to delivery location
+        // Automatically navigate to delivery location
         if (order.delivery_address) {
           const encodedAddress = encodeURIComponent(order.delivery_address);
           const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
@@ -186,7 +178,8 @@ const SimplifiedDeliveryFlow: React.FC<SimplifiedDeliveryFlowProps> = ({
 
         toast({
           title: "Pickup Complete!",
-          description: "Order picked up. Navigating to customer location.",
+          description:
+            "Order picked up successfully. Now navigate to customer.",
         });
       }
 
@@ -337,26 +330,74 @@ const SimplifiedDeliveryFlow: React.FC<SimplifiedDeliveryFlowProps> = ({
           </div>
         )}
 
-        {/* Main Action Button */}
+        {/* Action Buttons */}
         {phaseInfo.phase !== "completed" && (
-          <Button
-            onClick={handleMainAction}
-            disabled={loading}
-            className="w-full"
-            size="sm"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Processing...
-              </>
-            ) : (
-              <>
-                <Navigation className="h-4 w-4 mr-2" />
-                {phaseInfo.nextAction}
-              </>
+          <div className="space-y-2">
+            <Button
+              onClick={handleMainAction}
+              disabled={loading}
+              className={`w-full ${
+                phaseInfo.phase === "accept"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : ""
+              }`}
+              size="sm"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Navigation className="h-4 w-4 mr-2" />
+                  {phaseInfo.nextAction}
+                </>
+              )}
+            </Button>
+
+            {/* Show navigate button for pickup phase */}
+            {phaseInfo.phase === "pickup" && (
+              <Button
+                onClick={() => {
+                  const pickupLocation =
+                    order.chef?.kitchen_location || order.pickup_location;
+                  if (pickupLocation) {
+                    const encodedLocation = encodeURIComponent(pickupLocation);
+                    const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedLocation}`;
+                    window.open(navigationUrl, "_blank");
+                  }
+                }}
+                variant="outline"
+                className="w-full"
+                size="sm"
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                Get Directions to Chef
+              </Button>
             )}
-          </Button>
+
+            {/* Show navigate button for delivery phase */}
+            {phaseInfo.phase === "delivery" && (
+              <Button
+                onClick={() => {
+                  if (order.delivery_address) {
+                    const encodedAddress = encodeURIComponent(
+                      order.delivery_address
+                    );
+                    const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
+                    window.open(navigationUrl, "_blank");
+                  }
+                }}
+                variant="outline"
+                className="w-full"
+                size="sm"
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                Get Directions to Customer
+              </Button>
+            )}
+          </div>
         )}
 
         {/* Status Description */}

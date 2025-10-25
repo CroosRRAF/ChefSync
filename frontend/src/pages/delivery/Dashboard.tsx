@@ -61,6 +61,7 @@ const DeliveryDashboard: React.FC = () => {
   const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<DeliveryLog | null>(null);
   const [showLogDetail, setShowLogDetail] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
   // Distance warning dialog state
   const [distanceWarning, setDistanceWarning] = useState<{
     isOpen: boolean;
@@ -207,7 +208,7 @@ const DeliveryDashboard: React.FC = () => {
 
       // Define statuses considered "available for delivery"
       // Including confirmed, preparing and ready orders
-      const deliverableStatuses = ["confirmed", "preparing", "ready"];
+      const deliverableStatuses = ["preparing", "ready"];
 
       // Filter orders that are in deliverable statuses
       const availableOrdersData = ordersData.filter((order) =>
@@ -249,9 +250,11 @@ const DeliveryDashboard: React.FC = () => {
       const assignedData = await getMyAssignedOrders();
       console.log("Fetched assigned orders:", assignedData);
 
-      // Filter for active delivery states
+      // Filter for active delivery states - including ready for orders just accepted
       const activeOrders = assignedData.filter((order) =>
-        ["ready", "out_for_delivery", "in_transit"].includes(order.status)
+        ["ready", "out_for_delivery", "in_transit", "picked_up"].includes(
+          order.status
+        )
       );
 
       setAssignedOrders(activeOrders);
@@ -378,16 +381,18 @@ const DeliveryDashboard: React.FC = () => {
       // Remove from available orders
       setAvailableOrders((prev) => prev.filter((o) => o.id !== orderId));
 
-      // Refresh dashboard data
-      fetchDashboardData();
+      // Refresh dashboard data and assigned orders to show the new order
+      await fetchDashboardData();
+      await fetchAssignedOrders();
 
-      // Navigate to map with order details
-      navigate("/delivery/map", {
-        state: {
-          selectedOrderId: orderId,
-          orderDetails: order,
-        },
+      toast({
+        title: "Order Accepted!",
+        description:
+          "Order has been assigned to you. Navigate to chef for pickup.",
       });
+
+      // Keep the overview tab active to show the Active Deliveries section
+      setActiveTab("overview");
     } catch (error) {
       console.error("Failed to accept order:", error);
       // Could add toast notification here for error
@@ -413,21 +418,12 @@ const DeliveryDashboard: React.FC = () => {
         prev.filter((o) => o.id !== distanceWarning.orderId)
       );
 
-      // Refresh dashboard data
-      fetchDashboardData();
+      // Refresh dashboard data and assigned orders
+      await fetchDashboardData();
+      await fetchAssignedOrders();
 
-      // Navigate to map
-      const order = availableOrders.find(
-        (o) => o.id === distanceWarning.orderId
-      );
-      if (order) {
-        navigate("/delivery/map", {
-          state: {
-            selectedOrderId: distanceWarning.orderId,
-            orderDetails: order,
-          },
-        });
-      }
+      // Keep the overview tab active to show the Active Deliveries section
+      setActiveTab("overview");
 
       toast({
         title: "Order Accepted",
@@ -566,7 +562,7 @@ const DeliveryDashboard: React.FC = () => {
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList
             className="grid w-full grid-cols-4 rounded-lg p-1 transition-all duration-300"
             style={{
@@ -602,6 +598,56 @@ const DeliveryDashboard: React.FC = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Active Deliveries Section - Show first if there are any */}
+            {assignedOrders.length > 0 && (
+              <Card
+                className="group border-none theme-card-hover theme-animate-fade-in-up"
+                style={{ background: "var(--bg-card)" }}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Truck
+                      className="h-5 w-5 group-hover:scale-110 transition-transform duration-300"
+                      style={{ color: "var(--primary-emerald)" }}
+                    />
+                    <span style={{ color: "var(--text-primary)" }}>
+                      Active Deliveries
+                    </span>
+                    <Badge variant="secondary" className="ml-2">
+                      {assignedOrders.length}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription style={{ color: "var(--text-cool-grey)" }}>
+                    Your currently assigned orders for pickup and delivery
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {assignedOrders.map((order, index) => (
+                      <SimplifiedDeliveryFlow
+                        key={order.id}
+                        order={order}
+                        onStatusUpdate={(orderId, newStatus) => {
+                          // Refresh assigned orders after status update
+                          fetchAssignedOrders();
+                          fetchDashboardData();
+                        }}
+                        className="theme-animate-fade-in-up"
+                        style={{ animationDelay: `${index * 0.1}s` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-6 text-center">
+                    <Button asChild variant="outline" size="lg">
+                      <Link to="/delivery/map">
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Open Map View
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <Card
               className="group border-none theme-card-hover theme-animate-fade-in-up"
               style={{ background: "var(--bg-card)" }}
@@ -888,57 +934,6 @@ const DeliveryDashboard: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-
-            {/* Active Deliveries Section */}
-            {assignedOrders.length > 0 && (
-              <Card
-                className="group border-none theme-card-hover theme-animate-fade-in-up"
-                style={{ background: "var(--bg-card)" }}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Truck
-                      className="h-5 w-5 group-hover:scale-110 transition-transform duration-300"
-                      style={{ color: "var(--primary-emerald)" }}
-                    />
-                    <span style={{ color: "var(--text-primary)" }}>
-                      Active Deliveries
-                    </span>
-                    <Badge variant="secondary" className="ml-2">
-                      {assignedOrders.length}
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription style={{ color: "var(--text-cool-grey)" }}>
-                    Your currently assigned orders for pickup and delivery
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {assignedOrders.map((order, index) => (
-                      <SimplifiedDeliveryFlow
-                        key={order.id}
-                        order={order}
-                        onStatusUpdate={(orderId, newStatus) => {
-                          // Refresh assigned orders after status update
-                          fetchAssignedOrders();
-                          fetchDashboardData();
-                        }}
-                        className="theme-animate-fade-in-up"
-                        style={{ animationDelay: `${index * 0.1}s` }}
-                      />
-                    ))}
-                  </div>
-                  <div className="mt-6 text-center">
-                    <Button asChild variant="outline" size="lg">
-                      <Link to="/delivery/map">
-                        <MapPin className="h-4 w-4 mr-2" />
-                        Open Map View
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           {/* Deliveries Tab */}

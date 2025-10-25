@@ -118,7 +118,7 @@ const AllOrdersPage: React.FC = () => {
       // Filter available orders (not yet assigned to anyone)
       const actuallyAvailable = available.filter(
         (order) =>
-          !["assigned", "picked_up", "in_transit", "delivered"].includes(
+          !["assigned", "picked_up", "in_transit", "delivered","confirmed"].includes(
             order.status
           )
       );
