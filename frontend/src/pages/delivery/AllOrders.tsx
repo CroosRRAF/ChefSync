@@ -672,7 +672,6 @@ const AllOrdersPage: React.FC = () => {
 
                         <div className="flex items-center justify-between">
                           <div className="flex items-center font-semibold text-green-600">
-                            <DollarSign className="h-4 w-4 mr-1" />
                             <span>{formatCurrency(order.total_amount)}</span>
                           </div>
                           <div className="flex items-center text-yellow-600">
