@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Check, 
   Clock, 
@@ -10,7 +11,8 @@ import {
   Star,
   RotateCcw,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  MessageSquare
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +33,7 @@ interface OrderItem {
 interface Order {
   id: number;
   order_number: string;
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'completed' | 'cancelled';
   total_amount: number;
   delivery_fee: number;
   estimated_delivery_time: string;
@@ -67,10 +69,13 @@ const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
   onClose,
   orderId
 }) => {
+  const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [previousStatus, setPreviousStatus] = useState<string | null>(null);
+  const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
   const orderStages = [
@@ -154,6 +159,17 @@ const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
       if (!response.ok) throw new Error('Failed to fetch order');
       
       const orderData = await response.json();
+      
+      // Check if order status changed to delivered
+      if (orderData.status === 'delivered' && previousStatus !== 'delivered' && previousStatus !== null) {
+        // Order just got delivered, show review prompt
+        setShowReviewPrompt(true);
+        toast.success('🎉 Your order has been delivered! How was it?', {
+          duration: 5000,
+        });
+      }
+      
+      setPreviousStatus(orderData.status);
       setOrder(orderData as any);
 
       // Check cancellation status
@@ -529,6 +545,63 @@ const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
                 </div>
               </CardContent>
             </Card>
+
+            {/* Review Prompt for Delivered Orders */}
+            {(order.status === 'delivered' || order.status === 'completed') && (
+              <Card className="mx-6 mb-6 bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                      <MessageSquare className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900">How was your order?</h4>
+                      <p className="text-sm text-gray-600">Share your experience and help others</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      onClose();
+                      navigate(`/customer/orders/${order.id}/review`);
+                    }}
+                    className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white"
+                  >
+                    <Star className="h-4 w-4 mr-2" />
+                    Write a Review
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Action Buttons */}
+            <div className="px-6 pb-6 flex gap-3">
+              <Button
+                onClick={refreshOrder}
+                disabled={refreshing}
+                variant="outline"
+                className="flex-1"
+              >
+                {refreshing ? (
+                  <>
+                    <RotateCcw className="h-4 w-4 mr-2 animate-spin" />
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Refresh Status
+                  </>
+                )}
+              </Button>
+              
+              <Button
+                onClick={onClose}
+                variant="secondary"
+                className="flex-1"
+              >
+                Close
+              </Button>
+            </div>
           </div>
         )}
       </DialogContent>

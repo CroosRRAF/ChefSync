@@ -317,27 +317,86 @@ const CheckoutPage: React.FC = () => {
 
   // Handle order placement
   const handlePlaceOrder = async () => {
+    // Comprehensive validation before placing order
+    
+    // 1. Check if cart is not empty
+    if (!chefId || chefItems.length === 0 || items.length === 0) {
+      toast.error('Your cart is empty. Please add items before placing an order.');
+      navigate('/menu');
+      return;
+    }
+
+    // 2. Check authentication
+    if (!isAuthenticated || !user) {
+      toast.error('Please log in to place an order.');
+      navigate('/auth/login');
+      return;
+    }
+
+    // 3. Validate delivery address for delivery orders
     if (orderMode === 'delivery' && !selectedAddress) {
-      toast.error('Please select a delivery address');
+      toast.error('Please select a delivery address before placing your order.');
       return;
     }
-    if (!chefId || chefItems.length === 0) {
-      toast.error('No items in cart');
+
+    // 4. Validate delivery address details for delivery orders
+    if (orderMode === 'delivery' && selectedAddress) {
+      if (!selectedAddress.address_line1 || selectedAddress.address_line1.trim() === '') {
+        toast.error('Delivery address is incomplete. Please select a valid address.');
+        return;
+      }
+      
+      if (!selectedAddress.city || selectedAddress.city.trim() === '') {
+        toast.error('City is required in delivery address.');
+        return;
+      }
+    }
+
+    // 5. Validate phone number
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      toast.error('Please provide a valid phone number for order contact.');
       return;
     }
-    if (!phoneNumber) {
-      toast.error('Please enter your phone number');
+
+    // 6. Validate Sri Lankan phone number format
+    const { validateSriLankanPhone } = await import('@/utils/phoneValidation');
+    const phoneValidation = validateSriLankanPhone(phoneNumber);
+    if (!phoneValidation.isValid) {
+      toast.error(phoneValidation.error || 'Please provide a valid Sri Lankan phone number (e.g., +94 77 123 4567 or 0771234567)');
+      return;
+    }
+
+    // 7. Validate payment method is selected
+    if (!paymentMethod) {
+      toast.error('Please select a payment method.');
+      return;
+    }
+
+    // 8. Validate cart items have valid price_id and quantity
+    const invalidItems = items.filter(item => !item.price_id || item.quantity <= 0);
+    if (invalidItems.length > 0) {
+      toast.error('Some cart items are invalid. Please refresh your cart and try again.');
+      await refreshCart();
+      return;
+    }
+
+    // 9. Check minimum order amount
+    if (subtotal < 100) {
+      toast.error('Minimum order amount is LKR 100. Please add more items.');
+      navigate('/menu');
+      return;
+    }
+
+    // 10. Validate that all items belong to the same chef
+    const firstChefId = items[0]?.chef_id;
+    const hasMixedChefs = items.some(item => item.chef_id !== firstChefId);
+    if (hasMixedChefs) {
+      toast.error('Your cart contains items from multiple chefs. Please order from one chef at a time.');
       return;
     }
 
     try {
       setIsPlacingOrder(true);
-
-      // For delivery orders, address is required
-      if (orderMode === 'delivery' && !selectedAddress) {
-        toast.error('Please select a delivery address');
-        return;
-      }
 
       let orderData;
 

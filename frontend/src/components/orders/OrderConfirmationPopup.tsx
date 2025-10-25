@@ -79,11 +79,28 @@ const OrderConfirmationPopup: React.FC<OrderConfirmationPopupProps> = ({
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [autoRefreshCount, setAutoRefreshCount] = useState(0);
   const [trackingInfo, setTrackingInfo] = useState<any>(null);
+  const [previousStatus, setPreviousStatus] = useState<string | null>(null);
 
   // Fetch order details and tracking info
   const fetchOrderDetails = async () => {
     try {
       const orderDetails = await orderService.getOrder(orderId);
+      
+      // Check if order status changed to delivered
+      if (orderDetails.status === 'delivered' && previousStatus !== 'delivered' && previousStatus !== null) {
+        // Order just got delivered, show success message and redirect to review
+        toast.success('🎉 Your order has been delivered successfully!', {
+          duration: 3000,
+        });
+        
+        // Auto-redirect to review page after 2 seconds
+        setTimeout(() => {
+          onClose();
+          navigate(`/customer/orders/${orderId}/review`);
+        }, 2000);
+      }
+      
+      setPreviousStatus(orderDetails.status);
       setOrder(orderDetails as any);
       
       // Fetch tracking information (location updates, delivery log, etc.)

@@ -45,6 +45,8 @@ import { orderService } from '@/services/orderService';
 import { paymentService } from '@/services/paymentService';
 import { getFoodPlaceholder } from '@/utils/placeholderUtils';
 import { CheckoutCalculation, CartService } from '@/services/cartService';
+import { validateSriLankanPhone } from '@/utils/phoneValidation';
+import PhoneInput from '@/components/ui/phone-input';
 
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
@@ -238,23 +240,98 @@ const Checkout: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
+    // Comprehensive validation before placing order
+    
+    // 1. Check if cart is not empty
+    if (!cart || cart.length === 0) {
+      toast.error('Your cart is empty. Please add items before placing an order.');
+      navigate('/menu');
+      return;
+    }
+
+    // 2. Validate delivery address
     if (!selectedAddress) {
-      toast.error('Please select a delivery address');
+      toast.error('Please select a delivery address before placing your order.');
+      setCurrentStep(1); // Go back to delivery step
       return;
     }
 
-    if (!deliveryInfo.phone) {
-      toast.error('Please provide a phone number');
+    // 3. Validate phone number
+    if (!deliveryInfo.phone || deliveryInfo.phone.trim() === '') {
+      toast.error('Please provide a valid phone number for delivery contact.');
+      setCurrentStep(1); // Go back to delivery step
       return;
     }
 
-    // Validate card details if card payment is selected
+    // 4. Validate Sri Lankan phone number format
+    const phoneValidation = validateSriLankanPhone(deliveryInfo.phone);
+    if (!phoneValidation.isValid) {
+      toast.error(phoneValidation.error || 'Please provide a valid Sri Lankan phone number (e.g., +94 77 123 4567 or 0771234567)');
+      setCurrentStep(1);
+      return;
+    }
+
+    // 5. Validate payment method is selected
+    if (!paymentMethod) {
+      toast.error('Please select a payment method.');
+      setCurrentStep(2); // Go back to payment step
+      return;
+    }
+
+    // 6. Validate card details if card payment is selected
     if (paymentMethod === 'card') {
+      if (!cardDetails.cardNumber || cardDetails.cardNumber.trim() === '') {
+        toast.error('Please enter your card number');
+        setCurrentStep(2);
+        return;
+      }
+      
+      if (!cardDetails.cardHolder || cardDetails.cardHolder.trim() === '') {
+        toast.error('Please enter the cardholder name');
+        setCurrentStep(2);
+        return;
+      }
+      
+      if (!cardDetails.expiryMonth || !cardDetails.expiryYear) {
+        toast.error('Please enter the card expiry date');
+        setCurrentStep(2);
+        return;
+      }
+      
+      if (!cardDetails.cvv || cardDetails.cvv.trim() === '') {
+        toast.error('Please enter the CVV code');
+        setCurrentStep(2);
+        return;
+      }
+
       const validation = validateCardDetails();
       if (!validation.isValid) {
         toast.error(`Payment validation failed: ${validation.errors.join(', ')}`);
+        setCurrentStep(2);
         return;
       }
+    }
+
+    // 7. Validate cart items have valid data
+    const invalidItems = cart.filter(item => !item.price_id || item.quantity <= 0);
+    if (invalidItems.length > 0) {
+      toast.error('Some cart items are invalid. Please refresh your cart and try again.');
+      await refreshCart();
+      return;
+    }
+
+    // 8. Check minimum order amount (if applicable)
+    if (subtotal < 100) {
+      toast.error('Minimum order amount is LKR 100. Please add more items.');
+      navigate('/menu');
+      return;
+    }
+
+    // 9. Confirm user authentication
+    if (!isAuthenticated || !user) {
+      toast.error('Please log in to place an order.');
+      navigate('/auth/login');
+      return;
     }
 
     setIsProcessing(true);
@@ -285,7 +362,7 @@ const Checkout: React.FC = () => {
       if (paymentMethod !== 'cash') {
         try {
           const paymentData = {
-            order_id: order.id,
+            order_id: order.id || order.order_id,
             payment_method: paymentMethod,
             amount: total.toString(),
             save_payment_method: savePaymentMethod,
@@ -466,17 +543,13 @@ const Checkout: React.FC = () => {
                   </div>
 
                   {/* Phone Number */}
-                  <div>
-                    <Label htmlFor="phone">Phone Number *</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+94 XX XXX XXXX"
-                      value={deliveryInfo.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
+                  <PhoneInput
+                    value={deliveryInfo.phone}
+                    onChange={(value) => handleInputChange('phone', value)}
+                    label="Phone Number (Sri Lanka)"
+                    required={true}
+                    showValidation={true}
+                  />
 
                   {/* Delivery Instructions */}
                   <div>

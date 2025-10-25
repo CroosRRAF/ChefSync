@@ -414,26 +414,97 @@ const CustomerBulkOrderDashboard: React.FC = () => {
   };
 
   const handleSubmitOrder = async () => {
-    // Validation
+    // Comprehensive validation before placing bulk order
     console.log('📝 Starting order submission...');
     console.log('Order form data:', orderForm);
     console.log('Selected address:', selectedAddress);
     
-    if (!orderForm.event_date || !orderForm.event_time) {
+    // 1. Validate menu selection
+    if (!orderForm.menu_id || !selectedMenu) {
+      toast.error('Please select a bulk menu before placing your order.');
       return;
     }
 
-    // Check if we have either a selected address or manual entry (only for delivery)
+    // 2. Validate number of persons
+    if (!orderForm.num_persons || orderForm.num_persons <= 0) {
+      toast.error('Please enter the number of persons for the order.');
+      return;
+    }
+
+    // 3. Validate minimum and maximum persons
+    if (selectedMenu.min_persons && orderForm.num_persons < selectedMenu.min_persons) {
+      toast.error(`Minimum ${selectedMenu.min_persons} persons required for this menu.`);
+      return;
+    }
+
+    if (selectedMenu.max_persons && orderForm.num_persons > selectedMenu.max_persons) {
+      toast.error(`Maximum ${selectedMenu.max_persons} persons allowed for this menu.`);
+      return;
+    }
+
+    // 4. Validate event date
+    if (!orderForm.event_date) {
+      toast.error('Please select an event date.');
+      return;
+    }
+
+    // 5. Validate event time
+    if (!orderForm.event_time) {
+      toast.error('Please select an event time.');
+      return;
+    }
+
+    // 6. Validate event date is not in the past
+    const eventDateTime = new Date(orderForm.event_date);
+    const [hours, minutes] = orderForm.event_time.split(':');
+    eventDateTime.setHours(parseInt(hours), parseInt(minutes));
+    
+    if (eventDateTime <= new Date()) {
+      toast.error('Event date and time must be in the future.');
+      return;
+    }
+
+    // 7. Check advance notice requirement
+    const hoursUntilEvent = (eventDateTime.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+    
+    console.log(`⏰ Hours until event: ${hoursUntilEvent.toFixed(1)}, Required: ${selectedMenu.advance_notice_hours}`);
+    
+    if (selectedMenu.advance_notice_hours && hoursUntilEvent < selectedMenu.advance_notice_hours) {
+      toast.error(`This menu requires at least ${selectedMenu.advance_notice_hours} hours advance notice. Please select a later date/time.`);
+      return;
+    }
+
+    // 8. Validate order type
+    if (!orderForm.order_type || (orderForm.order_type !== 'delivery' && orderForm.order_type !== 'pickup')) {
+      toast.error('Please select delivery or pickup option.');
+      return;
+    }
+
+    // 9. Validate delivery address for delivery orders
     if (orderForm.order_type === 'delivery') {
       const hasAddress = (selectedAddress && selectedAddress.address_line1) || 
                          (orderForm.delivery_address && orderForm.delivery_address.trim().length > 0);
       
       if (!hasAddress) {
+        toast.error('Please provide a delivery address or select from saved addresses.');
         return;
+      }
+
+      // Validate selected address has required fields
+      if (selectedAddress) {
+        if (!selectedAddress.address_line1 || selectedAddress.address_line1.trim() === '') {
+          toast.error('Delivery address is incomplete. Please select a valid address.');
+          return;
+        }
+        
+        if (!selectedAddress.city || selectedAddress.city.trim() === '') {
+          toast.error('City is required in delivery address.');
+          return;
+        }
       }
     }
 
-    // Use selected address if available, otherwise use manual entry
+    // 10. Use selected address if available, otherwise use manual entry
     const finalAddress = selectedAddress ? 
       [
         selectedAddress.address_line1,
@@ -442,19 +513,23 @@ const CustomerBulkOrderDashboard: React.FC = () => {
       ].filter(Boolean).join(', ') : 
       orderForm.delivery_address;
 
-    // Check advance notice requirement
-    if (selectedMenu) {
-      const eventDateTime = new Date(orderForm.event_date);
-      const [hours, minutes] = orderForm.event_time.split(':');
-      eventDateTime.setHours(parseInt(hours), parseInt(minutes));
-      
-      const hoursUntilEvent = (eventDateTime.getTime() - new Date().getTime()) / (1000 * 60 * 60);
-      
-      console.log(`⏰ Hours until event: ${hoursUntilEvent.toFixed(1)}, Required: ${selectedMenu.advance_notice_hours}`);
-      
-      if (hoursUntilEvent < selectedMenu.advance_notice_hours) {
-        return;
-      }
+    // 11. Validate total amount
+    const totalAmount = calculateTotalCost();
+    if (totalAmount <= 0) {
+      toast.error('Invalid order total. Please review your order.');
+      return;
+    }
+
+    // 12. Validate minimum order amount for bulk orders
+    if (totalAmount < 5000) {
+      toast.error('Minimum bulk order amount is LKR 5,000.');
+      return;
+    }
+
+    // 13. Final confirmation
+    const confirmMessage = `Confirm bulk order for ${orderForm.num_persons} persons on ${format(orderForm.event_date, 'PPP')} at ${orderForm.event_time} for LKR ${totalAmount.toFixed(2)}?`;
+    if (!window.confirm(confirmMessage)) {
+      return;
     }
 
     try {

@@ -150,6 +150,12 @@ export interface CartItem {
   updated_at: string;
   discount?: number; // Optional discount percentage
   isVeg?: boolean; // Optional vegetarian indicator
+  price_id: number; // Price ID for order creation
+  kitchen_location?: { // Kitchen location for delivery calculations
+    lat: number;
+    lng: number;
+    address?: string;
+  };
 }
 
 export interface CartSummary {

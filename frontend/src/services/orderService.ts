@@ -44,6 +44,7 @@ export interface CreateOrderFromCartData {
 
 export interface OrderResponse {
   success?: string;
+  id?: number; // Alias for order_id
   order_id: number;
   order_number: string;
   status: string;

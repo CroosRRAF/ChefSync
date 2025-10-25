@@ -39,7 +39,8 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  Search
+  Search,
+  Users
 } from "lucide-react";
 import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 import { useState } from "react";
@@ -87,6 +88,17 @@ const items = [
     quickActions: [
       { label: "Pending", icon: Clock },
       { label: "Completed", icon: CheckCircle2 }
+    ]
+  },
+  { 
+    title: "Bulk Orders", 
+    url: "/cook/bulk-orders", 
+    icon: Package,
+    description: "Catering & Events",
+    badge: null,
+    quickActions: [
+      { label: "Pending", icon: Clock },
+      { label: "Collaborate", icon: Users }
     ]
   },
   { 
