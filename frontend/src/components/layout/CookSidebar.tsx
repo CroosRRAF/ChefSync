@@ -90,17 +90,6 @@ const items = [
     ]
   },
   { 
-    title: "Bulk Orders", 
-    url: "/cook/bulk-orders", 
-    icon: Package,
-    description: "Large Orders",
-    badge: null,
-    quickActions: [
-      { label: "Process", icon: Settings },
-      { label: "History", icon: Clock }
-    ]
-  },
-  { 
     title: "Notifications", 
     url: "/cook/notifications", 
     icon: Bell,

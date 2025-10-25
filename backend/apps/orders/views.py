@@ -753,6 +753,20 @@ class OrderViewSet(viewsets.ModelViewSet):
             notes=f"Order cancelled by customer: {cancellation_reason}",
         )
 
+        # Send notifications to chef and customer
+        try:
+            from apps.communications.services.order_notification_service import (
+                OrderNotificationService,
+            )
+
+            OrderNotificationService.notify_order_cancelled(
+                order, cancelled_by='customer', reason=cancellation_reason
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send cancellation notifications: {str(e)}")
+
         return Response(
             {
                 "success": "Order cancelled successfully",
@@ -811,6 +825,78 @@ class OrderViewSet(viewsets.ModelViewSet):
                 "time_remaining_seconds": int(remaining_time.total_seconds()),
             }
         )
+
+    @action(detail=True, methods=["get"])
+    def tracking_info(self, request, pk=None):
+        """Get comprehensive tracking information for an order"""
+        order = self.get_object()
+        
+        # Check if user is authorized
+        if order.customer != request.user and order.chef != request.user and order.delivery_partner != request.user:
+            return Response(
+                {"error": "You are not authorized to view this tracking information"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
+        # Get location updates
+        location_updates = LocationUpdate.objects.filter(order=order).order_by('-timestamp')[:10]
+        
+        # Get delivery log
+        delivery_log = None
+        try:
+            delivery_log = DeliveryLog.objects.get(order=order)
+        except DeliveryLog.DoesNotExist:
+            pass
+        
+        # Get delivery issues
+        delivery_issues = DeliveryIssue.objects.filter(order=order).order_by('-created_at')
+        
+        tracking_data = {
+            'order_id': order.id,
+            'order_number': order.order_number,
+            'status': order.status,
+            'status_timestamps': order.status_timestamps,
+            'estimated_delivery_time': order.estimated_delivery_time,
+            'actual_delivery_time': order.actual_delivery_time,
+            'location_updates': [
+                {
+                    'latitude': float(loc.latitude),
+                    'longitude': float(loc.longitude),
+                    'timestamp': loc.timestamp.isoformat(),
+                    'address': loc.address
+                } for loc in location_updates
+            ],
+            'latest_location': {
+                'latitude': float(location_updates[0].latitude),
+                'longitude': float(location_updates[0].longitude),
+                'timestamp': location_updates[0].timestamp.isoformat(),
+                'address': location_updates[0].address
+            } if location_updates else None,
+            'delivery_log': {
+                'start_time': delivery_log.start_time.isoformat() if delivery_log and delivery_log.start_time else None,
+                'end_time': delivery_log.end_time.isoformat() if delivery_log and delivery_log.end_time else None,
+                'pickup_time': delivery_log.pickup_time.isoformat() if delivery_log and delivery_log.pickup_time else None,
+                'distance_km': float(delivery_log.distance_km) if delivery_log else None,
+                'total_time_minutes': delivery_log.total_time_minutes if delivery_log else None,
+                'status': delivery_log.status if delivery_log else None,
+            } if delivery_log else None,
+            'delivery_issues': [
+                {
+                    'issue_type': issue.issue_type,
+                    'description': issue.description,
+                    'status': issue.status,
+                    'created_at': issue.created_at.isoformat(),
+                    'resolved_at': issue.resolved_at.isoformat() if issue.resolved_at else None,
+                } for issue in delivery_issues
+            ],
+            'delivery_partner': {
+                'id': order.delivery_partner.id,
+                'name': order.delivery_partner.name or order.delivery_partner.username,
+                'phone_no': getattr(order.delivery_partner, 'phone_no', None),
+            } if order.delivery_partner else None,
+        }
+        
+        return Response(tracking_data)
 
     @action(detail=True, methods=["patch"])
     def status(self, request, pk=None):
@@ -2461,8 +2547,9 @@ def place_order(request):
             "chef": chef,
             "order_number": f"ORD-{uuid.uuid4().hex[:8].upper()}",
             "status": initial_status,
+            "order_type": order_type,
             "payment_method": payment_method,
-            "payment_status": "pending",
+            "payment_status": "pending",  # Payment handled separately for COD
             "subtotal": Decimal(str(subtotal)),
             "tax_amount": Decimal(str(tax_amount)),
             "delivery_fee": Decimal(str(delivery_fee)),
@@ -2523,11 +2610,7 @@ def place_order(request):
         cart_items.delete()
 
         # Create initial status history
-        status_note = (
-            "Order placed and confirmed successfully. Chef can start preparing."
-            if initial_status == "confirmed"
-            else "Order placed successfully. Waiting for payment confirmation."
-        )
+        status_note = "Order placed successfully. Waiting for chef confirmation. Chef has 10 minutes to accept."
         OrderStatusHistory.objects.create(
             order=order,
             status=initial_status,

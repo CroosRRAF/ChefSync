@@ -11,6 +11,12 @@ from .customer_views import (
     submit_delivery_review,
     submit_food_review,
 )
+from .invoice_views import (
+    generate_order_invoice,
+    email_order_invoice,
+    generate_bulk_order_invoice,
+    email_bulk_order_invoice,
+)
 
 router = DefaultRouter()
 router.register(r"orders", views.OrderViewSet, basename="orders")
@@ -82,4 +88,9 @@ urlpatterns = [
     # Checkout and order placement endpoints
     path("checkout/calculate/", views.calculate_checkout, name="calculate-checkout"),
     path("place/", views.place_order, name="place-order"),
+    # Invoice generation endpoints
+    path("orders/<int:pk>/generate_invoice/", generate_order_invoice, name="generate-order-invoice"),
+    path("orders/<int:pk>/email_invoice/", email_order_invoice, name="email-order-invoice"),
+    path("bulk/<int:pk>/generate_invoice/", generate_bulk_order_invoice, name="generate-bulk-order-invoice"),
+    path("bulk/<int:pk>/email_invoice/", email_bulk_order_invoice, name="email-bulk-order-invoice"),
 ]

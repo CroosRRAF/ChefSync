@@ -57,8 +57,6 @@ ua-parser==1.0.1
 ua-parser-builtins==0.18.0.post1
 uritemplate==4.2.0
 urllib3==2.2.3
-google-generativeai==0.8.3
-psutil==7.1.0
 
 # AI/ML Dependencies (Phase 3)
 pandas==2.2.3
@@ -66,10 +64,14 @@ numpy==1.26.4
 scikit-learn==1.5.2
 
 # PDF processing dependencies
+reportlab==4.4.4  # PDF generation for invoices
 # Note: Poppler utilities must be installed separately on Windows
 # Download from: https://github.com/oschwartz10612/poppler-windows/releases/
 # Extract to C:\poppler\ and add C:\poppler\bin to PATH
 
 # Delivery Fee Calculation Dependencies
 googlemaps==4.10.0  # Google Maps API for distance calculation
-pytz==2024.1  # Timezone support for time-based surcharges
+pytz==2025.2  # Timezone support for time-based surcharges
+
+# Background Task Scheduling
+django-apscheduler==0.6.2  # Automatic scheduling for order auto-cancellation

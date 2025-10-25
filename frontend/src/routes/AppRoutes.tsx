@@ -37,10 +37,12 @@ import VerifyEmail from "@/pages/auth/VerifyEmail";
 import CustomerCart from "@/pages/customer/Cart";
 import CustomerDashboard from "@/pages/customer/Dashboard";
 import CustomerOrders from "@/pages/customer/Orders";
+import CustomerOrdersNew from "@/pages/customer/OrdersNew";
 import CustomerProfile from "@/pages/customer/Profile";
 import CustomerSettings from "@/pages/customer/Settings";
 import CustomerNotifications from "@/pages/customer/Notifications";
 import OrderReview from "@/pages/customer/OrderReview";
+import OrderReviewPage from "@/pages/customer/OrderReviewPage";
 import ChefProfilePage from "@/pages/ChefProfilePage";
 
 import AllOrders from "@/pages/delivery/AllOrders";
@@ -445,7 +447,7 @@ const InnerRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={["customer"]}>
               <CustomerDashboardLayout>
-                <CustomerOrders />
+                <CustomerOrdersNew />
               </CustomerDashboardLayout>
             </ProtectedRoute>
           }
@@ -454,7 +456,9 @@ const InnerRoutes: React.FC = () => {
           path="/customer/orders/:orderId/review"
           element={
             <ProtectedRoute allowedRoles={["customer"]}>
-              <OrderReview />
+              <CustomerDashboardLayout>
+                <OrderReviewPage />
+              </CustomerDashboardLayout>
             </ProtectedRoute>
           }
         />

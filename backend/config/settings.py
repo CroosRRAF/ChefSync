@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google",
     "cloudinary_storage",
     "cloudinary",
+    "django_apscheduler",  # Background task scheduling
     # Local apps
     "apps.authentication",
     "apps.analytics",

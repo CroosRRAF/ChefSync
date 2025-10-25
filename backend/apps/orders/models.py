@@ -45,7 +45,7 @@ class Order(models.Model):
 
     ORDER_STATUS_CHOICES = [
         ("cart", "Cart"),
-        ("pending", "Pending Payment"),
+        ("pending", "Order Placed"),  # Changed from "Pending Payment" - all orders start here
         ("confirmed", "Confirmed"),
         ("preparing", "Preparing"),
         ("ready", "Ready for Pickup"),
