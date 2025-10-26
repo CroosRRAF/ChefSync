@@ -14,6 +14,7 @@ export { default as AnalyticsHub } from "./AnalyticsHub";
 export { default as UserManagementHub } from "./UserManagementHub";
 export { default as OrderManagementHub } from "./OrderManagementHub";
 export { default as ContentManagementHub } from "./ContentManagementHub";
+export { default as ContentApprovalPage } from "./ContentApprovalPage";
 export { default as CommunicationCenter } from "./CommunicationCenter";
 export { default as SystemHub } from "./SystemHub";
 

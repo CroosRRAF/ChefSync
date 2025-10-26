@@ -288,6 +288,80 @@ const PaymentManagementHub: React.FC = () => {
     }
   };
 
+  // Export functionality
+  const handleExportData = useCallback(() => {
+    try {
+      let csvContent = "";
+      let filename = "";
+      const timestamp = new Date().toISOString().split("T")[0];
+
+      if (activeTab === "transactions") {
+        // Export transactions
+        filename = `transactions-${timestamp}.csv`;
+        csvContent = "ID,Amount,Type,Status,Date\n";
+        transactions.forEach((transaction: any) => {
+          const row = [
+            transaction.id || "",
+            transaction.amount || "",
+            transaction.type || "",
+            transaction.status || "",
+            transaction.transaction_date || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      } else if (activeTab === "refunds") {
+        // Export refunds
+        filename = `refunds-${timestamp}.csv`;
+        csvContent = "ID,Amount,Reason,Status,Created At\n";
+        refunds.forEach((refund: any) => {
+          const row = [
+            refund.id || "",
+            refund.amount || "",
+            `"${(refund.reason || "").replace(/"/g, '""')}"`,
+            refund.status || "",
+            refund.created_at || "",
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+      } else if (activeTab === "overview" || activeTab === "analytics") {
+        // Export payment stats
+        filename = `payment-stats-${timestamp}.csv`;
+        csvContent = "Metric,Value\n";
+        if (paymentStats) {
+          csvContent += `Total Revenue,${paymentStats.total_revenue}\n`;
+          csvContent += `Total Transactions,${paymentStats.total_transactions}\n`;
+          csvContent += `Total Refunds,${paymentStats.total_refunds}\n`;
+          csvContent += `Pending Refunds,${paymentStats.pending_refunds}\n`;
+          csvContent += `Success Rate,${paymentStats.success_rate}%\n`;
+          csvContent += `Average Transaction Value,${paymentStats.average_transaction_value}\n`;
+        }
+      }
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Success",
+        description: "Data exported successfully",
+      });
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export data",
+        variant: "destructive",
+      });
+    }
+  }, [activeTab, transactions, refunds, paymentStats]);
+
   // Load data on mount and tab changes
   useEffect(() => {
     loadPaymentStats();
@@ -643,7 +717,7 @@ const PaymentManagementHub: React.FC = () => {
       <GlassCard className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">All Transactions</h3>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportData}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -674,7 +748,7 @@ const PaymentManagementHub: React.FC = () => {
       <GlassCard className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Refund Management</h3>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportData}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -824,7 +898,7 @@ const PaymentManagementHub: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportData}>
             <Download className="h-4 w-4 mr-2" />
             Export Report
           </Button>

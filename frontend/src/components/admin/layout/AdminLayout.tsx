@@ -1,3 +1,5 @@
+import Footer from "@/components/layout/Footer";
+import NotificationBadge from "@/components/NotificationBadge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
@@ -21,39 +22,30 @@ import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3,
-  Bell,
+  Bot,
   ChevronLeft,
   ChevronRight,
   CreditCard,
-  FileText,
   HelpCircle,
   LayoutDashboard,
   LogOut,
   Menu,
   MessageSquare,
   Moon,
-  Search,
   Settings,
+  ShoppingCart,
+  Sparkles,
   Sun,
   User,
   Users,
   Utensils,
   X,
-  Bot,
-  Sparkles,
-  ShoppingCart,
-  Truck,
-  Gift,
-  Brain,
-  UserPlus,
-  Clock,
 } from "lucide-react";
 import React, { memo, useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import AdminBreadcrumb from "./AdminBreadcrumb";
-import { CommandPalette, AIAssistantButton, GlassCard } from "../shared";
+import { AIAssistantButton, CommandPalette } from "../shared";
 import PerformanceMonitor from "../shared/PerformanceMonitor";
-import NotificationBadge from "@/components/NotificationBadge";
+import AdminBreadcrumb from "./AdminBreadcrumb";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -464,9 +456,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <div className="flex items-center justify-start gap-2 p-2">
                     <div className="flex flex-col space-y-1 leading-none">
-                      <p className="font-medium">
-                        {user?.name || user?.email}
-                      </p>
+                      <p className="font-medium">{user?.name || user?.email}</p>
                       <p className="w-[200px] truncate text-sm text-muted-foreground">
                         {user?.email}
                       </p>
@@ -497,16 +487,17 @@ const AdminLayout: React.FC<AdminLayoutProps> = memo(({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-transparent">
-          <div className="p-6 min-h-full">
-            {children}
-          </div>
+        <main className="flex-1 overflow-y-auto bg-transparent flex flex-col">
+          <div className="p-6 flex-1">{children}</div>
+
+          {/* Admin Footer */}
+          <Footer variant="minimal" />
         </main>
       </div>
 
       {/* AI Assistant Button */}
       <AIAssistantButton />
-      
+
       {/* Performance Monitor */}
       <PerformanceMonitor />
     </div>

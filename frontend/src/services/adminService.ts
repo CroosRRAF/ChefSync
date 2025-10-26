@@ -1084,7 +1084,14 @@ class AdminService {
     format: "csv" | "excel" | "pdf" = "csv"
   ): Promise<Blob> {
     try {
-      const response = await apiClient.get(`${this.baseUrl}/export/${type}/`, {
+      // Map type to correct endpoint
+      const endpointMap = {
+        users: `${this.baseUrl}/users/export_users/`,
+        orders: `${this.baseUrl}/orders/export_orders/`,
+        activity_logs: `${this.baseUrl}/activity-logs/export_activity_logs/`,
+      };
+
+      const response = await apiClient.get(endpointMap[type], {
         params: { format },
         responseType: "blob",
       });
@@ -1165,7 +1172,7 @@ class AdminService {
   }> {
     try {
       const response = await apiClient.get(
-        `/api/admin-management/dashboard/orders_distribution/?days=7`
+        `/admin-management/dashboard/orders_distribution/?days=7`
       );
       return {
         data: response.data.data,
@@ -1187,7 +1194,7 @@ class AdminService {
     try {
       // Try the new endpoint first
       const response = await apiClient.get(
-        `/api/admin-management/dashboard/orders_distribution/?days=${days}`
+        `/admin-management/dashboard/orders_distribution/?days=${days}`
       );
       return response.data;
     } catch (error) {
@@ -1205,7 +1212,7 @@ class AdminService {
   }> {
     try {
       const response = await apiClient.get(
-        `/api/admin-management/dashboard/new_users/?days=${days}`
+        `/admin-management/dashboard/new_users/?days=${days}`
       );
       return response.data;
     } catch (error) {
@@ -1233,7 +1240,7 @@ class AdminService {
       );
       // Try the new endpoint first
       const response = await apiClient.get(
-        `/api/admin-management/dashboard/recent_deliveries/?limit=${limit}`
+        `/admin-management/dashboard/recent_deliveries/?limit=${limit}`
       );
       console.log(
         `[AdminService] getRecentDeliveries response:`,
@@ -1242,6 +1249,80 @@ class AdminService {
       return response.data;
     } catch (error) {
       console.error("[AdminService] Error fetching recent deliveries:", error);
+      throw error;
+    }
+  }
+
+  // Food and Bulk Menu Approval
+  async approveFoodItem(foodId: number, comments?: string) {
+    try {
+      const response = await apiClient.post(
+        `/food/admin/foods/${foodId}/approve/`,
+        { comments }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error approving food item:", error);
+      throw error;
+    }
+  }
+
+  async rejectFoodItem(foodId: number, reason: string) {
+    try {
+      const response = await apiClient.post(
+        `/food/admin/foods/${foodId}/reject/`,
+        { reason }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error rejecting food item:", error);
+      throw error;
+    }
+  }
+
+  async approveBulkMenu(menuId: number) {
+    try {
+      const response = await apiClient.post(
+        `/food/bulk-menus/${menuId}/approve/`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error approving bulk menu:", error);
+      throw error;
+    }
+  }
+
+  async rejectBulkMenu(menuId: number, reason: string) {
+    try {
+      const response = await apiClient.post(
+        `/food/bulk-menus/${menuId}/reject/`,
+        { reason }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error rejecting bulk menu:", error);
+      throw error;
+    }
+  }
+
+  async getAllFoods(status?: string) {
+    try {
+      const params = status ? `?status=${status}` : '';
+      const response = await apiClient.get(`/food/admin/foods/${params}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching foods:", error);
+      throw error;
+    }
+  }
+
+  async getAllBulkMenus(approvalStatus?: string) {
+    try {
+      const params = approvalStatus ? `?approval_status=${approvalStatus}` : '';
+      const response = await apiClient.get(`/food/bulk-menus/${params}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching bulk menus:", error);
       throw error;
     }
   }

@@ -158,7 +158,12 @@ class FoodPrice(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"{self.food.name} - {self.size} (${self.price})"
+        return f"{self.food.name} - {self.size} (LKR {self.price})"
+    
+    @property
+    def is_approved(self):
+        """Check if the parent food is approved"""
+        return self.food.status == 'Approved'
     
     class Meta:
         db_table = 'FoodPrice'
@@ -380,8 +385,6 @@ class BulkMenuItem(models.Model):
     
     # Nutritional and dietary information
     is_vegetarian = models.BooleanField(default=False)
-    is_vegan = models.BooleanField(default=False)
-    is_gluten_free = models.BooleanField(default=False)
     spice_level = models.CharField(
         max_length=20, 
         choices=[

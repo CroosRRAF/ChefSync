@@ -9,10 +9,19 @@ export interface Chef {
   rating_avg?: number;
 }
 
+export interface Customer {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  phone_no?: string;
+}
+
 export interface Order {
   id: number;
   order_number: string;
-  customer: any;
+  customer: Customer;
+  customer_name?: string;
   chef: Chef; // Enhanced chef interface with pickup location
   delivery_partner?: any;
   status:
@@ -28,10 +37,18 @@ export interface Order {
     | 'refunded';
   delivery_fee?: number;
   delivery_instructions?: string;
+  special_instructions?: string;
   total_amount: number;
   created_at: string;
   updated_at: string;
   actual_delivery_time?: string;
   delivery_address: string; // Customer delivery address
   pickup_location?: string; // Chef's kitchen location for pickup
+  // Additional fields for order management
+  items?: any[];
+  total_items?: number;
+  payment_method?: string;
+  payment_status?: string;
+  order_type?: string;
+  time_since_order?: string;
 }

@@ -97,7 +97,7 @@ const ChefMenu: React.FC = () => {
     price: number;
     preparation_time: number;
   }>>([{ size: 'Medium', price: 0, preparation_time: 15 }]);
-  const [dietaryType, setDietaryType] = useState<'vegetarian' | 'vegan' | 'non-vegetarian'>('vegetarian');
+  const [dietaryType, setDietaryType] = useState<'vegetarian' | 'non-vegetarian'>('vegetarian');
   const [notification, setNotification] = useState<{
     message: string;
     type: 'success' | 'error';
@@ -121,6 +121,11 @@ const ChefMenu: React.FC = () => {
     };
     return baseTimes[size as keyof typeof baseTimes] || 15;
   };
+
+const RsIcon = () => (
+  <span className="font-bold text-[13px] mr-1 leading-none">Rs.</span>
+);
+
 
   // Add new price variant
   const addPriceVariant = () => {
@@ -450,7 +455,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
         "is_vegetarian",
         dietaryType === "vegetarian" ? "true" : "false"
       );
-      foodFormData.append("is_vegan", dietaryType === "vegan" ? "true" : "false");
+      foodFormData.append("is_vegan", "false"); // Always false since we only have vegetarian/non-vegetarian
       foodFormData.append("spice_level", (formData.get("spice_level") as string) || "");
       foodFormData.append("is_available", "true");
 
@@ -951,7 +956,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
           {/* Dietary Type - Radio Buttons */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Dietary Type *</Label>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center space-x-3">
                 <input
                   type="radio"
@@ -964,21 +969,6 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
                 />
                 <Label htmlFor="vegetarian" className="text-sm font-medium flex items-center">
                   🥗 Vegetarian
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                <input
-                  type="radio"
-                  id="vegan"
-                  name="dietary_type"
-                  value="vegan"
-                  checked={dietaryType === 'vegan'}
-                  onChange={(e) => setDietaryType(e.target.value as any)}
-                  className="h-4 w-4 text-green-600"
-                />
-                <Label htmlFor="vegan" className="text-sm font-medium flex items-center">
-                  🌱 Vegan
                 </Label>
               </div>
               
@@ -1255,7 +1245,7 @@ const handleAddFood = async (event: React.FormEvent<HTMLFormElement>) => {
                   <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 rounded-xl p-4 border-2 border-orange-200 dark:border-orange-800">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-sm font-bold text-orange-900 dark:text-orange-100 flex items-center">
-                        <DollarSign className="w-4 h-4 mr-1" />
+                          <RsIcon />
                         Price Options
                       </h4>
                  <span className="text-xs text-orange-700 dark:text-orange-300">

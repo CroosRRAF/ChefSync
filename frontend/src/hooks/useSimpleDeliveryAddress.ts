@@ -331,9 +331,10 @@ export const useSimpleDeliveryAddress = () => {
   };
 
   // Calculate delivery fee based on distance
+  // Fee Structure: LKR 300 within 5 km, LKR 100 per km after 5 km
   const calculateDeliveryFee = (distanceKm: number): number => {
-    const baseDeliveryFee = 200; // Base fee in LKR
-    const additionalFeePerKm = 50; // Additional fee per km
+    const baseDeliveryFee = 300; // Base fee in LKR
+    const additionalFeePerKm = 100; // Additional fee per km
     const freeDeliveryDistance = 5; // Free delivery within 5km
     
     if (distanceKm <= freeDeliveryDistance) {

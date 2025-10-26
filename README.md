@@ -49,9 +49,11 @@ python manage.py runserver
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local  # Configure environment variables
+cp .env.example .env  # Configure Google API keys (see API Setup Guide)
 npm run dev
 ```
+
+**Important**: Configure Google Maps and AI API keys. See [API Setup Guide](API_SETUP_GUIDE.md) or visit `/setup` page.
 
 **App runs on:** http://localhost:8081
 
@@ -99,6 +101,40 @@ ChefSync/
 │   └── vite.config.ts       # Vite configuration
 └── README.md               # This file
 ```
+
+## 🗺️ Google API Setup
+
+ChefSync uses Google Maps API and Google AI API for enhanced features:
+
+### Quick Setup (5 Minutes)
+1. Copy environment template: `cp frontend/.env.example frontend/.env`
+2. Get [Google Maps API Key](https://console.cloud.google.com/) (Required)
+3. Get [Google AI API Key](https://aistudio.google.com/app/apikey) (Optional)
+4. Add keys to `frontend/.env` file
+5. Restart development server
+
+### Features Using Google APIs
+- 🗺️ **Google Maps** (Required): Location picker, address autocomplete, delivery tracking
+- 🤖 **Google AI** (Optional): AI chat assistant, food information
+
+### Interactive Setup Guide
+Visit `/setup` page in the application for a beautiful, step-by-step setup guide with:
+- Visual configuration status
+- Direct links to API consoles
+- Troubleshooting tips
+- Real-time validation
+
+### Detailed Documentation
+- **[Complete API Setup Guide](API_SETUP_GUIDE.md)** - Full documentation with screenshots
+- **[Quick Reference](frontend/README_API_SETUP.md)** - Developer quick start
+- **[Implementation Summary](GOOGLE_API_INTEGRATION_SUMMARY.md)** - Technical details
+
+### Without API Keys
+The app works without API keys but with limited functionality:
+- ✅ Menu browsing works
+- ✅ Order management works
+- ✅ AI features use smart fallback responses
+- ⚠️ Location features require Google Maps API
 
 ## 🔧 Setup Instructions
 

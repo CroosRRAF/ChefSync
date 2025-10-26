@@ -81,19 +81,19 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 / max(previous_week_users, 1)
             ) * 100
 
-            # Chef statistics
-            total_chefs = User.objects.filter(role="cook").count()
-            active_chefs = User.objects.filter(role="cook", is_active=True).count()
+            # Chef statistics - use case-insensitive queries
+            total_chefs = User.objects.filter(Q(role__iexact="cook") | Q(role__iexact="Cook")).count()
+            active_chefs = User.objects.filter(Q(role__iexact="cook") | Q(role__iexact="Cook"), is_active=True).count()
             pending_chef_approvals = User.objects.filter(
-                role="cook", approval_status="pending"
+                Q(role__iexact="cook") | Q(role__iexact="Cook"), approval_status="pending"
             ).count()
 
             # Calculate chef growth
             new_chefs_this_week = User.objects.filter(
-                role="cook", date_joined__gte=week_ago
+                Q(role__iexact="cook") | Q(role__iexact="Cook"), date_joined__gte=week_ago
             ).count()
             previous_week_chefs = User.objects.filter(
-                role="cook",
+                Q(role__iexact="cook") | Q(role__iexact="Cook"),
                 date_joined__gte=week_ago - timedelta(days=7),
                 date_joined__lt=week_ago,
             ).count()
@@ -174,18 +174,20 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 / max(previous_week_foods, 1)
             ) * 100
 
-            # Delivery agent statistics
-            total_delivery_agents = User.objects.filter(role="delivery_agent").count()
+            # Delivery agent statistics - use case-insensitive queries
+            total_delivery_agents = User.objects.filter(
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent")
+            ).count()
             active_delivery_agents = User.objects.filter(
-                role="delivery_agent", is_active=True
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"), is_active=True
             ).count()
 
             # Calculate delivery agent growth
             new_delivery_agents_this_week = User.objects.filter(
-                role="delivery_agent", date_joined__gte=week_ago
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"), date_joined__gte=week_ago
             ).count()
             previous_week_delivery_agents = User.objects.filter(
-                role="delivery_agent",
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"),
                 date_joined__gte=week_ago - timedelta(days=7),
                 date_joined__lt=week_ago,
             ).count()
@@ -194,14 +196,11 @@ class AdminDashboardViewSet(viewsets.ViewSet):
                 / max(previous_week_delivery_agents, 1)
             ) * 100
 
-            # Pending chef approvals (cooks only)
-            pending_chef_approvals = User.objects.filter(
-                role="Cook", approval_status="pending"
-            ).count()
-
-            # Pending user approvals (cooks and delivery agents)
+            # Pending user approvals (cooks and delivery agents) - case-insensitive
             pending_user_approvals = User.objects.filter(
-                role__in=["Cook", "DeliveryAgent"], approval_status="pending"
+                Q(role__iexact="cook") | Q(role__iexact="Cook") | 
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"),
+                approval_status="pending"
             ).count()
 
             # System statistics
@@ -1869,17 +1868,22 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
             # Count by role
             customer_count = User.objects.filter(
-                role__in=["customer", "Customer"]
+                Q(role__iexact="customer") | Q(role__iexact="Customer")
             ).count()
-            cook_count = User.objects.filter(role__in=["cook", "Cook"]).count()
+            cook_count = User.objects.filter(
+                Q(role__iexact="cook") | Q(role__iexact="Cook")
+            ).count()
             delivery_agent_count = User.objects.filter(
-                role__in=["delivery_agent", "DeliveryAgent"]
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent")
             ).count()
-            admin_count = User.objects.filter(role__in=["admin", "Admin"]).count()
+            admin_count = User.objects.filter(
+                Q(role__iexact="admin") | Q(role__iexact="Admin")
+            ).count()
 
             # Count pending approvals (cooks and delivery agents)
             pending_approvals = User.objects.filter(
-                role__in=["cook", "Cook", "delivery_agent", "DeliveryAgent"],
+                Q(role__iexact="cook") | Q(role__iexact="Cook") | 
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"),
                 approval_status="pending",
             ).count()
 
@@ -2945,17 +2949,23 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 .order_by("role")
             )
 
-            # Approval status for cooks and delivery agents
+            # Approval status for cooks and delivery agents - case-insensitive
             pending_approvals = User.objects.filter(
-                role__in=["cook", "delivery_agent"], approval_status="pending"
+                Q(role__iexact="cook") | Q(role__iexact="Cook") | 
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"),
+                approval_status="pending"
             ).count()
 
             approved_users = User.objects.filter(
-                role__in=["cook", "delivery_agent"], approval_status="approved"
+                Q(role__iexact="cook") | Q(role__iexact="Cook") | 
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"),
+                approval_status="approved"
             ).count()
 
             rejected_users = User.objects.filter(
-                role__in=["cook", "delivery_agent"], approval_status="rejected"
+                Q(role__iexact="cook") | Q(role__iexact="Cook") | 
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"),
+                approval_status="rejected"
             ).count()
 
             # Recent registrations (last 30 days)
@@ -2967,7 +2977,8 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             # Recent approvals (last 7 days)
             seven_days_ago = timezone.now() - timedelta(days=7)
             recent_approvals = User.objects.filter(
-                role__in=["cook", "delivery_agent"],
+                Q(role__iexact="cook") | Q(role__iexact="Cook") | 
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"),
                 approval_status="approved",
                 approved_at__gte=seven_days_ago,
             ).count()
@@ -3222,6 +3233,98 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=["get"])
+    def export_orders(self, request):
+        """Export orders data as CSV"""
+        try:
+            import csv
+            from io import StringIO
+
+            from django.http import HttpResponse
+            from apps.orders.models import Order
+
+            # Get query parameters
+            order_status = request.query_params.get("status", "")  # type: ignore
+            payment_status = request.query_params.get("payment_status", "")  # type: ignore
+
+            # Build queryset
+            queryset = Order.objects.select_related("customer", "chef").all()
+
+            if order_status:
+                queryset = queryset.filter(status=order_status)
+
+            if payment_status:
+                queryset = queryset.filter(payment_status=payment_status)
+
+            # Create CSV response
+            response = HttpResponse(content_type="text/csv")
+            response["Content-Disposition"] = 'attachment; filename="orders_export.csv"'
+
+            writer = csv.writer(response)
+
+            # Write header
+            writer.writerow(
+                [
+                    "Order Number",
+                    "Customer",
+                    "Chef",
+                    "Status",
+                    "Payment Status",
+                    "Total Amount",
+                    "Delivery Fee",
+                    "Tax Amount",
+                    "Created At",
+                    "Updated At",
+                ]
+            )
+
+            # Write data
+            for order in queryset:
+                writer.writerow(
+                    [
+                        order.order_number,
+                        getattr(order.customer, 'email', 'N/A') if order.customer else 'N/A',
+                        getattr(order.chef, 'name', 'N/A') if order.chef else 'N/A',
+                        order.status,
+                        order.payment_status,
+                        float(order.total_amount) if order.total_amount else 0,
+                        float(order.delivery_fee) if order.delivery_fee else 0,
+                        float(order.tax_amount) if order.tax_amount else 0,
+                        (
+                            order.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                            if order.created_at
+                            else ""
+                        ),
+                        (
+                            order.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+                            if order.updated_at
+                            else ""
+                        ),
+                    ]
+                )
+
+            # Log activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action="export",
+                resource_type="orders",
+                resource_id="export",
+                description=f"Exported {queryset.count()} orders to CSV",
+                ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT"),
+            )
+
+            return response
+
+        except Exception as e:
+            import traceback
+
+            logger.error(f"Error exporting orders: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"Failed to export orders: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=True, methods=["get"])
     def details(self, request, pk=None):
         """Get detailed order information"""
@@ -3327,9 +3430,17 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                     {"error": "chef_id is required"}, status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Verify chef exists and has correct role
-            chef = User.objects.get(pk=chef_id, role="cook", is_active=True)
-            chef = User.objects.get(pk=chef_id, role="cook", status="active")
+            # Verify chef exists and has correct role - case-insensitive
+            chef = User.objects.filter(
+                Q(pk=chef_id),
+                Q(role__iexact="cook") | Q(role__iexact="Cook"),
+                Q(is_active=True)
+            ).first()
+            if not chef:
+                return Response(
+                    {"error": "Chef not found or inactive"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
             # Update order
             old_chef = order.chef
@@ -3392,10 +3503,17 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Verify delivery partner exists and has correct role
-            partner = User.objects.get(
-                pk=partner_id, role="delivery_agent", status="active"
-            )
+            # Verify delivery agent exists and is active - case-insensitive
+            partner = User.objects.filter(
+                Q(pk=partner_id),
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"),
+                Q(is_active=True)
+            ).first()
+            if not partner:
+                return Response(
+                    {"error": "Delivery agent not found or inactive"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
             # Update order
             old_partner = order.delivery_partner
@@ -3447,9 +3565,11 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
     def available_chefs(self, request):
         """Get list of available chefs for order assignment"""
         try:
-            chefs = User.objects.filter(role="cook", status="active").values(
-                "id", "name", "email"
-            )
+            # Case-insensitive role query and use is_active instead of status
+            chefs = User.objects.filter(
+                Q(role__iexact="cook") | Q(role__iexact="Cook"),
+                is_active=True
+            ).values("user_id", "name", "email")
 
             return Response({"chefs": list(chefs)})
 
@@ -3463,9 +3583,11 @@ class AdminOrderManagementViewSet(viewsets.ViewSet):
     def available_delivery_partners(self, request):
         """Get list of available delivery partners for order assignment"""
         try:
+            # Case-insensitive role query and use is_active instead of status
             partners = User.objects.filter(
-                role="delivery_agent", status="active"
-            ).values("id", "name", "email")
+                Q(role__iexact="delivery_agent") | Q(role__iexact="DeliveryAgent"),
+                is_active=True
+            ).values("user_id", "name", "email")
 
             return Response({"partners": list(partners)})
 
@@ -3675,6 +3797,89 @@ class AdminActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(timestamp__date__lte=end_date)
 
         return queryset.order_by("-timestamp")
+
+    @action(detail=False, methods=["get"])
+    def export_activity_logs(self, request):
+        """Export activity logs data as CSV"""
+        try:
+            import csv
+            from io import StringIO
+
+            from django.http import HttpResponse
+
+            # Get query parameters
+            action = request.query_params.get("action", "")  # type: ignore
+            resource_type = request.query_params.get("resource_type", "")  # type: ignore
+
+            # Build queryset
+            queryset = AdminActivityLog.objects.select_related("admin").all()
+
+            if action:
+                queryset = queryset.filter(action=action)
+
+            if resource_type:
+                queryset = queryset.filter(resource_type=resource_type)
+
+            # Create CSV response
+            response = HttpResponse(content_type="text/csv")
+            response["Content-Disposition"] = 'attachment; filename="activity_logs_export.csv"'
+
+            writer = csv.writer(response)
+
+            # Write header
+            writer.writerow(
+                [
+                    "ID",
+                    "Admin",
+                    "Action",
+                    "Resource Type",
+                    "Resource ID",
+                    "Description",
+                    "IP Address",
+                    "Timestamp",
+                ]
+            )
+
+            # Write data
+            for log in queryset:
+                writer.writerow(
+                    [
+                        log.id,
+                        getattr(log.admin, 'email', 'N/A') if log.admin else 'N/A',
+                        log.action,
+                        log.resource_type or 'N/A',
+                        log.resource_id or 'N/A',
+                        log.description or '',
+                        log.ip_address or 'N/A',
+                        (
+                            log.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                            if log.timestamp
+                            else ""
+                        ),
+                    ]
+                )
+
+            # Log this export activity
+            AdminActivityLog.objects.create(
+                admin=request.user,
+                action="export",
+                resource_type="activity_logs",
+                resource_id="export",
+                description=f"Exported {queryset.count()} activity logs to CSV",
+                ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT"),
+            )
+
+            return response
+
+        except Exception as e:
+            import traceback
+
+            logger.error(f"Error exporting activity logs: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"Failed to export activity logs: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class AdminAIServiceViewSet(viewsets.ViewSet):

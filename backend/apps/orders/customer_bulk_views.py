@@ -14,6 +14,7 @@ from django.db import transaction
 from .models import Order, OrderItem, BulkOrder
 from .serializers import CustomerBulkOrderSerializer, BulkOrderDetailSerializer
 from apps.food.models import BulkMenu, BulkMenuItem
+from apps.food.ai_service import ai_service
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +41,13 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
             "total_amount": 5000.00
         }
         """
+        logger.info(f"📥 Bulk order request from user: {request.user.email if request.user.is_authenticated else 'Anonymous'}")
+        logger.info(f"📝 Request data: {request.data}")
+        
         serializer = CustomerBulkOrderSerializer(data=request.data)
         
         if not serializer.is_valid():
+            logger.warning(f"❌ Validation failed: {serializer.errors}")
             return Response(
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
@@ -72,29 +77,51 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
                 event_datetime = timezone.make_aware(event_datetime)
                 estimated_delivery = event_datetime - timedelta(hours=2)
                 
-                # Create the main order
-                order = Order.objects.create(
-                    customer=request.user,
+                # Create a BulkOrder only (do not create a regular Order for bulk orders).
+                # Bulk orders live primarily in the BulkOrder table. Keep the 'order' FK null
+                # unless downstream systems explicitly need an Order instance.
+                # Assign the chef from the selected bulk menu so the order goes to that chef only.
+                # Previously this was left as `chef=None` which made pending bulk orders visible
+                # to all cooks. Setting the chef ensures only the intended chef (and collaborators)
+                # can see the new bulk order.
+                bulk_order = BulkOrder.objects.create(
+                    # Relationships
+                    order=None,  # No regular order for bulk orders
+                    created_by=request.user,
                     chef=bulk_menu.chef,
+                    delivery_partner=None,
+                    
+                    # Status
                     status='pending',
                     payment_status='pending',
-                    payment_method='cash',  # Can be updated later
-                    delivery_address=validated_data['delivery_address'],
+                    
+                    # Financial
+                    total_amount=validated_data['total_amount'],
+                    subtotal=validated_data['total_amount'] - validated_data.get('delivery_fee', 0),
+                    delivery_fee=validated_data.get('delivery_fee', 0),
+                    
+                    # Event Details
+                    event_date=validated_data['event_date'],
+                    event_time=validated_data['event_time'],
+                    num_persons=validated_data['num_persons'],
+                    menu_name=bulk_menu.menu_name,
+                    
+                    # Delivery/Pickup
+                    order_type=validated_data.get('order_type', 'delivery'),
+                    delivery_address=validated_data.get('delivery_address', ''),
+                    delivery_latitude=validated_data.get('delivery_latitude'),
+                    delivery_longitude=validated_data.get('delivery_longitude'),
+                    distance_km=validated_data.get('distance_km'),
+                    
+                    # Notes
+                    notes=(
+                        f"Bulk order for {validated_data['num_persons']} persons. "
+                        f"Menu: {bulk_menu.menu_name}."
+                    ),
                     customer_notes=validated_data.get('special_instructions', ''),
+                    
+                    # Timestamps
                     estimated_delivery_time=estimated_delivery,
-                    subtotal=validated_data['total_amount'],
-                    total_amount=validated_data['total_amount'],
-                    # Store event info in admin_notes
-                    admin_notes=f"Bulk Order - Event Date: {validated_data['event_date']} {validated_data['event_time']}, Persons: {validated_data['num_persons']}"
-                )
-                
-                # Create BulkOrder record
-                bulk_order = BulkOrder.objects.create(
-                    order=order,
-                    created_by=request.user,
-                    status='pending',
-                    total_amount=validated_data['total_amount'],
-                    notes=f"Bulk order for {validated_data['num_persons']} persons. Menu: {bulk_menu.menu_name}. {validated_data.get('special_instructions', '')}"
                 )
                 
                 # Get all menu items (mandatory + selected optional)
@@ -118,36 +145,46 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
                 
                 num_persons = validated_data['num_persons']
                 
-                # Add base price as an order item (summary item)
-                Order.objects.filter(id=order.id).update(
-                    chef_notes=f"Bulk Menu: {bulk_menu.menu_name}\n"
-                               f"Meal Type: {bulk_menu.get_meal_type_display()}\n"
-                               f"Persons: {num_persons}\n"
-                               f"\nIncluded Items:\n" + 
-                               "\n".join([f"- {item.item_name}" for item in mandatory_items]) +
-                               (f"\n\nOptional Items:\n" + 
-                                "\n".join([f"- {item.item_name} (+Rs.{item.extra_cost}/person)" 
-                                          for item in optional_items]) if optional_items else "")
-                )
+                # We don't have order items stored on a regular Order for bulk orders in this flow.
+                # Keep a chef_notes-like summary in the BulkOrder.notes for easy reference.
+                try:
+                    summary = (
+                        f"Bulk Menu: {bulk_menu.menu_name}\n"
+                        f"Meal Type: {bulk_menu.get_meal_type_display()}\n"
+                        f"Persons: {num_persons}\n\nIncluded Items:\n"
+                        + "\n".join([f"- {item.item_name}" for item in mandatory_items])
+                    )
+                    if optional_items:
+                        summary += (
+                            "\n\nOptional Items:\n"
+                            + "\n".join([f"- {item.item_name} (+Rs.{item.extra_cost}/person)" for item in optional_items])
+                        )
+                    # Append to notes
+                    bulk_order.notes = (bulk_order.notes or "") + "\n\n" + summary
+                    bulk_order.save()
+                except Exception:
+                    # non-critical; continue
+                    pass
                 
                 # Return success response
+                logger.info(f"✅ Bulk order created successfully: BulkOrder #{bulk_order.bulk_order_id}")
                 return Response({
                     'message': 'Bulk order placed successfully',
-                    'order_id': order.id,
-                    'order_number': order.order_number,
                     'bulk_order_id': bulk_order.bulk_order_id,
-                    'total_amount': str(order.total_amount),
+                    'bulk_order_number': f"BULK-{bulk_order.bulk_order_id:06d}",
+                    'total_amount': str(bulk_order.total_amount),
                     'event_datetime': event_datetime.isoformat(),
                     'estimated_delivery_time': estimated_delivery.isoformat(),
                 }, status=status.HTTP_201_CREATED)
                 
         except BulkMenu.DoesNotExist:
+            logger.error(f"❌ Bulk menu not found: {validated_data.get('bulk_menu_id')}")
             return Response(
                 {'error': 'Bulk menu not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
-            logger.error(f"Error creating bulk order: {str(e)}", exc_info=True)
+            logger.error(f"💥 Error creating bulk order: {str(e)}", exc_info=True)
             return Response(
                 {'error': f'Failed to create bulk order: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -183,5 +220,185 @@ class CustomerBulkOrderViewSet(viewsets.ViewSet):
             return Response(
                 {'error': 'Bulk order not found'},
                 status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['post'], url_path='ai-search')
+    def ai_search(self, request):
+        """
+        AI-powered natural language search for bulk menus
+        
+        Request body:
+        {
+            "query": "healthy vegetarian food for corporate event",
+            "meal_type": "lunch" (optional)
+        }
+        """
+        query = request.data.get('query', '').strip()
+        meal_type_filter = request.data.get('meal_type')
+        
+        if not query:
+            return Response(
+                {'error': 'Search query is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        logger.info(f"🔍 AI Search query: '{query}' from user: {request.user.email}")
+        
+        try:
+            # Get available bulk menus
+            menus_queryset = BulkMenu.objects.filter(
+                availability_status=True,
+                approval_status='approved'
+            ).select_related('chef')
+            
+            if meal_type_filter:
+                menus_queryset = menus_queryset.filter(meal_type=meal_type_filter)
+            
+            # Convert to list of dicts for AI processing
+            menus_data = []
+            for menu in menus_queryset:
+                menu_items = BulkMenuItem.objects.filter(bulk_menu=menu)
+                mandatory_items = [item.item_name for item in menu_items if not item.is_optional]
+                optional_items = [item.item_name for item in menu_items if item.is_optional]
+                
+                menus_data.append({
+                    'id': menu.id,
+                    'menu_name': menu.menu_name,
+                    'description': menu.description or '',
+                    'meal_type': menu.meal_type,
+                    'meal_type_display': menu.get_meal_type_display(),
+                    'chef_name': menu.chef.name if hasattr(menu.chef, 'name') else menu.chef.username,
+                    'base_price_per_person': float(menu.base_price_per_person),
+                    'min_persons': menu.min_persons,
+                    'max_persons': menu.max_persons,
+                    'image_url': str(menu.image) if menu.image else None,
+                    'menu_items_summary': {
+                        'mandatory_items': mandatory_items,
+                        'optional_items': optional_items,
+                        'total_items': len(mandatory_items) + len(optional_items)
+                    }
+                })
+            
+            # Use AI to filter and rank menus
+            filtered_menus = ai_service.filter_menus_by_query(query, menus_data)
+            
+            return Response({
+                'query': query,
+                'total_results': len(filtered_menus),
+                'ai_powered': ai_service.is_available(),
+                'menus': filtered_menus
+            })
+            
+        except Exception as e:
+            logger.error(f"❌ AI search failed: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Search failed', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['get'], url_path='ai-analyze')
+    def ai_analyze_menu(self, request, pk=None):
+        """
+        Get AI-powered analysis and categorization of a specific bulk menu
+        
+        URL: /api/orders/customer-bulk-orders/{menu_id}/ai-analyze/
+        """
+        try:
+            menu = BulkMenu.objects.select_related('chef').get(
+                id=pk,
+                availability_status=True,
+                approval_status='approved'
+            )
+            
+            # Get menu items
+            menu_items = BulkMenuItem.objects.filter(bulk_menu=menu)
+            items_list = [item.item_name for item in menu_items]
+            
+            menu_data = {
+                'menu_name': menu.menu_name,
+                'description': menu.description or '',
+                'meal_type': menu.get_meal_type_display(),
+                'items': items_list
+            }
+            
+            # Get AI analysis
+            analysis = ai_service.analyze_menu_categories(menu_data)
+            
+            return Response({
+                'menu_id': menu.id,
+                'menu_name': menu.menu_name,
+                'analysis': analysis
+            })
+            
+        except BulkMenu.DoesNotExist:
+            return Response(
+                {'error': 'Bulk menu not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"❌ AI analysis failed: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Analysis failed', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], url_path='ai-recommendations')
+    def ai_recommendations(self, request):
+        """
+        Get AI-powered personalized menu recommendations
+        
+        Query params:
+        - dietary_preference: vegetarian, vegan, etc.
+        - occasion: corporate_event, wedding, etc.
+        - guest_count: number of guests
+        """
+        try:
+            # Extract user preferences from query params
+            user_preferences = {
+                'dietary_preference': request.query_params.get('dietary_preference'),
+                'occasion': request.query_params.get('occasion'),
+                'guest_count': request.query_params.get('guest_count'),
+                'meal_type': request.query_params.get('meal_type')
+            }
+            
+            # Remove None values
+            user_preferences = {k: v for k, v in user_preferences.items() if v is not None}
+            
+            # Get available menus
+            menus_queryset = BulkMenu.objects.filter(
+                availability_status=True,
+                approval_status='approved'
+            ).select_related('chef')
+            
+            # Convert to list of dicts
+            menus_data = []
+            for menu in menus_queryset:
+                menu_items = BulkMenuItem.objects.filter(bulk_menu=menu)
+                mandatory_items = [item.item_name for item in menu_items if not item.is_optional]
+                
+                menus_data.append({
+                    'id': menu.id,
+                    'menu_name': menu.menu_name,
+                    'description': menu.description or '',
+                    'meal_type': menu.meal_type,
+                    'chef_name': menu.chef.name if hasattr(menu.chef, 'name') else menu.chef.username,
+                    'base_price_per_person': float(menu.base_price_per_person),
+                    'items': mandatory_items[:10]  # First 10 items
+                })
+            
+            # Get AI recommendations
+            recommendations = ai_service.get_smart_recommendations(user_preferences, menus_data)
+            
+            return Response({
+                'preferences': user_preferences,
+                'recommendations': recommendations[:5],  # Top 5
+                'ai_powered': ai_service.is_available()
+            })
+            
+        except Exception as e:
+            logger.error(f"❌ AI recommendations failed: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Recommendations failed', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

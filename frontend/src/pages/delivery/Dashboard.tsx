@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import DeliveryLayout from "@/components/delivery/DeliveryLayout";
 import { DistanceWarningDialog } from "@/components/delivery/DistanceWarningDialog";
+import ContactCard from "@/components/delivery/ContactCard";
 import {
   getAvailableOrders,
   getMyAssignedOrders,
@@ -30,7 +31,7 @@ import {
   getDeliveryHistory,
   acceptOrder,
   type DeliveryLog,
-} from "@/services/deliveryService";
+} from "@/services/service";
 import { Link, useNavigate } from "react-router-dom";
 import type { Order } from "../../types/orderType";
 import {
@@ -46,7 +47,8 @@ import {
   Timer,
   Users,
 } from "lucide-react";
-import DeliveryPhaseCard from "@/components/delivery/DeliveryPhaseCard";
+import SimplifiedDeliveryFlow from "@/components/delivery/SimplifiedDeliveryFlow";
+import { formatCurrency } from "@/utils/numberUtils";
 
 const DeliveryDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -60,6 +62,7 @@ const DeliveryDashboard: React.FC = () => {
   const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<DeliveryLog | null>(null);
   const [showLogDetail, setShowLogDetail] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
   // Distance warning dialog state
   const [distanceWarning, setDistanceWarning] = useState<{
     isOpen: boolean;
@@ -100,7 +103,92 @@ const DeliveryDashboard: React.FC = () => {
     fetchRecentDeliveries();
     fetchDeliveryLogs();
     fetchAssignedOrders();
+    checkLocationPermission();
   }, []);
+
+  // Check location permission on component mount
+  const checkLocationPermission = async () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation Not Supported",
+        description:
+          "Your browser doesn't support location services. Some features may not work properly.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Check if permission is already granted
+      const permission = await navigator.permissions.query({
+        name: "geolocation",
+      });
+
+      if (permission.state === "denied") {
+        toast({
+          title: "Location Permission Denied",
+          description:
+            "Location access is blocked. Please enable it in your browser settings to accept orders.",
+          variant: "destructive",
+        });
+      } else if (permission.state === "prompt") {
+        // Show a friendly message about why we need location
+        toast({
+          title: "Location Access Needed",
+          description:
+            "We'll need your location to assign orders and track deliveries. Please allow access when prompted.",
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      // Fallback for browsers that don't support permissions API
+      console.warn("Could not check location permission:", error);
+    }
+  };
+
+  // Manual location permission request
+  const requestLocationPermission = async () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation Not Supported",
+        description: "Your browser doesn't support location services.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Try to get position which will prompt for permission
+      await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+        });
+      });
+
+      toast({
+        title: "Location Access Granted",
+        description: "Great! You can now accept orders with location tracking.",
+        variant: "default",
+      });
+    } catch (error: any) {
+      if (error.code === 1) {
+        toast({
+          title: "Permission Denied",
+          description:
+            "Please enable location access in your browser settings to accept orders.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Location Error",
+          description:
+            "Could not access your location. Please check your settings.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -120,12 +208,8 @@ const DeliveryDashboard: React.FC = () => {
       console.log("Fetched available orders:", ordersData);
 
       // Define statuses considered "available for delivery"
-      const deliverableStatuses = [
-        "pending",
-        "confirmed",
-        "preparing",
-        "ready",
-      ];
+      // Including confirmed, preparing and ready orders
+      const deliverableStatuses = ["preparing", "ready"];
 
       // Filter orders that are in deliverable statuses
       const availableOrdersData = ordersData.filter((order) =>
@@ -167,9 +251,11 @@ const DeliveryDashboard: React.FC = () => {
       const assignedData = await getMyAssignedOrders();
       console.log("Fetched assigned orders:", assignedData);
 
-      // Filter for active delivery states
+      // Filter for active delivery states - including ready for orders just accepted
       const activeOrders = assignedData.filter((order) =>
-        ["ready", "out_for_delivery", "in_transit"].includes(order.status)
+        ["ready", "out_for_delivery", "in_transit", "picked_up"].includes(
+          order.status
+        )
       );
 
       setAssignedOrders(activeOrders);
@@ -179,6 +265,23 @@ const DeliveryDashboard: React.FC = () => {
   };
 
   const handleAcceptOrder = async (orderId: number, order: Order) => {
+    console.log("handleAcceptOrder called with:", {
+      orderId,
+      orderIdType: typeof orderId,
+      order,
+    });
+
+    // Validate orderId
+    if (typeof orderId !== "number" || isNaN(orderId)) {
+      console.error("Invalid order ID:", orderId);
+      toast({
+        title: "Error",
+        description: "Invalid order ID. Please refresh the page and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setAcceptingOrder(orderId);
 
     // Get current location for distance checking
@@ -207,8 +310,49 @@ const DeliveryDashboard: React.FC = () => {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         };
-      } catch (locationError) {
+      } catch (locationError: any) {
         console.warn("Could not get current location:", locationError);
+
+        // Handle location permission errors
+        if (locationError.code === 1) {
+          // PERMISSION_DENIED
+          toast({
+            title: "Location Permission Required",
+            description:
+              "Please allow location access to accept orders. This helps us track deliveries and provide better service.",
+            variant: "destructive",
+          });
+          setAcceptingOrder(null);
+          return;
+        } else if (locationError.code === 2) {
+          // POSITION_UNAVAILABLE
+          toast({
+            title: "Location Unavailable",
+            description:
+              "Unable to determine your location. Please check your GPS settings and try again.",
+            variant: "destructive",
+          });
+          setAcceptingOrder(null);
+          return;
+        } else if (locationError.code === 3) {
+          // TIMEOUT
+          toast({
+            title: "Location Timeout",
+            description:
+              "Location request timed out. Please try again or check your GPS settings.",
+            variant: "destructive",
+          });
+          setAcceptingOrder(null);
+          return;
+        } else {
+          // Show a warning but continue without location
+          toast({
+            title: "Location Warning",
+            description:
+              "Could not get your location, but proceeding with order acceptance.",
+            variant: "default",
+          });
+        }
       }
 
       // For now, we'll accept without chef location, but the backend will handle it
@@ -238,16 +382,18 @@ const DeliveryDashboard: React.FC = () => {
       // Remove from available orders
       setAvailableOrders((prev) => prev.filter((o) => o.id !== orderId));
 
-      // Refresh dashboard data
-      fetchDashboardData();
+      // Refresh dashboard data and assigned orders to show the new order
+      await fetchDashboardData();
+      await fetchAssignedOrders();
 
-      // Navigate to map with order details
-      navigate("/delivery/map", {
-        state: {
-          selectedOrderId: orderId,
-          orderDetails: order,
-        },
+      toast({
+        title: "Order Accepted!",
+        description:
+          "Order has been assigned to you. Navigate to chef for pickup.",
       });
+
+      // Keep the overview tab active to show the Active Deliveries section
+      setActiveTab("overview");
     } catch (error) {
       console.error("Failed to accept order:", error);
       // Could add toast notification here for error
@@ -273,21 +419,12 @@ const DeliveryDashboard: React.FC = () => {
         prev.filter((o) => o.id !== distanceWarning.orderId)
       );
 
-      // Refresh dashboard data
-      fetchDashboardData();
+      // Refresh dashboard data and assigned orders
+      await fetchDashboardData();
+      await fetchAssignedOrders();
 
-      // Navigate to map
-      const order = availableOrders.find(
-        (o) => o.id === distanceWarning.orderId
-      );
-      if (order) {
-        navigate("/delivery/map", {
-          state: {
-            selectedOrderId: distanceWarning.orderId,
-            orderDetails: order,
-          },
-        });
-      }
+      // Keep the overview tab active to show the Active Deliveries section
+      setActiveTab("overview");
 
       toast({
         title: "Order Accepted",
@@ -405,7 +542,7 @@ const DeliveryDashboard: React.FC = () => {
               <div>
                 <p className="text-green-100 text-sm">Today's Earnings</p>
                 <p className="text-3xl font-bold text-white">
-                  LKR ${totalEarnings.toFixed(2)}
+                  {formatCurrency(totalEarnings)}
                 </p>
               </div>
               <DollarSign className="h-10 w-10 text-green-200 group-hover:scale-110 transition-transform duration-300" />
@@ -426,7 +563,7 @@ const DeliveryDashboard: React.FC = () => {
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList
             className="grid w-full grid-cols-4 rounded-lg p-1 transition-all duration-300"
             style={{
@@ -462,6 +599,56 @@ const DeliveryDashboard: React.FC = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Active Deliveries Section - Show first if there are any */}
+            {assignedOrders.length > 0 && (
+              <Card
+                className="group border-none theme-card-hover theme-animate-fade-in-up"
+                style={{ background: "var(--bg-card)" }}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Truck
+                      className="h-5 w-5 group-hover:scale-110 transition-transform duration-300"
+                      style={{ color: "var(--primary-emerald)" }}
+                    />
+                    <span style={{ color: "var(--text-primary)" }}>
+                      Active Deliveries
+                    </span>
+                    <Badge variant="secondary" className="ml-2">
+                      {assignedOrders.length}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription style={{ color: "var(--text-cool-grey)" }}>
+                    Your currently assigned orders for pickup and delivery
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {assignedOrders.map((order, index) => (
+                      <SimplifiedDeliveryFlow
+                        key={order.id}
+                        order={order}
+                        onStatusUpdate={(orderId, newStatus) => {
+                          // Refresh assigned orders after status update
+                          fetchAssignedOrders();
+                          fetchDashboardData();
+                        }}
+                        className="theme-animate-fade-in-up"
+                        style={{ animationDelay: `${index * 0.1}s` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-6 text-center">
+                    <Button asChild variant="outline" size="lg">
+                      <Link to="/delivery/map">
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Open Map View
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <Card
               className="group border-none theme-card-hover theme-animate-fade-in-up"
               style={{ background: "var(--bg-card)" }}
@@ -481,6 +668,31 @@ const DeliveryDashboard: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Location Permission Status */}
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <MapPin className="h-5 w-5 text-orange-600" />
+                      <div>
+                        <p className="font-medium text-orange-800">
+                          Location Access
+                        </p>
+                        <p className="text-sm text-orange-600">
+                          Required to accept orders and track deliveries
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={requestLocationPermission}
+                      variant="outline"
+                      size="sm"
+                      className="border-orange-300 text-orange-700 hover:bg-orange-100"
+                    >
+                      Enable Location
+                    </Button>
+                  </div>
+                </div>
+
                 {availableOrders.length === 0 ? (
                   <div className="text-center py-12 theme-animate-scale-in">
                     <div
@@ -588,20 +800,27 @@ const DeliveryDashboard: React.FC = () => {
                                 border: "1px solid rgba(156, 39, 176, 0.2)",
                               }}
                             >
-                              <DollarSign
+                              {/* <DollarSign
                                 className="h-4 w-4"
                                 style={{ color: "#9C27B0" }}
-                              />
+                              /> */}
                               <span
                                 className="font-semibold"
                                 style={{ color: "#9C27B0" }}
                               >
-                                ${order.total_amount}
+                                {formatCurrency(order.total_amount)}
                               </span>
                             </div>
                           </div>
                           <Button
-                            onClick={() => handleAcceptOrder(order.id, order)}
+                            onClick={() => {
+                              console.log("Accept button clicked for order:", {
+                                id: order.id,
+                                idType: typeof order.id,
+                                order,
+                              });
+                              handleAcceptOrder(order.id, order);
+                            }}
                             disabled={acceptingOrder === order.id}
                             className="ml-4 theme-button-primary"
                             size="lg"
@@ -619,6 +838,88 @@ const DeliveryDashboard: React.FC = () => {
                             )}
                           </Button>
                         </div>
+
+                        {/* Contact Information - Show contextually based on order status */}
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
+                            Contact Details
+                          </div>
+
+                          {/* Before pickup - Show only chef contact */}
+                          {[
+                            "pending",
+                            "confirmed",
+                            "preparing",
+                            "ready",
+                          ].includes(order.status) && (
+                            <div className="space-y-2">
+                              {order.chef && (
+                                <ContactCard
+                                  type="chef"
+                                  contact={order.chef}
+                                  showLocation={true}
+                                  className="ring-2 ring-orange-300 shadow-md"
+                                />
+                              )}
+                              <div className="text-xs text-orange-700 bg-orange-50 p-2 rounded border border-orange-200 text-center">
+                                <span className="font-medium">
+                                  Pickup Phase:
+                                </span>{" "}
+                                Contact chef for order collection
+                              </div>
+                            </div>
+                          )}
+
+                          {/* After pickup - Show only customer contact */}
+                          {[
+                            "out_for_delivery",
+                            "in_transit",
+                            "picked_up",
+                          ].includes(order.status) && (
+                            <div className="space-y-2">
+                              {order.customer && (
+                                <ContactCard
+                                  type="customer"
+                                  contact={order.customer}
+                                  className="ring-2 ring-blue-300 shadow-md"
+                                />
+                              )}
+                              <div className="text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-200 text-center">
+                                <span className="font-medium">
+                                  Delivery Phase:
+                                </span>{" "}
+                                Contact customer for delivery coordination
+                              </div>
+                            </div>
+                          )}
+
+                          {/* For other statuses or fallback - Show both */}
+                          {![
+                            "pending",
+                            "confirmed",
+                            "preparing",
+                            "ready",
+                            "out_for_delivery",
+                            "in_transit",
+                            "picked_up",
+                          ].includes(order.status) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {order.chef && (
+                                <ContactCard
+                                  type="chef"
+                                  contact={order.chef}
+                                  showLocation={true}
+                                />
+                              )}
+                              {order.customer && (
+                                <ContactCard
+                                  type="customer"
+                                  contact={order.customer}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                     {availableOrders.length > 5 && (
@@ -634,60 +935,6 @@ const DeliveryDashboard: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-
-            {/* Active Deliveries Section */}
-            {assignedOrders.length > 0 && (
-              <Card
-                className="group border-none theme-card-hover theme-animate-fade-in-up"
-                style={{ background: "var(--bg-card)" }}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Truck
-                      className="h-5 w-5 group-hover:scale-110 transition-transform duration-300"
-                      style={{ color: "var(--primary-emerald)" }}
-                    />
-                    <span style={{ color: "var(--text-primary)" }}>
-                      Active Deliveries
-                    </span>
-                    <Badge variant="secondary" className="ml-2">
-                      {assignedOrders.length}
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription style={{ color: "var(--text-cool-grey)" }}>
-                    Your currently assigned orders for pickup and delivery
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {assignedOrders.map((order, index) => (
-                      <DeliveryPhaseCard
-                        key={order.id}
-                        order={order}
-                        onNavigateToMap={(order) =>
-                          navigate("/delivery/map", {
-                            state: {
-                              selectedOrderId: order.id,
-                              orderDetails: order,
-                            },
-                          })
-                        }
-                        className="theme-animate-fade-in-up"
-                        style={{ animationDelay: `${index * 0.1}s` }}
-                      />
-                    ))}
-                  </div>
-                  <div className="mt-6 text-center">
-                    <Button asChild variant="outline" size="lg">
-                      <Link to="/delivery/map">
-                        <MapPin className="h-4 w-4 mr-2" />
-                        Open Map View
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           {/* Deliveries Tab */}
@@ -854,14 +1101,14 @@ const DeliveryDashboard: React.FC = () => {
                     <div>
                       <div className="flex justify-between mb-2">
                         <span>Earnings</span>
-                        <span>LKR ${totalEarnings.toFixed(2)}/LKR 200</span>
+                        <span>{formatCurrency(totalEarnings)}/LKR 20,000</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-green-600 h-2 rounded-full"
                           style={{
                             width: `${Math.min(
-                              (totalEarnings / 200) * 100,
+                              (totalEarnings / 20000) * 100,
                               100
                             )}%`,
                           }}

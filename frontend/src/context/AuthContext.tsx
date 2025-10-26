@@ -277,18 +277,29 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       // Use userService for comprehensive profile update
       await userService.updateUserProfile(data);
       
-      // Update the user in state with new data
+      // Fetch the fresh profile data from server to ensure we have the latest data
+      const freshProfile = await authService.getProfile();
+      
+      // Update the user in state with fresh data from server
       const updatedUser: User = {
-        ...state.user,
-        name: data.name || state.user.name,
-        phone: data.phone || state.user.phone,
-        address: data.address || state.user.address
+        id: freshProfile.user_id,
+        email: freshProfile.email,
+        name: freshProfile.name,
+        phone: freshProfile.phone_no,
+        role: freshProfile.role,
+        avatar: freshProfile.profile_image,
+        isEmailVerified: freshProfile.email_verified,
+        createdAt: freshProfile.created_at,
+        updatedAt: freshProfile.updated_at,
+        address: freshProfile.address
       };
       
       dispatch({ 
         type: 'SET_USER', 
         payload: { user: updatedUser, token: state.token! } 
       });
+      
+      console.log('Auth context updated with fresh user data:', updatedUser);
     } catch (error) {
       console.error('Profile update failed:', error);
       throw error;

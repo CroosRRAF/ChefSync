@@ -101,16 +101,17 @@ export interface Communication {
 
 export interface CommunicationResponse {
   id: number;
+  communication: number;
   communication_id: number;
   responder: {
     id: number;
     name: string;
   };
-  response: string;
+  message: string;
+  response: string; // Alias for message for backward compatibility
+  is_internal: boolean;
   created_at: string;
   updated_at: string;
-  is_resolution: boolean;
-  metadata?: Record<string, any>;
 }
 
 export interface EmailTemplate {
@@ -118,7 +119,13 @@ export interface EmailTemplate {
   name: string;
   subject: string;
   content: string;
-  template_type: "feedback" | "complaint" | "inquiry" | "general" | "resolution" | "acknowledgment";
+  template_type:
+    | "feedback"
+    | "complaint"
+    | "inquiry"
+    | "general"
+    | "resolution"
+    | "acknowledgment";
   variables: any;
   is_active: boolean;
   created_by: number;
@@ -181,6 +188,113 @@ export interface CommunicationStats {
     inquiry: number;
     other: number;
   };
+}
+
+// New interfaces for unified customer feedback
+export interface DeliveryReview {
+  review_id: number;
+  rating: number;
+  comment: string;
+  delivery: {
+    delivery_id: number;
+    order: {
+      order_id: number;
+      order_number: string;
+    };
+    delivery_agent: {
+      id: number;
+      name: string;
+      email: string;
+    };
+  };
+  customer: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  created_at: string;
+  admin_response?: string;
+  response_date?: string;
+}
+
+export interface FoodReview {
+  review_id: number;
+  rating: number;
+  comment: string;
+  taste_rating?: number;
+  presentation_rating?: number;
+  value_rating?: number;
+  price: {
+    price_id: number;
+    food: {
+      food_id: number;
+      name: string;
+    };
+    cook: {
+      id: number;
+      name: string;
+      email: string;
+    };
+  };
+  customer: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  order?: {
+    order_id: number;
+    order_number: string;
+  };
+  created_at: string;
+  admin_response?: string;
+  response_date?: string;
+}
+
+export interface Contact {
+  contact_id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  subject?: string;
+  message: string;
+  status: "new" | "read" | "replied" | "resolved";
+  user?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  created_at: string;
+  updated_at: string;
+  admin_response?: string;
+  response_date?: string;
+}
+
+export interface CustomerFeedbackStats {
+  total_feedback: number;
+  delivery_reviews: {
+    total: number;
+    average_rating: number;
+    pending_responses: number;
+  };
+  food_reviews: {
+    total: number;
+    average_rating: number;
+    pending_responses: number;
+  };
+  contact_messages: {
+    total: number;
+    new: number;
+    pending: number;
+    resolved: number;
+  };
+  recent_feedback: Array<{
+    type: "delivery" | "food" | "contact";
+    id: number;
+    summary: string;
+    rating?: number;
+    status: string;
+    created_at: string;
+  }>;
 }
 
 class CommunicationService {
@@ -248,9 +362,16 @@ class CommunicationService {
     data: { response: string; is_resolution?: boolean }
   ): Promise<CommunicationResponse> {
     try {
+      // Create response using the direct endpoint
+      const responseData = {
+        communication: communicationId,
+        message: data.response,
+        is_internal: false,
+      };
+
       const response = await apiClient.post(
-        `/communications/communications/${communicationId}/responses/`,
-        data
+        "/communications/responses/",
+        responseData
       );
       toast({
         title: "Success",
@@ -259,6 +380,20 @@ class CommunicationService {
       return response.data;
     } catch (error) {
       return this.handleError(error, "addResponse");
+    }
+  }
+
+  async getCommunicationResponses(
+    communicationId: number
+  ): Promise<CommunicationResponse[]> {
+    try {
+      const response = await apiClient.get(
+        `/communications/responses/?communication=${communicationId}`
+      );
+      return response.data.results || response.data || [];
+    } catch (error) {
+      console.error("Error getting communication responses:", error);
+      return [];
     }
   }
 
@@ -291,7 +426,10 @@ class CommunicationService {
       search?: string;
     } = {}
   ): Promise<PaginatedResponse<Communication>> {
-    return this.getCommunications({ ...params, communication_type: "feedback" });
+    return this.getCommunications({
+      ...params,
+      communication_type: "feedback",
+    });
   }
 
   async getComplaints(
@@ -303,7 +441,10 @@ class CommunicationService {
       search?: string;
     } = {}
   ): Promise<PaginatedResponse<Communication>> {
-    return this.getCommunications({ ...params, communication_type: "complaint" });
+    return this.getCommunications({
+      ...params,
+      communication_type: "complaint",
+    });
   }
 
   // Email Templates
@@ -447,7 +588,10 @@ class CommunicationService {
     data: Omit<SystemAlert, "id" | "created_at" | "updated_at">
   ): Promise<SystemAlert> {
     try {
-      const response = await apiClient.post("/communications/communications/", data);
+      const response = await apiClient.post(
+        "/communications/communications/",
+        data
+      );
       toast({
         title: "Success",
         description: "System alert created successfully",
@@ -463,7 +607,10 @@ class CommunicationService {
     data: Partial<SystemAlert>
   ): Promise<SystemAlert> {
     try {
-      const response = await apiClient.patch(`/communications/communications/${id}/`, data);
+      const response = await apiClient.patch(
+        `/communications/communications/${id}/`,
+        data
+      );
       toast({
         title: "Success",
         description: "System alert updated successfully",
@@ -488,7 +635,9 @@ class CommunicationService {
 
   async sendSystemAlert(id: number): Promise<SystemAlert> {
     try {
-      const response = await apiClient.post(`/communications/communications/${id}/send/`);
+      const response = await apiClient.post(
+        `/communications/communications/${id}/send/`
+      );
       toast({
         title: "Success",
         description: "System alert sent successfully",
@@ -526,7 +675,7 @@ class CommunicationService {
   async getCommunicationStats(): Promise<CommunicationStats> {
     try {
       const response = await apiClient.get(
-        "/api/communications/communications/stats/"
+        "/communications/communications/stats/"
       );
       return response.data;
     } catch (error) {
@@ -538,11 +687,14 @@ class CommunicationService {
     positive: number;
     negative: number;
     neutral: number;
-    trending_topics: Array<string | {
-      topic: string;
-      frequency: number;
-      sentiment: string;
-    }>;
+    trending_topics: Array<
+      | string
+      | {
+          topic: string;
+          frequency: number;
+          sentiment: string;
+        }
+    >;
     overall_sentiment?: {
       positive: number;
       negative: number;
@@ -570,7 +722,7 @@ class CommunicationService {
   }> {
     try {
       const response = await apiClient.get(
-        "/api/communications/communications/sentiment_analysis/",
+        "/communications/communications/sentiment_analysis/",
         {
           params: { period },
         }
@@ -587,9 +739,12 @@ class CommunicationService {
     priority: string
   ): Promise<Communication> {
     try {
-      const response = await apiClient.patch(`/communications/communications/${communicationId}/`, {
-        priority,
-      });
+      const response = await apiClient.patch(
+        `/communications/communications/${communicationId}/`,
+        {
+          priority,
+        }
+      );
       toast({
         title: "Success",
         description: "Priority updated successfully",
@@ -600,7 +755,10 @@ class CommunicationService {
     }
   }
 
-  async bulkUpdateStatus(communicationIds: number[], status: string): Promise<void> {
+  async bulkUpdateStatus(
+    communicationIds: number[],
+    status: string
+  ): Promise<void> {
     try {
       await apiClient.patch("/communications/communications/bulk-update/", {
         ids: communicationIds,
@@ -738,6 +896,219 @@ class CommunicationService {
     } catch (error) {
       console.error("Error in getTags:", error);
       return [];
+    }
+  }
+
+  // Customer Feedback Management Methods
+  async getDeliveryReviews(
+    params: {
+      page?: number;
+      limit?: number;
+      rating?: string;
+      has_response?: boolean;
+      search?: string;
+    } = {}
+  ): Promise<PaginatedResponse<DeliveryReview>> {
+    try {
+      const response = await apiClient.get("/orders/delivery-reviews/", {
+        params,
+      });
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, "getDeliveryReviews");
+    }
+  }
+
+  async getFoodReviews(
+    params: {
+      page?: number;
+      limit?: number;
+      rating?: string;
+      has_response?: boolean;
+      search?: string;
+    } = {}
+  ): Promise<PaginatedResponse<FoodReview>> {
+    try {
+      const response = await apiClient.get("/food/reviews/", {
+        params,
+      });
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, "getFoodReviews");
+    }
+  }
+
+  async getContactMessages(
+    params: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      has_response?: boolean;
+      search?: string;
+    } = {}
+  ): Promise<PaginatedResponse<Contact>> {
+    try {
+      const response = await apiClient.get("/communications/contacts/", {
+        params,
+      });
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, "getContactMessages");
+    }
+  }
+
+  async getCustomerFeedbackStats(): Promise<CustomerFeedbackStats> {
+    try {
+      const response = await apiClient.get(
+        "/communications/customer-feedback-stats/"
+      );
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, "getCustomerFeedbackStats");
+    }
+  }
+
+  // Reply methods for different feedback types
+  async replyToDeliveryReview(
+    reviewId: number,
+    response: string
+  ): Promise<DeliveryReview> {
+    try {
+      const res = await apiClient.post(
+        `/orders/delivery-reviews/${reviewId}/reply/`,
+        {
+          admin_response: response,
+        }
+      );
+      toast({
+        title: "Success",
+        description: "Reply sent to delivery review successfully",
+      });
+      return res.data;
+    } catch (error) {
+      return this.handleError(error, "replyToDeliveryReview");
+    }
+  }
+
+  async replyToFoodReview(
+    reviewId: number,
+    response: string
+  ): Promise<FoodReview> {
+    try {
+      const res = await apiClient.post(`/food/reviews/${reviewId}/reply/`, {
+        admin_response: response,
+      });
+      toast({
+        title: "Success",
+        description: "Reply sent to food review successfully",
+      });
+      return res.data;
+    } catch (error) {
+      return this.handleError(error, "replyToFoodReview");
+    }
+  }
+
+  async replyToContact(contactId: number, response: string): Promise<any> {
+    try {
+      const res = await apiClient.post(
+        `/communications/contacts/${contactId}/reply/`,
+        {
+          admin_response: response,
+        }
+      );
+      toast({
+        title: "Success",
+        description: "Reply sent to contact successfully",
+      });
+      return res.data;
+    } catch (error) {
+      return this.handleError(error, "replyToContact");
+    }
+  }
+
+  async replyToContactMessage(
+    contactId: number,
+    response: string,
+    subject?: string
+  ): Promise<Contact> {
+    try {
+      const res = await apiClient.post(
+        `/communications/contacts/${contactId}/reply/`,
+        {
+          admin_response: response,
+          reply_subject: subject,
+        }
+      );
+      toast({
+        title: "Success",
+        description: "Reply sent to contact message successfully",
+      });
+      return res.data;
+    } catch (error) {
+      return this.handleError(error, "replyToContactMessage");
+    }
+  }
+
+  // Bulk operations for feedback management
+  async bulkReplyToFeedback(
+    feedbackItems: Array<{
+      type: "delivery" | "food" | "contact";
+      id: number;
+      response: string;
+    }>
+  ): Promise<void> {
+    try {
+      await apiClient.post("/communications/bulk-reply-feedback/", {
+        feedback_items: feedbackItems,
+      });
+      toast({
+        title: "Success",
+        description: `${feedbackItems.length} feedback items replied to successfully`,
+      });
+    } catch (error) {
+      return this.handleError(error, "bulkReplyToFeedback");
+    }
+  }
+
+  // Mark feedback as read/resolved
+  async markDeliveryReviewAsRead(reviewId: number): Promise<void> {
+    try {
+      await apiClient.patch(`/orders/delivery-reviews/${reviewId}/`, {
+        is_read: true,
+      });
+    } catch (error) {
+      return this.handleError(error, "markDeliveryReviewAsRead");
+    }
+  }
+
+  async markFoodReviewAsRead(reviewId: number): Promise<void> {
+    try {
+      await apiClient.patch(`/food/reviews/${reviewId}/`, {
+        is_read: true,
+      });
+    } catch (error) {
+      return this.handleError(error, "markFoodReviewAsRead");
+    }
+  }
+
+  async updateContactStatus(
+    contactId: number,
+    status: "new" | "read" | "replied" | "resolved"
+  ): Promise<Contact> {
+    try {
+      const response = await apiClient.patch(
+        `/communications/contacts/${contactId}/`,
+        {
+          status,
+        }
+      );
+      toast({
+        title: "Success",
+        description: "Contact status updated successfully",
+      });
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, "updateContactStatus");
     }
   }
 }

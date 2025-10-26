@@ -19,14 +19,20 @@
     /* Primary - Warm Orange */
     --primary: 27 100% 63%;       /* #FF8C42 */
     --primary-foreground: 0 0% 100%;
+    --primary-light: 27 100% 73%;
+    --primary-dark: 27 100% 53%;
     
     /* Secondary - Deep Blue */
     --secondary: 210 29% 24%;     /* #2C3E50 */
     --secondary-foreground: 0 0% 100%;
+    --secondary-light: 210 29% 34%;
+    --secondary-dark: 210 29% 14%;
     
     /* Accent - Vibrant Green (for CTAs) */
     --accent: 145 58% 49%;        /* #2ECC71 */
     --accent-foreground: 0 0% 100%;
+    --accent-light: 145 58% 59%;
+    --accent-dark: 145 58% 39%;
     
     /* Success - Green (Matches Accent) */
     --success: 145 58% 49%;       /* #2ECC71 */
@@ -73,78 +79,75 @@
     --transition-spring: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     
     --radius: 0.75rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    /* Dark Mode - Professional dark theme with food accent colors */
-    --background: 20 14.3% 4.1%;
-    --foreground: 0 0% 95%;
+    /* Customer-Facing Theme - Dark & Professional */
+    --background: 210 29% 14%;     /* #1A202C */
+    --foreground: 210 40% 98%;        /* #F7FAFC */
     
-    --card: 20 14.3% 7%;
-    --card-foreground: 0 0% 95%;
+    --card: 210 29% 20%;           /* #2D3748 */
+    --card-foreground: 210 40% 98%;
     
-    --popover: 20 14.3% 4.1%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 210 29% 14%;
+    --popover-foreground: 210 40% 98%;
     
-    /* Dark Mode Primary - Softer Orange */
-    --primary: 24 100% 55%;
-    --primary-foreground: 20 14.3% 4.1%;
-    --primary-light: 24 100% 65%;
-    --primary-dark: 24 100% 45%;
+    /* Primary - Warm Orange (slightly desaturated for dark mode) */
+    --primary: 27 90% 60%;        /* #FF8C42 */
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 27 90% 70%;
+    --primary-dark: 27 90% 50%;
     
-    /* Dark Mode Secondary - Muted Green */
-    --secondary: 142 69% 50%;
-    --secondary-foreground: 20 14.3% 4.1%;
-    --secondary-light: 142 69% 60%;
-    --secondary-dark: 142 69% 40%;
+    /* Secondary - Lighter Blue */
+    --secondary: 210 31% 66%;     /* #829AB1 */
+    --secondary-foreground: 210 29% 14%;
+    --secondary-light: 210 31% 76%;
+    --secondary-dark: 210 31% 56%;
     
-    /* Dark Mode Accent - Softer Golden */
-    --accent: 45 100% 70%;
-    --accent-foreground: 20 14.3% 4.1%;
-    --accent-light: 45 100% 80%;
-    --accent-dark: 45 100% 60%;
+    /* Accent - Vibrant Green (slightly desaturated) */
+    --accent: 145 50% 55%;        /* #48BB78 */
+    --accent-foreground: 0 0% 100%;
+    --accent-light: 145 50% 65%;
+    --accent-dark: 145 50% 45%;
     
-    --muted: 20 14.3% 10%;
-    --muted-foreground: 215 20.2% 65.1%;
+    /* Success - Green (Matches Accent) */
+    --success: 145 50% 55%;
+    --success-foreground: 0 0% 100%;
     
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 95%;
+    /* Warning - Amber */
+    --warning: 38 82% 55%;        /* #F59E0B */
+    --warning-foreground: 0 0% 100%;
     
-    --border: 20 14.3% 15%;
-    --input: 20 14.3% 15%;
-    --ring: 24 100% 55%;
+    /* Error/Destructive - Coral Red */
+    --destructive: 0 90% 75%;      /* #FF7B7B */
+    --destructive-foreground: 0 0% 100%;
     
-    --success: 142 69% 50%;
-    --success-foreground: 20 14.3% 4.1%;
+    /* Neutral Colors */
+    --muted: 210 29% 24%;          /* #2C3E50 */
+    --muted-foreground: 210 20% 65%;
     
-    --warning: 38 100% 60%;
-    --warning-foreground: 20 14.3% 4.1%;
+    --border: 210 29% 30%;         /* #4A5568 */
+    --input: 210 29% 30%;
+    --ring: 27 90% 60%;            /* Primary orange for focus rings */
     
-    --info: 217 91% 65%;
-    --info-foreground: 20 14.3% 4.1%;
+    /* Info - Cool Blue */
+    --info: 217 81% 65%;
+    --info-foreground: 0 0% 98%;
     
-    /* Dark Mode Gradients */
+    /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
     --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-light)));
     --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-light)));
-    --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.8), hsl(var(--secondary) / 0.7));
+    --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.8), hsl(var(--destructive) / 0.7));
     --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(var(--muted) / 0.3));
+    
+    /* Shadows - Adapted for Dark Mode */
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.06);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -2px hsl(0 0% 0% / 0.05);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 10px 10px -5px hsl(0 0% 0% / 0.04);
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.2);
+    --shadow-card: 0 4px 12px hsl(var(--primary) / 0.05);
   }
 }
 
@@ -513,6 +516,86 @@
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgb(75, 85, 99);
+}
+
+/* Enhanced Sidebar Animations */
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px hsl(var(--primary) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.6);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply animations */
+.sidebar-item {
+  animation: slideInFromLeft 0.3s ease-out;
+}
+
+.sidebar-item:nth-child(1) { animation-delay: 0.1s; }
+.sidebar-item:nth-child(2) { animation-delay: 0.15s; }
+.sidebar-item:nth-child(3) { animation-delay: 0.2s; }
+.sidebar-item:nth-child(4) { animation-delay: 0.25s; }
+.sidebar-item:nth-child(5) { animation-delay: 0.3s; }
+.sidebar-item:nth-child(6) { animation-delay: 0.35s; }
+
+.active-indicator {
+  animation: pulseGlow 2s infinite;
+}
+
+.quick-action {
+  animation: fadeInUp 0.2s ease-out;
+}
+
+.user-profile {
+  animation: scaleIn 0.3s ease-out;
+}
+
+/* Hover effects */
+.sidebar-nav-item {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-nav-item:hover {
+  transform: translateX(4px);
+}
+
+/* Smooth transitions for collapsible state */
+.sidebar-content {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced tooltip animations */
+.tooltip-content {
+  animation: fadeInUp 0.15s ease-out;
+}
+
+/* Status indicator pulse */
+.status-online {
+  animation: pulseGlow 3s infinite;
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {

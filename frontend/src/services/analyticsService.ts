@@ -1,5 +1,6 @@
 // Analytics service for admin dashboard - enhanced with advanced AI analytics
 import { type DashboardStats } from "./adminService";
+import apiClient from "./apiClient";
 
 // Enhanced types for advanced analytics
 export interface RevenueAnalytics {
@@ -176,6 +177,7 @@ export interface OrderAnalytics {
   completed: number;
   pending: number;
   cancelled: number;
+  revenue: number;  // Total revenue from orders
   trend: number;
   avgOrderValue: number;
   peakHours: Array<{ hour: number; count: number }>;
@@ -991,57 +993,45 @@ class AnalyticsService {
   // Export functionality
   async exportData(format: "csv" | "pdf" | "excel", filters: any = {}) {
     try {
-      const response = await fetch(`${this.baseUrl}/analytics/export/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: JSON.stringify({
+      const response = await apiClient.post(
+        `/analytics/export/`,
+        {
           format,
           filters,
-        }),
+        },
+        {
+          responseType: "blob",
+        }
+      );
+
+      // Convert to Response-like object for compatibility with existing code
+      return new Response(response.data, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: new Headers(response.headers as any),
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return response;
     } catch (error) {
       console.error("Failed to export data:", error);
       // Return mock data for development
-      return {
-        data: "Mock export data",
+      return new Response("Mock export data", {
         status: 200,
         statusText: "OK",
-      };
+      });
     }
   }
 
   // Schedule report functionality
   async scheduleReport(templateId: string, schedule: any) {
     try {
-      const response = await fetch(
-        `${this.baseUrl}/analytics/reports/schedule/`,
+      const response = await apiClient.post(
+        `/analytics/reports/schedule/`,
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-          body: JSON.stringify({
-            templateId,
-            schedule,
-          }),
+          templateId,
+          schedule,
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error("Failed to schedule report:", error);
       return { success: true, message: "Report scheduled successfully" };
@@ -1088,24 +1078,39 @@ class AnalyticsService {
     timeRange: string = "30d"
   ): Promise<AdvancedAnalyticsData> {
     try {
-      const response = await fetch(
-        `${this.baseUrl}/analytics/admin/analytics/dashboard/advanced_analytics/?range=${timeRange}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-        }
-      );
+      const url = `${this.baseUrl}/analytics/admin/analytics/dashboard/advanced_analytics/?range=${timeRange}`;
+      console.log("🔗 Fetching advanced analytics from:", url);
+      
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+      });
+
+      console.log("📡 Advanced analytics response status:", response.status);
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error("❌ Advanced analytics error response:", errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      console.log("✅ Advanced analytics data received successfully:", {
+        hasData: !!data,
+        hasTrends: !!data?.trends,
+        trendCount: data?.trends?.revenue_trends?.length || 0,
+        hasSegmentation: !!data?.segmentation,
+      });
+      return data;
     } catch (error) {
-      console.error("Failed to get advanced analytics:", error);
+      console.error("❌ Failed to get advanced analytics - USING MOCK DATA:", error);
+      console.error("   Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       // Return mock data for development
       return this._getMockAdvancedAnalytics(timeRange);
     }

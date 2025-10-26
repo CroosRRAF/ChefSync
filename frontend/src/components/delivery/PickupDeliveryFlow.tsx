@@ -38,7 +38,8 @@ import {
   updateDeliveryProgress,
   markOrderPickedUp,
   getChefLocation,
-} from "@/services/deliveryService";
+  type UnifiedOrder,
+} from "@/services/service";
 import {
   calculateDistanceHaversine,
   estimateTravelTime,
@@ -47,6 +48,7 @@ import {
 } from "@/utils/mapUtils";
 import type { Order } from "../../types/orderType";
 import IntegratedMapView from "@/components/maps/IntegratedMapView";
+import { formatCurrency } from "@/utils/numberUtils";
 
 interface CookDetails {
   id: number;
@@ -65,9 +67,13 @@ interface CookDetails {
 }
 
 interface PickupDeliveryFlowProps {
-  order: Order;
+  order: UnifiedOrder;
   currentLocation: { lat: number; lng: number } | null;
-  onStatusUpdate: (orderId: number, newStatus: Order["status"]) => void;
+  onStatusUpdate: (
+    orderId: number,
+    newStatus: UnifiedOrder["status"],
+    orderType?: "normal" | "bulk"
+  ) => void;
   onOrderComplete: (orderId: number) => void;
 }
 
@@ -203,15 +209,18 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
 
       // Automatically start navigation to chef's kitchen location
       const pickupLocationValue = getPickupLocation(order);
-      if (pickupLocationValue && pickupLocationValue !== "Location not available") {
+      if (
+        pickupLocationValue &&
+        pickupLocationValue !== "Location not available"
+      ) {
         // Start external navigation to pickup location
         handleGoogleNavigation("pickup");
-        
+
         // Also show integrated navigation dialog for quick reference
         setTimeout(() => {
           setShowNavigationDialog(true);
         }, 1000); // Small delay to allow external navigation to open first
-        
+
         toast({
           title: "Pickup Navigation Started",
           description: `External navigation opened to ${
@@ -246,7 +255,8 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
               lng: currentLocation.lng,
               address: cookDetails?.address,
             }
-          : undefined
+          : undefined,
+        order.order_type_category || "normal"
       );
 
       setTracking((prev) => ({
@@ -254,18 +264,19 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
         pickup: { started: true, completed: true },
       }));
       setCurrentPhase("delivery");
-      onStatusUpdate(order.id, "in_transit");
+      onStatusUpdate(order.id, "in_transit", order.order_type_category);
 
       toast({
         title: "Order Picked Up",
         description: "Order has been collected. Now proceed to delivery.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Pickup completion error:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to update pickup status. Please try again.",
+        title: "Pickup Error",
+        description:
+          error.message || "Failed to update pickup status. Please try again.",
       });
     }
   };
@@ -284,24 +295,26 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
       await updateOrderStatus(
         order.id,
         "in_transit",
-        currentLocation || undefined
+        currentLocation || undefined,
+        order.order_type_category || "normal"
       );
 
       setTracking((prev) => ({
         ...prev,
         delivery: { ...prev.delivery, started: true },
       }));
-      onStatusUpdate(order.id, "in_transit");
+      onStatusUpdate(order.id, "in_transit", order.order_type_category);
 
       toast({
         title: "Delivery Started",
         description: "Navigation to customer has begun.",
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Delivery start error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to start delivery tracking.",
+        description: error.message || "Failed to start delivery tracking.",
       });
     }
   };
@@ -311,25 +324,27 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
       await updateOrderStatus(
         order.id,
         "delivered",
-        currentLocation || undefined
+        currentLocation || undefined,
+        order.order_type_category || "normal"
       );
 
       setTracking((prev) => ({
         ...prev,
         delivery: { started: true, completed: true },
       }));
-      onStatusUpdate(order.id, "delivered");
+      onStatusUpdate(order.id, "delivered", order.order_type_category);
       onOrderComplete(order.id);
 
       toast({
         title: "Delivery Completed",
         description: "Order has been successfully delivered!",
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Delivery completion error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to complete delivery.",
+        description: error.message || "Failed to complete delivery.",
       });
     }
   };
@@ -411,7 +426,9 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
       title = `Chef ${order.chef?.name || "Kitchen"}`;
     } else {
       location = order.delivery_address || "";
-      title = `Customer ${order.customer?.name || "Location"}`;
+      title = `Customer ${
+        order.customer?.name || order.customer_name || "Location"
+      }`;
     }
 
     if (location && location !== "Location not available") {
@@ -511,7 +528,7 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
             <div className="text-right">
               <p className="text-sm text-gray-600">Total Value</p>
               <p className="text-lg font-semibold text-green-600">
-                ${order.total_amount}
+                {formatCurrency(order.total_amount)}
               </p>
             </div>
           </div>
@@ -750,8 +767,16 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h4 className="font-semibold text-lg">
-                    {order.customer?.name || "Customer"}
+                    {order.customer?.name || order.customer_name || "Customer"}
                   </h4>
+                  {order.order_type_category === "bulk" && (
+                    <div className="flex items-center mt-1">
+                      <Package className="h-4 w-4 mr-1 text-blue-600" />
+                      <span className="text-sm text-blue-600 font-medium">
+                        Bulk Order - {order.event_type || "Event"}
+                      </span>
+                    </div>
+                  )}
                   <div className="space-y-2 mt-2">
                     <div className="flex items-center">
                       <Phone className="h-4 w-4 mr-2 text-gray-500" />
@@ -783,6 +808,7 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
                       window.open(`tel:${order.customer.phone}`, "_self");
                     }
                   }}
+                  disabled={!order.customer?.phone}
                 >
                   <Phone className="h-4 w-4" />
                 </Button>
@@ -848,7 +874,9 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
                         <IntegratedMapView
                           location={order.delivery_address}
                           title={`Customer ${
-                            order.customer?.name || "Location"
+                            order.customer?.name ||
+                            order.customer_name ||
+                            "Location"
                           }`}
                           userLocation={currentLocation}
                           onNavigate={() => handleGoogleNavigation("delivery")}
@@ -927,7 +955,10 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
         </Card>
       )}
       {/* Auto-opened Navigation Dialog after pickup tracking starts */}
-      <Dialog open={showNavigationDialog} onOpenChange={setShowNavigationDialog}>
+      <Dialog
+        open={showNavigationDialog}
+        onOpenChange={setShowNavigationDialog}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -938,18 +969,20 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-700">
-                External navigation to <strong>{order.chef?.name || "Chef"}'s kitchen</strong> has been opened. 
-                Use the integrated map below for quick reference or to re-open navigation.
+                External navigation to{" "}
+                <strong>{order.chef?.name || "Chef"}'s kitchen</strong> has been
+                opened. Use the integrated map below for quick reference or to
+                re-open navigation.
               </p>
             </div>
-            
+
             <IntegratedMapView
               location={getPickupLocation(order)}
               title={`Chef ${order.chef?.name || "Kitchen"}`}
               userLocation={currentLocation}
               onNavigate={() => handleGoogleNavigation("pickup")}
             />
-            
+
             <div className="flex gap-2">
               <Button
                 onClick={() => handleGoogleNavigation("pickup")}
@@ -965,10 +998,10 @@ const PickupDeliveryFlow: React.FC<PickupDeliveryFlowProps> = ({
                 </Button>
               )}
             </div>
-            
+
             <div className="text-center">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => setShowNavigationDialog(false)}
               >

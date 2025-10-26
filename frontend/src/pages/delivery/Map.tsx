@@ -26,7 +26,8 @@ import {
   updateDeliveryLocation,
   getRouteDirections,
   optimizeDeliveryRoute,
-} from "@/services/deliveryService";
+  type UnifiedOrder,
+} from "@/services/service";
 import {
   MapPin,
   Navigation,
@@ -45,8 +46,10 @@ import {
 import type { Order } from "../../types/orderType";
 import OrderStatusTracker from "@/components/delivery/OrderStatusTracker";
 import DeliveryTracker from "@/components/delivery/DeliveryTracker";
-import PickupDeliveryFlow from "@/components/delivery/PickupDeliveryFlow";
-import DeliveryPhaseCard from "@/components/delivery/DeliveryPhaseCard";
+import { formatCurrency } from "@/utils/numberUtils";
+
+import SimplifiedDeliveryFlow from "@/components/delivery/SimplifiedDeliveryFlow";
+import DeliveryContacts from "@/components/delivery/DeliveryContacts";
 
 interface Location {
   lat: number;
@@ -69,11 +72,11 @@ const DeliveryMap: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [assignedOrders, setAssignedOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<UnifiedOrder[]>([]);
+  const [assignedOrders, setAssignedOrders] = useState<UnifiedOrder[]>([]);
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<UnifiedOrder | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [loading, setLoading] = useState(false);
   const [routeOptimization, setRouteOptimization] =
@@ -655,40 +658,28 @@ const DeliveryMap: React.FC = () => {
             </DialogHeader>
             {selectedOrder && (
               <div className="space-y-6">
-                {/* Two-Stage Pickup & Delivery Flow */}
-                <PickupDeliveryFlow
+                {/* Simplified Delivery Flow */}
+                <SimplifiedDeliveryFlow
                   order={selectedOrder}
-                  currentLocation={currentLocation}
-                  onStatusUpdate={handleStatusUpdate}
-                  onOrderComplete={handleDeliveryComplete}
+                  onStatusUpdate={(orderId, newStatus) => {
+                    handleStatusUpdate(orderId, newStatus as Order["status"]);
+                    // Refresh orders after status update
+                    fetchAssignedOrders();
+                    fetchOrders();
+                  }}
                 />
-
+                {/* Contact Information */}
+                <DeliveryContacts order={selectedOrder} currentPhase="both" />
                 {/* Order Information */}
                 <Card>
                   <CardContent className="p-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">
-                          Customer
-                        </label>
-                        <p className="font-medium">
-                          {selectedOrder.customer?.name || "Unknown"}
-                        </p>
-                        {selectedOrder.customer?.phone && (
-                          <p className="text-sm text-gray-500">
-                            {selectedOrder.customer.phone}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">
-                          Order Total
-                        </label>
-                        <p className="font-medium text-lg text-green-600">
-                          ${selectedOrder.total_amount}
-                        </p>
-                      </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">
+                        Order Total
+                      </label>
+                      <p className="font-medium text-lg text-green-600">
+                        {formatCurrency(selectedOrder.total_amount)}
+                      </p>
                     </div>
 
                     <div>
@@ -722,7 +713,6 @@ const DeliveryMap: React.FC = () => {
                     </div>
                   </CardContent>
                 </Card>
-
                 {/* Enhanced Navigation Buttons */}
                 <div className="mt-3 space-y-2">
                   <div className="grid grid-cols-2 gap-2">
@@ -825,14 +815,13 @@ const DeliveryMap: React.FC = () => {
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {assignedOrders.map((order, index) => (
-                  <DeliveryPhaseCard
+                  <SimplifiedDeliveryFlow
                     key={order.id}
                     order={order}
-                    onNavigateToMap={(order) => {
-                      setSelectedOrder(order);
-                      setShowOrderDetails(true);
-                      // Scroll to top to see the selected order
-                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    onStatusUpdate={(orderId, newStatus) => {
+                      // Refresh assigned orders after status update
+                      fetchAssignedOrders();
+                      fetchOrders();
                     }}
                     className="transform hover:scale-[1.02] transition-all duration-300"
                     style={{ animationDelay: `${index * 0.1}s` }}
@@ -862,5 +851,3 @@ const DeliveryMap: React.FC = () => {
 };
 
 export default DeliveryMap;
-
-

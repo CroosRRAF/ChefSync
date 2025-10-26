@@ -1,15 +1,20 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { MapPin, Navigation, Search, Plus, Trash2, Edit } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { useCartService, UserAddress } from '@/services/cartService';
-import { toast } from 'sonner';
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { MapPin, Navigation, Search, Plus, Trash2, Edit } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useCartService, UserAddress } from "@/services/cartService";
+import { toast } from "sonner";
 
 interface LocationSelectorProps {
   isOpen: boolean;
@@ -29,32 +34,42 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   isOpen,
   onClose,
   onLocationSelect,
-  selectedAddress
+  selectedAddress,
 }) => {
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentLocation, setCurrentLocation] = useState<LocationState | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentLocation, setCurrentLocation] = useState<LocationState | null>(
+    null
+  );
   const [gettingLocation, setGettingLocation] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
-  
+  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(
+    null
+  );
+
   // Form state for adding/editing addresses
   const [formData, setFormData] = useState({
-    label: '',
-    address_line1: '',
-    address_line2: '',
-    city: '',
-    pincode: '',
+    label: "",
+    address_line1: "",
+    address_line2: "",
+    city: "",
+    pincode: "",
     latitude: 0,
     longitude: 0,
-    is_default: false
+    is_default: false,
   });
 
   const mapRef = useRef<google.maps.Map | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const { loadAddresses, addAddress, updateAddress, deleteAddress, setDefaultAddress } = useCartService();
+  const {
+    loadAddresses,
+    addAddress,
+    updateAddress,
+    deleteAddress,
+    setDefaultAddress,
+  } = useCartService();
 
   useEffect(() => {
     if (isOpen) {
@@ -69,8 +84,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       const userAddresses = await loadAddresses();
       setAddresses(userAddresses);
     } catch (error) {
-      console.error('Error loading addresses:', error);
-      toast.error('Failed to load saved addresses');
+      console.error("Error loading addresses:", error);
+      toast.error("Failed to load saved addresses");
     } finally {
       setLoading(false);
     }
@@ -79,16 +94,18 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const initializeGoogleMaps = () => {
     if (!window.google) {
       // Load Google Maps script if not already loaded
-  const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=places&callback=initMap&loading=async`;
-  script.async = true;
-  script.defer = true;
-      
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${
+        import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+      }&libraries=places&callback=initMap&loading=async`;
+      script.async = true;
+      script.defer = true;
+
       (window as any).initMap = () => {
         initMap();
         initAutocomplete();
       };
-      
+
       document.head.appendChild(script);
     } else {
       initMap();
@@ -99,8 +116,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const initMap = () => {
     // Default to Colombo, Sri Lanka
     const defaultCenter = { lat: 6.9271, lng: 79.8612 };
-    
-    const mapElement = document.getElementById('google-map');
+
+    const mapElement = document.getElementById("google-map");
     if (!mapElement) return;
 
     mapRef.current = new google.maps.Map(mapElement, {
@@ -109,10 +126,11 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
+      mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID,
     });
 
     // Add click listener to map
-    mapRef.current.addListener('click', (event: google.maps.MapMouseEvent) => {
+    mapRef.current.addListener("click", (event: google.maps.MapMouseEvent) => {
       if (event.latLng) {
         const lat = event.latLng.lat();
         const lng = event.latLng.lng();
@@ -124,12 +142,15 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const initAutocomplete = () => {
     if (!searchInputRef.current || !window.google) return;
 
-    autocompleteRef.current = new google.maps.places.Autocomplete(searchInputRef.current, {
-      types: ['address'],
-      componentRestrictions: { country: 'lk' } // Restrict to Sri Lanka
-    });
+    autocompleteRef.current = new google.maps.places.Autocomplete(
+      searchInputRef.current,
+      {
+        types: ["address"],
+        componentRestrictions: { country: "lk" }, // Restrict to Sri Lanka
+      }
+    );
 
-    autocompleteRef.current.addListener('place_changed', handlePlaceSelect);
+    autocompleteRef.current.addListener("place_changed", handlePlaceSelect);
   };
 
   const handlePlaceSelect = () => {
@@ -139,33 +160,33 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     if (place.geometry && place.geometry.location) {
       const lat = place.geometry.location.lat();
       const lng = place.geometry.location.lng();
-      
+
       setCurrentLocation({
         lat,
         lng,
-        address: place.name || '',
-        formatted_address: place.formatted_address || ''
+        address: place.name || "",
+        formatted_address: place.formatted_address || "",
       });
 
       // Update map
       if (mapRef.current) {
         mapRef.current.setCenter({ lat, lng });
         mapRef.current.setZoom(16);
-        
+
         // Add marker
         new google.maps.Marker({
           position: { lat, lng },
           map: mapRef.current,
-          title: 'Selected Location'
+          title: "Selected Location",
         });
       }
 
       // Update form data
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        address_line1: place.formatted_address || '',
+        address_line1: place.formatted_address || "",
         latitude: lat,
-        longitude: lng
+        longitude: lng,
       }));
     }
   };
@@ -174,42 +195,39 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     if (!window.google) return;
 
     const geocoder = new google.maps.Geocoder();
-    geocoder.geocode(
-      { location: { lat, lng } },
-      (results, status) => {
-        if (status === 'OK' && results?.[0]) {
-          const result = results[0];
-          
-          setCurrentLocation({
-            lat,
-            lng,
-            address: result.address_components?.[0]?.long_name || '',
-            formatted_address: result.formatted_address
+    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+      if (status === "OK" && results?.[0]) {
+        const result = results[0];
+
+        setCurrentLocation({
+          lat,
+          lng,
+          address: result.address_components?.[0]?.long_name || "",
+          formatted_address: result.formatted_address,
+        });
+
+        setFormData((prev) => ({
+          ...prev,
+          address_line1: result.formatted_address,
+          latitude: lat,
+          longitude: lng,
+        }));
+
+        // Add marker
+        if (mapRef.current) {
+          new google.maps.Marker({
+            position: { lat, lng },
+            map: mapRef.current,
+            title: "Selected Location",
           });
-
-          setFormData(prev => ({
-            ...prev,
-            address_line1: result.formatted_address,
-            latitude: lat,
-            longitude: lng
-          }));
-
-          // Add marker
-          if (mapRef.current) {
-            new google.maps.Marker({
-              position: { lat, lng },
-              map: mapRef.current,
-              title: 'Selected Location'
-            });
-          }
         }
       }
-    );
+    });
   };
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by this browser');
+      toast.error("Geolocation is not supported by this browser");
       return;
     }
 
@@ -218,17 +236,17 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       (position) => {
         const { latitude, longitude } = position.coords;
         reverseGeocode(latitude, longitude);
-        
+
         if (mapRef.current) {
           mapRef.current.setCenter({ lat: latitude, lng: longitude });
           mapRef.current.setZoom(16);
         }
-        
+
         setGettingLocation(false);
       },
       (error) => {
-        console.error('Error getting location:', error);
-        toast.error('Failed to get current location');
+        console.error("Error getting location:", error);
+        toast.error("Failed to get current location");
         setGettingLocation(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -242,54 +260,54 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   const handleSaveAddress = async () => {
     if (!formData.label || !formData.address_line1) {
-      toast.error('Please fill in required fields');
+      toast.error("Please fill in required fields");
       return;
     }
 
     try {
       if (editingAddress) {
         await updateAddress(editingAddress.id, formData);
-        toast.success('Address updated successfully');
+        toast.success("Address updated successfully");
       } else {
         await addAddress(formData);
-        toast.success('Address added successfully');
+        toast.success("Address added successfully");
       }
-      
+
       await loadUserAddresses();
       setShowAddForm(false);
       setEditingAddress(null);
       setFormData({
-        label: '',
-        address_line1: '',
-        address_line2: '',
-        city: '',
-        pincode: '',
+        label: "",
+        address_line1: "",
+        address_line2: "",
+        city: "",
+        pincode: "",
         latitude: 0,
         longitude: 0,
-        is_default: false
+        is_default: false,
       });
     } catch (error) {
-      toast.error('Failed to save address');
+      toast.error("Failed to save address");
     }
   };
 
   const handleDeleteAddress = async (addressId: number) => {
     try {
       await deleteAddress(addressId);
-      toast.success('Address deleted');
+      toast.success("Address deleted");
       await loadUserAddresses();
     } catch (error) {
-      toast.error('Failed to delete address');
+      toast.error("Failed to delete address");
     }
   };
 
   const handleSetDefault = async (addressId: number) => {
     try {
       await setDefaultAddress(addressId);
-      toast.success('Default address updated');
+      toast.success("Default address updated");
       await loadUserAddresses();
     } catch (error) {
-      toast.error('Failed to update default address');
+      toast.error("Failed to update default address");
     }
   };
 
@@ -316,14 +334,14 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                   setShowAddForm(true);
                   setEditingAddress(null);
                   setFormData({
-                    label: '',
-                    address_line1: '',
-                    address_line2: '',
-                    city: '',
-                    pincode: '',
+                    label: "",
+                    address_line1: "",
+                    address_line2: "",
+                    city: "",
+                    pincode: "",
                     latitude: 0,
                     longitude: 0,
-                    is_default: false
+                    is_default: false,
                   });
                 }}
               >
@@ -337,22 +355,26 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                 {loading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-orange-500 border-t-transparent mx-auto" />
-                    <p className="text-sm text-gray-500 mt-2">Loading addresses...</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Loading addresses...
+                    </p>
                   </div>
                 ) : addresses.length === 0 ? (
                   <Card className="p-6 text-center">
                     <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                     <p className="text-gray-500 mb-2">No saved addresses</p>
-                    <p className="text-sm text-gray-400">Add your first delivery address</p>
+                    <p className="text-sm text-gray-400">
+                      Add your first delivery address
+                    </p>
                   </Card>
                 ) : (
                   addresses.map((address) => (
-                    <Card 
-                      key={address.id} 
+                    <Card
+                      key={address.id}
                       className={`cursor-pointer transition-colors ${
-                        selectedAddress?.id === address.id 
-                          ? 'ring-2 ring-orange-500 bg-orange-50' 
-                          : 'hover:bg-gray-50'
+                        selectedAddress?.id === address.id
+                          ? "ring-2 ring-orange-500 bg-orange-50"
+                          : "hover:bg-gray-50"
                       }`}
                       onClick={() => handleAddressSelect(address)}
                     >
@@ -379,7 +401,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                               {address.city}, {address.pincode}
                             </p>
                           </div>
-                          
+
                           <div className="flex items-center gap-1">
                             <Button
                               size="sm"
@@ -390,12 +412,12 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                                 setFormData({
                                   label: address.label,
                                   address_line1: address.address_line1,
-                                  address_line2: address.address_line2 || '',
+                                  address_line2: address.address_line2 || "",
                                   city: address.city,
                                   pincode: address.pincode,
                                   latitude: Number(address.latitude) || 0,
                                   longitude: Number(address.longitude) || 0,
-                                  is_default: address.is_default
+                                  is_default: address.is_default,
                                 });
                                 setShowAddForm(true);
                               }}
@@ -447,7 +469,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                   )}
                 </Button>
               </div>
-              
+
               {currentLocation && (
                 <Card className="p-3 bg-blue-50 border-blue-200">
                   <p className="text-sm font-medium text-blue-900">
@@ -461,8 +483,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
             </div>
 
             {/* Google Map */}
-            <div 
-              id="google-map" 
+            <div
+              id="google-map"
               className="w-full h-[400px] bg-gray-200 rounded-lg"
             />
 
@@ -470,11 +492,11 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
             {currentLocation && (
               <Button
                 onClick={() => {
-                  setFormData(prev => ({
+                  setFormData((prev) => ({
                     ...prev,
                     address_line1: currentLocation.formatted_address,
                     latitude: currentLocation.lat,
-                    longitude: currentLocation.lng
+                    longitude: currentLocation.lng,
                   }));
                   setShowAddForm(true);
                 }}
@@ -493,7 +515,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>
-                  {editingAddress ? 'Edit Address' : 'Add New Address'}
+                  {editingAddress ? "Edit Address" : "Add New Address"}
                 </DialogTitle>
               </DialogHeader>
 
@@ -504,7 +526,12 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                     id="label"
                     placeholder="e.g. Home, Work, Office"
                     value={formData.label}
-                    onChange={(e) => setFormData(prev => ({ ...prev, label: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        label: e.target.value,
+                      }))
+                    }
                   />
                 </div>
 
@@ -514,7 +541,12 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                     id="address_line1"
                     placeholder="Street address"
                     value={formData.address_line1}
-                    onChange={(e) => setFormData(prev => ({ ...prev, address_line1: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        address_line1: e.target.value,
+                      }))
+                    }
                   />
                 </div>
 
@@ -524,7 +556,12 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                     id="address_line2"
                     placeholder="Apartment, suite, etc. (optional)"
                     value={formData.address_line2}
-                    onChange={(e) => setFormData(prev => ({ ...prev, address_line2: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        address_line2: e.target.value,
+                      }))
+                    }
                   />
                 </div>
 
@@ -535,7 +572,12 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                       id="city"
                       placeholder="City"
                       value={formData.city}
-                      onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          city: e.target.value,
+                        }))
+                      }
                     />
                   </div>
                   <div>
@@ -544,7 +586,12 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                       id="pincode"
                       placeholder="Postal code"
                       value={formData.pincode}
-                      onChange={(e) => setFormData(prev => ({ ...prev, pincode: e.target.value }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          pincode: e.target.value,
+                        }))
+                      }
                     />
                   </div>
                 </div>
@@ -560,7 +607,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                     onClick={handleSaveAddress}
                     className="bg-orange-500 hover:bg-orange-600"
                   >
-                    {editingAddress ? 'Update' : 'Save'} Address
+                    {editingAddress ? "Update" : "Save"} Address
                   </Button>
                 </div>
               </div>

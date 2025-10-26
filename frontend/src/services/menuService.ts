@@ -150,6 +150,12 @@ export interface CartItem {
   updated_at: string;
   discount?: number; // Optional discount percentage
   isVeg?: boolean; // Optional vegetarian indicator
+  price_id: number; // Price ID for order creation
+  kitchen_location?: { // Kitchen location for delivery calculations
+    lat: number;
+    lng: number;
+    address?: string;
+  };
 }
 
 export interface CartSummary {
@@ -197,7 +203,7 @@ export const menuService = {
     if (lat !== undefined) params.append('lat', lat.toString());
     if (lng !== undefined) params.append('lng', lng.toString());
 
-    const response = await apiClient.get(`/api/food/customer/foods/${foodId}/?${params}`);
+    const response = await apiClient.get(`/food/customer/foods/${foodId}/?${params}`);
     return response.data;
   },
 

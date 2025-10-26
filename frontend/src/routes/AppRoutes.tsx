@@ -8,6 +8,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 // Layout components
 import CustomerDashboardLayout from "@/components/layout/CustomerDashboardLayout";
 import CustomerHomeNavbar from "@/components/layout/CustomerHomeNavbar";
+import CustomerPageWrapper from "@/components/layout/CustomerPageWrapper";
 import Navbar from "@/components/layout/Navbar";
 // New unified admin layout
 import AdminLayout from "@/components/admin/layout/AdminLayout";
@@ -20,6 +21,7 @@ import DeliveryAddressTest from "@/pages/DeliveryAddressTest";
 import Home from "@/pages/Home";
 import MenuPage from "@/pages/MenuPage";
 import NotFound from "@/pages/NotFound";
+import SetupPage from "@/pages/SetupPage";
 
 // Authentication pages
 import ApprovalStatusPage from "@/pages/auth/ApprovalStatus";
@@ -35,9 +37,14 @@ import VerifyEmail from "@/pages/auth/VerifyEmail";
 import CustomerCart from "@/pages/customer/Cart";
 import CustomerDashboard from "@/pages/customer/Dashboard";
 import CustomerOrders from "@/pages/customer/Orders";
+import CustomerOrdersNew from "@/pages/customer/OrdersNew";
 import CustomerProfile from "@/pages/customer/Profile";
 import CustomerSettings from "@/pages/customer/Settings";
-import CustomerBulkOrderDashboard from "@/components/customer/CustomerBulkOrderDashboard";
+import CustomerNotifications from "@/pages/customer/Notifications";
+import OrderReview from "@/pages/customer/OrderReview";
+import OrderReviewPage from "@/pages/customer/OrderReviewPage";
+import OrderDetail from "@/pages/customer/OrderDetail";
+import BulkOrderDetail from "@/pages/customer/BulkOrderDetail";
 import ChefProfilePage from "@/pages/ChefProfilePage";
 
 import AllOrders from "@/pages/delivery/AllOrders";
@@ -64,6 +71,7 @@ const AnalyticsHub = React.lazy(() => import("@/pages/admin/AnalyticsHub"));
 const UserManagementHub = React.lazy(() => import("@/pages/admin/UserManagementHub"));
 const OrderManagementHub = React.lazy(() => import("@/pages/admin/OrderManagementHub"));
 const ContentManagementHub = React.lazy(() => import("@/pages/admin/ContentManagementHub"));
+const ContentApprovalPage = React.lazy(() => import("@/pages/admin/ContentApprovalPage"));
 const CommunicationCenter = React.lazy(() => import("@/pages/admin/CommunicationCenter"));
 const PaymentManagementHub = React.lazy(() => import("@/pages/admin/PaymentManagementHub"));
 const SystemHub = React.lazy(() => import("@/pages/admin/SystemHub"));
@@ -229,7 +237,7 @@ const InnerRoutes: React.FC = () => {
               user.role.toLowerCase() !== "customer" ? (
               <Navigate to={getDefaultRoute()} replace />
             ) : (
-              <>
+              <CustomerPageWrapper>
                 {isAuthenticated &&
                   user &&
                   user.role.toLowerCase() === "customer" ? (
@@ -238,58 +246,64 @@ const InnerRoutes: React.FC = () => {
                   <Navbar />
                 )}
                 <Home />
-              </>
+              </CustomerPageWrapper>
             )
           }
         />
         <Route
           path="/menu"
           element={
-            <>
+            <CustomerPageWrapper>
               {isAuthenticated && user && user.role === "customer" ? (
                 <CustomerHomeNavbar />
               ) : (
                 <Navbar />
               )}
               <MenuPage />
-            </>
+            </CustomerPageWrapper>
           }
         />
         <Route
           path="/chef-profile/:cookId"
-          element={<ChefProfilePage />}
+          element={
+            <CustomerPageWrapper>
+              <ChefProfilePage />
+            </CustomerPageWrapper>
+          }
         />
         <Route
           path="/about"
           element={
-            <>
+            <CustomerPageWrapper>
               {isAuthenticated && user && user.role === "customer" ? (
                 <CustomerHomeNavbar />
               ) : (
                 <Navbar />
               )}
               <About />
-            </>
+            </CustomerPageWrapper>
           }
         />
         <Route
           path="/contact"
           element={
-            <>
+            <CustomerPageWrapper>
               {isAuthenticated && user && user.role === "customer" ? (
                 <CustomerHomeNavbar />
               ) : (
                 <Navbar />
               )}
               <Contact />
-            </>
+            </CustomerPageWrapper>
           }
         />
         <Route
           path="/checkout"
           element={
             <ProtectedRoute allowedRoles={["customer"]}>
-              <CheckoutPage />
+              <CustomerPageWrapper>
+                <CheckoutPage />
+              </CustomerPageWrapper>
             </ProtectedRoute>
           }
         />
@@ -301,6 +315,12 @@ const InnerRoutes: React.FC = () => {
               <DeliveryAddressTest />
             </>
           }
+        />
+        
+        {/* Setup Page - Public route for API configuration */}
+        <Route
+          path="/setup"
+          element={<SetupPage />}
         />
 
         {/* Authentication Routes */}
@@ -425,21 +445,51 @@ const InnerRoutes: React.FC = () => {
           }
         />
         <Route
-          path="/customer/bulk-orders"
+          path="/customer/orders"
           element={
             <ProtectedRoute allowedRoles={["customer"]}>
               <CustomerDashboardLayout>
-                <CustomerBulkOrderDashboard />
+                <CustomerOrdersNew />
               </CustomerDashboardLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/customer/orders"
+          path="/customer/orders/:orderId"
           element={
             <ProtectedRoute allowedRoles={["customer"]}>
               <CustomerDashboardLayout>
-                <CustomerOrders />
+                <OrderDetail />
+              </CustomerDashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customer/orders/:orderId/review"
+          element={
+            <ProtectedRoute allowedRoles={["customer"]}>
+              <CustomerDashboardLayout>
+                <OrderReviewPage />
+              </CustomerDashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customer/bulk-orders/:bulkOrderId"
+          element={
+            <ProtectedRoute allowedRoles={["customer"]}>
+              <CustomerDashboardLayout>
+                <BulkOrderDetail />
+              </CustomerDashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customer/notifications"
+          element={
+            <ProtectedRoute allowedRoles={["customer"]}>
+              <CustomerDashboardLayout>
+                <CustomerNotifications />
               </CustomerDashboardLayout>
             </ProtectedRoute>
           }
@@ -684,6 +734,18 @@ const InnerRoutes: React.FC = () => {
               <AdminLayout>
                 <Suspense fallback={<LazyLoadingFallback />}>
                   <ContentManagementHub />
+                </Suspense>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/content-approval"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout>
+                <Suspense fallback={<LazyLoadingFallback />}>
+                  <ContentApprovalPage />
                 </Suspense>
               </AdminLayout>
             </ProtectedRoute>

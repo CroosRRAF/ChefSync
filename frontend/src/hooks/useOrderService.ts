@@ -1,20 +1,28 @@
 import { useState, useCallback } from 'react';
-import { orderService, CreateOrderData, OrderResponse } from '@/services/orderService';
+import { orderService, CreateOrderData, OrderResponse, IncomeResponse } from '@/services/orderService';
 import { toast } from 'sonner';
 
 export interface ChefDashboardStats {
   total_orders: number;
   total_revenue: number;
   pending_orders: number;
-  completed_orders: number;
+  completed_orders: number; // Maps to orders_completed from backend
+  orders_completed: number; // Direct from backend
+  orders_active: number; // Direct from backend
+  today_revenue: number; // Direct from backend
   average_rating: number;
   recent_orders: any[];
+  bulk_orders?: number;
+  total_reviews?: number;
+  monthly_orders?: number;
+  customer_satisfaction?: number;
 }
 
 export const useOrderService = () => {
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState<OrderResponse[]>([]);
   const [dashboardStats, setDashboardStats] = useState<ChefDashboardStats | null>(null);
+  const [incomeData, setIncomeData] = useState<IncomeResponse | null>(null);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -146,13 +154,30 @@ export const useOrderService = () => {
     }
   }, []);
 
+  const loadIncomeData = useCallback(async (period: string = '7days') => {
+    setLoading(true);
+    try {
+      const incomeResponse = await orderService.getChefIncomeData(period);
+      setIncomeData(incomeResponse);
+      return incomeResponse;
+    } catch (error) {
+      console.error('Error loading income data:', error);
+      toast.error('Failed to load income data');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     loading,
     orders,
     dashboardStats,
+    incomeData,
     loadOrders,
     loadDashboardStats,
     loadOrderDetails,
+    loadIncomeData,
     createOrder,
     cancelOrder,
     getOrderStatus,
@@ -166,6 +191,15 @@ export const useOrderService = () => {
     declineBulkOrder: orderService.declineBulkOrder.bind(orderService),
     requestCollaboration: orderService.requestCollaboration.bind(orderService),
     loadAvailableChefs: orderService.loadAvailableChefs.bind(orderService),
+  // Collaboration requests
+  loadIncomingCollaborationRequests: orderService.loadIncomingCollaborationRequests.bind(orderService),
+  acceptCollaborationRequest: orderService.acceptCollaborationRequest.bind(orderService),
+  rejectCollaborationRequest: orderService.rejectCollaborationRequest.bind(orderService),
+  deleteCollaborationRequest: orderService.deleteCollaborationRequest.bind(orderService),
+  loadOutgoingCollaborationRequests: orderService.loadOutgoingCollaborationRequests.bind(orderService),
+  // Bulk order workflow
+  updateBulkOrderStatus: orderService.updateBulkOrderStatus.bind(orderService),
+  assignDeliveryToBulkOrder: orderService.assignDeliveryToBulkOrder.bind(orderService),
     // Direct service methods - bind to preserve 'this' context
     calculateDeliveryFee: orderService.calculateDeliveryFee.bind(orderService),
     calculateTax: orderService.calculateTax.bind(orderService),

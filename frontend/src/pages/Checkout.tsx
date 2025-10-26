@@ -19,6 +19,8 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import GoogleMapsAddressPicker from '@/components/checkout/GoogleMapsAddressPicker';
+import DeliveryFeeBreakdown from '@/components/checkout/DeliveryFeeBreakdown';
+import { DeliveryAddress, addressService } from '@/services/addressService';
 import { 
   ArrowLeft,
   CreditCard,
@@ -34,13 +36,17 @@ import {
   LayoutDashboard,
   AlertCircle,
   Navigation,
-  Edit2
+  Edit2,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CartItem } from '@/services/menuService';
 import { orderService } from '@/services/orderService';
 import { paymentService } from '@/services/paymentService';
 import { getFoodPlaceholder } from '@/utils/placeholderUtils';
+import { CheckoutCalculation, CartService } from '@/services/cartService';
+import { validateSriLankanPhone } from '@/utils/phoneValidation';
+import PhoneInput from '@/components/ui/phone-input';
 
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
@@ -59,7 +65,8 @@ const Checkout: React.FC = () => {
     instructions: ''
   });
 
-  const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [selectedAddress, setSelectedAddress] = useState<DeliveryAddress | null>(null);
+  const [existingAddresses, setExistingAddresses] = useState<DeliveryAddress[]>([]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [orderNotes, setOrderNotes] = useState('');
   
@@ -73,6 +80,10 @@ const Checkout: React.FC = () => {
   });
   const [savePaymentMethod, setSavePaymentMethod] = useState(false);
   const [availablePaymentMethods, setAvailablePaymentMethods] = useState<any[]>([]);
+  
+  // Checkout calculation states
+  const [checkoutCalculation, setCheckoutCalculation] = useState<CheckoutCalculation | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   // Redirect if not authenticated or no cart items
   useEffect(() => {
@@ -97,7 +108,7 @@ const Checkout: React.FC = () => {
         // Set default methods if API fails
         setAvailablePaymentMethods([
           { id: 'cash', name: 'Cash on Delivery', type: 'cash', enabled: true },
-          { id: 'card', name: 'Credit/Debit Card', type: 'card', enabled: true },
+          { id: 'card', name: 'Credit/Debit Card', type: 'card', enabled: false }, // Coming soon
           { id: 'online', name: 'Online Payment', type: 'online', enabled: false }
         ]);
       }
@@ -108,15 +119,79 @@ const Checkout: React.FC = () => {
     }
   }, [isAuthenticated]);
 
+  // Load addresses
+  useEffect(() => {
+    const loadAddresses = async () => {
+      try {
+        const addresses = await addressService.getAddresses();
+        setExistingAddresses(addresses || []);
+        if (addresses && addresses.length > 0) {
+          const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
+          setSelectedAddress(defaultAddress);
+        }
+      } catch (error) {
+        console.error('Error loading addresses:', error);
+        setExistingAddresses([]);
+      }
+    };
+
+    if (isAuthenticated) {
+      loadAddresses();
+    }
+  }, [isAuthenticated]);
+
   const cart = cartSummary?.cart_items || [];
   
   const subtotal = cart.reduce((sum, item) => {
     return sum + (parseFloat((item.unit_price || 0).toString()) * item.quantity);
   }, 0);
 
-  const deliveryFee = subtotal > 300 ? 0 : 40;
-  const taxAmount = subtotal * 0.10; // 10% tax
-  const total = subtotal + deliveryFee + taxAmount;
+  // Use calculated values from backend or fallback to basic calculation
+  const deliveryFee = checkoutCalculation?.delivery_fee || 50;
+  const taxAmount = checkoutCalculation?.tax_amount || (subtotal * 0.10);
+  const total = checkoutCalculation?.total_amount || (subtotal + deliveryFee + taxAmount);
+  
+  // Calculate checkout when address changes
+  const calculateCheckout = async () => {
+    if (!selectedAddress || cart.length === 0) return;
+    
+    setIsCalculating(true);
+    try {
+      // Get chef location from first cart item (assuming all items from same chef)
+      const firstItem = cart[0];
+      const chefLocation = firstItem?.kitchen_location;
+      
+      const calculation = await CartService.calculateCheckout(
+        cart.map(item => ({
+          price_id: item.price_id,
+          quantity: item.quantity
+        })),
+        selectedAddress.id,
+        {
+          order_type: 'regular', // Can be changed based on order type
+          delivery_latitude: selectedAddress.latitude,
+          delivery_longitude: selectedAddress.longitude,
+          chef_latitude: chefLocation?.lat,
+          chef_longitude: chefLocation?.lng,
+        }
+      );
+      
+      setCheckoutCalculation(calculation);
+      console.log('Checkout calculation:', calculation);
+    } catch (error) {
+      console.error('Failed to calculate checkout:', error);
+      toast.error('Failed to calculate delivery fee. Using default values.');
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+  
+  // Recalculate when address changes
+  useEffect(() => {
+    if (selectedAddress && cart.length > 0) {
+      calculateCheckout();
+    }
+  }, [selectedAddress?.id, cart.length]);
 
   const handleInputChange = (field: string, value: string) => {
     setDeliveryInfo(prev => ({
@@ -165,23 +240,98 @@ const Checkout: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
+    // Comprehensive validation before placing order
+    
+    // 1. Check if cart is not empty
+    if (!cart || cart.length === 0) {
+      toast.error('Your cart is empty. Please add items before placing an order.');
+      navigate('/menu');
+      return;
+    }
+
+    // 2. Validate delivery address
     if (!selectedAddress) {
-      toast.error('Please select a delivery address');
+      toast.error('Please select a delivery address before placing your order.');
+      setCurrentStep(1); // Go back to delivery step
       return;
     }
 
-    if (!deliveryInfo.phone) {
-      toast.error('Please provide a phone number');
+    // 3. Validate phone number
+    if (!deliveryInfo.phone || deliveryInfo.phone.trim() === '') {
+      toast.error('Please provide a valid phone number for delivery contact.');
+      setCurrentStep(1); // Go back to delivery step
       return;
     }
 
-    // Validate card details if card payment is selected
+    // 4. Validate Sri Lankan phone number format
+    const phoneValidation = validateSriLankanPhone(deliveryInfo.phone);
+    if (!phoneValidation.isValid) {
+      toast.error(phoneValidation.error || 'Please provide a valid Sri Lankan phone number (e.g., +94 77 123 4567 or 0771234567)');
+      setCurrentStep(1);
+      return;
+    }
+
+    // 5. Validate payment method is selected
+    if (!paymentMethod) {
+      toast.error('Please select a payment method.');
+      setCurrentStep(2); // Go back to payment step
+      return;
+    }
+
+    // 6. Validate card details if card payment is selected
     if (paymentMethod === 'card') {
+      if (!cardDetails.cardNumber || cardDetails.cardNumber.trim() === '') {
+        toast.error('Please enter your card number');
+        setCurrentStep(2);
+        return;
+      }
+      
+      if (!cardDetails.cardHolder || cardDetails.cardHolder.trim() === '') {
+        toast.error('Please enter the cardholder name');
+        setCurrentStep(2);
+        return;
+      }
+      
+      if (!cardDetails.expiryMonth || !cardDetails.expiryYear) {
+        toast.error('Please enter the card expiry date');
+        setCurrentStep(2);
+        return;
+      }
+      
+      if (!cardDetails.cvv || cardDetails.cvv.trim() === '') {
+        toast.error('Please enter the CVV code');
+        setCurrentStep(2);
+        return;
+      }
+
       const validation = validateCardDetails();
       if (!validation.isValid) {
         toast.error(`Payment validation failed: ${validation.errors.join(', ')}`);
+        setCurrentStep(2);
         return;
       }
+    }
+
+    // 7. Validate cart items have valid data
+    const invalidItems = cart.filter(item => !item.price_id || item.quantity <= 0);
+    if (invalidItems.length > 0) {
+      toast.error('Some cart items are invalid. Please refresh your cart and try again.');
+      await refreshCart();
+      return;
+    }
+
+    // 8. Check minimum order amount (if applicable)
+    if (subtotal < 100) {
+      toast.error('Minimum order amount is LKR 100. Please add more items.');
+      navigate('/menu');
+      return;
+    }
+
+    // 9. Confirm user authentication
+    if (!isAuthenticated || !user) {
+      toast.error('Please log in to place an order.');
+      navigate('/auth/login');
+      return;
     }
 
     setIsProcessing(true);
@@ -212,7 +362,7 @@ const Checkout: React.FC = () => {
       if (paymentMethod !== 'cash') {
         try {
           const paymentData = {
-            order_id: order.id,
+            order_id: order.id || order.order_id,
             payment_method: paymentMethod,
             amount: total.toString(),
             save_payment_method: savePaymentMethod,
@@ -393,17 +543,13 @@ const Checkout: React.FC = () => {
                   </div>
 
                   {/* Phone Number */}
-                  <div>
-                    <Label htmlFor="phone">Phone Number *</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+94 XX XXX XXXX"
-                      value={deliveryInfo.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
+                  <PhoneInput
+                    value={deliveryInfo.phone}
+                    onChange={(value) => handleInputChange('phone', value)}
+                    label="Phone Number (Sri Lanka)"
+                    required={true}
+                    showValidation={true}
+                  />
 
                   {/* Delivery Instructions */}
                   <div>
@@ -733,7 +879,16 @@ const Checkout: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Delivery Fee</span>
-                    <span>{deliveryFee === 0 ? 'Free' : `LKR ${deliveryFee.toFixed(2)}`}</span>
+                    <span className={isCalculating ? 'text-muted-foreground' : ''}>
+                      {isCalculating ? (
+                        <span className="flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Calculating...
+                        </span>
+                      ) : (
+                        deliveryFee === 0 ? 'Free' : `LKR ${deliveryFee.toFixed(2)}`
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Taxes & Fees</span>
@@ -745,6 +900,13 @@ const Checkout: React.FC = () => {
                     <span className="text-orange-600">LKR {total.toFixed(2)}</span>
                   </div>
                 </div>
+                
+                {/* Delivery Fee Breakdown - Show detailed breakdown when available */}
+                {checkoutCalculation?.delivery_fee_breakdown && (
+                  <div className="mt-4">
+                    <DeliveryFeeBreakdown breakdown={checkoutCalculation.delivery_fee_breakdown} />
+                  </div>
+                )}
 
                 {/* Security Notice */}
                 <div className="flex items-center gap-2 mt-4 text-sm text-gray-500">
@@ -761,12 +923,20 @@ const Checkout: React.FC = () => {
       <GoogleMapsAddressPicker
         isOpen={showAddressPicker}
         onClose={() => setShowAddressPicker(false)}
-        onAddressSelect={(address) => {
+        onAddressSaved={async (address) => {
           setSelectedAddress(address);
           setShowAddressPicker(false);
           toast.success(`Selected ${address.label} address`);
+          // Refresh addresses list
+          try {
+            const addresses = await addressService.getAddresses();
+            setExistingAddresses(addresses || []);
+          } catch (error) {
+            console.error('Error refreshing addresses:', error);
+          }
         }}
-        selectedAddress={selectedAddress}
+        editingAddress={null}
+        existingAddresses={existingAddresses}
       />
     </div>
   );

@@ -25,7 +25,7 @@ import {
   startDeliveryTracking,
   updateDeliveryProgress,
   completeDelivery,
-} from "@/services/deliveryService";
+} from "@/services/service";
 import type { Order } from "../../types/orderType";
 
 interface DeliveryTrackerProps {

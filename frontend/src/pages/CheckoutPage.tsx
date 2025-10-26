@@ -4,6 +4,7 @@ import { useDatabaseCart, DatabaseCartItem } from '../context/DatabaseCartContex
 import { useAuth } from '../context/AuthContext';
 import { addressService, DeliveryAddress } from '../services/addressService';
 import { orderService } from '../services/orderService';
+import { CartService } from '../services/cartService';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -27,7 +28,10 @@ import {
   Edit2,
   ChefHat,
   Package,
-  AlertCircle
+  AlertCircle,
+  Trash2,
+  Moon,
+  CloudRain
 } from 'lucide-react';
 import GoogleMapsAddressPicker from '../components/checkout/GoogleMapsAddressPicker';
 
@@ -50,13 +54,17 @@ const CheckoutPage: React.FC = () => {
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isAddressPickerOpen, setIsAddressPickerOpen] = useState(false);
+  const [isLoadingDefaultAddress, setIsLoadingDefaultAddress] = useState(true);
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash_on_delivery');
+  const [deliveryFeeBreakdown, setDeliveryFeeBreakdown] = useState<any>(null);
+  const [isCalculatingFee, setIsCalculatingFee] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState(30);
   const [chefId, setChefId] = useState<number | null>(null);
+  const [editingAddress, setEditingAddress] = useState<DeliveryAddress | null>(null);
 
   // Get chefId from router state
   useEffect(() => {
@@ -107,27 +115,31 @@ const CheckoutPage: React.FC = () => {
     }
   }, [chefItems, cartLoading, navigate, chefId]);
 
-  // Load addresses
+  // Load addresses on mount
   useEffect(() => {
     const loadAddresses = async () => {
-      if (orderMode !== 'delivery') return;
+      if (orderMode !== 'delivery') {
+        setIsLoadingDefaultAddress(false);
+        return;
+      }
 
       try {
+        setIsLoadingDefaultAddress(true);
         setIsLoadingAddresses(true);
+        
+        // Load all addresses
         const fetchedAddresses = await addressService.getAddresses();
         setAddresses(fetchedAddresses);
-
-        // Set default address
-        const defaultAddr = fetchedAddresses.find(addr => addr.is_default);
+        
+        // Set default or first address
+        const defaultAddr = fetchedAddresses.find(addr => addr.is_default) || fetchedAddresses[0] || null;
         if (defaultAddr) {
           setSelectedAddress(defaultAddr);
-        } else if (fetchedAddresses.length > 0) {
-          setSelectedAddress(fetchedAddresses[0]);
         }
       } catch (error) {
         console.error('Error loading addresses:', error);
-        toast.error('Failed to load addresses');
       } finally {
+        setIsLoadingDefaultAddress(false);
         setIsLoadingAddresses(false);
       }
     };
@@ -147,39 +159,77 @@ const CheckoutPage: React.FC = () => {
         
         // Cart items always have kitchen_location from backend
         if (firstItem.kitchen_location && firstItem.kitchen_location.lat && firstItem.kitchen_location.lng) {
-          // Calculate distance using kitchen location from cart item
-          calculatedDistance = addressService.calculateDistance(
-            Number(selectedAddress.latitude),
-            Number(selectedAddress.longitude),
-            Number(firstItem.kitchen_location.lat),
-            Number(firstItem.kitchen_location.lng)
-          );
+          setIsCalculatingFee(true);
           
-          // Delivery fee calculation: LKR 50 base + LKR 15 per km after 5km
-          const baseFee = 50;
-          const freeDistanceKm = 5;
-          const perKmFee = 15;
-          
-          if (calculatedDistance > freeDistanceKm) {
-            const extraKm = Math.ceil(calculatedDistance - freeDistanceKm);
-            calculatedDeliveryFee = baseFee + (extraKm * perKmFee);
-          } else {
-            calculatedDeliveryFee = baseFee;
+          try {
+            // Call backend API for accurate delivery fee with surcharges
+            const calculation = await CartService.calculateCheckout(
+              chefItems.map(item => ({
+                price_id: item.price_id,
+                quantity: item.quantity
+              })),
+              selectedAddress.id,
+              {
+                order_type: 'regular',
+                delivery_latitude: selectedAddress.latitude,
+                delivery_longitude: selectedAddress.longitude,
+                chef_latitude: firstItem.kitchen_location.lat,
+                chef_longitude: firstItem.kitchen_location.lng,
+              }
+            );
+
+            // Use API response
+            calculatedDeliveryFee = calculation.delivery_fee;
+            calculatedDistance = calculation.delivery_fee_breakdown?.factors?.distance_km || 0;
+            setDeliveryFeeBreakdown(calculation.delivery_fee_breakdown);
+
+            // Estimate delivery time: 10 min base + 5 min per km
+            const estimatedTime = Math.ceil(10 + (calculatedDistance * 5));
+            setEstimatedDeliveryTime(estimatedTime);
+
+            console.log('✅ Delivery Fee Calculation Success (API)!', {
+              '📍 From (Chef Kitchen)': `(${firstItem.kitchen_location.lat}, ${firstItem.kitchen_location.lng})`,
+              '📍 To (Customer)': `(${selectedAddress.latitude}, ${selectedAddress.longitude})`,
+              '📏 Distance': calculatedDistance.toFixed(2) + ' km',
+              '💳 Total Delivery Fee': 'LKR ' + calculatedDeliveryFee.toFixed(2),
+              '⏱️ Estimated Time': estimatedTime + ' minutes',
+              '🌙 Night Surcharge': 'LKR ' + (calculation.delivery_fee_breakdown?.breakdown?.time_surcharge || 0),
+              '🌧️ Weather Surcharge': 'LKR ' + (calculation.delivery_fee_breakdown?.breakdown?.weather_surcharge || 0),
+            });
+
+          } catch (error) {
+            console.error('❌ API call failed, using fallback calculation:', error);
+            
+            // Fallback to local calculation
+            calculatedDistance = addressService.calculateDistance(
+              Number(selectedAddress.latitude),
+              Number(selectedAddress.longitude),
+              Number(firstItem.kitchen_location.lat),
+              Number(firstItem.kitchen_location.lng)
+            );
+            
+            // Delivery fee calculation: Regular Order Formula
+            const baseFee = 50;
+            const freeDistanceKm = 5;
+            const perKmFee = 15; // 30% of base = 50 × 0.30
+            
+            if (calculatedDistance > freeDistanceKm) {
+              const extraKm = calculatedDistance - freeDistanceKm;
+              calculatedDeliveryFee = baseFee + (extraKm * perKmFee);
+            } else {
+              calculatedDeliveryFee = baseFee;
+            }
+
+            const estimatedTime = Math.ceil(10 + (calculatedDistance * 5));
+            setEstimatedDeliveryTime(estimatedTime);
+            
+            console.log('⚠️ Delivery Fee Calculation (Fallback):', {
+              '📏 Distance': calculatedDistance.toFixed(2) + ' km',
+              '💳 Total Delivery Fee': 'LKR ' + calculatedDeliveryFee.toFixed(2),
+            });
+          } finally {
+            setIsCalculatingFee(false);
           }
-
-          // Estimate delivery time: 10 min base + 5 min per km
-          const estimatedTime = Math.ceil(10 + (calculatedDistance * 5));
-          setEstimatedDeliveryTime(estimatedTime);
-
-          console.log('✅ Delivery Fee Calculation Success!', {
-            '📍 From (Chef Kitchen)': `(${firstItem.kitchen_location.lat}, ${firstItem.kitchen_location.lng})`,
-            '📍 To (Customer)': `(${selectedAddress.latitude}, ${selectedAddress.longitude})`,
-            '📏 Distance': calculatedDistance.toFixed(2) + ' km',
-            '💰 Base Fee': 'LKR ' + baseFee,
-            '➕ Extra Distance': calculatedDistance > freeDistanceKm ? Math.ceil(calculatedDistance - freeDistanceKm) + ' km' : '0 km (FREE)',
-            '💳 Total Delivery Fee': 'LKR ' + calculatedDeliveryFee.toFixed(2),
-            '⏱️ Estimated Time': estimatedTime + ' minutes'
-          });
         } else {
           console.error('❌ Kitchen location not available in cart item:', firstItem);
           toast.error('Unable to calculate delivery fee - kitchen location not available');
@@ -209,46 +259,144 @@ const CheckoutPage: React.FC = () => {
     }
   }, [user]);
 
-  // Handle address picker
-  const handleAddressSelect = (address: DeliveryAddress) => {
+  // Handle address picker - for new/edited addresses
+  const handleAddressSaved = async (address: DeliveryAddress) => {
+    // Refresh addresses list
+    const fetchedAddresses = await addressService.getAddresses();
+    setAddresses(fetchedAddresses);
+    
+    // Select the new/updated address
     setSelectedAddress(address);
     setIsAddressPickerOpen(false);
-    // Refresh addresses list
-    loadAddresses();
+    setEditingAddress(null);
+    
+    toast.success(`Address ${editingAddress ? 'updated' : 'added'} successfully`, {
+      description: `${address.label} - ${address.city}, ${address.pincode}`
+    });
   };
 
-  const loadAddresses = async () => {
+  // Handle address selection from list
+  const handleAddressSelect = (address: DeliveryAddress) => {
+    setSelectedAddress(address);
+  };
+
+  // Handle delete address
+  const handleDeleteAddress = async (addressId: number) => {
     try {
-      const fetchedAddresses = await addressService.getAddresses();
-      setAddresses(fetchedAddresses);
+      await addressService.deleteAddress(addressId);
+      const updatedAddresses = addresses.filter(addr => addr.id !== addressId);
+      setAddresses(updatedAddresses);
+      
+      // If deleted address was selected, select another one
+      if (selectedAddress?.id === addressId) {
+        setSelectedAddress(updatedAddresses[0] || null);
+      }
+      
+      toast.success('Address deleted');
     } catch (error) {
-      console.error('Error loading addresses:', error);
+      console.error('Error deleting address:', error);
+      toast.error('Failed to delete address');
+    }
+  };
+
+  // Handle set default address
+  const handleSetDefault = async (addressId: number) => {
+    try {
+      await addressService.setDefaultAddress(addressId);
+      const updatedAddresses = addresses.map(addr => ({
+        ...addr,
+        is_default: addr.id === addressId
+      }));
+      setAddresses(updatedAddresses);
+      toast.success('Default address updated');
+    } catch (error) {
+      console.error('Error setting default:', error);
+      toast.error('Failed to set default address');
     }
   };
 
   // Handle order placement
   const handlePlaceOrder = async () => {
+    // Comprehensive validation before placing order
+    
+    // 1. Check if cart is not empty
+    if (!chefId || chefItems.length === 0 || items.length === 0) {
+      toast.error('Your cart is empty. Please add items before placing an order.');
+      navigate('/menu');
+      return;
+    }
+
+    // 2. Check authentication
+    if (!isAuthenticated || !user) {
+      toast.error('Please log in to place an order.');
+      navigate('/auth/login');
+      return;
+    }
+
+    // 3. Validate delivery address for delivery orders
     if (orderMode === 'delivery' && !selectedAddress) {
-      toast.error('Please select a delivery address');
+      toast.error('Please select a delivery address before placing your order.');
       return;
     }
-    if (!chefId || chefItems.length === 0) {
-      toast.error('No items in cart');
+
+    // 4. Validate delivery address details for delivery orders
+    if (orderMode === 'delivery' && selectedAddress) {
+      if (!selectedAddress.address_line1 || selectedAddress.address_line1.trim() === '') {
+        toast.error('Delivery address is incomplete. Please select a valid address.');
+        return;
+      }
+      
+      if (!selectedAddress.city || selectedAddress.city.trim() === '') {
+        toast.error('City is required in delivery address.');
+        return;
+      }
+    }
+
+    // 5. Validate phone number
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      toast.error('Please provide a valid phone number for order contact.');
       return;
     }
-    if (!phoneNumber) {
-      toast.error('Please enter your phone number');
+
+    // 6. Validate Sri Lankan phone number format
+    const { validateSriLankanPhone } = await import('@/utils/phoneValidation');
+    const phoneValidation = validateSriLankanPhone(phoneNumber);
+    if (!phoneValidation.isValid) {
+      toast.error(phoneValidation.error || 'Please provide a valid Sri Lankan phone number (e.g., +94 77 123 4567 or 0771234567)');
+      return;
+    }
+
+    // 7. Validate payment method is selected
+    if (!paymentMethod) {
+      toast.error('Please select a payment method.');
+      return;
+    }
+
+    // 8. Validate cart items have valid price_id and quantity
+    const invalidItems = items.filter(item => !item.price_id || item.quantity <= 0);
+    if (invalidItems.length > 0) {
+      toast.error('Some cart items are invalid. Please refresh your cart and try again.');
+      await refreshCart();
+      return;
+    }
+
+    // 9. Check minimum order amount
+    if (subtotal < 100) {
+      toast.error('Minimum order amount is LKR 100. Please add more items.');
+      navigate('/menu');
+      return;
+    }
+
+    // 10. Validate that all items belong to the same chef
+    const firstChefId = items[0]?.chef_id;
+    const hasMixedChefs = items.some(item => item.chef_id !== firstChefId);
+    if (hasMixedChefs) {
+      toast.error('Your cart contains items from multiple chefs. Please order from one chef at a time.');
       return;
     }
 
     try {
       setIsPlacingOrder(true);
-
-      // For delivery orders, address is required
-      if (orderMode === 'delivery' && !selectedAddress) {
-        toast.error('Please select a delivery address');
-        return;
-      }
 
       let orderData;
 
@@ -405,52 +553,125 @@ const CheckoutPage: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">
-                  {isLoadingAddresses ? (
+                  {isLoadingDefaultAddress || isLoadingAddresses ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-2 border-orange-500 border-t-transparent mx-auto mb-2" />
                       <p className="text-sm text-gray-500 dark:text-gray-400">Loading addresses...</p>
                     </div>
-                  ) : selectedAddress ? (
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-5 rounded-xl border-2 border-green-200 dark:border-green-700">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <MapPin className="w-5 h-5 text-green-600" />
-                            <h4 className="font-bold text-green-900 dark:text-green-100">{selectedAddress.label}</h4>
-                            {selectedAddress.is_default && (
-                              <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100 text-xs">Default</Badge>
-                            )}
-                          </div>
-                          <p className="text-gray-700 dark:text-gray-300 mb-1">{selectedAddress.address_line1}</p>
-                          {selectedAddress.address_line2 && (
-                            <p className="text-gray-600 dark:text-gray-400 text-sm">{selectedAddress.address_line2}</p>
-                          )}
-                          <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                            {selectedAddress.city}, {selectedAddress.pincode}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => setIsAddressPickerOpen(true)}
-                          variant="outline"
-                          size="sm"
-                          className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/30"
-                        >
-                          <Edit2 className="w-4 h-4 mr-1" />
-                          Change
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600">
-                      <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-700 dark:text-gray-300 font-medium mb-2">No delivery address selected</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Please add a delivery address to continue</p>
+                  ) : addresses.length === 0 ? (
+                    <div className="text-center py-8 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-xl border-2 border-dashed border-orange-300 dark:border-orange-700">
+                      <MapPin className="w-16 h-16 text-orange-400 mx-auto mb-4" />
+                      <p className="text-gray-700 dark:text-gray-300 font-medium mb-2">No delivery addresses yet</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Add your first delivery address to continue
+                      </p>
                       <Button
-                        onClick={() => setIsAddressPickerOpen(true)}
-                        className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                        onClick={() => {
+                          setEditingAddress(null);
+                          setIsAddressPickerOpen(true);
+                        }}
+                        className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-lg"
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Add Delivery Address
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Saved Addresses List */}
+                      <div className="space-y-3">
+                        {addresses.map((address) => (
+                          <Card
+                            key={address.id}
+                            className={`cursor-pointer transition-all ${
+                              selectedAddress?.id === address.id
+                                ? 'ring-2 ring-orange-500 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 shadow-md'
+                                : 'hover:bg-gray-50 dark:hover:bg-gray-800 hover:shadow-md'
+                            }`}
+                            onClick={() => handleAddressSelect(address)}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <MapPin className={`w-4 h-4 ${selectedAddress?.id === address.id ? 'text-orange-600' : 'text-gray-500'}`} />
+                                    <h4 className="font-semibold text-gray-900 dark:text-white">{address.label}</h4>
+                                    {address.is_default && (
+                                      <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100 text-xs">Default</Badge>
+                                    )}
+                                    {selectedAddress?.id === address.id && (
+                                      <Badge className="bg-orange-500 text-white text-xs">Selected</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-gray-700 dark:text-gray-300 text-sm mb-1">{address.address_line1}</p>
+                                  {address.address_line2 && (
+                                    <p className="text-gray-600 dark:text-gray-400 text-xs mb-1">{address.address_line2}</p>
+                                  )}
+                                  <p className="text-gray-500 dark:text-gray-500 text-xs">
+                                    {address.city}, {address.pincode}
+                                  </p>
+                                </div>
+                                
+                                <div className="flex items-center gap-1 ml-4">
+                                  {!address.is_default && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSetDefault(address.id);
+                                      }}
+                                      title="Set as default"
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingAddress(address);
+                                      setIsAddressPickerOpen(true);
+                                    }}
+                                    title="Edit address"
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm('Are you sure you want to delete this address?')) {
+                                        handleDeleteAddress(address.id);
+                                      }
+                                    }}
+                                    title="Delete address"
+                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+
+                      {/* Add New Address Button */}
+                      <Button
+                        onClick={() => {
+                          setEditingAddress(null);
+                          setIsAddressPickerOpen(true);
+                        }}
+                        variant="outline"
+                        className="w-full border-2 border-dashed border-orange-300 text-orange-600 hover:bg-orange-50 hover:border-orange-400 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add New Address
                       </Button>
                     </div>
                   )}
@@ -472,12 +693,36 @@ const CheckoutPage: React.FC = () => {
                           <p className="font-bold text-blue-900 dark:text-blue-100">~{estimatedDeliveryTime} min</p>
                         </div>
                       </div>
-                      <div className="text-xs text-blue-700 dark:text-blue-300 text-center pt-3 border-t border-blue-200 dark:border-blue-700">
-                        <p>💡 LKR 50 base fee + LKR 15 per km after first 5km</p>
-                        {distance > 5 && (
-                          <p className="mt-1 font-medium">
-                            (LKR 50 + {Math.ceil(distance - 5)} km × LKR 15 = LKR {deliveryFee.toFixed(2)})
-                          </p>
+                      <div className="text-xs text-blue-700 dark:text-blue-300 text-center pt-3 border-t border-blue-200 dark:border-blue-700 space-y-2">
+                        {/* Show breakdown if available from API */}
+                        {deliveryFeeBreakdown ? (
+                          <>
+                            <p>💡 Base: LKR {deliveryFeeBreakdown.breakdown.distance_fee.toFixed(2)}</p>
+                            {deliveryFeeBreakdown.breakdown.time_surcharge > 0 && (
+                              <p className="flex items-center justify-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                                <Moon className="h-3 w-3" />
+                                Night Surcharge (+10%): +LKR {deliveryFeeBreakdown.breakdown.time_surcharge.toFixed(2)}
+                              </p>
+                            )}
+                            {deliveryFeeBreakdown.breakdown.weather_surcharge > 0 && (
+                              <p className="flex items-center justify-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                                <CloudRain className="h-3 w-3" />
+                                Rain Surcharge (+10%): +LKR {deliveryFeeBreakdown.breakdown.weather_surcharge.toFixed(2)}
+                              </p>
+                            )}
+                            <p className="font-bold text-blue-900 dark:text-blue-100">
+                              Total: LKR {deliveryFee.toFixed(2)}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p>💡 LKR 50 base fee + LKR 15 per km after first 5km</p>
+                            {distance > 5 && (
+                              <p className="mt-1 font-medium">
+                                (LKR 50 + {(distance - 5).toFixed(2)} km × LKR 15 = LKR {deliveryFee.toFixed(2)})
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -582,21 +827,19 @@ const CheckoutPage: React.FC = () => {
                     </div>
 
                     <div 
-                      className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
-                        paymentMethod === 'card' 
-                          ? 'border-orange-500 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20' 
-                          : 'border-gray-300 dark:border-gray-600 hover:border-orange-300 dark:hover:border-orange-500'
-                      }`}
-                      onClick={() => setPaymentMethod('card')}
+                      className="border-2 rounded-xl p-4 cursor-not-allowed transition-all bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-800 opacity-60"
                     >
                       <div className="flex items-center gap-3">
-                        <RadioGroupItem value="card" id="card" />
-                        <Label htmlFor="card" className="flex items-center gap-3 cursor-pointer flex-1">
-                          <CreditCard className="w-5 h-5 text-blue-600" />
-                          <div>
-                            <p className="font-semibold text-gray-900 dark:text-white">Online Payment</p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">Pay securely with card</p>
+                        <RadioGroupItem value="card" id="card" disabled />
+                        <Label htmlFor="card" className="flex items-center gap-3 flex-1 opacity-60">
+                          <CreditCard className="w-5 h-5 text-gray-400" />
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-500 dark:text-gray-600">Online Payment</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">Pay securely with card</p>
                           </div>
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                            Coming Soon
+                          </Badge>
                         </Label>
                       </div>
                     </div>
@@ -740,12 +983,16 @@ const CheckoutPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Address Picker Modal */}
+      {/* Address Picker Modal - Only for Add/Edit */}
       <GoogleMapsAddressPicker
         isOpen={isAddressPickerOpen}
-        onClose={() => setIsAddressPickerOpen(false)}
-        onAddressSelect={handleAddressSelect}
-        selectedAddress={selectedAddress}
+        onClose={() => {
+          setIsAddressPickerOpen(false);
+          setEditingAddress(null);
+        }}
+        onAddressSaved={handleAddressSaved}
+        editingAddress={editingAddress}
+        existingAddresses={addresses}
       />
     </div>
   );

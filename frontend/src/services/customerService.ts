@@ -1,4 +1,4 @@
-import apiClient from './apiClient';
+import apiClient from "./apiClient";
 
 // Types
 export interface CustomerProfile {
@@ -62,6 +62,19 @@ export interface OrderItem {
   food_image: string | null;
   size: string;
   cook_name: string;
+  price_details?: {
+    price_id: number;
+    price: number;
+    size: string;
+    food_name: string;
+    food_description: string;
+    food_category: string;
+    food_image: string | null;
+  };
+  price?: {
+    id: number;
+    price_id?: number;
+  };
 }
 
 export interface CustomerStats {
@@ -78,101 +91,134 @@ export interface CustomerStats {
 export const customerService = {
   // Get customer profile
   getProfile: async (): Promise<CustomerProfile> => {
-  const response = await apiClient.get('/auth/profile/');
+    const response = await apiClient.get("/auth/profile/");
     return response.data;
   },
 
   // Update customer profile
-  updateProfile: async (data: Partial<CustomerProfile>): Promise<CustomerProfile> => {
-  const response = await apiClient.patch('/auth/profile/update/', data);
+  updateProfile: async (
+    data: Partial<CustomerProfile>
+  ): Promise<CustomerProfile> => {
+    const response = await apiClient.patch("/auth/profile/update/", data);
     return response.data;
   },
 
   // Get customer orders
-  getOrders: async (params: {
-    status?: string;
-    page?: number;
-    page_size?: number;
-    ordering?: string;
-  } = {}): Promise<{ results: Order[]; count: number; next: string | null; previous: string | null }> => {
+  getOrders: async (
+    params: {
+      status?: string;
+      page?: number;
+      page_size?: number;
+      ordering?: string;
+    } = {}
+  ): Promise<{
+    results: Order[];
+    count: number;
+    next: string | null;
+    previous: string | null;
+  }> => {
     const searchParams = new URLSearchParams();
-    
+
     Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value !== undefined && value !== null && value !== "") {
         searchParams.append(key, value.toString());
       }
     });
 
-    const response = await apiClient.get(`/api/orders/orders/?${searchParams}`);
+    const response = await apiClient.get(`/orders/orders/?${searchParams}`);
     return response.data;
   },
 
   // Get specific order details
   getOrder: async (orderId: number): Promise<Order> => {
-    const response = await apiClient.get(`/api/orders/orders/${orderId}/`);
+    const response = await apiClient.get(`/orders/orders/${orderId}/`);
     return response.data;
   },
 
-  // Get customer statistics
+  // Get customer stats
   getCustomerStats: async (): Promise<CustomerStats> => {
-    try {
-      // Get orders for statistics
-      const ordersResponse = await apiClient.get('/orders/orders/');
-      const orders = ordersResponse.data.results || ordersResponse.data;
-
-      const totalOrders = orders.length;
-      const completedOrders = orders.filter((order: Order) => order.status === 'delivered').length;
-      const pendingOrders = orders.filter((order: Order) => 
-        ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
-      ).length;
-      
-      const totalSpent = orders.reduce((sum: number, order: Order) => sum + (order.total_amount || 0), 0);
-      const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
-
-      // Get recent orders (last 5)
-      const recentOrders = orders
-        .sort((a: Order, b: Order) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 5);
-
-      // Extract favorite cuisines from orders (simplified)
-      const favoriteCuisines = ['Italian', 'Chinese', 'Indian', 'Mexican', 'Thai'];
-
-      return {
-        total_orders: totalOrders,
-        completed_orders: completedOrders,
-        pending_orders: pendingOrders,
-        total_spent: totalSpent,
-        average_order_value: averageOrderValue,
-        favorite_cuisines: favoriteCuisines,
-        recent_orders: recentOrders
-      };
-    } catch (error) {
-      console.error('Error fetching customer stats:', error);
-      return {
-        total_orders: 0,
-        completed_orders: 0,
-        pending_orders: 0,
-        total_spent: 0,
-        average_order_value: 0,
-        favorite_cuisines: [],
-        recent_orders: []
-      };
-    }
+    const response = await apiClient.get<CustomerStats>(
+      "/orders/customer/stats/"
+    );
+    return response.data;
   },
 
   // Cancel order
   cancelOrder: async (orderId: number, reason?: string): Promise<void> => {
-    await apiClient.patch(`/api/orders/orders/${orderId}/`, {
-      status: 'cancelled',
-      customer_notes: reason || 'Order cancelled by customer'
+    await apiClient.patch(`/orders/orders/${orderId}/`, {
+      status: "cancelled",
+      customer_notes: reason || "Order cancelled by customer",
     });
   },
 
   // Get order status history
   getOrderHistory: async (orderId: number): Promise<any[]> => {
-    const response = await apiClient.get(`/api/orders/order-history/?order=${orderId}`);
+    const response = await apiClient.get(
+      `/orders/order-history/?order=${orderId}`
+    );
     return response.data.results || response.data;
-  }
+  },
+
+  // Get customer orders
+  getCustomerOrders: async (): Promise<Order[]> => {
+    const response = await apiClient.get<Order[]>("/orders/customer/orders/");
+    return response.data;
+  },
+
+  // Upload profile image
+  uploadProfileImage: async (
+    imageFile: File
+  ): Promise<{ image_url: string; public_id: string }> => {
+    // Validate file before upload
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+    if (imageFile.size > maxSizeBytes) {
+      throw new Error("Image size must be less than 10MB");
+    }
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(imageFile.type)) {
+      throw new Error("Only JPEG, PNG, and WebP images are allowed");
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onloadend = async () => {
+        try {
+          const base64Image = reader.result as string;
+
+          // Make upload request with timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+          const response = await apiClient.post(
+            "/auth/profile/upload-image/",
+            { image: base64Image },
+            { signal: controller.signal }
+          );
+
+          clearTimeout(timeoutId);
+          resolve(response.data);
+        } catch (error: any) {
+          if (error.name === "AbortError") {
+            reject(new Error("Upload timeout - please try again"));
+          } else if (error.response?.status === 413) {
+            reject(new Error("Image size too large"));
+          } else if (error.response?.status === 503) {
+            reject(new Error("Storage service unavailable - please try again"));
+          } else {
+            reject(error);
+          }
+        }
+      };
+
+      reader.onerror = () => {
+        reject(new Error("Failed to read image file"));
+      };
+
+      reader.readAsDataURL(imageFile);
+    });
+  },
 };
 
 export default customerService;

@@ -1,4 +1,25 @@
-import apiClient from './apiClient';
+import axios from 'axios';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add auth token to requests
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 export interface Notification {
   notification_id: number;
@@ -7,143 +28,134 @@ export interface Notification {
   time: string;
   status: 'Read' | 'Unread';
   user: number;
-  user_name: string;
-  time_ago: string;
-  is_unread: boolean;
+  user_name?: string;
+  time_ago?: string;
+  is_unread?: boolean;
+  // Parsed metadata for order notifications
+  order_id?: number;
+  order_number?: string;
 }
 
 export interface NotificationResponse {
   results: Notification[];
   count: number;
-  unread_count: number;
+  unread_count?: number;
 }
 
 class NotificationService {
-  private baseUrl = '/communications/notifications';
-
   /**
    * Get all notifications for the current user
    */
-  async getNotifications(): Promise<Notification[]> {
-    const response = await apiClient.get<NotificationResponse>(`${this.baseUrl}/`);
-    return response.data.results || [];
+  async getNotifications(limit: number = 50): Promise<NotificationResponse> {
+    try {
+      const response = await apiClient.get('/communications/notifications/', {
+        params: { page_size: limit }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      return { results: [], count: 0, unread_count: 0 };
+    }
   }
 
   /**
    * Get recent notifications (last 20)
    */
   async getRecentNotifications(): Promise<NotificationResponse> {
-    const response = await apiClient.get<NotificationResponse>(`${this.baseUrl}/recent/`);
-    return response.data;
+    try {
+      const response = await apiClient.get('/communications/notifications/recent/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching recent notifications:', error);
+      return { results: [], count: 0, unread_count: 0 };
+    }
   }
 
   /**
    * Get count of unread notifications
    */
   async getUnreadCount(): Promise<number> {
-    const response = await apiClient.get<{ count: number }>(`${this.baseUrl}/unread_count/`);
-    return response.data.count;
+    try {
+      const response = await apiClient.get('/communications/notifications/unread_count/');
+      return response.data.count || 0;
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      return 0;
+    }
   }
 
   /**
-   * Mark a notification as read
+   * Mark a single notification as read
    */
-  async markAsRead(notificationId: number): Promise<void> {
-    await apiClient.post(`${this.baseUrl}/${notificationId}/mark_read/`);
+  async markAsRead(notificationId: number): Promise<boolean> {
+    try {
+      await apiClient.post(`/communications/notifications/${notificationId}/mark_read/`);
+      return true;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      return false;
+    }
   }
 
   /**
    * Mark all notifications as read
    */
-  async markAllAsRead(): Promise<{ message: string; count: number }> {
-    const response = await apiClient.post<{ message: string; count: number }>(
-      `${this.baseUrl}/mark_all_read/`
-    );
-    return response.data;
+  async markAllAsRead(): Promise<boolean> {
+    try {
+      await apiClient.post('/communications/notifications/mark_all_read/');
+      return true;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      return false;
+    }
   }
 
   /**
    * Clear all notifications
    */
-  async clearAll(): Promise<{ message: string; count: number }> {
-    const response = await apiClient.delete<{ message: string; count: number }>(
-      `${this.baseUrl}/clear_all/`
-    );
-    return response.data;
-  }
-
-  /**
-   * Extract order number from notification message
-   */
-  extractOrderNumber(notification: Notification): string | null {
-    const match = notification.subject.match(/#([A-Z0-9-]+)/);
-    return match ? match[1] : null;
-  }
-
-  /**
-   * Determine notification type from subject
-   */
-  getNotificationType(notification: Notification): 'placed' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled' | 'rejected' | 'general' {
-    const subject = notification.subject.toLowerCase();
-    if (subject.includes('placed')) return 'placed';
-    if (subject.includes('confirmed')) return 'confirmed';
-    if (subject.includes('preparing')) return 'preparing';
-    if (subject.includes('ready')) return 'ready';
-    if (subject.includes('delivered')) return 'delivered';
-    if (subject.includes('cancelled')) return 'cancelled';
-    if (subject.includes('rejected') || subject.includes('not accepted')) return 'rejected';
-    return 'general';
-  }
-
-  /**
-   * Get notification color based on type
-   */
-  getNotificationColor(notification: Notification): string {
-    const type = this.getNotificationType(notification);
-    switch (type) {
-      case 'placed':
-        return 'text-yellow-600';
-      case 'confirmed':
-        return 'text-green-600';
-      case 'preparing':
-        return 'text-blue-600';
-      case 'ready':
-        return 'text-orange-600';
-      case 'delivered':
-        return 'text-green-700';
-      case 'cancelled':
-      case 'rejected':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
+  async clearAll(): Promise<boolean> {
+    try {
+      await apiClient.delete('/communications/notifications/clear_all/');
+      return true;
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+      return false;
     }
   }
 
   /**
-   * Get notification icon based on type
+   * Delete a single notification by id
    */
-  getNotificationIcon(notification: Notification): string {
-    const type = this.getNotificationType(notification);
-    switch (type) {
-      case 'placed':
-        return '📝';
-      case 'confirmed':
-        return '✅';
-      case 'preparing':
-        return '👨‍🍳';
-      case 'ready':
-        return '📦';
-      case 'delivered':
-        return '🎉';
-      case 'cancelled':
-      case 'rejected':
-        return '❌';
-      default:
-        return '🔔';
+  async deleteNotification(notificationId: number): Promise<boolean> {
+    try {
+      // The backend exposes the ModelViewSet destroy action at the detail endpoint
+      await apiClient.delete(`/communications/notifications/${notificationId}/`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      return false;
     }
+  }
+
+  /**
+   * Parse notification to extract order information
+   */
+  parseNotification(notification: Notification): Notification {
+    // Try to extract order ID and number from the message
+    const orderNumberMatch = notification.message.match(/#(\w+-\d+)/);
+    const orderIdMatch = notification.subject.match(/order[:\s]+(\d+)/i);
+    
+    if (orderNumberMatch) {
+      notification.order_number = orderNumberMatch[1];
+    }
+    
+    if (orderIdMatch) {
+      notification.order_id = parseInt(orderIdMatch[1]);
+    }
+    
+    return notification;
   }
 }
 
 export const notificationService = new NotificationService();
 export default notificationService;
-

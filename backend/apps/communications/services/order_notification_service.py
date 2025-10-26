@@ -26,35 +26,35 @@ class OrderNotificationService:
         notification_messages = {
             'placed': {
                 'subject': f'Order #{order.order_number} Placed Successfully',
-                'message': f'Your order has been placed and is waiting for chef approval. Order total: ₹{order.total_amount}'
+                'message': f'Your order #{order.order_number} (ID: {order.id}) has been placed and is waiting for chef approval. Order total: ₹{order.total_amount}. Click to track your order.'
             },
             'confirmed': {
                 'subject': f'Order #{order.order_number} Confirmed',
-                'message': f'Great news! Your order has been confirmed by the chef and will be prepared soon.'
+                'message': f'Great news! Your order #{order.order_number} (ID: {order.id}) has been confirmed by the chef and will be prepared soon. Click to track.'
             },
             'preparing': {
                 'subject': f'Order #{order.order_number} is Being Prepared',
-                'message': f'Your order is now being prepared by the chef. It will be ready soon!'
+                'message': f'Your order #{order.order_number} (ID: {order.id}) is now being prepared by the chef. It will be ready soon! Click to track.'
             },
             'ready': {
                 'subject': f'Order #{order.order_number} is Ready',
-                'message': f'Your order is ready for pickup/delivery!'
+                'message': f'Your order #{order.order_number} (ID: {order.id}) is ready for pickup/delivery! Click to view details.'
             },
             'out_for_delivery': {
                 'subject': f'Order #{order.order_number} is Out for Delivery',
-                'message': f'Your order is on its way! Track your delivery in real-time.'
+                'message': f'Your order #{order.order_number} (ID: {order.id}) is on its way! Click to track your delivery in real-time.'
             },
             'delivered': {
                 'subject': f'Order #{order.order_number} Delivered',
-                'message': f'Your order has been delivered. Enjoy your meal!'
+                'message': f'Your order #{order.order_number} (ID: {order.id}) has been delivered. Enjoy your meal! Click to leave a review.'
             },
             'cancelled': {
                 'subject': f'Order #{order.order_number} Cancelled',
-                'message': f'Your order has been cancelled. Refund will be processed within 3-5 business days.'
+                'message': f'Your order #{order.order_number} (ID: {order.id}) has been cancelled. Refund will be processed within 3-5 business days.'
             },
             'rejected': {
                 'subject': f'Order #{order.order_number} Not Accepted',
-                'message': f'Unfortunately, the chef couldn not accept your order. Please try ordering from another chef.'
+                'message': f'Unfortunately, the chef could not accept your order #{order.order_number} (ID: {order.id}). Please try ordering from another chef.'
             },
         }
 
@@ -96,7 +96,7 @@ class OrderNotificationService:
         notification = Notification.objects.create(
             user=order.chef,
             subject=f'New Order Received: #{order.order_number}',
-            message=f'You have received a new order from {order.customer.name or order.customer.username}. Total: ₹{order.total_amount}. Please review and accept.',
+            message=f'You have received a new order #{order.order_number} (ID: {order.id}) from {order.customer.name or order.customer.username}. Total: ₹{order.total_amount}. Please review and accept.',
             status='Unread'
         )
         return notification
@@ -117,7 +117,7 @@ class OrderNotificationService:
         notification = Notification.objects.create(
             user=order.customer,
             subject=f'Order #{order.order_number} Not Accepted',
-            message=f'Unfortunately, the chef could not accept your order. {f"Reason: {reason}" if reason else ""}',
+            message=f'Unfortunately, the chef could not accept your order #{order.order_number} (ID: {order.id}). {f"Reason: {reason}" if reason else ""}',
             status='Unread'
         )
         return notification
@@ -151,7 +151,7 @@ class OrderNotificationService:
             delivery_notification = Notification.objects.create(
                 user=order.delivery_partner,
                 subject=f'Order #{order.order_number} Ready for Pickup',
-                message=f'Order is ready for pickup from {order.chef.name or order.chef.username}.',
+                message=f'Order #{order.order_number} (ID: {order.id}) is ready for pickup from {order.chef.name or order.chef.username}. Click to view details.',
                 status='Unread'
             )
             notifications.append(delivery_notification)
@@ -187,7 +187,7 @@ class OrderNotificationService:
             chef_notification = Notification.objects.create(
                 user=order.chef,
                 subject=f'Order #{order.order_number} Delivered Successfully',
-                message=f'Your order to {order.customer.name or order.customer.username} has been delivered.',
+                message=f'Your order #{order.order_number} (ID: {order.id}) to {order.customer.name or order.customer.username} has been delivered. Great job!',
                 status='Unread'
             )
             notifications.append(chef_notification)
@@ -204,7 +204,7 @@ class OrderNotificationService:
             chef_notification = Notification.objects.create(
                 user=order.chef,
                 subject=f'Order #{order.order_number} Cancelled by Customer',
-                message=f'Order from {order.customer.name or order.customer.username} has been cancelled. {f"Reason: {reason}" if reason else ""}',
+                message=f'Order #{order.order_number} (ID: {order.id}) from {order.customer.name or order.customer.username} has been cancelled. {f"Reason: {reason}" if reason else ""}',
                 status='Unread'
             )
             notifications.append(chef_notification)
@@ -224,7 +224,7 @@ class OrderNotificationService:
             delivery_notification = Notification.objects.create(
                 user=order.delivery_partner,
                 subject=f'Order #{order.order_number} Cancelled',
-                message=f'Order has been cancelled and is no longer available for delivery.',
+                message=f'Order #{order.order_number} (ID: {order.id}) has been cancelled and is no longer available for delivery.',
                 status='Unread'
             )
             notifications.append(delivery_notification)

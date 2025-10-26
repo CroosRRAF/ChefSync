@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, Star, Clock, MapPin, ShoppingCart, Heart, ChefHat, Target, SlidersHorizontal, X, ExternalLink, Minus, Plus, Eye, Sun, Moon, Truck } from 'lucide-react';
+import { Search, Filter, Star, Clock, MapPin, ShoppingCart, Heart, ChefHat, Target, SlidersHorizontal, X, ExternalLink, Minus, Plus, Eye, Sun, Moon, Truck, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import FilterSidebar from './FilterSidebar';
 import { toast } from 'sonner';
 import LocationSelector from '@/components/location/LocationSelector';
 import DatabaseCartButton from '@/components/cart/DatabaseCartButton';
+import FoodInfoPopup from './FoodInfoPopup';
 
 interface EnhancedMenuPageProps {
   className?: string;
@@ -36,8 +37,12 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
   const { addItem } = useDatabaseCart();
 
   // Handle chef profile navigation
-  const handleChefProfileClick = (cookId: number) => {
-    navigate(`/chef-profile/${cookId}`);
+  const handleChefProfileClick = (food: MenuFood, userCookId?: number) => {
+    // Use chef_profile_id if available, otherwise fall back to user ID
+    const profileId = food.chef_profile_id || userCookId || food.chef;
+    if (profileId) {
+      navigate(`/chef-profile/${profileId}`);
+    }
   };
   
   // State management
@@ -67,6 +72,9 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
   // Modal interaction states
   const [selectedPriceId, setSelectedPriceId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
+  // AI Food Info popup state
+  const [showAIFoodInfo, setShowAIFoodInfo] = useState(false);
+  const [aiFoodForInfo, setAIFoodForInfo] = useState<MenuFood | null>(null);
 
   useEffect(() => {
     // Reset selection when opening a new food detail
@@ -122,7 +130,6 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
       await loadFoods();
     } catch (error) {
       console.error('Error loading initial data:', error);
-      toast.error('Failed to load menu data');
     } finally {
       setLoading(false);
     }
@@ -143,18 +150,29 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
         page_size: 20,
       };
 
-      // Add location if available
+      // Add location and sort by distance if available
       if (userLocation) {
         menuFilters.user_lat = userLocation.latitude;
         menuFilters.user_lng = userLocation.longitude;
+        menuFilters.sort_by = 'distance'; // Sort food cards by distance from selected address
       }
 
       const response = await enhancedMenuService.getMenuFoods(menuFilters);
-      setFoods(response.results);
+      
+      // Sort foods by distance if user location is available (closest first)
+      let sortedFoods = response.results;
+      if (userLocation && response.results.length > 0) {
+        sortedFoods = [...response.results].sort((a, b) => {
+          const distanceA = a.distance_km ?? Infinity;
+          const distanceB = b.distance_km ?? Infinity;
+          return distanceA - distanceB; // Ascending order (closest first)
+        });
+      }
+      
+      setFoods(sortedFoods);
       setTotalPages(response.num_pages);
     } catch (error) {
       console.error('Error loading foods:', error);
-      toast.error('Failed to load menu items');
     } finally {
       if (isFilterChange) {
         setIsFiltering(false);
@@ -176,7 +194,6 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
       longitude: location.lng,
       address: location.address
     });
-    toast.success('Location updated! Delivery fees recalculated.');
   };
 
   const handleSearch = useCallback((query: string) => {
@@ -198,22 +215,25 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
     setShowFoodDetail(true);
   };
 
+  const handleAIInfoClick = (food: MenuFood, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAIFoodForInfo(food);
+    setShowAIFoodInfo(true);
+  };
+
   const handleAddToCart = () => {
     // Check if user is authenticated
     if (!isAuthenticated) {
-      toast.error('Please login to add items to cart');
       navigate('/auth/login');
       return;
     }
 
     if (!selectedFood || !selectedPriceId) {
-      toast.error('Please select a cook and size');
       return;
     }
 
     const selectedPrice = selectedFood.prices.find(p => p.price_id === selectedPriceId);
     if (!selectedPrice) {
-      toast.error('Selected option not found');
       return;
     }
 
@@ -228,7 +248,6 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
     // Add to cart using the cart context
     addItem(selectedPrice.price_id, 1, '');
 
-    toast.success(`Added ${quantity} × ${selectedFood.name} (${selectedPrice.size}) to cart!`);
     setShowFoodDetail(false);
     setSelectedPriceId(null);
     setQuantity(1);
@@ -248,10 +267,8 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
       const newSet = new Set(prev);
       if (newSet.has(foodId)) {
         newSet.delete(foodId);
-        toast.success('Removed from favorites');
       } else {
         newSet.add(foodId);
-        toast.success('Added to favorites');
       }
       return newSet;
     });
@@ -439,9 +456,17 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
             </div>
           </div>
 
-          {/* Active Filters Display */}
-          {Object.keys(filters).length > 0 && (
+          {/* Active Filters Display & Sort Indicator */}
+          {(Object.keys(filters).length > 0 || userLocation) && (
             <div className="flex flex-wrap gap-1 sm:gap-2 mt-2 sm:mt-3 px-1">
+              {/* Distance Sort Indicator */}
+              {userLocation && (
+                <Badge className="flex items-center gap-1 text-xs sm:text-sm px-2 py-1 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-300 dark:border-orange-700">
+                  <Target className="h-3 w-3" />
+                  <span>Sorted by Distance</span>
+                </Badge>
+              )}
+              
               {filters.cuisines?.map(id => {
                 const cuisine = filterOptions?.cuisines.find(c => c.id === id);
                 return cuisine ? (
@@ -566,16 +591,28 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                       loading="lazy"
                     />
                     
-                    {/* Favorite Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(food.food_id);
-                      }}
-                      className="absolute top-2 right-2 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
-                    >
-                      <Heart className={`h-4 w-4 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
-                    </button>
+                    {/* Action Buttons - Top Right */}
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      {/* AI Info Button */}
+                      <button
+                        onClick={(e) => handleAIInfoClick(food, e)}
+                        className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 backdrop-blur-sm rounded-full hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg group"
+                        title="View AI Food Insights"
+                      >
+                        <Sparkles className="h-4 w-4 text-white group-hover:scale-110 transition-transform" />
+                      </button>
+                      
+                      {/* Favorite Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(food.food_id);
+                        }}
+                        className="p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
+                      >
+                        <Heart className={`h-4 w-4 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
+                      </button>
+                    </div>
 
                     {/* Badges */}
                     <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -628,6 +665,13 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                           )}
                         </div>
                       )}
+                      {/* Display distance when user has selected an address */}
+                      {userLocation && food.distance_km != null && typeof food.distance_km === 'number' && (
+                        <div className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 font-medium">
+                          <MapPin className="h-3 w-3 flex-shrink-0" />
+                          <span>{food.distance_km.toFixed(1)} km away</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Price and Add Button */}
@@ -661,7 +705,6 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                           className="border-orange-500 text-orange-600 hover:bg-orange-50 text-xs"
                           onClick={(e) => {
                             e.stopPropagation();
-                            toast.error('Please login to add items to cart');
                             navigate('/auth/login');
                           }}
                         >
@@ -968,7 +1011,7 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
                               <div className="flex items-center justify-between mb-6">
                                 <div 
                                   className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={() => handleChefProfileClick(cookId)}
+                                  onClick={() => handleChefProfileClick(selectedFood, cookId)}
                                 >
                                   {/* Cook Avatar */}
                                   <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 hover:bg-orange-600 transition-colors">
@@ -1171,6 +1214,20 @@ const EnhancedMenuPage: React.FC<EnhancedMenuPageProps> = ({ className = '' }) =
 
       {/* Floating Cart Button */}
       <DatabaseCartButton />
+
+      {/* AI Food Info Popup */}
+      {aiFoodForInfo && (
+        <FoodInfoPopup
+          isOpen={showAIFoodInfo}
+          onClose={() => {
+            setShowAIFoodInfo(false);
+            setAIFoodForInfo(null);
+          }}
+          foodName={aiFoodForInfo.name}
+          foodDescription={aiFoodForInfo.description}
+          foodImage={aiFoodForInfo.optimized_image_url || aiFoodForInfo.primary_image}
+        />
+      )}
     </div>
   );
 };

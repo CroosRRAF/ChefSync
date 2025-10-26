@@ -23,7 +23,7 @@ import {
   getAvailableOrders,
   optimizeDeliveryRoute,
   type DeliveryLog,
-} from "@/services/deliveryService";
+} from "@/services/service";
 import {
   Calendar,
   Clock,
@@ -530,5 +530,3 @@ const DeliverySchedule: React.FC = () => {
 };
 
 export default DeliverySchedule;
-
-

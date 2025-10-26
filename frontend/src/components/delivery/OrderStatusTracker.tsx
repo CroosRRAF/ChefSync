@@ -22,7 +22,7 @@ import {
   MessageSquare,
   Camera,
 } from "lucide-react";
-import { updateOrderStatus } from "@/services/deliveryService";
+import { updateOrderStatus } from "@/services/service";
 import type { Order } from "../../types/orderType";
 
 interface OrderStatusTrackerProps {

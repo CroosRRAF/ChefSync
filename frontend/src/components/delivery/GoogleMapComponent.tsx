@@ -308,6 +308,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
           streetViewControl: true,
           mapTypeControl: true,
           fullscreenControl: true,
+          mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID,
         }}
       >
         {/* Current Location Marker */}
