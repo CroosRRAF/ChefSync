@@ -800,10 +800,10 @@ const DeliveryDashboard: React.FC = () => {
                                 border: "1px solid rgba(156, 39, 176, 0.2)",
                               }}
                             >
-                              <DollarSign
+                              {/* <DollarSign
                                 className="h-4 w-4"
                                 style={{ color: "#9C27B0" }}
-                              />
+                              /> */}
                               <span
                                 className="font-semibold"
                                 style={{ color: "#9C27B0" }}

@@ -1,6 +1,7 @@
 """
 Bulk Menu ViewSets for large orders/catering
 """
+import json
 import logging
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -148,48 +149,91 @@ class BulkMenuViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['put'])
     def update_with_items(self, request, pk=None):
         """Update bulk menu along with its items"""
-        bulk_menu = self.get_object()
-        
-        # Only chef who created it can update
-        if bulk_menu.chef != request.user:
-            return Response(
-                {'error': 'You can only update your own menus'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Update bulk menu fields
-        menu_data = request.data.get('menu', {})
-        for field in ['menu_name', 'description', 'base_price_per_person', 'min_persons', 'max_persons', 'advance_notice_hours']:
-            if field in menu_data:
-                setattr(bulk_menu, field, menu_data[field])
-        bulk_menu.save()
-        
-        # Update items if provided
-        items_data = request.data.get('items', [])
-        if items_data:
-            # Delete existing items not in the update
-            existing_item_ids = [item.get('id') for item in items_data if item.get('id')]
-            bulk_menu.items.exclude(id__in=existing_item_ids).delete()
+        try:
+            bulk_menu = self.get_object()
             
-            # Update or create items
-            for item_data in items_data:
-                item_id = item_data.get('id')
-                if item_id:
-                    # Update existing item
+            # Only chef who created it can update
+            if bulk_menu.chef != request.user:
+                return Response(
+                    {'error': 'You can only update your own menus'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Handle different data formats (JSON vs FormData)
+            logger.info(f"Request content type: {request.content_type}")
+            logger.info(f"Request data keys: {list(request.data.keys()) if hasattr(request.data, 'keys') else 'No keys'}")
+            
+            if hasattr(request.data, 'get'):
+                # Try to get menu data
+                menu_data = request.data.get('menu', {})
+                logger.info(f"Raw menu_data type: {type(menu_data)}, value: {menu_data}")
+                
+                # If menu_data is a string (from FormData), parse it as JSON
+                if isinstance(menu_data, str):
                     try:
-                        item = BulkMenuItem.objects.get(id=item_id, bulk_menu=bulk_menu)
-                        for field, value in item_data.items():
-                            if field != 'id' and field != 'bulk_menu':
-                                setattr(item, field, value)
-                        item.save()
-                    except BulkMenuItem.DoesNotExist:
-                        pass
-                else:
-                    # Create new item
-                    BulkMenuItem.objects.create(bulk_menu=bulk_menu, **{k: v for k, v in item_data.items() if k != 'id' and k != 'bulk_menu'})
-        
-        serializer = self.get_serializer(bulk_menu)
-        return Response(serializer.data)
+                        menu_data = json.loads(menu_data)
+                        logger.info(f"Parsed menu_data: {menu_data}")
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse menu JSON: {menu_data}")
+                        menu_data = {}
+                
+                # Get items data
+                items_data = request.data.get('items', [])
+                logger.info(f"Raw items_data type: {type(items_data)}, length: {len(items_data) if hasattr(items_data, '__len__') else 'No length'}")
+                
+                # If items_data is a string (from FormData), parse it as JSON
+                if isinstance(items_data, str):
+                    try:
+                        items_data = json.loads(items_data)
+                        logger.info(f"Parsed items_data: {len(items_data)} items")
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse items JSON: {items_data}")
+                        items_data = []
+            else:
+                logger.error("Invalid request data format")
+                return Response(
+                    {'error': 'Invalid request data format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Update bulk menu fields
+            for field in ['menu_name', 'description', 'base_price_per_person', 'min_persons', 'max_persons', 'advance_notice_hours']:
+                if field in menu_data:
+                    setattr(bulk_menu, field, menu_data[field])
+            bulk_menu.save()
+            
+            # Update items if provided
+            if items_data:
+                # Delete existing items not in the update
+                existing_item_ids = [item.get('id') for item in items_data if item.get('id')]
+                bulk_menu.items.exclude(id__in=existing_item_ids).delete()
+                
+                # Update or create items
+                for item_data in items_data:
+                    item_id = item_data.get('id')
+                    if item_id:
+                        # Update existing item
+                        try:
+                            item = BulkMenuItem.objects.get(id=item_id, bulk_menu=bulk_menu)
+                            for field, value in item_data.items():
+                                if field != 'id' and field != 'bulk_menu':
+                                    setattr(item, field, value)
+                            item.save()
+                        except BulkMenuItem.DoesNotExist:
+                            pass
+                    else:
+                        # Create new item
+                        BulkMenuItem.objects.create(bulk_menu=bulk_menu, **{k: v for k, v in item_data.items() if k != 'id' and k != 'bulk_menu'})
+            
+            serializer = self.get_serializer(bulk_menu)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            logger.error(f"Error in update_with_items: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Internal server error: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):

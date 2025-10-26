@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Switch } from '@/components/ui/switch';
 import { Plus, Edit, Trash2, DollarSign, Users, Clock, CheckCircle, XCircle, AlertCircle, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { safeJsonParse } from '@/utils/responseUtils';
 
 // Types
 interface BulkMenu {
@@ -87,6 +88,64 @@ const BulkMenuManagement: React.FC = () => {
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
+  // Helper function to safely parse JSON responses
+  const safeJsonParse = async (response: Response) => {
+    let responseText = '';
+    try {
+      responseText = await response.text();
+      if (!responseText.trim()) {
+        console.error(`Empty response from ${response.url} (${response.status})`);
+        throw new Error('Empty response');
+      }
+      return JSON.parse(responseText);
+    } catch (error) {
+      console.error('JSON parsing error:', error);
+      console.error(`URL: ${response.url}`);
+      console.error(`Status: ${response.status} ${response.statusText}`);
+      console.error(`Content-Type: ${response.headers.get('content-type')}`);
+      
+      // Log first 500 characters of response for debugging
+      if (error instanceof SyntaxError && responseText) {
+        console.error('Response was not valid JSON - likely HTML error page or plain text');
+        console.error('Response preview:', responseText.substring(0, 500));
+      }
+      
+      throw new Error(`Invalid JSON response from server (${response.status})`);
+    }
+  };
+
+  // Helper function to handle update errors
+  const handleUpdateError = async (response: Response) => {
+    try {
+      const errorData = await safeJsonParse(response);
+      console.error('Update error response:', errorData);
+      
+      if (errorData.items && Array.isArray(errorData.items)) {
+        errorData.items.forEach((error: string) => {
+          toast.error(`Validation error: ${error}`);
+        });
+      } else if (typeof errorData === 'object') {
+        const errorMessages: string[] = [];
+        for (const [field, errors] of Object.entries(errorData)) {
+          if (Array.isArray(errors)) {
+            errorMessages.push(`${field}: ${errors.join(', ')}`);
+          } else {
+            errorMessages.push(`${field}: ${errors}`);
+          }
+        }
+        toast.error(`Validation errors: ${errorMessages.join('; ')}`);
+      } else {
+        toast.error(errorData.message || 'Failed to update bulk menu');
+      }
+    } catch (parseError) {
+      console.error('Error parsing update error response:', parseError);
+      console.error(`Response status: ${response.status} ${response.statusText}`);
+      console.error(`Response URL: ${response.url}`);
+      
+      toast.error(`Server error (${response.status}): Unable to update bulk menu. Please check the server logs and try again.`);
+    }
+  };
+
   // Form state for creating/editing menus
   const [menuForm, setMenuForm] = useState({
     meal_type: '',
@@ -135,13 +194,14 @@ const BulkMenuManagement: React.FC = () => {
         },
       });
       if (response.ok) {
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         setBulkMenus(data.results || data);
       } else {
-        toast.error('Failed to fetch bulk menus');
+        toast.error(`Failed to fetch bulk menus (${response.status})`);
       }
     } catch (error) {
-      toast.error('Error fetching bulk menus');
+      console.error('Error fetching bulk menus:', error);
+      toast.error('Error fetching bulk menus. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -155,8 +215,10 @@ const BulkMenuManagement: React.FC = () => {
         },
       });
       if (response.ok) {
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         setMealTypes(data);
+      } else {
+        console.error(`Failed to fetch meal types (${response.status})`);
       }
     } catch (error) {
       console.error('Error fetching meal types:', error);
@@ -171,8 +233,10 @@ const BulkMenuManagement: React.FC = () => {
         },
       });
       if (response.ok) {
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         setDashboardStats(data);
+      } else {
+        console.error(`Failed to fetch dashboard stats (${response.status})`);
       }
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -240,22 +304,27 @@ const BulkMenuManagement: React.FC = () => {
         fetchDashboardStats();
       } else {
         console.error('Response status:', response.status);
-        const errorData = await response.json();
-        console.error('Error details:', errorData);
-        
-        // Display specific validation errors
-        if (errorData && typeof errorData === 'object') {
-          const errorMessages = [];
-          for (const [field, errors] of Object.entries(errorData)) {
-            if (Array.isArray(errors)) {
-              errorMessages.push(`${field}: ${errors.join(', ')}`);
-            } else {
-              errorMessages.push(`${field}: ${errors}`);
+        try {
+          const errorData = await safeJsonParse(response);
+          console.error('Error details:', errorData);
+          
+          // Display specific validation errors
+          if (errorData && typeof errorData === 'object') {
+            const errorMessages = [];
+            for (const [field, errors] of Object.entries(errorData)) {
+              if (Array.isArray(errors)) {
+                errorMessages.push(`${field}: ${errors.join(', ')}`);
+              } else {
+                errorMessages.push(`${field}: ${errors}`);
+              }
             }
+            toast.error(`Validation errors: ${errorMessages.join('; ')}`);
+          } else {
+            toast.error(errorData.message || 'Failed to create bulk menu');
           }
-          toast.error(`Validation errors: ${errorMessages.join('; ')}`);
-        } else {
-          toast.error(errorData.message || 'Failed to create bulk menu');
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          toast.error(`Server error (${response.status}). Please try again.`);
         }
       }
     } catch (error) {
@@ -309,7 +378,7 @@ const BulkMenuManagement: React.FC = () => {
       });
 
       if (response.ok) {
-        const itemsData = await response.json();
+        const itemsData = await safeJsonParse(response);
         setMenuItems(itemsData.results || itemsData);
       } else {
         toast.error('Failed to load menu items');
@@ -327,59 +396,73 @@ const BulkMenuManagement: React.FC = () => {
     if (!editingMenu) return;
 
     try {
-      const formData = new FormData();
-      
+      // If there's an image to upload, use FormData
+      if (selectedImage) {
+        const formData = new FormData();
+        
+        // Create menu data object
+        const menuData: any = {};
+        Object.entries(menuForm).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) {
+            menuData[key] = value;
+          }
+        });
+        
+        // Add menu and items data as JSON strings
+        formData.append('menu', JSON.stringify(menuData));
+        formData.append('items', JSON.stringify(menuItems));
+        formData.append('image', selectedImage);
+
+        const response = await fetch(`/api/food/bulk-menus/${editingMenu.id}/update_with_items/`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          },
+          body: formData,
+        });
+
+        if (response.ok) {
+          toast.success('Bulk menu updated successfully!');
+          setIsEditDialogOpen(false);
+          resetForm();
+          fetchBulkMenus();
+          return;
+        } else {
+          await handleUpdateError(response);
+          return;
+        }
+      }
+
+      // If no image, use JSON
+      const requestData = {
+        menu: {} as any,
+        items: menuItems
+      };
+
       // Add menu fields
       Object.entries(menuForm).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
-          formData.append(key, value.toString());
+          requestData.menu[key] = value;
         }
       });
-
-      // Add image if selected
-      if (selectedImage) {
-        formData.append('image', selectedImage);
-      }
-
-      // Add menu items
-      if (menuItems.length > 0) {
-        formData.append('items', JSON.stringify(menuItems));
-      }
 
       const response = await fetch(`/api/food/bulk-menus/${editingMenu.id}/update_with_items/`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
         },
-        body: formData,
+        body: JSON.stringify(requestData),
       });
 
+      // Handle response for JSON request
       if (response.ok) {
         toast.success('Bulk menu updated successfully!');
         setIsEditDialogOpen(false);
         resetForm();
         fetchBulkMenus();
       } else {
-        const errorData = await response.json();
-        console.error('Update error response:', errorData);
-        
-        if (errorData.items && Array.isArray(errorData.items)) {
-          errorData.items.forEach((error: string) => {
-            toast.error(`Validation error: ${error}`);
-          });
-        } else if (typeof errorData === 'object') {
-          const errorMessages: string[] = [];
-          for (const [field, errors] of Object.entries(errorData)) {
-            if (Array.isArray(errors)) {
-              errorMessages.push(`${field}: ${errors.join(', ')}`);
-            } else {
-              errorMessages.push(`${field}: ${errors}`);
-            }
-          }
-          toast.error(`Validation errors: ${errorMessages.join('; ')}`);
-        } else {
-          toast.error(errorData.message || 'Failed to update bulk menu');
-        }
+        await handleUpdateError(response);
       }
     } catch (error) {
       console.error('Update bulk menu error:', error);
