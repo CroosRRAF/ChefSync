@@ -1,4 +1,5 @@
 annotated-types==0.7.0
+APScheduler==3.11.0
 asgiref==3.9.1
 cachetools==5.5.2
 certifi==2025.8.3
@@ -9,6 +10,7 @@ colorama==0.4.6
 cryptography==43.0.3
 Django==5.2.5
 django-allauth==65.11.1
+django-apscheduler==0.7.0
 django-cloudinary-storage==0.3.0
 django-cors-headers==4.7.0
 django-ratelimit==4.1.0
@@ -23,12 +25,16 @@ google-auth-httplib2==0.2.0
 google-auth-oauthlib==1.2.2
 google-generativeai==0.8.3
 googleapis-common-protos==1.70.0
+googlemaps==4.10.0
 grpcio==1.75.1
 grpcio-status==1.71.2
 httplib2==0.31.0
 idna==3.10
+joblib==1.5.2
 mysqlclient==2.2.7
+numpy==1.26.4
 oauthlib==3.3.1
+pandas==2.2.3
 pdf2image==1.17.0
 pillow==10.4.0
 proto-plus==1.26.1
@@ -42,36 +48,24 @@ pydantic_core==2.33.2
 PyJWT==2.10.1
 pyparsing==3.2.5
 PyPDF2==3.0.1
-python-dateutil==2.9.0.post0   # ✅ newer, works with pandas
+python-dateutil==2.9.0.post0
 python-decouple==3.8
+pytz==2025.2
+reportlab==4.4.4
 requests==2.32.3
 requests-oauthlib==2.0.0
 rsa==4.9.1
+scikit-learn==1.5.2
+scipy==1.16.2
 six==1.17.0
 sqlparse==0.5.3
+threadpoolctl==3.6.0
 tqdm==4.67.1
 typing-inspection==0.4.1
 typing_extensions==4.15.0
 tzdata==2025.2
+tzlocal==5.3.1
 ua-parser==1.0.1
 ua-parser-builtins==0.18.0.post1
 uritemplate==4.2.0
 urllib3==2.2.3
-
-# AI/ML Dependencies (Phase 3)
-pandas==2.2.3
-numpy==1.26.4
-scikit-learn==1.5.2
-
-# PDF processing dependencies
-reportlab==4.4.4  # PDF generation for invoices
-# Note: Poppler utilities must be installed separately on Windows
-# Download from: https://github.com/oschwartz10612/poppler-windows/releases/
-# Extract to C:\poppler\ and add C:\poppler\bin to PATH
-
-# Delivery Fee Calculation Dependencies
-googlemaps==4.10.0  # Google Maps API for distance calculation
-pytz==2025.2  # Timezone support for time-based surcharges
-
-# Background Task Scheduling
-django-apscheduler==0.7.0  # Automatic scheduling for order auto-cancellation
