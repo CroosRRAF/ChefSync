@@ -1963,8 +1963,8 @@ const UserManagementHub: React.FC = () => {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() =>
-                                window.open(doc.file_url, "_blank")
+                              onClick={() => 
+                                window.open(doc.file_url, "_blank", "noopener,noreferrer")
                               }
                             >
                               <Eye className="h-4 w-4 mr-2" />
@@ -1977,7 +1977,11 @@ const UserManagementHub: React.FC = () => {
                                 const link = document.createElement("a");
                                 link.href = doc.file_url;
                                 link.download = doc.file_name;
+                                link.target = "_blank";
+                                link.rel = "noopener noreferrer";
+                                document.body.appendChild(link);
                                 link.click();
+                                document.body.removeChild(link);
                               }}
                             >
                               <Download className="h-4 w-4 mr-2" />
